@@ -1,14 +1,11 @@
-# 🗺️ Mapty — Map Your Workouts
+# 🗺️ Mapty - Map Your Workouts
 
 > A workout tracking app built with **vanilla JavaScript** and **Leaflet.js** — log your runs and cycling sessions directly on an interactive map, plan routes from A to B, and keep your training history saved in the browser.
-
-![Mapty App](https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/logo.png)
-
 ---
 
 ## 🚀 Live Demo
 
-👉 **[mapty.github.io](https://YOUR_USERNAME.github.io/YOUR_REPO)**
+👉 **[mapty.github.io](https://leszekm12.github.io/Mapty-App/)**
 
 ---
 
@@ -154,7 +151,7 @@ No server needed — everything runs in the browser.
 ## 📝 Credits
 
 Original project concept by [Jonas Schmedtmann](https://twitter.com/jonasschmedtman) — used for learning purposes.  
-Extended with routing, mobile support, and delete functionality.
+**Extended with** `routing`, `mobile support`, and `delete functionality`.
 
 ---
 
