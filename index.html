@@ -21,6 +21,14 @@
   <div class="route-controls">
     <button class="btn-route" id="btnRoute">🗺️ Wyznacz trasę A → B</button>
     <div class="route-info hidden" id="routeInfo">
+
+      <!-- Tryb aktywności -->
+      <div class="route-mode-selector">
+        <button class="route-mode-btn route-mode-btn--active" data-mode="running" title="Bieg">🏃‍♂️</button>
+        <button class="route-mode-btn" data-mode="cycling" title="Rower">🚴‍♀️</button>
+        <button class="route-mode-btn" data-mode="walking" title="Marsz">🚶</button>
+      </div>
+
       <div class="route-info__steps">
         <div class="route-info__step">
           <span class="route-info__badge route-info__badge--a">A</span>
@@ -31,6 +39,16 @@
           <span id="stepBText">Kliknij punkt końcowy na mapie</span>
         </div>
       </div>
+      <!-- Loading indicator -->
+      <div class="route-loading hidden" id="routeLoading">
+        <div class="route-loading__spinner">
+          <div class="route-loading__dot"></div>
+          <div class="route-loading__dot"></div>
+          <div class="route-loading__dot"></div>
+        </div>
+        <span class="route-loading__text">Wyznaczam trasę...</span>
+      </div>
+
       <div class="route-result hidden" id="routeResult">
         <div class="route-result__item">
           <span class="route-result__icon">📏</span>
@@ -72,7 +90,7 @@
         <label class="form__label">Elev Gain</label>
         <input class="form__input form__input--elevation" placeholder="meters" />
       </div>
-      <button class="form__btn">OK</button>
+      <button class="form__btn">✓ Add Workout</button>
     </form>
   </ul>
 </div>

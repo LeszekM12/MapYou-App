@@ -73,6 +73,7 @@ const stepBText = document.getElementById('stepBText');
 const routeResult = document.getElementById('routeResult');
 const routeDist = document.getElementById('routeDist');
 const routeTime = document.getElementById('routeTime');
+const routeLoading = document.getElementById('routeLoading');
 
 class App {
   #map;
@@ -88,6 +89,15 @@ class App {
   #routingControl = null;
   #routeMarkerA = null;
   #routeMarkerB = null;
+  #routeActivityMode = 'running'; // 'running' | 'cycling' | 'walking'
+  #markers = new Map(); // id -> L.marker (żeby móc usuwać)
+
+  // Średnie prędkości w km/h do przeliczania czasu
+  #activitySpeeds = {
+    running: 10,   // ~6 min/km
+    cycling: 20,   // typowy rower rekreacyjny
+    walking: 5,    // ~12 min/km
+  };
 
   constructor() {
     this._getPosition();
@@ -100,6 +110,11 @@ class App {
     // Route button listeners
     btnRoute.addEventListener('click', this._startRouteMode.bind(this));
     btnCancelRoute.addEventListener('click', this._cancelRoute.bind(this));
+
+    // Activity mode buttons
+    document.querySelectorAll('.route-mode-btn').forEach(btn => {
+      btn.addEventListener('click', this._setActivityMode.bind(this));
+    });
   }
 
   _getPosition() {
@@ -191,7 +206,7 @@ class App {
   }
 
   _renderWorkoutMarker(workout) {
-    L.marker(workout.coords)
+    const marker = L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(
         L.popup({
@@ -204,6 +219,8 @@ class App {
       )
       .setPopupContent(`${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`)
       .openPopup();
+
+    this.#markers.set(workout.id, marker);
   }
 
   _renderWorkout(workout) {
@@ -250,14 +267,31 @@ class App {
         </div>
       </li>`;
 
+    // Dodaj przycisk usuwania
+    html = html.replace('</li>', `
+        <button class="workout__delete" data-id="${workout.id}" title="Delete workout">✕</button>
+      </li>`);
+
     form.insertAdjacentHTML('afterend', html);
   }
 
   _moveToPopup(e) {
     if (!this.#map) return;
+
+    // Delete button — musi być sprawdzony PRZED closest('.workout')
+    const deleteBtn = e.target.closest('.workout__delete');
+    if (deleteBtn) {
+      e.stopPropagation();
+      this._deleteWorkout(deleteBtn.dataset.id);
+      return;
+    }
+
     const workoutEl = e.target.closest('.workout');
     if (!workoutEl) return;
+
     const workout = this.#workouts.find(work => work.id === workoutEl.dataset.id);
+    if (!workout) return;
+
     this.#map.setView(workout.coords, this.#mapZoomLevel, {
       animate: true,
       pan: { duration: 1 },
@@ -282,7 +316,51 @@ class App {
     location.reload();
   }
 
+  _deleteWorkout(id) {
+    // Usuń marker z mapy
+    const marker = this.#markers.get(id);
+    if (marker) {
+      this.#map.removeLayer(marker);
+      this.#markers.delete(id);
+    }
+
+    // Usuń z tablicy
+    this.#workouts = this.#workouts.filter(w => w.id !== id);
+
+    // Animacja + usuń z DOM
+    const el = document.querySelector(`.workout[data-id="${id}"]`);
+    if (el) {
+      el.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+      el.style.transform = 'translateX(-110%)';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }
+
+    // Zapisz do localStorage
+    this._setLocalStorage();
+  }
+
   // ─── ROUTING FEATURE ────────────────────────────────────────────
+
+  _setActivityMode(e) {
+    const btn = e.currentTarget;
+    const mode = btn.dataset.mode;
+    this.#routeActivityMode = mode;
+
+    // Aktualizuj aktywny przycisk
+    document.querySelectorAll('.route-mode-btn').forEach(b => b.classList.remove('route-mode-btn--active'));
+    btn.classList.add('route-mode-btn--active');
+
+    // Jeśli trasa już wyznaczona — przelicz czas na nowo
+    if (this.#routeStep === 3 && !routeResult.classList.contains('hidden')) {
+      const distKm = parseFloat(routeDist.textContent);
+      if (!isNaN(distKm)) {
+        const speed = this.#activitySpeeds[mode];
+        const timeMin = Math.round((distKm / speed) * 60);
+        routeTime.textContent = timeMin;
+      }
+    }
+  }
 
   _startRouteMode() {
     // Hide workout form if open
@@ -355,6 +433,10 @@ class App {
   }
 
   _drawRoute() {
+    // Pokaż loading, ukryj poprzedni wynik
+    routeLoading.classList.remove('hidden');
+    routeResult.classList.add('hidden');
+
     // Remove old routing control if exists
     if (this.#routingControl) {
       this.#map.removeControl(this.#routingControl);
@@ -377,15 +459,20 @@ class App {
       createMarker: () => null, // używamy własnych markerów A/B
     })
       .on('routesfound', e => {
+        routeLoading.classList.add('hidden');
         const route = e.routes[0].summary;
         const distKm = (route.totalDistance / 1000).toFixed(2);
-        const timeMin = Math.round(route.totalTime / 60);
+
+        // Przelicz czas na podstawie wybranej aktywności
+        const speed = this.#activitySpeeds[this.#routeActivityMode];
+        const timeMin = Math.round((parseFloat(distKm) / speed) * 60);
 
         routeDist.textContent = distKm;
         routeTime.textContent = timeMin;
         routeResult.classList.remove('hidden');
       })
       .on('routingerror', () => {
+        routeLoading.classList.add('hidden');
         routeDist.textContent = 'Błąd';
         routeTime.textContent = '—';
         routeResult.classList.remove('hidden');
@@ -409,6 +496,7 @@ class App {
       this.#routingControl = null;
     }
 
+    routeLoading.classList.add('hidden');
     btnRoute.classList.remove('hidden');
     routeInfo.classList.add('hidden');
     routeResult.classList.add('hidden');
@@ -417,3 +505,61 @@ class App {
 }
 
 const app = new App();
+
+// ─── MOBILE PANEL DRAG ───────────────────────────────────────────
+(function initMobilePanel() {
+  const sidebar = document.querySelector('.sidebar');
+  const HANDLE_ZONE = 56; // px od góry sidebara = strefa uchwytu
+
+  let startY = 0;
+  let startHeight = 0;
+  let isDragging = false;
+
+  const isMobile = () => window.innerWidth <= 768;
+
+  // Snap helpers
+  const snapTo = h => {
+    sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
+    sidebar.style.height = h;
+  };
+
+  const collapse = () => snapTo('5.5rem');  // tylko uchwyt
+  const toHalf   = () => snapTo('45vh');    // połowa
+  const toFull   = () => snapTo('85vh');    // pełny
+
+  // Domyślnie zwinięty na mobile
+  if (isMobile()) collapse();
+  window.addEventListener('resize', () => {
+    if (!isMobile()) { sidebar.style.height = ''; sidebar.style.transition = ''; }
+    else collapse();
+  });
+
+  sidebar.addEventListener('touchstart', e => {
+    if (!isMobile()) return;
+    const touch = e.touches[0];
+    const rect = sidebar.getBoundingClientRect();
+    if (touch.clientY - rect.top > HANDLE_ZONE) return; // tylko uchwyt
+    isDragging = true;
+    startY = touch.clientY;
+    startHeight = sidebar.offsetHeight;
+    sidebar.style.transition = 'none';
+  }, { passive: true });
+
+  sidebar.addEventListener('touchmove', e => {
+    if (!isDragging || !isMobile()) return;
+    const touch = e.touches[0];
+    const delta = startY - touch.clientY;
+    const newH = Math.min(Math.max(startHeight + delta, 50), window.innerHeight * 0.88);
+    sidebar.style.height = newH + 'px';
+  }, { passive: true });
+
+  sidebar.addEventListener('touchend', () => {
+    if (!isDragging) return;
+    isDragging = false;
+    const h = sidebar.offsetHeight;
+    const vh = window.innerHeight;
+    if      (h < vh * 0.18) collapse();
+    else if (h < vh * 0.60) toHalf();
+    else                     toFull();
+  });
+})();
