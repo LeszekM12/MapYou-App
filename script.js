@@ -316,6 +316,30 @@ class App {
     location.reload();
   }
 
+  _deleteWorkout(id) {
+    // Usuń marker z mapy
+    const marker = this.#markers.get(id);
+    if (marker) {
+      this.#map.removeLayer(marker);
+      this.#markers.delete(id);
+    }
+
+    // Usuń z tablicy
+    this.#workouts = this.#workouts.filter(w => w.id !== id);
+
+    // Animacja + usuń z DOM
+    const el = document.querySelector(`.workout[data-id="${id}"]`);
+    if (el) {
+      el.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
+      el.style.transform = 'translateX(-110%)';
+      el.style.opacity = '0';
+      setTimeout(() => el.remove(), 300);
+    }
+
+    // Zapisz do localStorage
+    this._setLocalStorage();
+  }
+
   // ─── ROUTING FEATURE ────────────────────────────────────────────
 
   _setActivityMode(e) {
