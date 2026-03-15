@@ -668,3 +668,32 @@ a:visited {
         color: var(--color-light--1);
     }
 }
+
+/* ─── MOBILE SUBMIT BUTTON ─── */
+@media (max-width: 768px) {
+    .form__btn {
+        display: block;
+        grid-column: 1 / -1;
+        width: 100%;
+        padding: 1.1rem;
+        margin-top: 0.4rem;
+        background-color: var(--color-brand--2);
+        color: #fff;
+        border: none;
+        border-radius: 5px;
+        font-family: inherit;
+        font-size: 1.5rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+
+    .form__btn:hover {
+        background-color: #00a85a;
+    }
+
+    /* Formularz wyższy żeby pomieścić przycisk */
+    .form {
+        height: auto;
+    }
+}
