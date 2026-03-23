@@ -18,20 +18,23 @@
 <div class="sidebar">
   <img src="logo.png" alt="Mapty logo" class="logo" />
 
+  <!-- LIVE TRACKING -->
+  <div class="tracking-controls">
+    <button class="btn-track" id="btnTrack">📍 Start tracking</button>
+  </div>
+
   <!-- ROUTE PLANNER -->
   <div class="route-controls">
     <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
 
     <div class="route-info hidden" id="routeInfo">
 
-      <!-- Activity mode selector — determines estimated travel time -->
       <div class="route-mode-selector">
         <button class="route-mode-btn route-mode-btn--active" data-mode="running" title="Running">🏃‍♂️</button>
         <button class="route-mode-btn" data-mode="cycling" title="Cycling">🚴‍♀️</button>
         <button class="route-mode-btn" data-mode="walking" title="Walking">🚶</button>
       </div>
 
-      <!-- Step-by-step instructions -->
       <div class="route-info__steps">
         <div class="route-info__step">
           <span class="route-info__badge route-info__badge--a">A</span>
@@ -43,7 +46,6 @@
         </div>
       </div>
 
-      <!-- Loading indicator shown while OSRM calculates the route -->
       <div class="route-loading hidden" id="routeLoading">
         <div class="route-loading__spinner">
           <div class="route-loading__dot"></div>
@@ -53,7 +55,6 @@
         <span class="route-loading__text">Calculating route...</span>
       </div>
 
-      <!-- Route result: distance + estimated time -->
       <div class="route-result hidden" id="routeResult">
         <div class="route-result__item">
           <span class="route-result__icon">📏</span>
@@ -97,13 +98,11 @@
         <label class="form__label">Elev Gain</label>
         <input class="form__input form__input--elevation" placeholder="meters" />
       </div>
-      <!-- Submit button visible on mobile (no keyboard Enter available) -->
       <button class="form__btn">✓ Add Workout</button>
     </form>
   </ul>
 </div>
 
-<!-- Map rendered by Leaflet -->
 <div id="map"></div>
 </body>
 </html>

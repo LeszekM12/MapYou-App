@@ -7,9 +7,9 @@ class Workout {
   clicks = 0;
 
   constructor(coords, distance, duration) {
-    this.coords = coords;   // [lat, lng]
-    this.distance = distance; // in km
-    this.duration = duration; // in min
+    this.coords = coords;
+    this.distance = distance;
+    this.duration = duration;
   }
 
   _setDescription() {
@@ -35,7 +35,6 @@ class Running extends Workout {
   }
 
   calcPace() {
-    // min/km
     this.pace = this.duration / this.distance;
     return this.pace;
   }
@@ -53,7 +52,6 @@ class Cycling extends Workout {
   }
 
   calcSpeed() {
-    // km/h
     this.speed = this.distance / (this.duration / 60);
     return this.speed;
   }
@@ -62,7 +60,6 @@ class Cycling extends Workout {
 ///////////////////////////////////////
 // APPLICATION ARCHITECTURE
 
-// Form & input DOM elements
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
 const inputType = document.querySelector('.form__input--type');
@@ -71,7 +68,6 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
-// Route planner DOM elements
 const btnRoute = document.getElementById('btnRoute');
 const routeInfo = document.getElementById('routeInfo');
 const btnCancelRoute = document.getElementById('btnCancelRoute');
@@ -81,6 +77,7 @@ const routeResult = document.getElementById('routeResult');
 const routeDist = document.getElementById('routeDist');
 const routeTime = document.getElementById('routeTime');
 const routeLoading = document.getElementById('routeLoading');
+const btnTrack = document.getElementById('btnTrack');
 
 // ─── MAIN APP CLASS ──────────────────────────────────────────────
 class App {
@@ -91,41 +88,39 @@ class App {
 
   // Route planner state
   #routeMode = false;
-  #routeStep = 0; // 0=idle, 1=waiting for point A, 2=waiting for point B, 3=route drawn
+  #routeStep = 0;
   #routePointA = null;
   #routePointB = null;
   #routingControl = null;
   #routeMarkerA = null;
   #routeMarkerB = null;
-  #routeActivityMode = 'running'; // 'running' | 'cycling' | 'walking'
+  #routeActivityMode = 'running';
 
-  // Stores Leaflet marker references by workout id — enables individual deletion
+  // Tracking state
+  #trackingActive = false;
+  #watchId = null;
+  #trackingMarker = null;
+
   #markers = new Map();
 
-  // Average speeds (km/h) used to calculate estimated route time per activity
   #activitySpeeds = {
-    running: 10,  // ~6 min/km
-    cycling: 20,  // recreational pace
-    walking: 5,   // ~12 min/km
+    running: 10,
+    cycling: 20,
+    walking: 5,
   };
 
   constructor() {
-    // Initialise map at user's current position
     this._getPosition();
-
-    // Restore workouts from localStorage
     this._getLocalStorage();
 
-    // Event listeners
     form.addEventListener('submit', this._newWorkout.bind(this));
     inputType.addEventListener('change', this._toggleElevationField);
     containerWorkouts.addEventListener('click', this._moveToPopup.bind(this));
 
-    // Route planner buttons
     btnRoute.addEventListener('click', this._startRouteMode.bind(this));
     btnCancelRoute.addEventListener('click', this._cancelRoute.bind(this));
+    btnTrack.addEventListener('click', this._toggleTracking.bind(this));
 
-    // Activity mode selector buttons (running / cycling / walking)
     document.querySelectorAll('.route-mode-btn').forEach(btn => {
       btn.addEventListener('click', this._setActivityMode.bind(this));
     });
@@ -151,15 +146,79 @@ class App {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.#map);
 
-    // Single unified click handler — delegates to form or route planner
     this.#map.on('click', this._handleMapClick.bind(this));
-
-    // Re-render markers for workouts loaded from localStorage
     this.#workouts.forEach(work => this._renderWorkoutMarker(work));
   }
 
+  // ─── LIVE TRACKING ───────────────────────────────────────────────
+
+  _toggleTracking() {
+    if (this.#trackingActive) {
+      this._stopTracking();
+    } else {
+      this._startTracking();
+    }
+  }
+
+  _startTracking() {
+    if (!navigator.geolocation) return;
+
+    this.#trackingActive = true;
+    btnTrack.textContent = '⏹ Stop tracking';
+    btnTrack.classList.add('tracking--active');
+
+    // Create the pulsing dot marker
+    const dotIcon = L.divIcon({
+      className: '',
+      html: `<div class="tracking-dot">
+               <div class="tracking-dot__pulse"></div>
+               <div class="tracking-dot__core"></div>
+             </div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+
+    this.#watchId = navigator.geolocation.watchPosition(
+      position => {
+        const { latitude: lat, longitude: lng } = position.coords;
+        const latlng = [lat, lng];
+
+        if (!this.#trackingMarker) {
+          // First fix — create marker and fly to position
+          this.#trackingMarker = L.marker(latlng, { icon: dotIcon, zIndexOffset: 1000 })
+            .addTo(this.#map);
+          this.#map.setView(latlng, this.#mapZoomLevel, { animate: true });
+        } else {
+          // Subsequent fixes — move marker and follow
+          this.#trackingMarker.setLatLng(latlng);
+          this.#map.setView(latlng, this.#map.getZoom(), { animate: true, pan: { duration: 0.5 } });
+        }
+      },
+      () => {
+        alert('Could not get your position for tracking.');
+        this._stopTracking();
+      },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+    );
+  }
+
+  _stopTracking() {
+    this.#trackingActive = false;
+    btnTrack.textContent = '📍 Start tracking';
+    btnTrack.classList.remove('tracking--active');
+
+    if (this.#watchId !== null) {
+      navigator.geolocation.clearWatch(this.#watchId);
+      this.#watchId = null;
+    }
+
+    if (this.#trackingMarker) {
+      this.#map.removeLayer(this.#trackingMarker);
+      this.#trackingMarker = null;
+    }
+  }
+
   // ─── MAP CLICK HANDLER ───────────────────────────────────────────
-  // Routes the click to either the workout form or the route planner
   _handleMapClick(mapE) {
     if (this.#routeMode) {
       this._handleRouteClick(mapE);
@@ -173,14 +232,12 @@ class App {
     form.classList.remove('hidden');
     inputDistance.focus();
 
-    // On mobile — auto-expand the sidebar panel so the form is fully visible
     if (window.innerWidth <= 768) {
       const sidebar = document.querySelector('.sidebar');
-      // Wait one frame for the form to render before measuring actual scrollHeight
       requestAnimationFrame(() => {
         sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
         const needed = sidebar.scrollHeight;
-        const minH = window.innerHeight * 0.55; // at least 55vh so form is never clipped
+        const minH = window.innerHeight * 0.55;
         const maxH = window.innerHeight * 0.85;
         sidebar.style.height = Math.min(Math.max(needed, minH), maxH) + 'px';
       });
@@ -188,13 +245,11 @@ class App {
   }
 
   _hideForm() {
-    // Clear all input fields
     inputDistance.value = inputDuration.value = inputCadence.value = inputElevation.value = '';
     form.style.display = 'none';
     form.classList.add('hidden');
     setTimeout(() => (form.style.display = 'grid'), 1000);
 
-    // On mobile — return sidebar to half height after adding a workout
     if (window.innerWidth <= 768) {
       const sidebar = document.querySelector('.sidebar');
       sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
@@ -203,7 +258,6 @@ class App {
   }
 
   _toggleElevationField() {
-    // Swap between cadence (running) and elevation (cycling) input
     inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
     inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
   }
@@ -258,7 +312,6 @@ class App {
       .setPopupContent(`${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`)
       .openPopup();
 
-    // Store reference so the marker can be removed when workout is deleted
     this.#markers.set(workout.id, marker);
   }
 
@@ -307,7 +360,6 @@ class App {
         </div>
       </li>`;
 
-    // Inject delete button before closing </li>
     html = html.replace('</li>', `
         <button class="workout__delete" data-id="${workout.id}" title="Delete workout">✕</button>
       </li>`);
@@ -319,7 +371,6 @@ class App {
   _moveToPopup(e) {
     if (!this.#map) return;
 
-    // Check for delete button FIRST — before closest('.workout') captures the event
     const deleteBtn = e.target.closest('.workout__delete');
     if (deleteBtn) {
       e.stopPropagation();
@@ -327,7 +378,6 @@ class App {
       return;
     }
 
-    // Click on workout card — fly to its map location
     const workoutEl = e.target.closest('.workout');
     if (!workoutEl) return;
 
@@ -342,17 +392,14 @@ class App {
 
   // ─── DELETE WORKOUT ──────────────────────────────────────────────
   _deleteWorkout(id) {
-    // Remove marker from the map
     const marker = this.#markers.get(id);
     if (marker) {
       this.#map.removeLayer(marker);
       this.#markers.delete(id);
     }
 
-    // Remove from workouts array
     this.#workouts = this.#workouts.filter(w => w.id !== id);
 
-    // Animate out then remove from DOM
     const el = document.querySelector(`.workout[data-id="${id}"]`);
     if (el) {
       el.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
@@ -361,7 +408,6 @@ class App {
       setTimeout(() => el.remove(), 300);
     }
 
-    // Persist updated list
     this._setLocalStorage();
   }
 
@@ -384,17 +430,14 @@ class App {
 
   // ─── ROUTE PLANNER ───────────────────────────────────────────────
 
-  // Update active activity mode button and recalculate time if route is already drawn
   _setActivityMode(e) {
     const btn = e.currentTarget;
     const mode = btn.dataset.mode;
     this.#routeActivityMode = mode;
 
-    // Highlight selected button
     document.querySelectorAll('.route-mode-btn').forEach(b => b.classList.remove('route-mode-btn--active'));
     btn.classList.add('route-mode-btn--active');
 
-    // If a route is already shown — recalculate time without re-fetching the route
     if (this.#routeStep === 3 && !routeResult.classList.contains('hidden')) {
       const distKm = parseFloat(routeDist.textContent);
       if (!isNaN(distKm)) {
@@ -405,9 +448,7 @@ class App {
     }
   }
 
-  // Enter route planning mode — next two map clicks set point A and point B
   _startRouteMode() {
-    // Close workout form if it's open
     if (!form.classList.contains('hidden')) this._hideForm();
 
     this.#routeMode = true;
@@ -419,7 +460,6 @@ class App {
     routeInfo.classList.remove('hidden');
     routeResult.classList.add('hidden');
 
-    // Reset step indicators
     stepAText.textContent = 'Click the start point on the map';
     stepBText.textContent = 'Click the end point on the map';
     stepAText.closest('.route-info__step').classList.remove('route-info__step--done');
@@ -432,7 +472,6 @@ class App {
     const { lat, lng } = mapE.latlng;
 
     if (this.#routeStep === 1) {
-      // First click — set starting point A
       this.#routePointA = [lat, lng];
       this.#routeStep = 2;
 
@@ -451,7 +490,6 @@ class App {
       stepBText.textContent = 'Click the end point on the map';
 
     } else if (this.#routeStep === 2) {
-      // Second click — set destination point B and draw route
       this.#routePointB = [lat, lng];
       this.#routeStep = 3;
 
@@ -475,11 +513,9 @@ class App {
   }
 
   _drawRoute() {
-    // Show loading indicator, hide any previous result
     routeLoading.classList.remove('hidden');
     routeResult.classList.add('hidden');
 
-    // Remove previous routing control if one exists
     if (this.#routingControl) {
       this.#map.removeControl(this.#routingControl);
       this.#routingControl = null;
@@ -494,18 +530,17 @@ class App {
       addWaypoints: false,
       draggableWaypoints: false,
       fitSelectedRoutes: true,
-      show: false, // hide default Leaflet Routing Machine panel — we use our own
+      show: false,
       lineOptions: {
         styles: [{ color: '#00c46a', weight: 5, opacity: 0.85 }],
       },
-      createMarker: () => null, // suppress default waypoint markers — we use custom A/B markers
+      createMarker: () => null,
     })
       .on('routesfound', e => {
         routeLoading.classList.add('hidden');
         const route = e.routes[0].summary;
         const distKm = (route.totalDistance / 1000).toFixed(2);
 
-        // Calculate time based on selected activity speed, not the OSRM car estimate
         const speed = this.#activitySpeeds[this.#routeActivityMode];
         const timeMin = Math.round((parseFloat(distKm) / speed) * 60);
 
@@ -522,7 +557,6 @@ class App {
       .addTo(this.#map);
   }
 
-  // Cancel route mode — clean up all markers, routing control and UI state
   _cancelRoute() {
     this.#routeMode = false;
     this.#routeStep = 0;
@@ -548,11 +582,9 @@ class App {
 const app = new App();
 
 // ─── MOBILE SLIDING PANEL ────────────────────────────────────────
-// Sidebar behaves as a bottom sheet on mobile (like Google Maps / Strava)
-// Drag the handle to expand or collapse; snaps to 3 positions
 (function initMobilePanel() {
   const sidebar = document.querySelector('.sidebar');
-  const HANDLE_ZONE = 56; // px from top of sidebar treated as the drag handle
+  const HANDLE_ZONE = 56;
 
   let startY = 0;
   let startHeight = 0;
@@ -560,17 +592,15 @@ const app = new App();
 
   const isMobile = () => window.innerWidth <= 768;
 
-  // Snap to a specific height with transition
   const snapTo = h => {
     sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
     sidebar.style.height = h;
   };
 
-  const collapse = () => snapTo('5.5rem'); // handle only — map fully visible
-  const toHalf   = () => snapTo('55vh');   // half screen — enough room for workouts
-  const toFull   = () => snapTo('85vh');   // nearly full screen
+  const collapse = () => snapTo('5.5rem');
+  const toHalf   = () => snapTo('55vh');
+  const toFull   = () => snapTo('85vh');
 
-  // Start at half height on mobile (panel visible but map accessible)
   if (isMobile()) toHalf();
 
   window.addEventListener('resize', () => {
@@ -578,7 +608,6 @@ const app = new App();
     else toHalf();
   });
 
-  // Begin drag only when touch starts within the handle zone
   sidebar.addEventListener('touchstart', e => {
     if (!isMobile()) return;
     const touch = e.touches[0];
@@ -590,7 +619,6 @@ const app = new App();
     sidebar.style.transition = 'none';
   }, { passive: true });
 
-  // Follow finger while dragging
   sidebar.addEventListener('touchmove', e => {
     if (!isDragging || !isMobile()) return;
     const touch = e.touches[0];
@@ -599,7 +627,6 @@ const app = new App();
     sidebar.style.height = newH + 'px';
   }, { passive: true });
 
-  // On release — snap to nearest position
   sidebar.addEventListener('touchend', () => {
     if (!isDragging) return;
     isDragging = false;
