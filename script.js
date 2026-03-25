@@ -127,7 +127,6 @@ class App {
       btn.addEventListener('click', this._setActivityMode.bind(this));
     });
 
-    // POI Search
     this._initPOISearch();
   }
 
@@ -173,7 +172,6 @@ class App {
     btnTrack.textContent = '⏹ Stop tracking';
     btnTrack.classList.add('tracking--active');
 
-    // Create the pulsing dot marker
     const dotIcon = L.divIcon({
       className: '',
       html: `<div class="tracking-dot">
@@ -190,12 +188,10 @@ class App {
         const latlng = [lat, lng];
 
         if (!this.#trackingMarker) {
-          // First fix — create marker and fly to position
           this.#trackingMarker = L.marker(latlng, { icon: dotIcon, zIndexOffset: 1000 })
             .addTo(this.#map);
           this.#map.setView(latlng, this.#mapZoomLevel, { animate: true });
         } else {
-          // Subsequent fixes — move marker and follow
           this.#trackingMarker.setLatLng(latlng);
           this.#map.setView(latlng, this.#map.getZoom(), { animate: true, pan: { duration: 0.5 } });
         }
@@ -471,21 +467,37 @@ class App {
 
     this._clearPOIMarkers();
 
-    const center = this.#userCoords || (this.#map ? [this.#map.getCenter().lat, this.#map.getCenter().lng] : null);
-    let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1`;
-    if (center) url += `&lat=${center[0]}&lon=${center[1]}&bounded=0`;
+    // ── KEY CHANGE: use current map viewport (viewbox) instead of user coords ──
+    // This makes search always respect what area you're looking at on the map,
+    // just like Google Maps — zoom into any city and search results stay local.
+    let url;
+    if (this.#map) {
+      const bounds = this.#map.getBounds();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      // viewbox = left,top,right,bottom (minLon, maxLat, maxLon, minLat)
+      const viewbox = `${sw.lng},${ne.lat},${ne.lng},${sw.lat}`;
+      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&viewbox=${viewbox}&bounded=1`;
+    } else {
+      // Fallback if map not loaded yet — use user coords without bounding
+      const center = this.#userCoords;
+      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1`;
+      if (center) url += `&lat=${center[0]}&lon=${center[1]}`;
+    }
 
     try {
-      const res  = await fetch(url, { headers: { 'Accept-Language': 'pl' } });
+      const res  = await fetch(url, { headers: { 'Accept-Language': 'en' } });
       const data = await res.json();
 
       if (!data.length) {
-        resultsList.innerHTML = `<li class="poi-empty">Brak wyników dla "<b>${query}</b>"</li>`;
+        resultsList.innerHTML = `<li class="poi-empty">No results for "<b>${query}</b>" in this area.<br><small>Try zooming out or panning the map.</small></li>`;
         return;
       }
 
+      // Calculate distance from user's real position (not map center)
+      const userPos = this.#userCoords;
       const withDist = data.map(p => {
-        const distM = center ? this._haversine(center, [+p.lat, +p.lon]) : null;
+        const distM = userPos ? this._haversine(userPos, [+p.lat, +p.lon]) : null;
         return { ...p, distM };
       });
       withDist.sort((a, b) => (a.distM ?? Infinity) - (b.distM ?? Infinity));
@@ -493,9 +505,13 @@ class App {
       resultsList.innerHTML = '';
       withDist.forEach(place => {
         const name  = place.name || place.display_name.split(',')[0];
-        const addr  = place.address ? [place.address.road, place.address.house_number].filter(Boolean).join(' ') : '';
+        const addr  = place.address
+          ? [place.address.road, place.address.house_number].filter(Boolean).join(' ')
+          : place.display_name.split(',').slice(1, 3).join(',').trim();
         const distTxt = place.distM != null
-          ? place.distM < 1000 ? `${Math.round(place.distM)} m` : `${(place.distM / 1000).toFixed(1)} km`
+          ? place.distM < 1000
+            ? `${Math.round(place.distM)} m away`
+            : `${(place.distM / 1000).toFixed(1)} km away`
           : '';
 
         const li = document.createElement('li');
@@ -503,7 +519,7 @@ class App {
         li.innerHTML = `
           <span class="poi-result-item__name">${name}</span>
           ${addr ? `<span class="poi-result-item__addr">${addr}</span>` : ''}
-          ${distTxt ? `<span class="poi-result-item__dist">📍 ${distTxt} od Ciebie</span>` : ''}
+          ${distTxt ? `<span class="poi-result-item__dist">📍 ${distTxt}</span>` : ''}
         `;
         li.addEventListener('click', () => this._selectPOI(place, name));
         resultsList.appendChild(li);
@@ -521,8 +537,8 @@ class App {
           .addTo(this.#map)
           .bindPopup(`
             <b>${name}</b>${addr ? `<br>${addr}` : ''}<br>
-            ${distTxt ? `<small>${distTxt} od Ciebie</small><br>` : ''}
-            <button onclick="window._poiSetA(${place.lat},${place.lon})" style="margin-top:6px;padding:4px 10px;background:#00c46a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">Ustaw jako punkt A →</button>
+            ${distTxt ? `<small>${distTxt}</small><br>` : ''}
+            <button onclick="window._poiSetA(${place.lat},${place.lon})" style="margin-top:6px;padding:4px 10px;background:#00c46a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">Set as point A →</button>
           `);
         this.#poiMarkers.push(marker);
       });
@@ -530,7 +546,6 @@ class App {
       // Expose global helper for popup button
       window._poiSetA = (lat, lon) => {
         if (!this.#routeMode) this._startRouteMode();
-        // Simulate placing point A
         this.#routePointA = [lat, lon];
         this.#routeStep = 2;
         if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
@@ -550,7 +565,7 @@ class App {
       };
 
     } catch {
-      resultsList.innerHTML = `<li class="poi-empty">Błąd połączenia. Spróbuj ponownie.</li>`;
+      resultsList.innerHTML = `<li class="poi-empty">Connection error. Please try again.</li>`;
     }
   }
 
@@ -570,12 +585,13 @@ class App {
   }
 
   _poiEmoji(query) {
-    if (/sklep|spożyw|żabka|biedronk|lidl/i.test(query)) return '🛒';
-    if (/woda|fontanna/i.test(query)) return '💧';
-    if (/toalet|wc/i.test(query)) return '🚻';
-    if (/apteka/i.test(query)) return '💊';
-    if (/park|las/i.test(query)) return '🌳';
-    if (/kawiarnia|cafe|kawa/i.test(query)) return '☕';
+    if (/grocery|store|shop|market|żabka|biedronk|lidl/i.test(query)) return '🛒';
+    if (/water|fountain|drink/i.test(query)) return '💧';
+    if (/toilet|wc|restroom|bathroom/i.test(query)) return '🚻';
+    if (/pharmacy|chemist|apteka/i.test(query)) return '💊';
+    if (/park|forest|garden/i.test(query)) return '🌳';
+    if (/cafe|coffee|kawiarnia/i.test(query)) return '☕';
+    if (/hospital|clinic|doctor/i.test(query)) return '🏥';
     return '📍';
   }
 
@@ -584,7 +600,7 @@ class App {
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat / 2) ** 2 +
-              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
     return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
