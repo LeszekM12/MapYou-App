@@ -102,6 +102,8 @@ class App {
   #trackingMarker = null;
 
   #markers = new Map();
+  #poiMarkers = [];
+  #userCoords = null;
 
   #activitySpeeds = {
     running: 10,
@@ -124,6 +126,9 @@ class App {
     document.querySelectorAll('.route-mode-btn').forEach(btn => {
       btn.addEventListener('click', this._setActivityMode.bind(this));
     });
+
+    // POI Search
+    this._initPOISearch();
   }
 
   _getPosition() {
@@ -139,6 +144,7 @@ class App {
   _loadMap(position) {
     const { latitude, longitude } = position.coords;
     const coords = [latitude, longitude];
+    this.#userCoords = coords;
 
     this.#map = L.map('map').setView(coords, this.#mapZoomLevel);
 
@@ -426,6 +432,160 @@ class App {
   reset() {
     localStorage.removeItem('workouts');
     location.reload();
+  }
+
+  // ─── POI SEARCH ──────────────────────────────────────────────────
+
+  _initPOISearch() {
+    const input = document.getElementById('poiInput');
+    const btn   = document.getElementById('poiSearchBtn');
+    const filters = document.getElementById('poiFilters');
+
+    btn.addEventListener('click', () => this._searchPOI(input.value.trim()));
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') this._searchPOI(input.value.trim());
+    });
+
+    filters.addEventListener('click', e => {
+      const filterBtn = e.target.closest('.poi-filter-btn');
+      if (!filterBtn) return;
+      document.querySelectorAll('.poi-filter-btn').forEach(b => b.classList.remove('poi-filter-btn--active'));
+      filterBtn.classList.add('poi-filter-btn--active');
+      input.value = filterBtn.dataset.query;
+      this._searchPOI(filterBtn.dataset.query);
+    });
+  }
+
+  async _searchPOI(query) {
+    if (!query) return;
+    const resultsList = document.getElementById('poiResults');
+    resultsList.classList.remove('hidden');
+    resultsList.innerHTML = `<li class="poi-loading">
+      <div class="route-loading__spinner">
+        <div class="route-loading__dot"></div>
+        <div class="route-loading__dot"></div>
+        <div class="route-loading__dot"></div>
+      </div>
+      Searching…
+    </li>`;
+
+    this._clearPOIMarkers();
+
+    const center = this.#userCoords || (this.#map ? [this.#map.getCenter().lat, this.#map.getCenter().lng] : null);
+    let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=8&addressdetails=1`;
+    if (center) url += `&lat=${center[0]}&lon=${center[1]}&bounded=0`;
+
+    try {
+      const res  = await fetch(url, { headers: { 'Accept-Language': 'pl' } });
+      const data = await res.json();
+
+      if (!data.length) {
+        resultsList.innerHTML = `<li class="poi-empty">Brak wyników dla "<b>${query}</b>"</li>`;
+        return;
+      }
+
+      const withDist = data.map(p => {
+        const distM = center ? this._haversine(center, [+p.lat, +p.lon]) : null;
+        return { ...p, distM };
+      });
+      withDist.sort((a, b) => (a.distM ?? Infinity) - (b.distM ?? Infinity));
+
+      resultsList.innerHTML = '';
+      withDist.forEach(place => {
+        const name  = place.name || place.display_name.split(',')[0];
+        const addr  = place.address ? [place.address.road, place.address.house_number].filter(Boolean).join(' ') : '';
+        const distTxt = place.distM != null
+          ? place.distM < 1000 ? `${Math.round(place.distM)} m` : `${(place.distM / 1000).toFixed(1)} km`
+          : '';
+
+        const li = document.createElement('li');
+        li.className = 'poi-result-item';
+        li.innerHTML = `
+          <span class="poi-result-item__name">${name}</span>
+          ${addr ? `<span class="poi-result-item__addr">${addr}</span>` : ''}
+          ${distTxt ? `<span class="poi-result-item__dist">📍 ${distTxt} od Ciebie</span>` : ''}
+        `;
+        li.addEventListener('click', () => this._selectPOI(place, name));
+        resultsList.appendChild(li);
+
+        // Add marker on map
+        const emoji = this._poiEmoji(query);
+        const marker = L.marker([+place.lat, +place.lon], {
+          icon: L.divIcon({
+            className: '',
+            html: `<div style="background:#2d3439;border:2px solid #00c46a;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.4)">${emoji}</div>`,
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+          }),
+        })
+          .addTo(this.#map)
+          .bindPopup(`
+            <b>${name}</b>${addr ? `<br>${addr}` : ''}<br>
+            ${distTxt ? `<small>${distTxt} od Ciebie</small><br>` : ''}
+            <button onclick="window._poiSetA(${place.lat},${place.lon})" style="margin-top:6px;padding:4px 10px;background:#00c46a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">Ustaw jako punkt A →</button>
+          `);
+        this.#poiMarkers.push(marker);
+      });
+
+      // Expose global helper for popup button
+      window._poiSetA = (lat, lon) => {
+        if (!this.#routeMode) this._startRouteMode();
+        // Simulate placing point A
+        this.#routePointA = [lat, lon];
+        this.#routeStep = 2;
+        if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
+        this.#routeMarkerA = L.marker([lat, lon], {
+          icon: L.divIcon({
+            className: '',
+            html: '<div class="route-marker route-marker--a">A</div>',
+            iconSize: [28, 28], iconAnchor: [14, 14],
+          }),
+        }).addTo(this.#map);
+        document.getElementById('stepAText').textContent = 'Start point set ✓';
+        document.getElementById('stepAText').closest('.route-info__step').classList.add('route-info__step--done');
+        document.getElementById('stepBText').textContent = 'Click the end point on the map';
+        document.getElementById('map').style.cursor = 'crosshair';
+        this.#map.closePopup();
+        this.#map.setView([lat, lon], 15);
+      };
+
+    } catch {
+      resultsList.innerHTML = `<li class="poi-empty">Błąd połączenia. Spróbuj ponownie.</li>`;
+    }
+  }
+
+  _selectPOI(place, name) {
+    this.#map.setView([+place.lat, +place.lon], 16, { animate: true });
+    this.#poiMarkers.forEach(m => {
+      const pos = m.getLatLng();
+      if (Math.abs(pos.lat - +place.lat) < 0.0001 && Math.abs(pos.lng - +place.lon) < 0.0001) {
+        m.openPopup();
+      }
+    });
+  }
+
+  _clearPOIMarkers() {
+    this.#poiMarkers.forEach(m => this.#map.removeLayer(m));
+    this.#poiMarkers = [];
+  }
+
+  _poiEmoji(query) {
+    if (/sklep|spożyw|żabka|biedronk|lidl/i.test(query)) return '🛒';
+    if (/woda|fontanna/i.test(query)) return '💧';
+    if (/toalet|wc/i.test(query)) return '🚻';
+    if (/apteka/i.test(query)) return '💊';
+    if (/park|las/i.test(query)) return '🌳';
+    if (/kawiarnia|cafe|kawa/i.test(query)) return '☕';
+    return '📍';
+  }
+
+  _haversine([lat1, lon1], [lat2, lon2]) {
+    const R = 6371000;
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) ** 2 +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   }
 
   // ─── ROUTE PLANNER ───────────────────────────────────────────────

@@ -18,6 +18,21 @@
 <div class="sidebar">
   <img src="logo.png" alt="Mapty logo" class="logo" />
 
+  <!-- POI SEARCH -->
+  <div class="poi-search">
+    <div class="poi-search__bar">
+      <input class="poi-search__input" id="poiInput" type="text" placeholder="Search nearby… (e.g. Żabka, park)" />
+      <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
+    </div>
+    <div class="poi-filters" id="poiFilters">
+      <button class="poi-filter-btn poi-filter-btn--active" data-query="sklep spożywczy">🛒 Sklepy</button>
+      <button class="poi-filter-btn" data-query="fontanna pitna woda">💧 Woda</button>
+      <button class="poi-filter-btn" data-query="toaleta publiczna">🚻 WC</button>
+      <button class="poi-filter-btn" data-query="apteka">💊 Apteka</button>
+    </div>
+    <ul class="poi-results hidden" id="poiResults"></ul>
+  </div>
+
   <!-- LIVE TRACKING -->
   <div class="tracking-controls">
     <button class="btn-track" id="btnTrack">📍 Start tracking</button>
