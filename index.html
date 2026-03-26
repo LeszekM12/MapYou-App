@@ -4,7 +4,14 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+  <meta name="theme-color" content="#2d3439"/>
+  <meta name="description" content="Mapty — track your workouts on the map"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Mapty"/>
   <link rel="shortcut icon" type="image/png" href="icon.png"/>
+  <link rel="apple-touch-icon" href="icon.png"/>
+  <link rel="manifest" href="manifest.json"/>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css"/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
@@ -25,7 +32,11 @@
   <!-- POI SEARCH -->
   <div class="poi-search">
     <div class="poi-search__bar">
-      <input class="poi-search__input" id="poiInput" type="text" placeholder="Search nearby… (e.g. Żabka, park)"/>
+      <input class="poi-search__input" id="poiInput" type="text"
+             placeholder="Search nearby… (e.g. Cafe, park)"
+             autocomplete="off"
+             list="poiSuggestions"/>
+      <datalist id="poiSuggestions"></datalist>
       <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
     </div>
     <div class="poi-filters" id="poiFilters">
@@ -123,5 +134,10 @@
 </div>
 
 <div id="map"></div>
+<script>
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js');
+  }
+</script>
 </body>
 </html>
