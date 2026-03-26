@@ -64,13 +64,6 @@ const routeTime = document.getElementById('routeTime');
 const routeLoading = document.getElementById('routeLoading');
 const btnTrack = document.getElementById('btnTrack');
 
-// ─── PWA SERVICE WORKER ───────────────────────────────────────────
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
-  });
-}
-
 // ─── MAIN APP CLASS ──────────────────────────────────────────────
 class App {
   #map;
@@ -89,12 +82,17 @@ class App {
   #routeActivityMode = 'running';
 
   // Route progress
-  #routeCoords = [];           // full route as [[lat,lng],...]
-  #routeTotalDist = 0;         // total route distance in metres
-  #progressLine = null;        // grey "done" polyline
-  #progressWatchId = null;     // dedicated watch when tracking is off
+  #routeCoords = [];
+  #routeTotalDist = 0;
+  #progressLineOuter = null;   // white outline for contrast
+  #progressLineInner = null;   // dark fill — highly visible
+  #progressWatchId = null;
   #coveredUpToIndex = 0;
-  #arrivedShown = false;       // prevent showing arrival toast multiple times
+  #arrivedShown = false;
+  // Arrival detection: require staying within threshold for N consecutive fixes
+  #nearDestCount = 0;
+  static #ARRIVAL_CONSEC = 3;  // 3 consecutive fixes within threshold
+  static #ARRIVAL_DIST = 25;   // metres — strict radius to avoid false positives
 
   // Live tracking
   #trackingActive = false;
@@ -102,7 +100,7 @@ class App {
   #trackingMarker = null;
   #trackingCoords = null;
 
-  // Lazy centering — don't re-center if user is touching the map
+  // Lazy map centering
   #userTouchingMap = false;
   #recenterTimer = null;
 
@@ -158,14 +156,12 @@ class App {
     this.#map.on('click', this._handleMapClick.bind(this));
     this.#workouts.forEach(work => this._renderWorkoutMarker(work));
 
-    // Track whether user is interacting with the map
-    // so we can delay re-centering during tracking
+    // Lazy centering: block re-center for 5s after user touches the map
     this.#map.on('mousedown touchstart', () => {
       this.#userTouchingMap = true;
       clearTimeout(this.#recenterTimer);
     });
     this.#map.on('mouseup touchend', () => {
-      // After 5 seconds of no touch, allow re-centering again
       this.#recenterTimer = setTimeout(() => {
         this.#userTouchingMap = false;
       }, 5000);
@@ -245,21 +241,19 @@ class App {
         } else {
           this.#trackingMarker.setLatLng(latlng);
 
-          // ── LAZY CENTERING: only re-center if user hasn't touched map in 5s ──
+          // Lazy centering: re-center only when marker drifts far from screen center
+          // AND user hasn't touched the map in the last 5 seconds
           if (!this.#userTouchingMap) {
-            const mapCenter = this.#map.getCenter();
-            const markerPt = this.#map.latLngToContainerPoint(L.latLng(latlng));
-            const center = this.#map.getSize().divideBy(2);
-            const offscreen = markerPt.distanceTo(center) > 120; // px threshold
-
-            if (offscreen) {
+            const markerPx = this.#map.latLngToContainerPoint(L.latLng(latlng));
+            const centerPx = this.#map.getSize().divideBy(2);
+            if (markerPx.distanceTo(centerPx) > 120) {
               this.#map.setView(latlng, this.#map.getZoom(), { animate: true, pan: { duration: 0.6 } });
             }
           }
         }
 
-        // Update route progress using the same GPS fix
-        if (this.#routeCoords.length > 0 && this.#progressLine) {
+        // Piggyback route progress on the same GPS fix
+        if (this.#routeCoords.length > 0 && this.#progressLineOuter) {
           this._updateRouteProgress(lat, lng);
         }
       },
@@ -292,23 +286,34 @@ class App {
     this.#routeTotalDist = totalDistM;
     this.#coveredUpToIndex = 0;
     this.#arrivedShown = false;
+    this.#nearDestCount = 0;
 
-    if (this.#progressLine) this.#map.removeLayer(this.#progressLine);
+    // Clear old lines
+    if (this.#progressLineOuter) { this.#map.removeLayer(this.#progressLineOuter); this.#progressLineOuter = null; }
+    if (this.#progressLineInner) { this.#map.removeLayer(this.#progressLineInner); this.#progressLineInner = null; }
 
-    // Thicker white outline + coloured fill = clearly visible over green route
-    this.#progressLine = L.polyline([], {
+    // Two-layer progress line for maximum visibility:
+    // 1. Thick white outline (12px) — creates a halo so the line pops from both
+    //    the green route and any map background
+    // 2. Bold dark orange inner line (7px) — high contrast, not confused with route
+    this.#progressLineOuter = L.polyline([], {
       color: '#ffffff',
-      weight: 9,
-      opacity: 0.6,
+      weight: 12,
+      opacity: 0.7,
+      lineJoin: 'round',
+      lineCap: 'round',
     }).addTo(this.#map);
 
-    // Inner grey line on top
-    this._progressLineInner = L.polyline([], {
-      color: '#555555',
-      weight: 5,
-      opacity: 0.9,
+    this.#progressLineInner = L.polyline([], {
+      color: '#e05a00',   // dark orange — stands out clearly from green route
+      weight: 7,
+      opacity: 1,
+      lineJoin: 'round',
+      lineCap: 'round',
     }).addTo(this.#map);
 
+    // If tracking is already active, its watchPosition feeds progress updates.
+    // If not, start a dedicated lightweight watch.
     if (!this.#trackingActive) this._startProgressOnlyWatch();
   }
 
@@ -328,38 +333,47 @@ class App {
 
   _updateRouteProgress(lat, lng) {
     const userPt = L.latLng(lat, lng);
+
+    // ── Find closest route point ahead of current position ──
     let closestIdx = this.#coveredUpToIndex;
     let minDist = Infinity;
 
     for (let i = this.#coveredUpToIndex; i < this.#routeCoords.length; i++) {
       const d = userPt.distanceTo(L.latLng(this.#routeCoords[i]));
       if (d < minDist) { minDist = d; closestIdx = i; }
-      if (d > minDist + 150 && i > this.#coveredUpToIndex + 10) break;
+      // Early-exit scan once distance increases significantly beyond minimum
+      if (d > minDist + 200 && i > this.#coveredUpToIndex + 15) break;
     }
 
+    // Only advance forward and only if GPS is close enough to the route
     if (closestIdx > this.#coveredUpToIndex && minDist < 40) {
       this.#coveredUpToIndex = closestIdx;
       const covered = this.#routeCoords.slice(0, this.#coveredUpToIndex + 1);
-      this.#progressLine.setLatLngs(covered);
-      this._progressLineInner.setLatLngs(covered);
-
-      // ── Update remaining distance & time in sidebar ──
+      this.#progressLineOuter.setLatLngs(covered);
+      this.#progressLineInner.setLatLngs(covered);
       this._updateRemainingStats();
+    }
 
-      // ── Check arrival ──
-      const isLastPoint = this.#coveredUpToIndex >= this.#routeCoords.length - 2;
-      const nearDestination = minDist < 30;
-      if ((isLastPoint || nearDestination) && !this.#arrivedShown) {
-        this.#arrivedShown = true;
-        this._showArrivalToast();
-      }
+    // ── Arrival detection: require N consecutive GPS fixes near destination ──
+    // This prevents a false positive from a single noisy GPS reading.
+    const destPt = L.latLng(this.#routeCoords[this.#routeCoords.length - 1]);
+    const distToDest = userPt.distanceTo(destPt);
+
+    if (distToDest < App.#ARRIVAL_DIST) {
+      this.#nearDestCount++;
+    } else {
+      this.#nearDestCount = 0; // reset counter if user moves away
+    }
+
+    if (this.#nearDestCount >= App.#ARRIVAL_CONSEC && !this.#arrivedShown) {
+      this.#arrivedShown = true;
+      this._showArrivalToast();
     }
   }
 
   _updateRemainingStats() {
-    if (!this.#routeCoords.length || !routeResult) return;
+    if (!this.#routeCoords.length) return;
 
-    // Calculate remaining distance by summing segments from current index onwards
     let remainM = 0;
     for (let i = this.#coveredUpToIndex; i < this.#routeCoords.length - 1; i++) {
       remainM += L.latLng(this.#routeCoords[i]).distanceTo(L.latLng(this.#routeCoords[i + 1]));
@@ -367,14 +381,11 @@ class App {
 
     const remainKm = remainM / 1000;
     const speed = this.#activitySpeeds[this.#routeActivityMode];
-    const remainMin = Math.round((remainKm / speed) * 60);
-
     routeDist.textContent = remainKm.toFixed(2);
-    routeTime.textContent = remainMin;
+    routeTime.textContent = Math.max(0, Math.round((remainKm / speed) * 60));
   }
 
   _showArrivalToast() {
-    // Remove existing toast if any
     document.querySelector('.arrival-toast')?.remove();
 
     const toast = document.createElement('div');
@@ -388,11 +399,8 @@ class App {
       <button class="arrival-toast__close">✕</button>
     `;
     document.body.appendChild(toast);
-
     toast.querySelector('.arrival-toast__close').addEventListener('click', () => toast.remove());
-
-    // Auto-dismiss after 6 seconds
-    setTimeout(() => toast?.remove(), 6000);
+    setTimeout(() => toast?.remove(), 8000);
   }
 
   _stopRouteProgress() {
@@ -400,11 +408,12 @@ class App {
       navigator.geolocation.clearWatch(this.#progressWatchId);
       this.#progressWatchId = null;
     }
-    if (this.#progressLine) { this.#map.removeLayer(this.#progressLine); this.#progressLine = null; }
-    if (this._progressLineInner) { this.#map.removeLayer(this._progressLineInner); this._progressLineInner = null; }
+    if (this.#progressLineOuter) { this.#map.removeLayer(this.#progressLineOuter); this.#progressLineOuter = null; }
+    if (this.#progressLineInner) { this.#map.removeLayer(this.#progressLineInner); this.#progressLineInner = null; }
     this.#routeCoords = [];
     this.#coveredUpToIndex = 0;
     this.#arrivedShown = false;
+    this.#nearDestCount = 0;
     document.querySelector('.arrival-toast')?.remove();
   }
 
@@ -593,18 +602,34 @@ class App {
     const input = document.getElementById('poiInput');
     const btn   = document.getElementById('poiSearchBtn');
     const filters = document.getElementById('poiFilters');
+    const resultsList = document.getElementById('poiResults');
 
     btn.addEventListener('click', () => this._searchPOI(input.value.trim()));
+
     input.addEventListener('keydown', e => {
       if (e.key === 'Enter') this._searchPOI(input.value.trim());
     });
 
-    // ── API-based autocomplete: debounce 350ms, min 2 chars ──
+    // Clear results when input is emptied
     input.addEventListener('input', () => {
-      clearTimeout(this.#autocompleteTimer);
       const val = input.value.trim();
-      if (val.length < 2) return;
-      this.#autocompleteTimer = setTimeout(() => this._fetchAutocompleteSuggestions(val), 350);
+
+      // Hide results when bar is cleared
+      if (val === '') {
+        resultsList.classList.add('hidden');
+        resultsList.innerHTML = '';
+        this._clearPOIMarkers();
+        // Clear datalist suggestions too
+        const datalist = document.getElementById('poiSuggestions');
+        if (datalist) datalist.innerHTML = '';
+        return;
+      }
+
+      // API-based autocomplete: debounce 350ms, min 2 chars
+      clearTimeout(this.#autocompleteTimer);
+      if (val.length >= 2) {
+        this.#autocompleteTimer = setTimeout(() => this._fetchAutocompleteSuggestions(val), 350);
+      }
     });
 
     filters.addEventListener('click', e => {
@@ -618,11 +643,10 @@ class App {
   }
 
   async _fetchAutocompleteSuggestions(query) {
-    // Use Nominatim suggest endpoint within current map bounds
     const datalist = document.getElementById('poiSuggestions');
     if (!datalist) return;
 
-    let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&addressdetails=0&namedetails=0`;
+    let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&addressdetails=0`;
 
     if (this.#map) {
       const bounds = this.#map.getBounds();
@@ -804,14 +828,13 @@ class App {
 
   _poiEmoji(query) {
     if (/grocery|store|shop|market|sklep|żabka|biedronk|lidl/i.test(query)) return '🛒';
-    if (/water|fountain|woda|fontanna/i.test(query)) return '💧';
+    if (/water|fountain|woda|fontanna|jezioro|staw|rzeka/i.test(query)) return '💧';
     if (/toilet|wc|restroom|toaleta/i.test(query)) return '🚻';
     if (/pharmacy|chemist|apteka/i.test(query)) return '💊';
     if (/park|forest|las|garden/i.test(query)) return '🌳';
     if (/cafe|coffee|kawiarnia/i.test(query)) return '☕';
     if (/hospital|clinic|doctor|szpital/i.test(query)) return '🏥';
     if (/restaurant|restauracja|bar|pub/i.test(query)) return '🍴';
-    if (/church|kościół|parafia|pw/i.test(query)) return '✝️';
     return '📍';
   }
 
