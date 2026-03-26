@@ -18,47 +18,33 @@ class Workout {
     this.description = `${this.type[0].toUpperCase()}${this.type.slice(1)} on ${months[this.date.getMonth()]} ${this.date.getDate()}`;
   }
 
-  click() {
-    this.clicks++;
-  }
+  click() { this.clicks++; }
 }
 
-// ─── RUNNING CHILD CLASS ─────────────────────────────────────────
 class Running extends Workout {
   type = 'running';
-
   constructor(coords, distance, duration, cadence) {
     super(coords, distance, duration);
     this.cadence = cadence;
     this.calcPace();
     this._setDescription();
   }
-
-  calcPace() {
-    this.pace = this.duration / this.distance;
-    return this.pace;
-  }
+  calcPace() { this.pace = this.duration / this.distance; return this.pace; }
 }
 
-// ─── CYCLING CHILD CLASS ─────────────────────────────────────────
 class Cycling extends Workout {
   type = 'cycling';
-
   constructor(coords, distance, duration, elevationGain) {
     super(coords, distance, duration);
     this.elevationGain = elevationGain;
     this.calcSpeed();
     this._setDescription();
   }
-
-  calcSpeed() {
-    this.speed = this.distance / (this.duration / 60);
-    return this.speed;
-  }
+  calcSpeed() { this.speed = this.distance / (this.duration / 60); return this.speed; }
 }
 
 ///////////////////////////////////////
-// APPLICATION ARCHITECTURE
+// DOM REFS
 
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -67,7 +53,6 @@ const inputDistance = document.querySelector('.form__input--distance');
 const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
-
 const btnRoute = document.getElementById('btnRoute');
 const routeInfo = document.getElementById('routeInfo');
 const btnCancelRoute = document.getElementById('btnCancelRoute');
@@ -96,20 +81,25 @@ class App {
   #routeMarkerB = null;
   #routeActivityMode = 'running';
 
-  // Tracking state
+  // Route progress state
+  #routeCoords = [];
+  #progressLine = null;
+  #progressWatchId = null;
+
+  // Live tracking state
   #trackingActive = false;
   #watchId = null;
   #trackingMarker = null;
+  #trackingCoords = null; // latest GPS fix while tracking
+
+  // Wake Lock
+  #wakeLock = null;
 
   #markers = new Map();
   #poiMarkers = [];
   #userCoords = null;
 
-  #activitySpeeds = {
-    running: 10,
-    cycling: 20,
-    walking: 5,
-  };
+  #activitySpeeds = { running: 10, cycling: 20, walking: 5 };
 
   constructor() {
     this._getPosition();
@@ -118,25 +108,23 @@ class App {
     form.addEventListener('submit', this._newWorkout.bind(this));
     inputType.addEventListener('change', this._toggleElevationField);
     containerWorkouts.addEventListener('click', this._moveToPopup.bind(this));
-
     btnRoute.addEventListener('click', this._startRouteMode.bind(this));
     btnCancelRoute.addEventListener('click', this._cancelRoute.bind(this));
     btnTrack.addEventListener('click', this._toggleTracking.bind(this));
 
-    document.querySelectorAll('.route-mode-btn').forEach(btn => {
-      btn.addEventListener('click', this._setActivityMode.bind(this));
-    });
+    document.querySelectorAll('.route-mode-btn').forEach(btn =>
+      btn.addEventListener('click', this._setActivityMode.bind(this))
+    );
 
     this._initPOISearch();
   }
 
+  // ─── GEOLOCATION ─────────────────────────────────────────────────
   _getPosition() {
     if (navigator.geolocation)
       navigator.geolocation.getCurrentPosition(
         this._loadMap.bind(this),
-        function () {
-          alert('Could not get your position');
-        }
+        () => alert('Could not get your position')
       );
   }
 
@@ -146,7 +134,6 @@ class App {
     this.#userCoords = coords;
 
     this.#map = L.map('map').setView(coords, this.#mapZoomLevel);
-
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.#map);
@@ -155,8 +142,45 @@ class App {
     this.#workouts.forEach(work => this._renderWorkoutMarker(work));
   }
 
-  // ─── LIVE TRACKING ───────────────────────────────────────────────
+  // ─── SCREEN WAKE LOCK ────────────────────────────────────────────
+  async _requestWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+    try {
+      this.#wakeLock = await navigator.wakeLock.request('screen');
+      document.addEventListener('visibilitychange', this._handleVisibilityChange.bind(this));
+      this._updateWakeLockBadge(true);
+    } catch { /* not available — fail silently */ }
+  }
 
+  async _releaseWakeLock() {
+    if (!this.#wakeLock) return;
+    try { await this.#wakeLock.release(); } catch { /* ignore */ }
+    this.#wakeLock = null;
+    document.removeEventListener('visibilitychange', this._handleVisibilityChange.bind(this));
+    this._updateWakeLockBadge(false);
+  }
+
+  async _handleVisibilityChange() {
+    if (this.#wakeLock !== null && document.visibilityState === 'visible' && this.#trackingActive) {
+      await this._requestWakeLock();
+    }
+  }
+
+  _updateWakeLockBadge(active) {
+    let badge = btnTrack.querySelector('.wake-lock-badge');
+    if (active) {
+      if (!badge) {
+        badge = document.createElement('span');
+        badge.className = 'wake-lock-badge';
+        badge.textContent = 'SCREEN ON';
+        btnTrack.appendChild(badge);
+      }
+    } else {
+      if (badge) badge.remove();
+    }
+  }
+
+  // ─── LIVE TRACKING ───────────────────────────────────────────────
   _toggleTracking() {
     if (this.#trackingActive) {
       this._stopTracking();
@@ -171,6 +195,7 @@ class App {
     this.#trackingActive = true;
     btnTrack.textContent = '⏹ Stop tracking';
     btnTrack.classList.add('tracking--active');
+    this._requestWakeLock();
 
     const dotIcon = L.divIcon({
       className: '',
@@ -186,38 +211,90 @@ class App {
       position => {
         const { latitude: lat, longitude: lng } = position.coords;
         const latlng = [lat, lng];
+        this.#trackingCoords = latlng; // always keep latest fix
 
         if (!this.#trackingMarker) {
-          this.#trackingMarker = L.marker(latlng, { icon: dotIcon, zIndexOffset: 1000 })
-            .addTo(this.#map);
+          this.#trackingMarker = L.marker(latlng, { icon: dotIcon, zIndexOffset: 1000 }).addTo(this.#map);
           this.#map.setView(latlng, this.#mapZoomLevel, { animate: true });
         } else {
           this.#trackingMarker.setLatLng(latlng);
           this.#map.setView(latlng, this.#map.getZoom(), { animate: true, pan: { duration: 0.5 } });
         }
       },
-      () => {
-        alert('Could not get your position for tracking.');
-        this._stopTracking();
-      },
+      () => { alert('Could not get your position for tracking.'); this._stopTracking(); },
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
     );
   }
 
   _stopTracking() {
     this.#trackingActive = false;
+    this.#trackingCoords = null;
     btnTrack.textContent = '📍 Start tracking';
     btnTrack.classList.remove('tracking--active');
+
+    this._releaseWakeLock();
 
     if (this.#watchId !== null) {
       navigator.geolocation.clearWatch(this.#watchId);
       this.#watchId = null;
     }
-
     if (this.#trackingMarker) {
       this.#map.removeLayer(this.#trackingMarker);
       this.#trackingMarker = null;
     }
+  }
+
+  // ─── ROUTE PROGRESS ──────────────────────────────────────────────
+  _startRouteProgress(routeCoords) {
+    this.#routeCoords = routeCoords;
+
+    if (this.#progressWatchId !== null) {
+      navigator.geolocation.clearWatch(this.#progressWatchId);
+    }
+    if (this.#progressLine) this.#map.removeLayer(this.#progressLine);
+
+    this.#progressLine = L.polyline([], {
+      color: '#888',
+      weight: 5,
+      opacity: 0.7,
+    }).addTo(this.#map);
+
+    let coveredUpToIndex = 0;
+
+    this.#progressWatchId = navigator.geolocation.watchPosition(
+      position => {
+        const { latitude: lat, longitude: lng } = position.coords;
+        const userPt = L.latLng(lat, lng);
+
+        let closestIdx = coveredUpToIndex;
+        let minDist = Infinity;
+
+        for (let i = coveredUpToIndex; i < this.#routeCoords.length; i++) {
+          const d = userPt.distanceTo(L.latLng(this.#routeCoords[i]));
+          if (d < minDist) { minDist = d; closestIdx = i; }
+        }
+
+        if (closestIdx > coveredUpToIndex && minDist < 50) {
+          coveredUpToIndex = closestIdx;
+        }
+
+        this.#progressLine.setLatLngs(this.#routeCoords.slice(0, coveredUpToIndex + 1));
+      },
+      () => { /* GPS error — progress pauses silently */ },
+      { enableHighAccuracy: true, maximumAge: 3000, timeout: 15000 }
+    );
+  }
+
+  _stopRouteProgress() {
+    if (this.#progressWatchId !== null) {
+      navigator.geolocation.clearWatch(this.#progressWatchId);
+      this.#progressWatchId = null;
+    }
+    if (this.#progressLine) {
+      this.#map.removeLayer(this.#progressLine);
+      this.#progressLine = null;
+    }
+    this.#routeCoords = [];
   }
 
   // ─── MAP CLICK HANDLER ───────────────────────────────────────────
@@ -268,7 +345,6 @@ class App {
   _newWorkout(e) {
     const validInputs = (...inputs) => inputs.every(inp => Number.isFinite(inp));
     const allPositive = (...inputs) => inputs.every(inp => inp > 0);
-
     e.preventDefault();
 
     const type = inputType.value;
@@ -298,26 +374,15 @@ class App {
     this._setLocalStorage();
   }
 
-  // ─── RENDER MARKER ON MAP ────────────────────────────────────────
   _renderWorkoutMarker(workout) {
     const marker = L.marker(workout.coords)
       .addTo(this.#map)
-      .bindPopup(
-        L.popup({
-          maxWidth: 250,
-          minWidth: 100,
-          autoClose: false,
-          closeOnClick: false,
-          className: `${workout.type}-popup`,
-        })
-      )
+      .bindPopup(L.popup({ maxWidth: 250, minWidth: 100, autoClose: false, closeOnClick: false, className: `${workout.type}-popup` }))
       .setPopupContent(`${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`)
       .openPopup();
-
     this.#markers.set(workout.id, marker);
   }
 
-  // ─── RENDER WORKOUT IN SIDEBAR LIST ─────────────────────────────
   _renderWorkout(workout) {
     let html = `
       <li class="workout workout--${workout.type}" data-id="${workout.id}">
@@ -369,7 +434,6 @@ class App {
     form.insertAdjacentHTML('afterend', html);
   }
 
-  // ─── SIDEBAR LIST CLICK HANDLER ──────────────────────────────────
   _moveToPopup(e) {
     if (!this.#map) return;
 
@@ -382,23 +446,15 @@ class App {
 
     const workoutEl = e.target.closest('.workout');
     if (!workoutEl) return;
-
     const workout = this.#workouts.find(work => work.id === workoutEl.dataset.id);
     if (!workout) return;
 
-    this.#map.setView(workout.coords, this.#mapZoomLevel, {
-      animate: true,
-      pan: { duration: 1 },
-    });
+    this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
   }
 
-  // ─── DELETE WORKOUT ──────────────────────────────────────────────
   _deleteWorkout(id) {
     const marker = this.#markers.get(id);
-    if (marker) {
-      this.#map.removeLayer(marker);
-      this.#markers.delete(id);
-    }
+    if (marker) { this.#map.removeLayer(marker); this.#markers.delete(id); }
 
     this.#workouts = this.#workouts.filter(w => w.id !== id);
 
@@ -409,14 +465,10 @@ class App {
       el.style.opacity = '0';
       setTimeout(() => el.remove(), 300);
     }
-
     this._setLocalStorage();
   }
 
-  // ─── LOCAL STORAGE ───────────────────────────────────────────────
-  _setLocalStorage() {
-    localStorage.setItem('workouts', JSON.stringify(this.#workouts));
-  }
+  _setLocalStorage() { localStorage.setItem('workouts', JSON.stringify(this.#workouts)); }
 
   _getLocalStorage() {
     const data = JSON.parse(localStorage.getItem('workouts'));
@@ -425,10 +477,7 @@ class App {
     this.#workouts.forEach(work => this._renderWorkout(work));
   }
 
-  reset() {
-    localStorage.removeItem('workouts');
-    location.reload();
-  }
+  reset() { localStorage.removeItem('workouts'); location.reload(); }
 
   // ─── POI SEARCH ──────────────────────────────────────────────────
 
@@ -454,6 +503,7 @@ class App {
 
   async _searchPOI(query) {
     if (!query) return;
+
     const resultsList = document.getElementById('poiResults');
     resultsList.classList.remove('hidden');
     resultsList.innerHTML = `<li class="poi-loading">
@@ -467,22 +517,16 @@ class App {
 
     this._clearPOIMarkers();
 
-    // ── KEY CHANGE: use current map viewport (viewbox) instead of user coords ──
-    // This makes search always respect what area you're looking at on the map,
-    // just like Google Maps — zoom into any city and search results stay local.
     let url;
     if (this.#map) {
       const bounds = this.#map.getBounds();
       const sw = bounds.getSouthWest();
       const ne = bounds.getNorthEast();
-      // viewbox = left,top,right,bottom (minLon, maxLat, maxLon, minLat)
       const viewbox = `${sw.lng},${ne.lat},${ne.lng},${sw.lat}`;
       url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&viewbox=${viewbox}&bounded=1`;
     } else {
-      // Fallback if map not loaded yet — use user coords without bounding
-      const center = this.#userCoords;
       url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1`;
-      if (center) url += `&lat=${center[0]}&lon=${center[1]}`;
+      if (this.#userCoords) url += `&lat=${this.#userCoords[0]}&lon=${this.#userCoords[1]}`;
     }
 
     try {
@@ -494,24 +538,21 @@ class App {
         return;
       }
 
-      // Calculate distance from user's real position (not map center)
       const userPos = this.#userCoords;
-      const withDist = data.map(p => {
-        const distM = userPos ? this._haversine(userPos, [+p.lat, +p.lon]) : null;
-        return { ...p, distM };
-      });
+      const withDist = data.map(p => ({
+        ...p,
+        distM: userPos ? this._haversine(userPos, [+p.lat, +p.lon]) : null,
+      }));
       withDist.sort((a, b) => (a.distM ?? Infinity) - (b.distM ?? Infinity));
 
       resultsList.innerHTML = '';
       withDist.forEach(place => {
-        const name  = place.name || place.display_name.split(',')[0];
-        const addr  = place.address
+        const name = place.name || place.display_name.split(',')[0];
+        const addr = place.address
           ? [place.address.road, place.address.house_number].filter(Boolean).join(' ')
           : place.display_name.split(',').slice(1, 3).join(',').trim();
         const distTxt = place.distM != null
-          ? place.distM < 1000
-            ? `${Math.round(place.distM)} m away`
-            : `${(place.distM / 1000).toFixed(1)} km away`
+          ? place.distM < 1000 ? `${Math.round(place.distM)} m away` : `${(place.distM / 1000).toFixed(1)} km away`
           : '';
 
         const li = document.createElement('li');
@@ -524,7 +565,6 @@ class App {
         li.addEventListener('click', () => this._selectPOI(place, name));
         resultsList.appendChild(li);
 
-        // Add marker on map
         const emoji = this._poiEmoji(query);
         const marker = L.marker([+place.lat, +place.lon], {
           icon: L.divIcon({
@@ -543,25 +583,32 @@ class App {
         this.#poiMarkers.push(marker);
       });
 
-      // Expose global helper for popup button
+      // ── AUTO-ROUTE: if tracking is active, clicking "Set as point A" routes
+      // FROM current GPS position TO the POI automatically ──
       window._poiSetA = (lat, lon) => {
-        if (!this.#routeMode) this._startRouteMode();
-        this.#routePointA = [lat, lon];
-        this.#routeStep = 2;
-        if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
-        this.#routeMarkerA = L.marker([lat, lon], {
-          icon: L.divIcon({
-            className: '',
-            html: '<div class="route-marker route-marker--a">A</div>',
-            iconSize: [28, 28], iconAnchor: [14, 14],
-          }),
-        }).addTo(this.#map);
-        document.getElementById('stepAText').textContent = 'Start point set ✓';
-        document.getElementById('stepAText').closest('.route-info__step').classList.add('route-info__step--done');
-        document.getElementById('stepBText').textContent = 'Click the end point on the map';
-        document.getElementById('map').style.cursor = 'crosshair';
-        this.#map.closePopup();
-        this.#map.setView([lat, lon], 15);
+        if (this.#trackingActive && this.#trackingCoords) {
+          // Tracking is on — route FROM current position TO this POI directly
+          this._autoRouteFromTracking([lat, lon]);
+        } else {
+          // Normal flow — set as point A in route planner
+          if (!this.#routeMode) this._startRouteMode();
+          this.#routePointA = [lat, lon];
+          this.#routeStep = 2;
+          if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
+          this.#routeMarkerA = L.marker([lat, lon], {
+            icon: L.divIcon({
+              className: '',
+              html: '<div class="route-marker route-marker--a">A</div>',
+              iconSize: [28, 28], iconAnchor: [14, 14],
+            }),
+          }).addTo(this.#map);
+          document.getElementById('stepAText').textContent = 'Start point set ✓';
+          document.getElementById('stepAText').closest('.route-info__step').classList.add('route-info__step--done');
+          document.getElementById('stepBText').textContent = 'Click the end point on the map';
+          document.getElementById('map').style.cursor = 'crosshair';
+          this.#map.closePopup();
+          this.#map.setView([lat, lon], 15);
+        }
       };
 
     } catch {
@@ -569,13 +616,58 @@ class App {
     }
   }
 
+  // ─── AUTO-ROUTE FROM TRACKING POSITION ───────────────────────────
+  // Called when tracking is active and user picks a destination.
+  // Sets point A = current GPS, point B = destination, draws route immediately.
+  _autoRouteFromTracking(destCoords) {
+    if (!this.#trackingCoords) return;
+
+    this.#map.closePopup();
+
+    // Prepare route mode state
+    this.#routeMode = true;
+    this.#routeStep = 3;
+    this.#routePointA = [...this.#trackingCoords];
+    this.#routePointB = destCoords;
+
+    btnRoute.classList.add('hidden');
+    routeInfo.classList.remove('hidden');
+    routeResult.classList.add('hidden');
+
+    // Place marker A at current GPS position
+    if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
+    this.#routeMarkerA = L.marker(this.#routePointA, {
+      icon: L.divIcon({
+        className: '',
+        html: '<div class="route-marker route-marker--a">A</div>',
+        iconSize: [28, 28], iconAnchor: [14, 14],
+      }),
+    }).addTo(this.#map);
+
+    // Place marker B at destination
+    if (this.#routeMarkerB) this.#map.removeLayer(this.#routeMarkerB);
+    this.#routeMarkerB = L.marker(destCoords, {
+      icon: L.divIcon({
+        className: '',
+        html: '<div class="route-marker route-marker--b">B</div>',
+        iconSize: [28, 28], iconAnchor: [14, 14],
+      }),
+    }).addTo(this.#map);
+
+    stepAText.textContent = 'Your position ✓';
+    stepBText.textContent = 'Destination set ✓';
+    stepAText.closest('.route-info__step').classList.add('route-info__step--done');
+    stepBText.closest('.route-info__step').classList.add('route-info__step--done');
+    document.getElementById('map').style.cursor = '';
+
+    this._drawRoute();
+  }
+
   _selectPOI(place, name) {
     this.#map.setView([+place.lat, +place.lon], 16, { animate: true });
     this.#poiMarkers.forEach(m => {
       const pos = m.getLatLng();
-      if (Math.abs(pos.lat - +place.lat) < 0.0001 && Math.abs(pos.lng - +place.lon) < 0.0001) {
-        m.openPopup();
-      }
+      if (Math.abs(pos.lat - +place.lat) < 0.0001 && Math.abs(pos.lng - +place.lon) < 0.0001) m.openPopup();
     });
   }
 
@@ -585,13 +677,14 @@ class App {
   }
 
   _poiEmoji(query) {
-    if (/grocery|store|shop|market|żabka|biedronk|lidl/i.test(query)) return '🛒';
-    if (/water|fountain|drink/i.test(query)) return '💧';
-    if (/toilet|wc|restroom|bathroom/i.test(query)) return '🚻';
+    if (/grocery|store|shop|market|sklep|żabka|biedronk|lidl/i.test(query)) return '🛒';
+    if (/water|fountain|woda|fontanna|jezioro|staw|rzeka/i.test(query)) return '💧';
+    if (/toilet|wc|restroom|toaleta/i.test(query)) return '🚻';
     if (/pharmacy|chemist|apteka/i.test(query)) return '💊';
-    if (/park|forest|garden/i.test(query)) return '🌳';
+    if (/park|forest|las|garden/i.test(query)) return '🌳';
     if (/cafe|coffee|kawiarnia/i.test(query)) return '☕';
-    if (/hospital|clinic|doctor/i.test(query)) return '🏥';
+    if (/hospital|clinic|doctor|szpital/i.test(query)) return '🏥';
+    if (/restaurant|restaurcja|bar|pub/i.test(query)) return '🍴';
     return '📍';
   }
 
@@ -617,9 +710,7 @@ class App {
     if (this.#routeStep === 3 && !routeResult.classList.contains('hidden')) {
       const distKm = parseFloat(routeDist.textContent);
       if (!isNaN(distKm)) {
-        const speed = this.#activitySpeeds[mode];
-        const timeMin = Math.round((distKm / speed) * 60);
-        routeTime.textContent = timeMin;
+        routeTime.textContent = Math.round((distKm / this.#activitySpeeds[mode]) * 60);
       }
     }
   }
@@ -642,6 +733,26 @@ class App {
     stepBText.closest('.route-info__step').classList.remove('route-info__step--done');
 
     document.getElementById('map').style.cursor = 'crosshair';
+
+    // ── AUTO-ROUTE: if tracking active, set point A to current GPS immediately ──
+    if (this.#trackingActive && this.#trackingCoords) {
+      const [lat, lng] = this.#trackingCoords;
+      this.#routePointA = [lat, lng];
+      this.#routeStep = 2;
+
+      if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
+      this.#routeMarkerA = L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: '',
+          html: '<div class="route-marker route-marker--a">A</div>',
+          iconSize: [28, 28], iconAnchor: [14, 14],
+        }),
+      }).addTo(this.#map);
+
+      stepAText.textContent = 'Your position ✓';
+      stepAText.closest('.route-info__step').classList.add('route-info__step--done');
+      stepBText.textContent = 'Click the destination on the map';
+    }
   }
 
   _handleRouteClick(mapE) {
@@ -653,12 +764,7 @@ class App {
 
       if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
       this.#routeMarkerA = L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: '',
-          html: '<div class="route-marker route-marker--a">A</div>',
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        }),
+        icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--a">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
       }).addTo(this.#map);
 
       stepAText.textContent = 'Start point set ✓';
@@ -671,17 +777,11 @@ class App {
 
       if (this.#routeMarkerB) this.#map.removeLayer(this.#routeMarkerB);
       this.#routeMarkerB = L.marker([lat, lng], {
-        icon: L.divIcon({
-          className: '',
-          html: '<div class="route-marker route-marker--b">B</div>',
-          iconSize: [28, 28],
-          iconAnchor: [14, 14],
-        }),
+        icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--b">B</div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
       }).addTo(this.#map);
 
       stepBText.textContent = 'End point set ✓';
       stepBText.closest('.route-info__step').classList.add('route-info__step--done');
-
       document.getElementById('map').style.cursor = '';
 
       this._drawRoute();
@@ -697,6 +797,8 @@ class App {
       this.#routingControl = null;
     }
 
+    this._stopRouteProgress();
+
     this.#routingControl = L.Routing.control({
       waypoints: [
         L.latLng(this.#routePointA[0], this.#routePointA[1]),
@@ -707,22 +809,21 @@ class App {
       draggableWaypoints: false,
       fitSelectedRoutes: true,
       show: false,
-      lineOptions: {
-        styles: [{ color: '#00c46a', weight: 5, opacity: 0.85 }],
-      },
+      lineOptions: { styles: [{ color: '#00c46a', weight: 5, opacity: 0.85 }] },
       createMarker: () => null,
     })
       .on('routesfound', e => {
         routeLoading.classList.add('hidden');
-        const route = e.routes[0].summary;
-        const distKm = (route.totalDistance / 1000).toFixed(2);
-
+        const route = e.routes[0];
+        const distKm = (route.summary.totalDistance / 1000).toFixed(2);
         const speed = this.#activitySpeeds[this.#routeActivityMode];
-        const timeMin = Math.round((parseFloat(distKm) / speed) * 60);
-
         routeDist.textContent = distKm;
-        routeTime.textContent = timeMin;
+        routeTime.textContent = Math.round((parseFloat(distKm) / speed) * 60);
         routeResult.classList.remove('hidden');
+
+        // Start greying out the route as user walks it
+        const coords = route.coordinates.map(c => [c.lat, c.lng]);
+        this._startRouteProgress(coords);
       })
       .on('routingerror', () => {
         routeLoading.classList.add('hidden');
@@ -741,11 +842,9 @@ class App {
 
     if (this.#routeMarkerA) { this.#map.removeLayer(this.#routeMarkerA); this.#routeMarkerA = null; }
     if (this.#routeMarkerB) { this.#map.removeLayer(this.#routeMarkerB); this.#routeMarkerB = null; }
+    if (this.#routingControl) { this.#map.removeControl(this.#routingControl); this.#routingControl = null; }
 
-    if (this.#routingControl) {
-      this.#map.removeControl(this.#routingControl);
-      this.#routingControl = null;
-    }
+    this._stopRouteProgress();
 
     routeLoading.classList.add('hidden');
     btnRoute.classList.remove('hidden');
@@ -761,18 +860,10 @@ const app = new App();
 (function initMobilePanel() {
   const sidebar = document.querySelector('.sidebar');
   const HANDLE_ZONE = 56;
-
-  let startY = 0;
-  let startHeight = 0;
-  let isDragging = false;
+  let startY = 0, startHeight = 0, isDragging = false;
 
   const isMobile = () => window.innerWidth <= 768;
-
-  const snapTo = h => {
-    sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
-    sidebar.style.height = h;
-  };
-
+  const snapTo = h => { sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)'; sidebar.style.height = h; };
   const collapse = () => snapTo('5.5rem');
   const toHalf   = () => snapTo('55vh');
   const toFull   = () => snapTo('85vh');
@@ -797,8 +888,7 @@ const app = new App();
 
   sidebar.addEventListener('touchmove', e => {
     if (!isDragging || !isMobile()) return;
-    const touch = e.touches[0];
-    const delta = startY - touch.clientY;
+    const delta = startY - e.touches[0].clientY;
     const newH = Math.min(Math.max(startHeight + delta, 50), window.innerHeight * 0.88);
     sidebar.style.height = newH + 'px';
   }, { passive: true });

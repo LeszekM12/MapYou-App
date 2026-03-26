@@ -385,6 +385,20 @@ a:visited {
     color: var(--color-brand--2);
 }
 
+/* ─── WAKE LOCK BADGE ─── */
+.wake-lock-badge {
+    display: inline-block;
+    font-size: 1rem;
+    padding: 0.2rem 0.5rem;
+    border-radius: 3px;
+    background-color: rgba(0, 196, 106, 0.2);
+    color: var(--color-brand--2);
+    margin-left: 0.6rem;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    vertical-align: middle;
+}
+
 /* ─── PULSING DOT (live tracking marker) ─── */
 .tracking-dot {
     position: relative;

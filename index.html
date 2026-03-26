@@ -1,32 +1,36 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-  <link rel="shortcut icon" type="image/png" href="icon.png" />
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css" integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ==" crossorigin="" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
-  <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js" integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew==" crossorigin=""></script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+  <link rel="shortcut icon" type="image/png" href="icon.png"/>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+        integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+        crossorigin=""/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+  <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+          integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+          crossorigin=""></script>
   <script defer src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
   <script defer src="script.js"></script>
   <title>Mapty - Workouts App</title>
 </head>
 <body>
 <div class="sidebar">
-  <img src="logo.png" alt="Mapty logo" class="logo" />
+  <img src="logo.png" alt="Mapty logo" class="logo"/>
 
   <!-- POI SEARCH -->
   <div class="poi-search">
     <div class="poi-search__bar">
-      <input class="poi-search__input" id="poiInput" type="text" placeholder="Search nearby… (e.g. pharmacy, park)" />
+      <input class="poi-search__input" id="poiInput" type="text" placeholder="Search nearby… (e.g. Żabka, park)"/>
       <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
     </div>
     <div class="poi-filters" id="poiFilters">
       <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
-      <button class="poi-filter-btn" data-query="public toilet">🚻 WC</button>
+      <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
       <button class="poi-filter-btn" data-query="pharmacy">💊 Pharmacy</button>
       <button class="poi-filter-btn" data-query="park">🌳 Park</button>
     </div>
@@ -99,19 +103,19 @@
       </div>
       <div class="form__row">
         <label class="form__label">Distance</label>
-        <input class="form__input form__input--distance" placeholder="km" />
+        <input class="form__input form__input--distance" placeholder="km"/>
       </div>
       <div class="form__row">
         <label class="form__label">Duration</label>
-        <input class="form__input form__input--duration" placeholder="min" />
+        <input class="form__input form__input--duration" placeholder="min"/>
       </div>
       <div class="form__row">
         <label class="form__label">Cadence</label>
-        <input class="form__input form__input--cadence" placeholder="step/min" />
+        <input class="form__input form__input--cadence" placeholder="step/min"/>
       </div>
       <div class="form__row form__row--hidden">
         <label class="form__label">Elev Gain</label>
-        <input class="form__input form__input--elevation" placeholder="meters" />
+        <input class="form__input form__input--elevation" placeholder="meters"/>
       </div>
       <button class="form__btn">✓ Add Workout</button>
     </form>
