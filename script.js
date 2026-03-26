@@ -684,7 +684,7 @@ class App {
     if (/park|forest|las|garden/i.test(query)) return '🌳';
     if (/cafe|coffee|kawiarnia/i.test(query)) return '☕';
     if (/hospital|clinic|doctor|szpital/i.test(query)) return '🏥';
-    if (/restaurant|restaurcja|bar|pub/i.test(query)) return '🍴';
+    if (/restaurant|restauracja|bar|pub/i.test(query)) return '🍴';
     return '📍';
   }
 
