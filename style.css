@@ -42,10 +42,13 @@ a:visited {
 /* SIDEBAR */
 .sidebar {
     flex-basis: 50rem;
+    min-width: 0;
     background-color: var(--color-dark--1);
-    padding: 3rem 5rem 4rem 5rem;
+    padding: 3rem 2.5rem 4rem 2.5rem;
     display: flex;
     flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .logo {
@@ -926,7 +929,6 @@ a:visited {
     overflow: visible;
 }
 .settings-panel.hidden { display: none !important; }
-
 .settings-panel__header {
     display: flex;
     align-items: center;
@@ -991,6 +993,31 @@ a:visited {
 }
 .night-toggle.active .night-toggle__knob { left: 1.9rem; }
 
+/* Voice toggle switch — same as night but reused */
+.voice-toggle {
+    width: 3.6rem;
+    height: 2rem;
+    border-radius: 2rem;
+    background: #555;
+    position: relative;
+    flex-shrink: 0;
+    transition: background 0.25s;
+    cursor: pointer;
+}
+.voice-toggle.active { background: var(--color-brand--2); }
+.voice-toggle__knob {
+    position: absolute;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: 50%;
+    background: #fff;
+    top: 0.3rem;
+    left: 0.3rem;
+    transition: left 0.25s;
+    pointer-events: none;
+}
+.voice-toggle.active .voice-toggle__knob { left: 1.9rem; }
+
 /* Gear button next to search */
 .btn-settings-gear {
     background: var(--color-dark--2);
@@ -1007,12 +1034,8 @@ a:visited {
 .btn-settings-gear:hover { color: var(--color-light--2); }
 
 /* ─── NIGHT MODE overrides ─── */
-body.night-mode {
-    background-color: #0f1923;
-}
-body.night-mode .sidebar {
-    background-color: #0f1923;
-}
+body.night-mode { background-color: #0f1923; }
+body.night-mode .sidebar { background-color: #0f1923; }
 body.night-mode .workout,
 body.night-mode .form,
 body.night-mode .route-info,
@@ -1035,37 +1058,14 @@ body.night-mode .poi-filter-btn.poi-filter-btn--active {
     color: var(--color-brand--2);
     background-color: rgba(0,196,106,0.08);
 }
-body.night-mode .btn-settings-gear {
-    background: #1a2a3a;
-    border-color: #2a3d5e;
-}
-body.night-mode .btn-track {
-    background-color: #1a2a3a;
-    border-color: #2a3d5e;
-    color: #b8c8d8;
-}
-body.night-mode .btn-route {
-    background-color: #006e3a;
-    border: 1px solid var(--color-brand--2);
-    color: var(--color-brand--2);
-}
-body.night-mode .form__input {
-    background-color: #1a2a3a;
-    color: #b8c8d8;
-}
-body.night-mode .settings-item {
-    border-bottom-color: rgba(100,160,220,0.08);
-}
-body.night-mode .poi-result-item {
-    background-color: #1a2a3a;
-    border-color: #2a3d5e;
-}
-body.night-mode .route-result__item {
-    background-color: #0f1923;
-}
-body.night-mode .route-mode-btn {
-    background-color: #1a2a3a;
-}
+body.night-mode .btn-settings-gear { background: #1a2a3a; border-color: #2a3d5e; }
+body.night-mode .btn-track { background-color: #1a2a3a; border-color: #2a3d5e; color: #b8c8d8; }
+body.night-mode .btn-route { background-color: #006e3a; border: 1px solid var(--color-brand--2); color: var(--color-brand--2); }
+body.night-mode .form__input { background-color: #1a2a3a; color: #b8c8d8; }
+body.night-mode .settings-item { border-bottom-color: rgba(100,160,220,0.08); }
+body.night-mode .poi-result-item { background-color: #1a2a3a; border-color: #2a3d5e; }
+body.night-mode .route-result__item { background-color: #0f1923; }
+body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 
 /* ─── ARRIVAL TOAST ─── */
 .arrival-toast {

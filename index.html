@@ -2,11 +2,10 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
   <meta name="theme-color" content="#2d3439"/>
   <meta name="description" content="Mapty — track your workouts on the map"/>
-
   <meta name="apple-mobile-web-app-capable" content="yes"/>
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
   <meta name="apple-mobile-web-app-title" content="Mapty"/>
@@ -14,37 +13,28 @@
 
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="style.css"/>
-
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
         integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
         crossorigin=""/>
   <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
-
   <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
           integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
           crossorigin=""></script>
   <script defer src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
   <script defer src="script.js"></script>
-
   <title>Mapty - Workouts App</title>
 </head>
 <body>
 <div class="sidebar">
   <img src="logo.png" alt="Mapty logo" class="logo"/>
 
-  <!-- POI SEARCH + GEAR BUTTON -->
   <div class="poi-search">
     <div class="poi-search__bar">
-      <input class="poi-search__input" id="poiInput" type="text"
-             placeholder="Search nearby…"
-             autocomplete="off"
-             list="poiSuggestions"/>
+      <input class="poi-search__input" id="poiInput" type="text" placeholder="Search nearby…" autocomplete="off" list="poiSuggestions"/>
       <datalist id="poiSuggestions"></datalist>
       <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
       <button class="btn-settings-gear" id="btnSettings" title="Settings">⚙️</button>
     </div>
-
-    <!-- Single-row horizontally scrollable filter pills -->
     <div class="poi-filters" id="poiFilters">
       <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
       <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
@@ -58,17 +48,14 @@
       <button class="poi-filter-btn" data-query="cafe">☕ Cafe</button>
       <button class="poi-filter-btn" data-query="hospital">🏥 Hospital</button>
     </div>
-
     <ul class="poi-results hidden" id="poiResults"></ul>
   </div>
 
-  <!-- SETTINGS PANEL — always in DOM, toggled via JS -->
   <div class="settings-panel hidden" id="settingsPanel">
     <div class="settings-panel__header">
       <button class="btn-settings-back" id="btnSettingsBack">←</button>
       <span class="settings-panel__title">Settings</span>
     </div>
-
     <div class="settings-item" id="settingShare">
       <span class="settings-item__icon">📤</span>
       <div class="settings-item__text">
@@ -77,18 +64,22 @@
       </div>
       <span class="settings-item__arrow">›</span>
     </div>
-
     <div class="settings-item" id="settingNight">
       <span class="settings-item__icon">🌙</span>
       <div class="settings-item__text">
         <div class="settings-item__label">Night mode</div>
         <div class="settings-item__sub">Dark UI + dark map tiles</div>
       </div>
-      <div class="night-toggle" id="nightToggle">
-        <div class="night-toggle__knob"></div>
-      </div>
+      <div class="night-toggle" id="nightToggle"><div class="night-toggle__knob"></div></div>
     </div>
-
+    <div class="settings-item" id="settingVoice">
+      <span class="settings-item__icon">🔊</span>
+      <div class="settings-item__text">
+        <div class="settings-item__label">Voice stats</div>
+        <div class="settings-item__sub">Announce distance &amp; pace every km</div>
+      </div>
+      <div class="voice-toggle" id="voiceToggle"><div class="voice-toggle__knob"></div></div>
+    </div>
     <div class="settings-item" id="settingClear">
       <span class="settings-item__icon">🗑️</span>
       <div class="settings-item__text">
@@ -97,7 +88,6 @@
       </div>
       <span class="settings-item__arrow">›</span>
     </div>
-
     <div class="settings-item" id="settingInstall" style="display:none">
       <span class="settings-item__icon">📱</span>
       <div class="settings-item__text">
@@ -108,15 +98,12 @@
     </div>
   </div>
 
-  <!-- LIVE TRACKING -->
   <div class="tracking-controls">
     <button class="btn-track" id="btnTrack">📍 Start tracking</button>
   </div>
 
-  <!-- ROUTE PLANNER -->
   <div class="route-controls">
     <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
-
     <div class="route-info hidden" id="routeInfo">
       <div class="route-mode-selector">
         <button class="route-mode-btn route-mode-btn--active" data-mode="running" title="Running">🏃‍♂️</button>
@@ -157,7 +144,6 @@
     </div>
   </div>
 
-  <!-- WORKOUT LIST -->
   <ul class="workouts">
     <form class="form hidden">
       <div class="form__row">

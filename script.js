@@ -64,7 +64,7 @@ const routeTime = document.getElementById('routeTime');
 const routeLoading = document.getElementById('routeLoading');
 const btnTrack = document.getElementById('btnTrack');
 
-// Map tile URLs
+// Map tile configs
 const TILES = {
   day:   'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
   night: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
@@ -93,6 +93,9 @@ class App {
   #routeActivityMode = 'running';
 
   // Route progress
+  // KEY FIX: progress line is drawn in a custom Leaflet pane with zIndex 650,
+  // which is higher than the routing polyline pane (400) but below markers (600→800).
+  // This guarantees the grey line always renders ON TOP of the green route.
   #routeCoords = [];
   #routeTotalDist = 0;
   #progressLine = null;
@@ -103,23 +106,30 @@ class App {
   static #ARRIVAL_CONSEC = 3;
   static #ARRIVAL_DIST = 20;
 
+  // Voice stats (Text-to-Speech)
+  #voiceEnabled = false;
+  #voiceKmAnnounced = 0;   // how many km milestones already announced
+  #voiceStartTime = null;  // timestamp when tracking started (for pace calc)
+  #voiceDistCovered = 0;   // metres covered since tracking start
+
   // Live tracking
   #trackingActive = false;
   #watchId = null;
   #trackingMarker = null;
   #trackingCoords = null;
+  #prevTrackingCoords = null; // for distance accumulation
 
   // Lazy centering
   #userTouchingMap = false;
   #recenterTimer = null;
 
-  // Wake Lock
-  #wakeLock = null;
-
   // Night mode
   #nightMode = false;
 
-  // PWA install prompt
+  // Wake Lock
+  #wakeLock = null;
+
+  // PWA install
   #deferredInstallPrompt = null;
 
   #markers = new Map();
@@ -150,11 +160,15 @@ class App {
     this._initFilterScroll();
     this._initPWAInstall();
 
-    // Restore night mode preference
+    // Restore preferences
     if (localStorage.getItem('nightMode') === 'true') {
       this.#nightMode = true;
       document.body.classList.add('night-mode');
       document.getElementById('nightToggle')?.classList.add('active');
+    }
+    if (localStorage.getItem('voiceStats') === 'true') {
+      this.#voiceEnabled = true;
+      document.getElementById('voiceToggle')?.classList.add('active');
     }
   }
 
@@ -174,6 +188,12 @@ class App {
 
     this.#map = L.map('map').setView(coords, this.#mapZoomLevel);
 
+    // Create a custom pane for the progress line with zIndex 650.
+    // Leaflet's default polyline pane is 400; overlayPane is 200.
+    // zIndex 650 puts our grey line above the route (400) but below markers (600-900).
+    this.#map.createPane('progressPane');
+    this.#map.getPane('progressPane').style.zIndex = 650;
+
     const tileKey = this.#nightMode ? 'night' : 'day';
     this.#tileLayer = L.tileLayer(TILES[tileKey], { attribution: TILE_ATTR[tileKey] }).addTo(this.#map);
 
@@ -191,56 +211,44 @@ class App {
 
   // ─── SETTINGS ────────────────────────────────────────────────────
   _initSettings() {
-    const btnGear    = document.getElementById('btnSettings');
-    const panel      = document.getElementById('settingsPanel');
-    const btnBack    = document.getElementById('btnSettingsBack');
-    const itemShare  = document.getElementById('settingShare');
-    const itemNight  = document.getElementById('settingNight');
-    const toggle     = document.getElementById('nightToggle');
-    const itemClear  = document.getElementById('settingClear');
+    const btnGear     = document.getElementById('btnSettings');
+    const panel       = document.getElementById('settingsPanel');
+    const btnBack     = document.getElementById('btnSettingsBack');
+    const itemShare   = document.getElementById('settingShare');
+    const itemNight   = document.getElementById('settingNight');
+    const nightToggle = document.getElementById('nightToggle');
+    const itemVoice   = document.getElementById('settingVoice');
+    const voiceToggle = document.getElementById('voiceToggle');
+    const itemClear   = document.getElementById('settingClear');
     const itemInstall = document.getElementById('settingInstall');
 
-    // Toggle panel open/close — works on ALL screen sizes
-    btnGear.addEventListener('click', e => {
-      e.stopPropagation();
-      panel.classList.toggle('hidden');
-    });
-
+    btnGear.addEventListener('click', e => { e.stopPropagation(); panel.classList.toggle('hidden'); });
     btnBack.addEventListener('click', () => panel.classList.add('hidden'));
 
-    // Close panel when clicking outside
     document.addEventListener('click', e => {
-      if (!panel.classList.contains('hidden') &&
-        !panel.contains(e.target) &&
-        e.target !== btnGear) {
+      if (!panel.classList.contains('hidden') && !panel.contains(e.target) && e.target !== btnGear)
         panel.classList.add('hidden');
-      }
     });
 
     itemShare.addEventListener('click', () => this._shareLocation());
-
-    // Night mode toggle
     itemNight.addEventListener('click', () => this._toggleNightMode());
-    toggle.addEventListener('click', e => { e.stopPropagation(); this._toggleNightMode(); });
+    nightToggle?.addEventListener('click', e => { e.stopPropagation(); this._toggleNightMode(); });
+    itemVoice.addEventListener('click', () => this._toggleVoice());
+    voiceToggle?.addEventListener('click', e => { e.stopPropagation(); this._toggleVoice(); });
 
     itemClear.addEventListener('click', () => {
-      if (confirm('Delete all workouts?')) {
-        localStorage.removeItem('workouts');
-        location.reload();
-      }
+      if (confirm('Delete all workouts?')) { localStorage.removeItem('workouts'); location.reload(); }
     });
 
-    if (itemInstall) {
-      itemInstall.addEventListener('click', () => {
-        if (this.#deferredInstallPrompt) {
-          this.#deferredInstallPrompt.prompt();
-          this.#deferredInstallPrompt.userChoice.then(() => {
-            this.#deferredInstallPrompt = null;
-            itemInstall.style.display = 'none';
-          });
-        }
-      });
-    }
+    itemInstall?.addEventListener('click', () => {
+      if (this.#deferredInstallPrompt) {
+        this.#deferredInstallPrompt.prompt();
+        this.#deferredInstallPrompt.userChoice.then(() => {
+          this.#deferredInstallPrompt = null;
+          if (itemInstall) itemInstall.style.display = 'none';
+        });
+      }
+    });
   }
 
   _initPWAInstall() {
@@ -256,18 +264,82 @@ class App {
   _toggleNightMode() {
     this.#nightMode = !this.#nightMode;
     document.body.classList.toggle('night-mode', this.#nightMode);
-
-    const toggle = document.getElementById('nightToggle');
-    if (toggle) toggle.classList.toggle('active', this.#nightMode);
-
+    document.getElementById('nightToggle')?.classList.toggle('active', this.#nightMode);
     localStorage.setItem('nightMode', this.#nightMode);
 
-    // Swap map tiles
     if (this.#map && this.#tileLayer) {
       this.#map.removeLayer(this.#tileLayer);
-      const tileKey = this.#nightMode ? 'night' : 'day';
-      this.#tileLayer = L.tileLayer(TILES[tileKey], { attribution: TILE_ATTR[tileKey] }).addTo(this.#map);
+      const key = this.#nightMode ? 'night' : 'day';
+      this.#tileLayer = L.tileLayer(TILES[key], { attribution: TILE_ATTR[key] }).addTo(this.#map);
     }
+  }
+
+  // ─── VOICE STATS ─────────────────────────────────────────────────
+  _toggleVoice() {
+    this.#voiceEnabled = !this.#voiceEnabled;
+    document.getElementById('voiceToggle')?.classList.toggle('active', this.#voiceEnabled);
+    localStorage.setItem('voiceStats', this.#voiceEnabled);
+
+    if (this.#voiceEnabled) {
+      // Test TTS so browser grants audio permission
+      this._speak('Voice stats enabled.');
+    }
+  }
+
+  _speak(text) {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const utt = new SpeechSynthesisUtterance(text);
+    utt.lang = 'pl-PL';
+    utt.rate = 1.0;
+    utt.pitch = 1.0;
+    window.speechSynthesis.speak(utt);
+  }
+
+  // Called from tracking GPS fix — accumulates distance and triggers announcements
+  _updateVoiceStats(lat, lng) {
+    if (!this.#voiceEnabled || !this.#trackingActive) return;
+
+    if (!this.#voiceStartTime) {
+      this.#voiceStartTime = Date.now();
+      this.#voiceDistCovered = 0;
+      this.#voiceKmAnnounced = 0;
+      this.#prevTrackingCoords = [lat, lng];
+      return;
+    }
+
+    // Accumulate distance from previous fix
+    if (this.#prevTrackingCoords) {
+      const segM = this._haversine(this.#prevTrackingCoords, [lat, lng]);
+      // Ignore GPS jumps > 100m between fixes (noise)
+      if (segM < 100) this.#voiceDistCovered += segM;
+    }
+    this.#prevTrackingCoords = [lat, lng];
+
+    const kmCovered = this.#voiceDistCovered / 1000;
+    const nextMilestone = this.#voiceKmAnnounced + 1;
+
+    if (kmCovered >= nextMilestone) {
+      this.#voiceKmAnnounced = nextMilestone;
+
+      const elapsedMin = (Date.now() - this.#voiceStartTime) / 60000;
+      const paceMinPerKm = elapsedMin / kmCovered;
+      const paceMin = Math.floor(paceMinPerKm);
+      const paceSec = Math.round((paceMinPerKm - paceMin) * 60);
+      const paceSec2 = paceSec < 10 ? `0${paceSec}` : `${paceSec}`;
+
+      this._speak(
+        `Pokonałeś ${nextMilestone} ${nextMilestone === 1 ? 'kilometr' : nextMilestone < 5 ? 'kilometry' : 'kilometrów'}. ` +
+        `Średnie tempo: ${paceMin} minut ${paceSec2} sekund na kilometr.`
+      );
+    }
+  }
+
+  _resetVoiceStats() {
+    this.#voiceKmAnnounced = 0;
+    this.#voiceDistCovered = 0;
+    this.#voiceStartTime = null;
+    this.#prevTrackingCoords = null;
   }
 
   // ─── SHARE LOCATION ──────────────────────────────────────────────
@@ -279,10 +351,8 @@ class App {
     const url = `https://www.google.com/maps?q=${lat},${lng}`;
 
     if (navigator.share) {
-      try {
-        await navigator.share({ title: 'My location — Mapty', text: 'Here is my current location:', url });
-        return;
-      } catch { /* cancelled */ }
+      try { await navigator.share({ title: 'My location — Mapty', text: 'Here is my current location:', url }); return; }
+      catch { /* cancelled */ }
     }
 
     try {
@@ -370,6 +440,7 @@ class App {
     btnTrack.textContent = '⏹ Stop tracking';
     btnTrack.classList.add('tracking--active');
     this._requestWakeLock();
+    this._resetVoiceStats();
 
     const dotIcon = L.divIcon({
       className: '',
@@ -398,9 +469,13 @@ class App {
           }
         }
 
+        // Update route progress
         if (this.#routeCoords.length > 0 && this.#progressLine) {
           this._updateRouteProgress(lat, lng);
         }
+
+        // Update voice stats
+        this._updateVoiceStats(lat, lng);
       },
       () => { alert('Could not get your position for tracking.'); this._stopTracking(); },
       { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
@@ -413,11 +488,18 @@ class App {
     btnTrack.textContent = '📍 Start tracking';
     btnTrack.classList.remove('tracking--active');
     this._releaseWakeLock();
+    this._resetVoiceStats();
+
     if (this.#watchId !== null) { navigator.geolocation.clearWatch(this.#watchId); this.#watchId = null; }
     if (this.#trackingMarker) { this.#map.removeLayer(this.#trackingMarker); this.#trackingMarker = null; }
   }
 
   // ─── ROUTE PROGRESS ──────────────────────────────────────────────
+  // THE FIX: progress line now uses pane:'progressPane' (zIndex 650).
+  // Leaflet draws polylines in the overlayPane (zIndex 200) by default.
+  // Leaflet Routing Machine also uses overlayPane.
+  // By using a higher-z pane, the grey line always appears on top of green.
+
   _setupRouteProgress(routeCoords, totalDistM) {
     this.#routeCoords = routeCoords;
     this.#routeTotalDist = totalDistM;
@@ -427,12 +509,14 @@ class App {
 
     if (this.#progressLine) { this.#map.removeLayer(this.#progressLine); this.#progressLine = null; }
 
+    // Draw grey line in the custom high-z pane
     this.#progressLine = L.polyline([], {
-      color: '#b0b0b0',
-      weight: 6,
+      color: '#a0a0a0',
+      weight: 7,
       opacity: 1,
       lineJoin: 'round',
       lineCap: 'round',
+      pane: 'progressPane',   // ← THIS is what makes it render on top
     }).addTo(this.#map);
 
     if (!this.#trackingActive) this._startProgressOnlyWatch();
@@ -476,6 +560,7 @@ class App {
     if (this.#nearDestCount >= App.#ARRIVAL_CONSEC && !this.#arrivedShown) {
       this.#arrivedShown = true;
       this._showArrivalToast();
+      if (this.#voiceEnabled) this._speak('Dotarłeś na miejsce. Cel osiągnięty!');
     }
   }
 
@@ -745,7 +830,6 @@ class App {
     const resultsList = document.getElementById('poiResults');
     resultsList.classList.remove('hidden');
     resultsList.innerHTML = `<li class="poi-loading"><div class="route-loading__spinner"><div class="route-loading__dot"></div><div class="route-loading__dot"></div><div class="route-loading__dot"></div></div>Searching…</li>`;
-
     this._clearPOIMarkers();
 
     let url;
