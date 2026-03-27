@@ -1,13 +1,14 @@
 const CACHE = 'mapty-v1';
 
 const PRECACHE = [
-  '/',
-  '/index.html',
-  '/style.css',
-  '/script.js',
-  '/manifest.json',
-  '/icon.png',
-  '/logo.png',
+  './',
+  'index.html',
+  'style.css',
+  'script.js',
+  'manifest.json',
+  'icon-192.png',
+  'icon-512.png',
+  'logo.png',
 ];
 
 // Install — pre-cache app shell
