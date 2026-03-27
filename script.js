@@ -64,9 +64,20 @@ const routeTime = document.getElementById('routeTime');
 const routeLoading = document.getElementById('routeLoading');
 const btnTrack = document.getElementById('btnTrack');
 
+// Map tile URLs
+const TILES = {
+  day:   'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+  night: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+};
+const TILE_ATTR = {
+  day:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  night: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+};
+
 // ─── MAIN APP CLASS ──────────────────────────────────────────────
 class App {
   #map;
+  #tileLayer = null;
   #mapZoomLevel = 13;
   #mapEvent;
   #workouts = [];
@@ -84,15 +95,13 @@ class App {
   // Route progress
   #routeCoords = [];
   #routeTotalDist = 0;
-  #progressLineOuter = null;   // white outline for contrast
-  #progressLineInner = null;   // dark fill — highly visible
+  #progressLine = null;
   #progressWatchId = null;
   #coveredUpToIndex = 0;
   #arrivedShown = false;
-  // Arrival detection: require staying within threshold for N consecutive fixes
   #nearDestCount = 0;
-  static #ARRIVAL_CONSEC = 3;  // 3 consecutive fixes within threshold
-  static #ARRIVAL_DIST = 25;   // metres — strict radius to avoid false positives
+  static #ARRIVAL_CONSEC = 3;
+  static #ARRIVAL_DIST = 20;
 
   // Live tracking
   #trackingActive = false;
@@ -100,19 +109,24 @@ class App {
   #trackingMarker = null;
   #trackingCoords = null;
 
-  // Lazy map centering
+  // Lazy centering
   #userTouchingMap = false;
   #recenterTimer = null;
 
   // Wake Lock
   #wakeLock = null;
 
+  // Night mode
+  #nightMode = false;
+
+  // PWA install prompt
+  #deferredInstallPrompt = null;
+
   #markers = new Map();
   #poiMarkers = [];
   #userCoords = null;
-
-  // Autocomplete debounce
   #autocompleteTimer = null;
+  #filterDrag = { active: false, startX: 0, scrollLeft: 0 };
 
   #activitySpeeds = { running: 10, cycling: 20, walking: 5 };
 
@@ -132,6 +146,16 @@ class App {
     );
 
     this._initPOISearch();
+    this._initSettings();
+    this._initFilterScroll();
+    this._initPWAInstall();
+
+    // Restore night mode preference
+    if (localStorage.getItem('nightMode') === 'true') {
+      this.#nightMode = true;
+      document.body.classList.add('night-mode');
+      document.getElementById('nightToggle')?.classList.add('active');
+    }
   }
 
   // ─── GEOLOCATION ─────────────────────────────────────────────────
@@ -149,22 +173,150 @@ class App {
     this.#userCoords = coords;
 
     this.#map = L.map('map').setView(coords, this.#mapZoomLevel);
-    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(this.#map);
+
+    const tileKey = this.#nightMode ? 'night' : 'day';
+    this.#tileLayer = L.tileLayer(TILES[tileKey], { attribution: TILE_ATTR[tileKey] }).addTo(this.#map);
 
     this.#map.on('click', this._handleMapClick.bind(this));
     this.#workouts.forEach(work => this._renderWorkoutMarker(work));
 
-    // Lazy centering: block re-center for 5s after user touches the map
     this.#map.on('mousedown touchstart', () => {
       this.#userTouchingMap = true;
       clearTimeout(this.#recenterTimer);
     });
     this.#map.on('mouseup touchend', () => {
-      this.#recenterTimer = setTimeout(() => {
-        this.#userTouchingMap = false;
-      }, 5000);
+      this.#recenterTimer = setTimeout(() => { this.#userTouchingMap = false; }, 5000);
+    });
+  }
+
+  // ─── SETTINGS ────────────────────────────────────────────────────
+  _initSettings() {
+    const btnGear    = document.getElementById('btnSettings');
+    const panel      = document.getElementById('settingsPanel');
+    const btnBack    = document.getElementById('btnSettingsBack');
+    const itemShare  = document.getElementById('settingShare');
+    const itemNight  = document.getElementById('settingNight');
+    const toggle     = document.getElementById('nightToggle');
+    const itemClear  = document.getElementById('settingClear');
+    const itemInstall = document.getElementById('settingInstall');
+
+    // Toggle panel open/close — works on ALL screen sizes
+    btnGear.addEventListener('click', e => {
+      e.stopPropagation();
+      panel.classList.toggle('hidden');
+    });
+
+    btnBack.addEventListener('click', () => panel.classList.add('hidden'));
+
+    // Close panel when clicking outside
+    document.addEventListener('click', e => {
+      if (!panel.classList.contains('hidden') &&
+        !panel.contains(e.target) &&
+        e.target !== btnGear) {
+        panel.classList.add('hidden');
+      }
+    });
+
+    itemShare.addEventListener('click', () => this._shareLocation());
+
+    // Night mode toggle
+    itemNight.addEventListener('click', () => this._toggleNightMode());
+    toggle.addEventListener('click', e => { e.stopPropagation(); this._toggleNightMode(); });
+
+    itemClear.addEventListener('click', () => {
+      if (confirm('Delete all workouts?')) {
+        localStorage.removeItem('workouts');
+        location.reload();
+      }
+    });
+
+    if (itemInstall) {
+      itemInstall.addEventListener('click', () => {
+        if (this.#deferredInstallPrompt) {
+          this.#deferredInstallPrompt.prompt();
+          this.#deferredInstallPrompt.userChoice.then(() => {
+            this.#deferredInstallPrompt = null;
+            itemInstall.style.display = 'none';
+          });
+        }
+      });
+    }
+  }
+
+  _initPWAInstall() {
+    window.addEventListener('beforeinstallprompt', e => {
+      e.preventDefault();
+      this.#deferredInstallPrompt = e;
+      const item = document.getElementById('settingInstall');
+      if (item) item.style.display = 'flex';
+    });
+  }
+
+  // ─── NIGHT MODE ──────────────────────────────────────────────────
+  _toggleNightMode() {
+    this.#nightMode = !this.#nightMode;
+    document.body.classList.toggle('night-mode', this.#nightMode);
+
+    const toggle = document.getElementById('nightToggle');
+    if (toggle) toggle.classList.toggle('active', this.#nightMode);
+
+    localStorage.setItem('nightMode', this.#nightMode);
+
+    // Swap map tiles
+    if (this.#map && this.#tileLayer) {
+      this.#map.removeLayer(this.#tileLayer);
+      const tileKey = this.#nightMode ? 'night' : 'day';
+      this.#tileLayer = L.tileLayer(TILES[tileKey], { attribution: TILE_ATTR[tileKey] }).addTo(this.#map);
+    }
+  }
+
+  // ─── SHARE LOCATION ──────────────────────────────────────────────
+  async _shareLocation() {
+    const coords = this.#trackingCoords || this.#userCoords;
+    if (!coords) { alert('Location not available yet. Start tracking first.'); return; }
+
+    const [lat, lng] = coords;
+    const url = `https://www.google.com/maps?q=${lat},${lng}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'My location — Mapty', text: 'Here is my current location:', url });
+        return;
+      } catch { /* cancelled */ }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      this._showToast('📋 Link copied to clipboard!');
+    } catch {
+      prompt('Copy this link:', url);
+    }
+  }
+
+  _showToast(message) {
+    document.querySelector('.arrival-toast')?.remove();
+    const toast = document.createElement('div');
+    toast.className = 'arrival-toast';
+    toast.style.borderLeftColor = '#ffb545';
+    toast.innerHTML = `<span class="arrival-toast__icon">📤</span><div><strong>${message}</strong></div><button class="arrival-toast__close">✕</button>`;
+    document.body.appendChild(toast);
+    toast.querySelector('.arrival-toast__close').addEventListener('click', () => toast.remove());
+    setTimeout(() => toast?.remove(), 4000);
+  }
+
+  // ─── FILTER DRAG SCROLL ──────────────────────────────────────────
+  _initFilterScroll() {
+    const el = document.getElementById('poiFilters');
+    if (!el) return;
+    el.addEventListener('mousedown', e => {
+      this.#filterDrag = { active: true, startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft };
+    });
+    el.addEventListener('mouseleave', () => { this.#filterDrag.active = false; });
+    el.addEventListener('mouseup',    () => { this.#filterDrag.active = false; });
+    el.addEventListener('mousemove', e => {
+      if (!this.#filterDrag.active) return;
+      e.preventDefault();
+      el.scrollLeft = this.#filterDrag.scrollLeft - (e.pageX - el.offsetLeft - this.#filterDrag.startX);
     });
   }
 
@@ -221,10 +373,7 @@ class App {
 
     const dotIcon = L.divIcon({
       className: '',
-      html: `<div class="tracking-dot">
-               <div class="tracking-dot__pulse"></div>
-               <div class="tracking-dot__core"></div>
-             </div>`,
+      html: `<div class="tracking-dot"><div class="tracking-dot__pulse"></div><div class="tracking-dot__core"></div></div>`,
       iconSize: [18, 18],
       iconAnchor: [9, 9],
     });
@@ -240,9 +389,6 @@ class App {
           this.#map.setView(latlng, this.#mapZoomLevel, { animate: true });
         } else {
           this.#trackingMarker.setLatLng(latlng);
-
-          // Lazy centering: re-center only when marker drifts far from screen center
-          // AND user hasn't touched the map in the last 5 seconds
           if (!this.#userTouchingMap) {
             const markerPx = this.#map.latLngToContainerPoint(L.latLng(latlng));
             const centerPx = this.#map.getSize().divideBy(2);
@@ -252,8 +398,7 @@ class App {
           }
         }
 
-        // Piggyback route progress on the same GPS fix
-        if (this.#routeCoords.length > 0 && this.#progressLineOuter) {
+        if (this.#routeCoords.length > 0 && this.#progressLine) {
           this._updateRouteProgress(lat, lng);
         }
       },
@@ -268,19 +413,11 @@ class App {
     btnTrack.textContent = '📍 Start tracking';
     btnTrack.classList.remove('tracking--active');
     this._releaseWakeLock();
-
-    if (this.#watchId !== null) {
-      navigator.geolocation.clearWatch(this.#watchId);
-      this.#watchId = null;
-    }
-    if (this.#trackingMarker) {
-      this.#map.removeLayer(this.#trackingMarker);
-      this.#trackingMarker = null;
-    }
+    if (this.#watchId !== null) { navigator.geolocation.clearWatch(this.#watchId); this.#watchId = null; }
+    if (this.#trackingMarker) { this.#map.removeLayer(this.#trackingMarker); this.#trackingMarker = null; }
   }
 
   // ─── ROUTE PROGRESS ──────────────────────────────────────────────
-
   _setupRouteProgress(routeCoords, totalDistM) {
     this.#routeCoords = routeCoords;
     this.#routeTotalDist = totalDistM;
@@ -288,42 +425,23 @@ class App {
     this.#arrivedShown = false;
     this.#nearDestCount = 0;
 
-    // Clear old lines
-    if (this.#progressLineOuter) { this.#map.removeLayer(this.#progressLineOuter); this.#progressLineOuter = null; }
-    if (this.#progressLineInner) { this.#map.removeLayer(this.#progressLineInner); this.#progressLineInner = null; }
+    if (this.#progressLine) { this.#map.removeLayer(this.#progressLine); this.#progressLine = null; }
 
-    // Two-layer progress line for maximum visibility:
-    // 1. Thick white outline (12px) — creates a halo so the line pops from both
-    //    the green route and any map background
-    // 2. Bold dark orange inner line (7px) — high contrast, not confused with route
-    this.#progressLineOuter = L.polyline([], {
-      color: '#ffffff',
-      weight: 12,
-      opacity: 0.7,
-      lineJoin: 'round',
-      lineCap: 'round',
-    }).addTo(this.#map);
-
-    this.#progressLineInner = L.polyline([], {
-      color: '#e05a00',   // dark orange — stands out clearly from green route
-      weight: 7,
+    this.#progressLine = L.polyline([], {
+      color: '#b0b0b0',
+      weight: 6,
       opacity: 1,
       lineJoin: 'round',
       lineCap: 'round',
     }).addTo(this.#map);
 
-    // If tracking is already active, its watchPosition feeds progress updates.
-    // If not, start a dedicated lightweight watch.
     if (!this.#trackingActive) this._startProgressOnlyWatch();
   }
 
   _startProgressOnlyWatch() {
     this.#progressWatchId = navigator.geolocation.watchPosition(
       position => {
-        if (!this.#routeCoords.length) {
-          navigator.geolocation.clearWatch(this.#progressWatchId);
-          return;
-        }
+        if (!this.#routeCoords.length) { navigator.geolocation.clearWatch(this.#progressWatchId); return; }
         this._updateRouteProgress(position.coords.latitude, position.coords.longitude);
       },
       () => {},
@@ -333,36 +451,26 @@ class App {
 
   _updateRouteProgress(lat, lng) {
     const userPt = L.latLng(lat, lng);
-
-    // ── Find closest route point ahead of current position ──
     let closestIdx = this.#coveredUpToIndex;
     let minDist = Infinity;
 
     for (let i = this.#coveredUpToIndex; i < this.#routeCoords.length; i++) {
       const d = userPt.distanceTo(L.latLng(this.#routeCoords[i]));
       if (d < minDist) { minDist = d; closestIdx = i; }
-      // Early-exit scan once distance increases significantly beyond minimum
       if (d > minDist + 200 && i > this.#coveredUpToIndex + 15) break;
     }
 
-    // Only advance forward and only if GPS is close enough to the route
     if (closestIdx > this.#coveredUpToIndex && minDist < 40) {
       this.#coveredUpToIndex = closestIdx;
-      const covered = this.#routeCoords.slice(0, this.#coveredUpToIndex + 1);
-      this.#progressLineOuter.setLatLngs(covered);
-      this.#progressLineInner.setLatLngs(covered);
+      this.#progressLine.setLatLngs(this.#routeCoords.slice(0, this.#coveredUpToIndex + 1));
       this._updateRemainingStats();
     }
 
-    // ── Arrival detection: require N consecutive GPS fixes near destination ──
-    // This prevents a false positive from a single noisy GPS reading.
-    const destPt = L.latLng(this.#routeCoords[this.#routeCoords.length - 1]);
-    const distToDest = userPt.distanceTo(destPt);
-
-    if (distToDest < App.#ARRIVAL_DIST) {
+    const lastPt = L.latLng(this.#routeCoords[this.#routeCoords.length - 1]);
+    if (userPt.distanceTo(lastPt) < App.#ARRIVAL_DIST) {
       this.#nearDestCount++;
     } else {
-      this.#nearDestCount = 0; // reset counter if user moves away
+      this.#nearDestCount = 0;
     }
 
     if (this.#nearDestCount >= App.#ARRIVAL_CONSEC && !this.#arrivedShown) {
@@ -373,43 +481,28 @@ class App {
 
   _updateRemainingStats() {
     if (!this.#routeCoords.length) return;
-
     let remainM = 0;
     for (let i = this.#coveredUpToIndex; i < this.#routeCoords.length - 1; i++) {
       remainM += L.latLng(this.#routeCoords[i]).distanceTo(L.latLng(this.#routeCoords[i + 1]));
     }
-
     const remainKm = remainM / 1000;
-    const speed = this.#activitySpeeds[this.#routeActivityMode];
     routeDist.textContent = remainKm.toFixed(2);
-    routeTime.textContent = Math.max(0, Math.round((remainKm / speed) * 60));
+    routeTime.textContent = Math.max(0, Math.round((remainKm / this.#activitySpeeds[this.#routeActivityMode]) * 60));
   }
 
   _showArrivalToast() {
     document.querySelector('.arrival-toast')?.remove();
-
     const toast = document.createElement('div');
     toast.className = 'arrival-toast';
-    toast.innerHTML = `
-      <span class="arrival-toast__icon">🎯</span>
-      <div>
-        <strong>You've arrived!</strong>
-        <p>Destination reached.</p>
-      </div>
-      <button class="arrival-toast__close">✕</button>
-    `;
+    toast.innerHTML = `<span class="arrival-toast__icon">🎯</span><div><strong>You've arrived!</strong><p>Destination reached.</p></div><button class="arrival-toast__close">✕</button>`;
     document.body.appendChild(toast);
     toast.querySelector('.arrival-toast__close').addEventListener('click', () => toast.remove());
     setTimeout(() => toast?.remove(), 8000);
   }
 
   _stopRouteProgress() {
-    if (this.#progressWatchId !== null) {
-      navigator.geolocation.clearWatch(this.#progressWatchId);
-      this.#progressWatchId = null;
-    }
-    if (this.#progressLineOuter) { this.#map.removeLayer(this.#progressLineOuter); this.#progressLineOuter = null; }
-    if (this.#progressLineInner) { this.#map.removeLayer(this.#progressLineInner); this.#progressLineInner = null; }
+    if (this.#progressWatchId !== null) { navigator.geolocation.clearWatch(this.#progressWatchId); this.#progressWatchId = null; }
+    if (this.#progressLine) { this.#map.removeLayer(this.#progressLine); this.#progressLine = null; }
     this.#routeCoords = [];
     this.#coveredUpToIndex = 0;
     this.#arrivedShown = false;
@@ -417,7 +510,7 @@ class App {
     document.querySelector('.arrival-toast')?.remove();
   }
 
-  // ─── MAP CLICK HANDLER ───────────────────────────────────────────
+  // ─── MAP CLICK ───────────────────────────────────────────────────
   _handleMapClick(mapE) {
     if (this.#routeMode) this._handleRouteClick(mapE);
     else this._showForm(mapE);
@@ -433,9 +526,7 @@ class App {
       requestAnimationFrame(() => {
         sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
         const needed = sidebar.scrollHeight;
-        const minH = window.innerHeight * 0.55;
-        const maxH = window.innerHeight * 0.85;
-        sidebar.style.height = Math.min(Math.max(needed, minH), maxH) + 'px';
+        sidebar.style.height = Math.min(Math.max(needed, window.innerHeight * 0.55), window.innerHeight * 0.85) + 'px';
       });
     }
   }
@@ -458,7 +549,7 @@ class App {
     inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
   }
 
-  // ─── CREATE NEW WORKOUT ──────────────────────────────────────────
+  // ─── WORKOUT ─────────────────────────────────────────────────────
   _newWorkout(e) {
     const validInputs = (...inputs) => inputs.every(inp => Number.isFinite(inp));
     const allPositive = (...inputs) => inputs.every(inp => inp > 0);
@@ -553,28 +644,19 @@ class App {
 
   _moveToPopup(e) {
     if (!this.#map) return;
-
     const deleteBtn = e.target.closest('.workout__delete');
-    if (deleteBtn) {
-      e.stopPropagation();
-      this._deleteWorkout(deleteBtn.dataset.id);
-      return;
-    }
-
+    if (deleteBtn) { e.stopPropagation(); this._deleteWorkout(deleteBtn.dataset.id); return; }
     const workoutEl = e.target.closest('.workout');
     if (!workoutEl) return;
     const workout = this.#workouts.find(work => work.id === workoutEl.dataset.id);
     if (!workout) return;
-
     this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
   }
 
   _deleteWorkout(id) {
     const marker = this.#markers.get(id);
     if (marker) { this.#map.removeLayer(marker); this.#markers.delete(id); }
-
     this.#workouts = this.#workouts.filter(w => w.id !== id);
-
     const el = document.querySelector(`.workout[data-id="${id}"]`);
     if (el) {
       el.style.transition = 'transform 0.3s ease, opacity 0.3s ease';
@@ -597,7 +679,6 @@ class App {
   reset() { localStorage.removeItem('workouts'); location.reload(); }
 
   // ─── POI SEARCH ──────────────────────────────────────────────────
-
   _initPOISearch() {
     const input = document.getElementById('poiInput');
     const btn   = document.getElementById('poiSearchBtn');
@@ -605,27 +686,18 @@ class App {
     const resultsList = document.getElementById('poiResults');
 
     btn.addEventListener('click', () => this._searchPOI(input.value.trim()));
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') this._searchPOI(input.value.trim()); });
 
-    input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') this._searchPOI(input.value.trim());
-    });
-
-    // Clear results when input is emptied
     input.addEventListener('input', () => {
       const val = input.value.trim();
-
-      // Hide results when bar is cleared
       if (val === '') {
         resultsList.classList.add('hidden');
         resultsList.innerHTML = '';
         this._clearPOIMarkers();
-        // Clear datalist suggestions too
-        const datalist = document.getElementById('poiSuggestions');
-        if (datalist) datalist.innerHTML = '';
+        const dl = document.getElementById('poiSuggestions');
+        if (dl) dl.innerHTML = '';
         return;
       }
-
-      // API-based autocomplete: debounce 350ms, min 2 chars
       clearTimeout(this.#autocompleteTimer);
       if (val.length >= 2) {
         this.#autocompleteTimer = setTimeout(() => this._fetchAutocompleteSuggestions(val), 350);
@@ -645,20 +717,14 @@ class App {
   async _fetchAutocompleteSuggestions(query) {
     const datalist = document.getElementById('poiSuggestions');
     if (!datalist) return;
-
     let url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=6&addressdetails=0`;
-
     if (this.#map) {
-      const bounds = this.#map.getBounds();
-      const sw = bounds.getSouthWest();
-      const ne = bounds.getNorthEast();
-      url += `&viewbox=${sw.lng},${ne.lat},${ne.lng},${sw.lat}&bounded=1`;
+      const b = this.#map.getBounds();
+      url += `&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}&bounded=1`;
     }
-
     try {
       const res = await fetch(url, { headers: { 'Accept-Language': 'en' } });
       const data = await res.json();
-
       datalist.innerHTML = '';
       const seen = new Set();
       data.forEach(place => {
@@ -678,24 +744,14 @@ class App {
 
     const resultsList = document.getElementById('poiResults');
     resultsList.classList.remove('hidden');
-    resultsList.innerHTML = `<li class="poi-loading">
-      <div class="route-loading__spinner">
-        <div class="route-loading__dot"></div>
-        <div class="route-loading__dot"></div>
-        <div class="route-loading__dot"></div>
-      </div>
-      Searching…
-    </li>`;
+    resultsList.innerHTML = `<li class="poi-loading"><div class="route-loading__spinner"><div class="route-loading__dot"></div><div class="route-loading__dot"></div><div class="route-loading__dot"></div></div>Searching…</li>`;
 
     this._clearPOIMarkers();
 
     let url;
     if (this.#map) {
-      const bounds = this.#map.getBounds();
-      const sw = bounds.getSouthWest();
-      const ne = bounds.getNorthEast();
-      const viewbox = `${sw.lng},${ne.lat},${ne.lng},${sw.lat}`;
-      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&viewbox=${viewbox}&bounded=1`;
+      const b = this.#map.getBounds();
+      url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1&viewbox=${b.getWest()},${b.getNorth()},${b.getEast()},${b.getSouth()}&bounded=1`;
     } else {
       url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=10&addressdetails=1`;
       if (this.#userCoords) url += `&lat=${this.#userCoords[0]}&lon=${this.#userCoords[1]}`;
@@ -711,10 +767,7 @@ class App {
       }
 
       const userPos = this.#userCoords;
-      const withDist = data.map(p => ({
-        ...p,
-        distM: userPos ? this._haversine(userPos, [+p.lat, +p.lon]) : null,
-      }));
+      const withDist = data.map(p => ({ ...p, distM: userPos ? this._haversine(userPos, [+p.lat, +p.lon]) : null }));
       withDist.sort((a, b) => (a.distM ?? Infinity) - (b.distM ?? Infinity));
 
       resultsList.innerHTML = '';
@@ -742,16 +795,11 @@ class App {
           icon: L.divIcon({
             className: '',
             html: `<div style="background:#2d3439;border:2px solid #00c46a;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,0.4)">${emoji}</div>`,
-            iconSize: [32, 32],
-            iconAnchor: [16, 16],
+            iconSize: [32, 32], iconAnchor: [16, 16],
           }),
         })
           .addTo(this.#map)
-          .bindPopup(`
-            <b>${name}</b>${addr ? `<br>${addr}` : ''}<br>
-            ${distTxt ? `<small>${distTxt}</small><br>` : ''}
-            <button onclick="window._poiSetA(${place.lat},${place.lon})" style="margin-top:6px;padding:4px 10px;background:#00c46a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">Set as point A →</button>
-          `);
+          .bindPopup(`<b>${name}</b>${addr ? `<br>${addr}` : ''}<br>${distTxt ? `<small>${distTxt}</small><br>` : ''}<button onclick="window._poiSetA(${place.lat},${place.lon})" style="margin-top:6px;padding:4px 10px;background:#00c46a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:13px;font-weight:700">Set as point A →</button>`);
         this.#poiMarkers.push(marker);
       });
 
@@ -780,10 +828,8 @@ class App {
     }
   }
 
-  // ─── AUTO-ROUTE FROM TRACKING POSITION ───────────────────────────
   _autoRouteFromTracking(destCoords) {
     if (!this.#trackingCoords) return;
-
     this.#map.closePopup();
     this.#routeMode = true;
     this.#routeStep = 3;
@@ -795,21 +841,15 @@ class App {
     routeResult.classList.add('hidden');
 
     if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
-    this.#routeMarkerA = L.marker(this.#routePointA, {
-      icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--a">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
-    }).addTo(this.#map);
-
+    this.#routeMarkerA = L.marker(this.#routePointA, { icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--a">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(this.#map);
     if (this.#routeMarkerB) this.#map.removeLayer(this.#routeMarkerB);
-    this.#routeMarkerB = L.marker(destCoords, {
-      icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--b">B</div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
-    }).addTo(this.#map);
+    this.#routeMarkerB = L.marker(destCoords, { icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--b">B</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(this.#map);
 
     stepAText.textContent = 'Your position ✓';
     stepBText.textContent = 'Destination set ✓';
     stepAText.closest('.route-info__step').classList.add('route-info__step--done');
     stepBText.closest('.route-info__step').classList.add('route-info__step--done');
     document.getElementById('map').style.cursor = '';
-
     this._drawRoute();
   }
 
@@ -821,20 +861,21 @@ class App {
     });
   }
 
-  _clearPOIMarkers() {
-    this.#poiMarkers.forEach(m => this.#map.removeLayer(m));
-    this.#poiMarkers = [];
-  }
+  _clearPOIMarkers() { this.#poiMarkers.forEach(m => this.#map.removeLayer(m)); this.#poiMarkers = []; }
 
   _poiEmoji(query) {
     if (/grocery|store|shop|market|sklep|żabka|biedronk|lidl/i.test(query)) return '🛒';
-    if (/water|fountain|woda|fontanna|jezioro|staw|rzeka/i.test(query)) return '💧';
+    if (/water|fountain|woda|fontanna/i.test(query)) return '💧';
     if (/toilet|wc|restroom|toaleta/i.test(query)) return '🚻';
     if (/pharmacy|chemist|apteka/i.test(query)) return '💊';
     if (/park|forest|las|garden/i.test(query)) return '🌳';
     if (/cafe|coffee|kawiarnia/i.test(query)) return '☕';
     if (/hospital|clinic|doctor|szpital/i.test(query)) return '🏥';
     if (/restaurant|restauracja|bar|pub/i.test(query)) return '🍴';
+    if (/paczkomat|inpost|parcel/i.test(query)) return '📦';
+    if (/atm|bankomat/i.test(query)) return '🏧';
+    if (/hotel|hostel/i.test(query)) return '🏨';
+    if (/church|kościół|chapel/i.test(query)) return '⛪';
     return '📍';
   }
 
@@ -848,15 +889,12 @@ class App {
   }
 
   // ─── ROUTE PLANNER ───────────────────────────────────────────────
-
   _setActivityMode(e) {
     const btn = e.currentTarget;
     const mode = btn.dataset.mode;
     this.#routeActivityMode = mode;
-
     document.querySelectorAll('.route-mode-btn').forEach(b => b.classList.remove('route-mode-btn--active'));
     btn.classList.add('route-mode-btn--active');
-
     if (this.#routeStep === 3 && !routeResult.classList.contains('hidden')) {
       const distKm = parseFloat(routeDist.textContent);
       if (!isNaN(distKm)) routeTime.textContent = Math.round((distKm / this.#activitySpeeds[mode]) * 60);
@@ -865,7 +903,6 @@ class App {
 
   _startRouteMode() {
     if (!form.classList.contains('hidden')) this._hideForm();
-
     this.#routeMode = true;
     this.#routeStep = 1;
     this.#routePointA = null;
@@ -879,19 +916,14 @@ class App {
     stepBText.textContent = 'Click the end point on the map';
     stepAText.closest('.route-info__step').classList.remove('route-info__step--done');
     stepBText.closest('.route-info__step').classList.remove('route-info__step--done');
-
     document.getElementById('map').style.cursor = 'crosshair';
 
     if (this.#trackingActive && this.#trackingCoords) {
       const [lat, lng] = this.#trackingCoords;
       this.#routePointA = [lat, lng];
       this.#routeStep = 2;
-
       if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
-      this.#routeMarkerA = L.marker([lat, lng], {
-        icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--a">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
-      }).addTo(this.#map);
-
+      this.#routeMarkerA = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--a">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(this.#map);
       stepAText.textContent = 'Your position ✓';
       stepAText.closest('.route-info__step').classList.add('route-info__step--done');
       stepBText.textContent = 'Click the destination on the map';
@@ -904,12 +936,8 @@ class App {
     if (this.#routeStep === 1) {
       this.#routePointA = [lat, lng];
       this.#routeStep = 2;
-
       if (this.#routeMarkerA) this.#map.removeLayer(this.#routeMarkerA);
-      this.#routeMarkerA = L.marker([lat, lng], {
-        icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--a">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
-      }).addTo(this.#map);
-
+      this.#routeMarkerA = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--a">A</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(this.#map);
       stepAText.textContent = 'Start point set ✓';
       stepAText.closest('.route-info__step').classList.add('route-info__step--done');
       stepBText.textContent = 'Click the end point on the map';
@@ -917,16 +945,11 @@ class App {
     } else if (this.#routeStep === 2) {
       this.#routePointB = [lat, lng];
       this.#routeStep = 3;
-
       if (this.#routeMarkerB) this.#map.removeLayer(this.#routeMarkerB);
-      this.#routeMarkerB = L.marker([lat, lng], {
-        icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--b">B</div>', iconSize: [28, 28], iconAnchor: [14, 14] }),
-      }).addTo(this.#map);
-
+      this.#routeMarkerB = L.marker([lat, lng], { icon: L.divIcon({ className: '', html: '<div class="route-marker route-marker--b">B</div>', iconSize: [28, 28], iconAnchor: [14, 14] }) }).addTo(this.#map);
       stepBText.textContent = 'End point set ✓';
       stepBText.closest('.route-info__step').classList.add('route-info__step--done');
       document.getElementById('map').style.cursor = '';
-
       this._drawRoute();
     }
   }
@@ -934,25 +957,14 @@ class App {
   _drawRoute() {
     routeLoading.classList.remove('hidden');
     routeResult.classList.add('hidden');
-
-    if (this.#routingControl) {
-      this.#map.removeControl(this.#routingControl);
-      this.#routingControl = null;
-    }
-
+    if (this.#routingControl) { this.#map.removeControl(this.#routingControl); this.#routingControl = null; }
     this._stopRouteProgress();
 
     this.#routingControl = L.Routing.control({
-      waypoints: [
-        L.latLng(this.#routePointA[0], this.#routePointA[1]),
-        L.latLng(this.#routePointB[0], this.#routePointB[1]),
-      ],
-      routeWhileDragging: false,
-      addWaypoints: false,
-      draggableWaypoints: false,
-      fitSelectedRoutes: true,
-      show: false,
-      lineOptions: { styles: [{ color: '#00c46a', weight: 5, opacity: 0.85 }] },
+      waypoints: [L.latLng(this.#routePointA[0], this.#routePointA[1]), L.latLng(this.#routePointB[0], this.#routePointB[1])],
+      routeWhileDragging: false, addWaypoints: false, draggableWaypoints: false,
+      fitSelectedRoutes: true, show: false,
+      lineOptions: { styles: [{ color: '#00c46a', weight: 6, opacity: 0.85 }] },
       createMarker: () => null,
     })
       .on('routesfound', e => {
@@ -960,13 +972,10 @@ class App {
         const route = e.routes[0];
         const totalDistM = route.summary.totalDistance;
         const distKm = (totalDistM / 1000).toFixed(2);
-        const speed = this.#activitySpeeds[this.#routeActivityMode];
         routeDist.textContent = distKm;
-        routeTime.textContent = Math.round((parseFloat(distKm) / speed) * 60);
+        routeTime.textContent = Math.round((parseFloat(distKm) / this.#activitySpeeds[this.#routeActivityMode]) * 60);
         routeResult.classList.remove('hidden');
-
-        const coords = route.coordinates.map(c => [c.lat, c.lng]);
-        this._setupRouteProgress(coords, totalDistM);
+        this._setupRouteProgress(route.coordinates.map(c => [c.lat, c.lng]), totalDistM);
       })
       .on('routingerror', () => {
         routeLoading.classList.add('hidden');
@@ -982,13 +991,10 @@ class App {
     this.#routeStep = 0;
     this.#routePointA = null;
     this.#routePointB = null;
-
     if (this.#routeMarkerA) { this.#map.removeLayer(this.#routeMarkerA); this.#routeMarkerA = null; }
     if (this.#routeMarkerB) { this.#map.removeLayer(this.#routeMarkerB); this.#routeMarkerB = null; }
     if (this.#routingControl) { this.#map.removeControl(this.#routingControl); this.#routingControl = null; }
-
     this._stopRouteProgress();
-
     routeLoading.classList.add('hidden');
     btnRoute.classList.remove('hidden');
     routeInfo.classList.add('hidden');

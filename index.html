@@ -29,23 +29,80 @@
 <div class="sidebar">
   <img src="logo.png" alt="Mapty logo" class="logo"/>
 
-  <!-- POI SEARCH -->
+  <!-- POI SEARCH + GEAR BUTTON -->
   <div class="poi-search">
     <div class="poi-search__bar">
       <input class="poi-search__input" id="poiInput" type="text"
-             placeholder="Search nearby… (e.g. Cafe, park)"
+             placeholder="Search nearby…"
              autocomplete="off"
              list="poiSuggestions"/>
       <datalist id="poiSuggestions"></datalist>
       <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
+      <button class="btn-settings-gear" id="btnSettings" title="Settings">⚙️</button>
     </div>
+
+    <!-- Single-row horizontally scrollable filter pills -->
     <div class="poi-filters" id="poiFilters">
       <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
       <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
       <button class="poi-filter-btn" data-query="pharmacy">💊 Pharmacy</button>
       <button class="poi-filter-btn" data-query="park">🌳 Park</button>
+      <button class="poi-filter-btn" data-query="Paczkomat InPost">📦 Paczkomat</button>
+      <button class="poi-filter-btn" data-query="restaurant">🍴 Restaurant</button>
+      <button class="poi-filter-btn" data-query="ATM">🏧 ATM</button>
+      <button class="poi-filter-btn" data-query="hotel">🏨 Hotel</button>
+      <button class="poi-filter-btn" data-query="church">⛪ Church</button>
+      <button class="poi-filter-btn" data-query="cafe">☕ Cafe</button>
+      <button class="poi-filter-btn" data-query="hospital">🏥 Hospital</button>
     </div>
+
     <ul class="poi-results hidden" id="poiResults"></ul>
+  </div>
+
+  <!-- SETTINGS PANEL — always in DOM, toggled via JS -->
+  <div class="settings-panel hidden" id="settingsPanel">
+    <div class="settings-panel__header">
+      <button class="btn-settings-back" id="btnSettingsBack">←</button>
+      <span class="settings-panel__title">Settings</span>
+    </div>
+
+    <div class="settings-item" id="settingShare">
+      <span class="settings-item__icon">📤</span>
+      <div class="settings-item__text">
+        <div class="settings-item__label">Share my location</div>
+        <div class="settings-item__sub">Send a Google Maps link</div>
+      </div>
+      <span class="settings-item__arrow">›</span>
+    </div>
+
+    <div class="settings-item" id="settingNight">
+      <span class="settings-item__icon">🌙</span>
+      <div class="settings-item__text">
+        <div class="settings-item__label">Night mode</div>
+        <div class="settings-item__sub">Dark UI + dark map tiles</div>
+      </div>
+      <div class="night-toggle" id="nightToggle">
+        <div class="night-toggle__knob"></div>
+      </div>
+    </div>
+
+    <div class="settings-item" id="settingClear">
+      <span class="settings-item__icon">🗑️</span>
+      <div class="settings-item__text">
+        <div class="settings-item__label">Clear all workouts</div>
+        <div class="settings-item__sub">Remove saved history</div>
+      </div>
+      <span class="settings-item__arrow">›</span>
+    </div>
+
+    <div class="settings-item" id="settingInstall" style="display:none">
+      <span class="settings-item__icon">📱</span>
+      <div class="settings-item__text">
+        <div class="settings-item__label">Install app</div>
+        <div class="settings-item__sub">Add to home screen</div>
+      </div>
+      <span class="settings-item__arrow">›</span>
+    </div>
   </div>
 
   <!-- LIVE TRACKING -->
@@ -58,13 +115,11 @@
     <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
 
     <div class="route-info hidden" id="routeInfo">
-
       <div class="route-mode-selector">
         <button class="route-mode-btn route-mode-btn--active" data-mode="running" title="Running">🏃‍♂️</button>
         <button class="route-mode-btn" data-mode="cycling" title="Cycling">🚴‍♀️</button>
         <button class="route-mode-btn" data-mode="walking" title="Walking">🚶</button>
       </div>
-
       <div class="route-info__steps">
         <div class="route-info__step">
           <span class="route-info__badge route-info__badge--a">A</span>
@@ -75,7 +130,6 @@
           <span id="stepBText">Click the end point on the map</span>
         </div>
       </div>
-
       <div class="route-loading hidden" id="routeLoading">
         <div class="route-loading__spinner">
           <div class="route-loading__dot"></div>
@@ -84,7 +138,6 @@
         </div>
         <span class="route-loading__text">Calculating route...</span>
       </div>
-
       <div class="route-result hidden" id="routeResult">
         <div class="route-result__item">
           <span class="route-result__icon">📏</span>
@@ -97,7 +150,6 @@
           <span class="route-result__unit">min</span>
         </div>
       </div>
-
       <button class="btn-route-cancel" id="btnCancelRoute">✕ Cancel route</button>
     </div>
   </div>
@@ -135,7 +187,6 @@
 
 <div id="map"></div>
 
-<!-- PWA Service Worker -->
 <script>
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('/sw.js');
