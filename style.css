@@ -1109,3 +1109,89 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     letter-spacing: 0.05em;
     vertical-align: middle;
 }
+
+/* ─── STATS PANEL ─── */
+.stats-panel {
+    background-color: var(--color-dark--2);
+    border: 1.5px solid var(--color-brand--2);
+    border-radius: 8px;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.2rem;
+    cursor: pointer;
+    transition: border-color 0.2s;
+}
+.stats-panel:hover { border-color: #00a85a; }
+.stats-panel__label {
+    font-size: 1rem;
+    font-weight: 800;
+    color: var(--color-light--1);
+    letter-spacing: 0.1em;
+    text-align: center;
+    margin-bottom: 1.2rem;
+}
+.stats-panel__rings {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 1.2rem;
+    justify-content: space-between;
+}
+.stats-ring-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+.stats-ring-wrap svg { width: 100%; max-width: 7.2rem; height: auto; }
+.stats-panel__goal { border-top: 1px solid rgba(255,255,255,0.07); padding-top: 1rem; }
+.stats-panel__goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.stats-panel__goal-label { font-size: 1rem; font-weight: 800; color: var(--color-light--1); letter-spacing: 0.1em; }
+.stats-panel__goal-pct { font-size: 1.3rem; font-weight: 800; color: var(--color-light--2); }
+.stats-panel__goal-bar { height: 0.6rem; background: rgba(255,255,255,0.1); border-radius: 0.3rem; overflow: hidden; }
+.stats-panel__goal-fill { height: 100%; background: var(--color-brand--2); border-radius: 0.3rem; transition: width 0.6s ease; }
+
+/* ─── STATS DETAIL (expanded) ─── */
+.stats-detail {
+    background-color: var(--color-dark--2);
+    border-radius: 8px;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.2rem;
+}
+.stats-detail.hidden { display: none !important; }
+.stats-detail__title { font-size: 1.3rem; font-weight: 800; color: var(--color-light--2); margin-bottom: 1.2rem; }
+.stats-detail__bars { display: flex; align-items: flex-end; gap: 0.5rem; height: 5.6rem; margin-bottom: 0.6rem; }
+.stats-detail__day-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; height: 100%; justify-content: flex-end; }
+.stats-detail__bar { width: 100%; border-radius: 0.3rem 0.3rem 0 0; min-height: 0.3rem; transition: height 0.4s ease; }
+.stats-detail__day-name { font-size: 1rem; color: var(--color-light--1); font-weight: 700; }
+.stats-detail__totals { display: flex; justify-content: space-between; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.07); margin-top: 0.4rem; }
+.stats-detail__total-item { text-align: center; }
+.stats-detail__total-val { font-size: 1.6rem; font-weight: 800; color: var(--color-brand--2); display: block; }
+.stats-detail__total-val--amber { color: var(--color-brand--1); }
+.stats-detail__total-val--gray { color: var(--color-light--2); }
+.stats-detail__total-label { font-size: 1rem; color: var(--color-light--1); }
+
+/* ─── GOAL EDITOR ─── */
+.stats-goal-editor {
+    background-color: var(--color-dark--2);
+    border-radius: 8px;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.2rem;
+}
+.stats-goal-editor.hidden { display: none !important; }
+.stats-goal-editor__title { font-size: 1.1rem; font-weight: 800; color: var(--color-light--1); letter-spacing: 0.08em; margin-bottom: 1rem; }
+.stats-goal-editor__row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.8rem; }
+.stats-goal-editor__row:last-child { margin-bottom: 0; }
+.stats-goal-editor__label { font-size: 1.2rem; color: var(--color-light--2); flex: 1; }
+.stats-goal-editor__input {
+    width: 6rem;
+    background: var(--color-dark--1);
+    border: 1px solid var(--color-light--1);
+    border-radius: 4px;
+    color: var(--color-light--2);
+    font-family: inherit;
+    font-size: 1.3rem;
+    font-weight: 800;
+    text-align: center;
+    padding: 0.4rem 0.6rem;
+}
+.stats-goal-editor__input:focus { outline: none; border-color: var(--color-brand--2); }
+.stats-goal-editor__unit { font-size: 1.1rem; color: var(--color-light--1); min-width: 3rem; }

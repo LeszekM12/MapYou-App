@@ -140,6 +140,11 @@ class App {
 
   #activitySpeeds = { running: 10, cycling: 20, walking: 5 };
 
+  // Weekly stats
+  #goalKm = 35;
+  #goalCount = 7;
+  #statsExpanded = false;
+
   constructor() {
     this._getPosition();
     this._getLocalStorage();
@@ -159,6 +164,7 @@ class App {
     this._initSettings();
     this._initFilterScroll();
     this._initPWAInstall();
+    this._initStats();
 
     // Restore preferences
     if (localStorage.getItem('nightMode') === 'true') {
@@ -170,6 +176,10 @@ class App {
       this.#voiceEnabled = true;
       document.getElementById('voiceToggle')?.classList.add('active');
     }
+    const savedGoalKm = localStorage.getItem('goalKm');
+    const savedGoalCount = localStorage.getItem('goalCount');
+    if (savedGoalKm) this.#goalKm = +savedGoalKm;
+    if (savedGoalCount) this.#goalCount = +savedGoalCount;
   }
 
   // ─── GEOLOCATION ─────────────────────────────────────────────────
@@ -665,6 +675,7 @@ class App {
     this._renderWorkout(workout);
     this._hideForm();
     this._setLocalStorage();
+    this._renderStats();
   }
 
   _renderWorkoutMarker(workout) {
@@ -750,6 +761,7 @@ class App {
       setTimeout(() => el.remove(), 300);
     }
     this._setLocalStorage();
+    this._renderStats();
   }
 
   _setLocalStorage() { localStorage.setItem('workouts', JSON.stringify(this.#workouts)); }
@@ -759,9 +771,161 @@ class App {
     if (!data) return;
     this.#workouts = data;
     this.#workouts.forEach(work => this._renderWorkout(work));
+    this._renderStats();
   }
 
   reset() { localStorage.removeItem('workouts'); location.reload(); }
+
+  // ─── WEEKLY STATS ─────────────────────────────────────────────────
+  // Data source: this.#workouts (already in memory from localStorage).
+  // A "week" = Mon 00:00 to Sun 23:59 of the current calendar week.
+
+  _getWeekBounds() {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon…
+    const diffToMon = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+    const mon = new Date(now);
+    mon.setDate(now.getDate() + diffToMon);
+    mon.setHours(0, 0, 0, 0);
+    const sun = new Date(mon);
+    sun.setDate(mon.getDate() + 6);
+    sun.setHours(23, 59, 59, 999);
+    return { mon, sun };
+  }
+
+  _getWeekWorkouts() {
+    const { mon, sun } = this._getWeekBounds();
+    return this.#workouts.filter(w => {
+      const d = new Date(w.date);
+      return d >= mon && d <= sun;
+    });
+  }
+
+  _initStats() {
+    const panel = document.getElementById('statsPanel');
+    const detail = document.getElementById('statsDetail');
+    const editor = document.getElementById('statsGoalEditor');
+    const inKm  = document.getElementById('goalKmInput');
+    const inCnt = document.getElementById('goalCountInput');
+
+    if (!panel) return;
+
+    // Set saved goal values in inputs
+    if (inKm)  inKm.value  = this.#goalKm;
+    if (inCnt) inCnt.value = this.#goalCount;
+
+    // Toggle detail + goal editor on panel click
+    panel.addEventListener('click', () => {
+      this.#statsExpanded = !this.#statsExpanded;
+      detail?.classList.toggle('hidden', !this.#statsExpanded);
+      editor?.classList.toggle('hidden', !this.#statsExpanded);
+    });
+
+    // Goal inputs — save on change and re-render
+    inKm?.addEventListener('change', () => {
+      this.#goalKm = Math.max(1, +inKm.value || 35);
+      inKm.value = this.#goalKm;
+      localStorage.setItem('goalKm', this.#goalKm);
+      this._renderStats();
+    });
+
+    inCnt?.addEventListener('change', () => {
+      this.#goalCount = Math.max(1, +inCnt.value || 7);
+      inCnt.value = this.#goalCount;
+      localStorage.setItem('goalCount', this.#goalCount);
+      this._renderStats();
+    });
+
+    // Stop panel click from closing settings when inside stats
+    detail?.addEventListener('click', e => e.stopPropagation());
+    editor?.addEventListener('click', e => e.stopPropagation());
+
+    this._renderStats();
+  }
+
+  _renderStats() {
+    const weekW = this._getWeekWorkouts();
+
+    // ── Aggregates ──
+    const totalKm  = weekW.reduce((s, w) => s + (w.distance || 0), 0);
+    const totalMin = weekW.reduce((s, w) => s + (w.duration || 0), 0);
+    const totalCnt = weekW.length;
+
+    // ── Ring circumference = 2π×28 ≈ 175.9 ──
+    const CIRC = 175.9;
+    const ring = (id, pct) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      const offset = CIRC - Math.min(pct, 1) * CIRC;
+      el.setAttribute('stroke-dashoffset', offset.toFixed(1));
+    };
+
+    ring('statsRingKm',       totalKm   / this.#goalKm);
+    ring('statsRingWorkouts', totalCnt  / this.#goalCount);
+    ring('statsRingTime',     Math.min(totalMin / 300, 1)); // 300 min = 5h reference
+
+    // ── Value labels ──
+    const fmt = n => n.toFixed(1);
+    const fmtTime = m => m >= 60
+      ? `${Math.floor(m / 60)}h ${m % 60}m`
+      : `${Math.round(m)}m`;
+
+    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    setTxt('statsValKm',       fmt(totalKm));
+    setTxt('statsValTime',     fmtTime(totalMin));
+    setTxt('statsValWorkouts', totalCnt);
+
+    // ── Goal bar (based on km) ──
+    const goalPct = Math.min(Math.round((totalKm / this.#goalKm) * 100), 100);
+    setTxt('statsGoalPct', goalPct + '%');
+    const fill = document.getElementById('statsGoalFill');
+    if (fill) fill.style.width = goalPct + '%';
+
+    // ── Detail totals ──
+    setTxt('statsDetailKm',    fmt(totalKm));
+    setTxt('statsDetailTime',  fmtTime(totalMin));
+    setTxt('statsDetailCount', totalCnt);
+
+    // ── Bar chart: km per day Mon–Sun ──
+    this._renderDayBars(weekW);
+  }
+
+  _renderDayBars(weekWorkouts) {
+    const barsEl = document.getElementById('statsDetailBars');
+    if (!barsEl) return;
+
+    const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const { mon } = this._getWeekBounds();
+    const kmPerDay = Array(7).fill(0);
+    const typPerDay = Array(7).fill('none');
+
+    weekWorkouts.forEach(w => {
+      const d = new Date(w.date);
+      const diff = Math.floor((d - mon) / 86400000);
+      if (diff >= 0 && diff < 7) {
+        kmPerDay[diff] += w.distance || 0;
+        typPerDay[diff] = w.type; // last type wins
+      }
+    });
+
+    const maxKm = Math.max(...kmPerDay, 1);
+    const BAR_H = 48; // px available height
+
+    barsEl.innerHTML = DAY_NAMES.map((name, i) => {
+      const km  = kmPerDay[i];
+      const h   = Math.round((km / maxKm) * BAR_H);
+      const color = typPerDay[i] === 'running'
+        ? '#00c46a'
+        : typPerDay[i] === 'cycling'
+          ? '#ffb545'
+          : '#42484d';
+      return `
+        <div class="stats-detail__day-col">
+          <div class="stats-detail__bar" style="height:${Math.max(h, km > 0 ? 3 : 2)}px;background:${color}"></div>
+          <div class="stats-detail__day-name">${name}</div>
+        </div>`;
+    }).join('');
+  }
 
   // ─── POI SEARCH ──────────────────────────────────────────────────
   _initPOISearch() {
