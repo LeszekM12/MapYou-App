@@ -102,6 +102,113 @@
     <button class="btn-track" id="btnTrack">📍 Start tracking</button>
   </div>
 
+  <!-- ═══ STATS PANEL ═══ -->
+  <!-- Collapsed view: 3 rings + weekly goal bar. Click to expand. -->
+  <div class="stats-panel" id="statsPanel">
+    <div class="stats-panel__label">THIS WEEK'S SUMMARY</div>
+    <div class="stats-panel__rings">
+
+      <!-- KM ring -->
+      <div class="stats-ring-wrap">
+        <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="#42484d" stroke-width="6"/>
+          <circle id="statsRingKm" cx="36" cy="36" r="28" fill="none"
+                  stroke="#00c46a" stroke-width="6"
+                  stroke-dasharray="175.9" stroke-dashoffset="175.9"
+                  stroke-linecap="round" transform="rotate(-90 36 36)"/>
+          <text x="36" y="30" text-anchor="middle" fill="#ececec"
+                font-size="13" font-weight="800" font-family="Manrope,sans-serif"
+                id="statsValKm">0</text>
+          <text x="36" y="43" text-anchor="middle" fill="#aaa"
+                font-size="8" font-family="Manrope,sans-serif">KM</text>
+          <text x="36" y="21" text-anchor="middle" font-size="11">🏃</text>
+        </svg>
+      </div>
+
+      <!-- Time ring -->
+      <div class="stats-ring-wrap">
+        <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="#42484d" stroke-width="6"/>
+          <circle id="statsRingTime" cx="36" cy="36" r="28" fill="none"
+                  stroke="#aaa" stroke-width="6"
+                  stroke-dasharray="175.9" stroke-dashoffset="175.9"
+                  stroke-linecap="round" transform="rotate(-90 36 36)"/>
+          <text x="36" y="33" text-anchor="middle" fill="#ececec"
+                font-size="10" font-weight="800" font-family="Manrope,sans-serif"
+                id="statsValTime">0m</text>
+          <text x="36" y="44" text-anchor="middle" fill="#aaa"
+                font-size="8" font-family="Manrope,sans-serif">TIME</text>
+          <text x="36" y="22" text-anchor="middle" font-size="10">⏱</text>
+        </svg>
+      </div>
+
+      <!-- Workouts ring -->
+      <div class="stats-ring-wrap">
+        <svg viewBox="0 0 72 72" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="36" cy="36" r="28" fill="none" stroke="#42484d" stroke-width="6"/>
+          <circle id="statsRingWorkouts" cx="36" cy="36" r="28" fill="none"
+                  stroke="#ffb545" stroke-width="6"
+                  stroke-dasharray="175.9" stroke-dashoffset="175.9"
+                  stroke-linecap="round" transform="rotate(-90 36 36)"/>
+          <text x="36" y="30" text-anchor="middle" fill="#ececec"
+                font-size="13" font-weight="800" font-family="Manrope,sans-serif"
+                id="statsValWorkouts">0</text>
+          <text x="36" y="43" text-anchor="middle" fill="#aaa"
+                font-size="8" font-family="Manrope,sans-serif">WORKOUTS</text>
+          <text x="36" y="21" text-anchor="middle" font-size="11">🚴</text>
+        </svg>
+      </div>
+
+    </div>
+    <div class="stats-panel__goal">
+      <div class="stats-panel__goal-header">
+        <span class="stats-panel__goal-label">WEEKLY GOAL</span>
+        <span class="stats-panel__goal-pct" id="statsGoalPct">0%</span>
+      </div>
+      <div class="stats-panel__goal-bar">
+        <div class="stats-panel__goal-fill" id="statsGoalFill" style="width:0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Expanded: bar chart per day + goal editor. Hidden by default. -->
+  <div class="stats-detail hidden" id="statsDetail">
+    <div class="stats-detail__title">📊 Weekly activity</div>
+    <div class="stats-detail__bars" id="statsDetailBars">
+      <!-- filled by JS -->
+    </div>
+    <div class="stats-detail__totals">
+      <div class="stats-detail__total-item">
+        <span class="stats-detail__total-val" id="statsDetailKm">0.0</span>
+        <span class="stats-detail__total-label">km total</span>
+      </div>
+      <div class="stats-detail__total-item">
+        <span class="stats-detail__total-val stats-detail__total-val--gray" id="statsDetailTime">0m</span>
+        <span class="stats-detail__total-label">time</span>
+      </div>
+      <div class="stats-detail__total-item">
+        <span class="stats-detail__total-val stats-detail__total-val--amber" id="statsDetailCount">0</span>
+        <span class="stats-detail__total-label">workouts</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Goal editor, shown inside expanded view -->
+  <div class="stats-goal-editor hidden" id="statsGoalEditor">
+    <div class="stats-goal-editor__title">⚙ WEEKLY GOAL</div>
+    <div class="stats-goal-editor__row">
+      <span class="stats-goal-editor__label">Distance target</span>
+      <input class="stats-goal-editor__input" id="goalKmInput" type="number" min="1" max="500" value="35"/>
+      <span class="stats-goal-editor__unit">km</span>
+    </div>
+    <div class="stats-goal-editor__row">
+      <span class="stats-goal-editor__label">Workouts target</span>
+      <input class="stats-goal-editor__input" id="goalCountInput" type="number" min="1" max="30" value="7"/>
+      <span class="stats-goal-editor__unit">× /week</span>
+    </div>
+  </div>
+  <!-- ═══ END STATS PANEL ═══ -->
+
   <div class="route-controls">
     <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
     <div class="route-info hidden" id="routeInfo">
