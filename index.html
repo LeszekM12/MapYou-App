@@ -106,43 +106,31 @@
   <div class="stats-panel" id="statsPanel">
     <div class="stats-panel__label">THIS WEEK'S SUMMARY</div>
     <div class="stats-panel__rings">
-      <!-- KM ring -->
       <div class="stats-ring-wrap">
         <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
           <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-          <circle id="statsRingKm" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
-                  stroke="#00c46a" stroke-width="7"
-                  stroke-dasharray="226.2" stroke-dashoffset="226.2"
-                  stroke-linecap="round" transform="rotate(-90 45 45)"/>
-          <text x="45" y="38" text-anchor="middle" fill="#ececec" font-size="14" font-weight="800" font-family="Manrope,sans-serif" id="statsValKm">0.0</text>
+          <circle id="statsRingKm" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none" stroke="#00c46a" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2" stroke-linecap="round" transform="rotate(-90 45 45)"/>
+          <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800" font-family="Manrope,sans-serif" id="statsValKm">0.0</text>
           <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9" font-family="Manrope,sans-serif">KM</text>
-          <text x="45" y="24" text-anchor="middle" font-size="13">🏃</text>
+          <text x="45" y="25" text-anchor="middle" font-size="12">🏃</text>
         </svg>
       </div>
-      <!-- Time ring -->
       <div class="stats-ring-wrap">
         <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
           <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-          <circle id="statsRingTime" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
-                  stroke="#aaa" stroke-width="7"
-                  stroke-dasharray="226.2" stroke-dashoffset="226.2"
-                  stroke-linecap="round" transform="rotate(-90 45 45)"/>
+          <circle id="statsRingTime" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none" stroke="#aaa" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2" stroke-linecap="round" transform="rotate(-90 45 45)"/>
           <text x="45" y="41" text-anchor="middle" fill="#ececec" font-size="11" font-weight="800" font-family="Manrope,sans-serif" id="statsValTime">0m</text>
           <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9" font-family="Manrope,sans-serif">TIME</text>
           <text x="45" y="25" text-anchor="middle" font-size="12">⏱</text>
         </svg>
       </div>
-      <!-- Workouts ring -->
       <div class="stats-ring-wrap">
         <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
           <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-          <circle id="statsRingWorkouts" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
-                  stroke="#ffb545" stroke-width="7"
-                  stroke-dasharray="226.2" stroke-dashoffset="226.2"
-                  stroke-linecap="round" transform="rotate(-90 45 45)"/>
-          <text x="45" y="38" text-anchor="middle" fill="#ececec" font-size="14" font-weight="800" font-family="Manrope,sans-serif" id="statsValWorkouts">0</text>
+          <circle id="statsRingWorkouts" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none" stroke="#ffb545" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2" stroke-linecap="round" transform="rotate(-90 45 45)"/>
+          <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800" font-family="Manrope,sans-serif" id="statsValWorkouts">0</text>
           <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9" font-family="Manrope,sans-serif">WORKOUTS</text>
-          <text x="45" y="24" text-anchor="middle" font-size="13">🚴</text>
+          <text x="45" y="25" text-anchor="middle" font-size="12">🚴</text>
         </svg>
       </div>
     </div>
@@ -151,13 +139,10 @@
         <span class="stats-panel__goal-label">WEEKLY GOAL</span>
         <span class="stats-panel__goal-pct" id="statsGoalPct">0%</span>
       </div>
-      <div class="stats-panel__goal-bar">
-        <div class="stats-panel__goal-fill" id="statsGoalFill" style="width:0%"></div>
-      </div>
+      <div class="stats-panel__goal-bar"><div class="stats-panel__goal-fill" id="statsGoalFill" style="width:0%"></div></div>
     </div>
   </div>
 
-  <!-- Expanded detail: week navigation + day bars -->
   <div class="stats-detail hidden" id="statsDetail">
     <div class="stats-detail__header">
       <div class="stats-detail__title">📊 Weekly activity</div>
@@ -169,45 +154,20 @@
     </div>
     <div class="stats-detail__bars" id="statsDetailBars"></div>
     <div class="stats-detail__totals">
-      <div class="stats-detail__total-item">
-        <span class="stats-detail__total-val" id="statsDetailKm">0.0</span>
-        <span class="stats-detail__total-label">km</span>
-      </div>
-      <div class="stats-detail__total-item">
-        <span class="stats-detail__total-val stats-detail__total-val--gray" id="statsDetailTime">0m</span>
-        <span class="stats-detail__total-label">time</span>
-      </div>
-      <div class="stats-detail__total-item">
-        <span class="stats-detail__total-val stats-detail__total-val--amber" id="statsDetailCount">0</span>
-        <span class="stats-detail__total-label">workouts</span>
-      </div>
-      <div class="stats-detail__total-item">
-        <span class="stats-detail__total-val stats-detail__total-val--blue" id="statsDetailDate">—</span>
-        <span class="stats-detail__total-label">day</span>
-      </div>
+      <div class="stats-detail__total-item"><span class="stats-detail__total-val" id="statsDetailKm">0.0</span><span class="stats-detail__total-label">km</span></div>
+      <div class="stats-detail__total-item"><span class="stats-detail__total-val stats-detail__total-val--gray" id="statsDetailTime">0m</span><span class="stats-detail__total-label">time</span></div>
+      <div class="stats-detail__total-item"><span class="stats-detail__total-val stats-detail__total-val--amber" id="statsDetailCount">0</span><span class="stats-detail__total-label">workouts</span></div>
+      <div class="stats-detail__total-item"><span class="stats-detail__total-val stats-detail__total-val--blue" id="statsDetailDate">—</span><span class="stats-detail__total-label">day</span></div>
     </div>
   </div>
 
-  <!-- Goal editor -->
   <div class="stats-goal-editor hidden" id="statsGoalEditor">
     <div class="stats-goal-editor__title">⚙ WEEKLY GOAL</div>
-    <div class="stats-goal-editor__row">
-      <span class="stats-goal-editor__label">Distance target</span>
-      <input class="stats-goal-editor__input" id="goalKmInput" type="number" min="1" max="500" value="35"/>
-      <span class="stats-goal-editor__unit">km</span>
-    </div>
-    <div class="stats-goal-editor__row">
-      <span class="stats-goal-editor__label">Time target</span>
-      <input class="stats-goal-editor__input" id="goalTimeInput" type="number" min="1" max="1200" value="300"/>
-      <span class="stats-goal-editor__unit">min</span>
-    </div>
-    <div class="stats-goal-editor__row">
-      <span class="stats-goal-editor__label">Workouts target</span>
-      <input class="stats-goal-editor__input" id="goalCountInput" type="number" min="1" max="30" value="7"/>
-      <span class="stats-goal-editor__unit">× /week</span>
-    </div>
+    <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Distance target</span><input class="stats-goal-editor__input" id="goalKmInput" type="number" min="1" max="500" value="35"/><span class="stats-goal-editor__unit">km</span></div>
+    <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Time target</span><input class="stats-goal-editor__input" id="goalTimeInput" type="number" min="1" max="2000" value="300"/><span class="stats-goal-editor__unit">min</span></div>
+    <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Workouts target</span><input class="stats-goal-editor__input" id="goalCountInput" type="number" min="1" max="30" value="7"/><span class="stats-goal-editor__unit">× /week</span></div>
   </div>
-  <!-- ═══ END STATS PANEL ═══ -->
+  <!-- ═══ END STATS ═══ -->
 
   <div class="route-controls">
     <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
@@ -283,19 +243,29 @@
 
 <div id="map"></div>
 
-<!-- iOS install banner — shown only on iOS Safari if not standalone -->
+<!-- iOS install banner — shown only on iOS Safari, not standalone -->
 <div class="ios-install-banner hidden" id="iosInstallBanner">
-  <div class="ios-install-banner__icon">🗺️</div>
+  <div class="ios-install-banner__icon">
+    <img src="icon-192.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
+    <span style="display:none;font-size:2.4rem">🗺️</span>
+  </div>
   <div class="ios-install-banner__text">
     <div class="ios-install-banner__title">Install Mapty on your phone</div>
-    <div class="ios-install-banner__sub">Tap <strong>Share</strong> &#x2197; and <strong>"Add to Home Screen"</strong> +</div>
+    <div class="ios-install-banner__sub">Tap
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin:0 1px;color:#ccc">
+        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+        <polyline points="16 6 12 2 8 6"/>
+        <line x1="12" y1="2" x2="12" y2="15"/>
+      </svg>
+      Share and &ldquo;Add to Home Screen&rdquo; +
+    </div>
   </div>
   <button class="ios-install-banner__close" id="iosInstallClose">✕</button>
 </div>
 
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js');
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 </script>
 </body>

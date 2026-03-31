@@ -140,14 +140,14 @@ class App {
 
   #activitySpeeds = { running: 10, cycling: 20, walking: 5 };
 
-  // Weekly stats
-  #goalKm    = 35;
-  #goalTime  = 300;
-  #goalCount = 7;
-  #statsExpanded     = false;
-  #statsWeekOffset   = 0;   // 0 = current week, -1 = last week, etc.
-  #statsSelectedDay  = null; // 0-6 (Mon-Sun) or null = week total
-  #statsPrevGoalReached = false; // track if 100% was already celebrated
+  // Weekly stats — goals loaded from localStorage at field declaration (fixes reset bug)
+  #goalKm    = +(localStorage.getItem('goalKm')    || 35);
+  #goalTime  = +(localStorage.getItem('goalTime')  || 300);
+  #goalCount = +(localStorage.getItem('goalCount') || 7);
+  #statsExpanded        = false;
+  #statsWeekOffset      = 0;
+  #statsSelectedDay     = null;
+  #statsPrevGoalReached = false;
 
   constructor() {
     this._getPosition();
@@ -181,12 +181,6 @@ class App {
       this.#voiceEnabled = true;
       document.getElementById('voiceToggle')?.classList.add('active');
     }
-    const sk = localStorage.getItem('goalKm');
-    const st = localStorage.getItem('goalTime');
-    const sc = localStorage.getItem('goalCount');
-    if (sk) this.#goalKm    = +sk;
-    if (st) this.#goalTime  = +st;
-    if (sc) this.#goalCount = +sc;
   }
 
   // ─── GEOLOCATION ─────────────────────────────────────────────────
@@ -784,28 +778,35 @@ class App {
   reset() { localStorage.removeItem('workouts'); location.reload(); }
 
   // ─── iOS INSTALL BANNER ──────────────────────────────────────────
+  // Shows only on iOS Safari that hasn't installed the app yet.
+  // Dismissed state persists in localStorage.
   _initIOSBanner() {
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
-    const dismissed = localStorage.getItem('iosBannerDismissed');
-    if (!isIOS || isStandalone || dismissed) return;
+    const ua = navigator.userAgent;
+    const isIOS = /iphone|ipad|ipod/i.test(ua);
+    // standalone = already installed
+    const isStandalone = ('standalone' in window.navigator && window.navigator.standalone)
+      || window.matchMedia('(display-mode: standalone)').matches;
+    if (!isIOS || isStandalone) return;
+    if (localStorage.getItem('iosBannerDismissed')) return;
 
-    const banner = document.getElementById('iosInstallBanner');
+    const banner   = document.getElementById('iosInstallBanner');
     const closeBtn = document.getElementById('iosInstallClose');
     if (!banner) return;
 
-    setTimeout(() => banner.classList.remove('hidden'), 2000);
+    // Show after 2.5 s so the map has time to load first
+    setTimeout(() => banner.classList.remove('hidden'), 2500);
+
     closeBtn?.addEventListener('click', () => {
       banner.classList.add('hidden');
       localStorage.setItem('iosBannerDismissed', '1');
     });
   }
 
-  // ─── WEEKLY STATS ─────────────────────────────────────────────────
+  // ─── WEEKLY STATS ────────────────────────────────────────────────
   _getWeekBounds(offsetWeeks = 0) {
     const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diffToMon = (dayOfWeek === 0 ? -6 : 1 - dayOfWeek);
+    const dow = now.getDay();
+    const diffToMon = dow === 0 ? -6 : 1 - dow;
     const mon = new Date(now);
     mon.setDate(now.getDate() + diffToMon + offsetWeeks * 7);
     mon.setHours(0, 0, 0, 0);
@@ -817,59 +818,49 @@ class App {
 
   _getWeekWorkouts(offsetWeeks = 0) {
     const { mon, sun } = this._getWeekBounds(offsetWeeks);
-    return this.#workouts.filter(w => {
-      const d = new Date(w.date);
-      return d >= mon && d <= sun;
-    });
+    return this.#workouts.filter(w => { const d = new Date(w.date); return d >= mon && d <= sun; });
   }
 
   _initStats() {
-    const panel  = document.getElementById('statsPanel');
-    const detail = document.getElementById('statsDetail');
-    const editor = document.getElementById('statsGoalEditor');
-    const inKm   = document.getElementById('goalKmInput');
-    const inTime = document.getElementById('goalTimeInput');
-    const inCnt  = document.getElementById('goalCountInput');
+    const panel   = document.getElementById('statsPanel');
+    const detail  = document.getElementById('statsDetail');
+    const editor  = document.getElementById('statsGoalEditor');
+    const inKm    = document.getElementById('goalKmInput');
+    const inTime  = document.getElementById('goalTimeInput');
+    const inCnt   = document.getElementById('goalCountInput');
     const prevBtn = document.getElementById('statsWeekPrev');
     const nextBtn = document.getElementById('statsWeekNext');
-
     if (!panel) return;
 
-    // Set saved goal values in inputs
+    // Sync inputs with already-loaded goal values (fixes goal reset bug)
     if (inKm)   inKm.value   = this.#goalKm;
-    if (inTime) inTime.value  = this.#goalTime;
+    if (inTime) inTime.value = this.#goalTime;
     if (inCnt)  inCnt.value  = this.#goalCount;
 
-    // Toggle detail + editor on panel click
     panel.addEventListener('click', () => {
       this.#statsExpanded = !this.#statsExpanded;
       detail?.classList.toggle('hidden', !this.#statsExpanded);
       editor?.classList.toggle('hidden', !this.#statsExpanded);
     });
-
-    // Prevent input clicks from toggling the panel
     detail?.addEventListener('click', e => e.stopPropagation());
     editor?.addEventListener('click', e => e.stopPropagation());
 
-    // Week navigation
     prevBtn?.addEventListener('click', e => {
       e.stopPropagation();
       this.#statsWeekOffset--;
       this.#statsSelectedDay = null;
-      nextBtn.disabled = false;
+      if (nextBtn) nextBtn.disabled = false;
       this._renderStats();
     });
     nextBtn?.addEventListener('click', e => {
       e.stopPropagation();
-      if (this.#statsWeekOffset < 0) {
-        this.#statsWeekOffset++;
-        this.#statsSelectedDay = null;
-        if (this.#statsWeekOffset === 0) nextBtn.disabled = true;
-        this._renderStats();
-      }
+      if (this.#statsWeekOffset >= 0) return;
+      this.#statsWeekOffset++;
+      this.#statsSelectedDay = null;
+      if (this.#statsWeekOffset === 0 && nextBtn) nextBtn.disabled = true;
+      this._renderStats();
     });
 
-    // Goal inputs
     inKm?.addEventListener('change', () => {
       this.#goalKm = Math.max(1, +inKm.value || 35);
       inKm.value = this.#goalKm;
@@ -888,76 +879,54 @@ class App {
       localStorage.setItem('goalCount', this.#goalCount);
       this._renderStats();
     });
-
-    this._renderStats();
   }
 
   _renderStats(animate = false) {
-    const offset   = this.#statsWeekOffset;
-    const weekW    = this._getWeekWorkouts(offset);
-    const { mon }  = this._getWeekBounds(offset);
+    const offset  = this.#statsWeekOffset;
+    const weekW   = this._getWeekWorkouts(offset);
+    const { mon } = this._getWeekBounds(offset);
 
-    // ── Aggregates (whole week or selected day) ──
+    const weekKm  = weekW.reduce((s, w) => s + (w.distance || 0), 0);
+    const weekMin = weekW.reduce((s, w) => s + (w.duration  || 0), 0);
+    const weekCnt = weekW.length;
+
     let subset = weekW;
-    if (this.#statsSelectedDay !== null) {
-      subset = weekW.filter(w => {
-        const d = new Date(w.date);
-        const diff = Math.floor((d - mon) / 86400000);
-        return diff === this.#statsSelectedDay;
-      });
-    }
+    if (this.#statsSelectedDay !== null)
+      subset = weekW.filter(w => Math.floor((new Date(w.date) - mon) / 86400000) === this.#statsSelectedDay);
+    const subKm  = subset.reduce((s, w) => s + (w.distance || 0), 0);
+    const subMin = subset.reduce((s, w) => s + (w.duration  || 0), 0);
+    const subCnt = subset.length;
 
-    const totalKm  = subset.reduce((s, w) => s + (w.distance || 0), 0);
-    const totalMin = subset.reduce((s, w) => s + (w.duration  || 0), 0);
-    const totalCnt = subset.length;
-
-    // ── Circumference for r=36 ring: 2π×36 ≈ 226.2 ──
     const CIRC = 226.2;
     const setRing = (id, pct) => {
       const el = document.getElementById(id);
       if (!el) return;
-      const offset = CIRC - Math.min(pct, 1) * CIRC;
+      const off = Math.max(0, CIRC - Math.min(pct, 1) * CIRC);
       if (animate) {
-        el.classList.remove('animate');
-        void el.offsetWidth; // reflow to restart animation
-        el.classList.add('animate');
-        el.setAttribute('stroke-dashoffset', CIRC); // start empty
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            el.setAttribute('stroke-dashoffset', offset.toFixed(1));
-          });
-        });
-      } else {
-        el.setAttribute('stroke-dashoffset', offset.toFixed(1));
+        el.style.transition = 'none';
+        el.setAttribute('stroke-dashoffset', CIRC);
+        void el.getBoundingClientRect();
+        el.style.transition = 'stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1)';
       }
+      requestAnimationFrame(() => el.setAttribute('stroke-dashoffset', off.toFixed(1)));
     };
-
-    // Use whole-week totals for ring fill (not selected day)
-    const weekKm  = weekW.reduce((s, w) => s + (w.distance || 0), 0);
-    const weekMin = weekW.reduce((s, w) => s + (w.duration  || 0), 0);
-    const weekCnt = weekW.length;
 
     setRing('statsRingKm',       weekKm  / this.#goalKm);
     setRing('statsRingTime',     weekMin / this.#goalTime);
     setRing('statsRingWorkouts', weekCnt / this.#goalCount);
 
-    // ── Labels ──
-    const fmtTime = m => m >= 60
-      ? `${Math.floor(m / 60)}h ${Math.round(m % 60)}m`
-      : `${Math.round(m)}m`;
-    const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const fmtT = m => m >= 60 ? `${Math.floor(m / 60)}h ${Math.round(m % 60)}m` : `${Math.round(m)}m`;
+    const set  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
-    setTxt('statsValKm',       weekKm.toFixed(1));
-    setTxt('statsValTime',     fmtTime(weekMin));
-    setTxt('statsValWorkouts', weekCnt);
+    set('statsValKm',       weekKm.toFixed(1));
+    set('statsValTime',     fmtT(weekMin));
+    set('statsValWorkouts', weekCnt);
 
-    // ── Goal bar (km based) ──
     const goalPct = Math.min(Math.round((weekKm / this.#goalKm) * 100), 100);
-    setTxt('statsGoalPct', goalPct + '%');
+    set('statsGoalPct', goalPct + '%');
     const fill = document.getElementById('statsGoalFill');
     if (fill) fill.style.width = goalPct + '%';
 
-    // ── Goal reached celebration ──
     if (goalPct >= 100 && !this.#statsPrevGoalReached && animate) {
       this.#statsPrevGoalReached = true;
       this._showGoalCelebration();
@@ -965,29 +934,24 @@ class App {
       this.#statsPrevGoalReached = false;
     }
 
-    // ── Week nav label ──
+    const nextBtn = document.getElementById('statsWeekNext');
     if (offset === 0) {
-      setTxt('statsWeekLabel', 'This week');
+      set('statsWeekLabel', 'This week');
+      if (nextBtn) nextBtn.disabled = true;
     } else {
-      const mo = mon.toLocaleDateString('en', { month: 'short', day: 'numeric' });
       const su = new Date(mon); su.setDate(mon.getDate() + 6);
-      const suStr = su.toLocaleDateString('en', { month: 'short', day: 'numeric' });
-      setTxt('statsWeekLabel', `${mo}–${suStr}`);
+      const fmt = d => d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+      set('statsWeekLabel', `${fmt(mon)}–${fmt(su)}`);
+      if (nextBtn) nextBtn.disabled = false;
     }
 
-    // ── Detail totals (subset — selected day or whole week) ──
-    setTxt('statsDetailKm',    totalKm.toFixed(1));
-    setTxt('statsDetailTime',  fmtTime(totalMin));
-    setTxt('statsDetailCount', totalCnt);
-
-    // Date label: show selected day's date or week range start
+    set('statsDetailKm',    subKm.toFixed(1));
+    set('statsDetailTime',  fmtT(subMin));
+    set('statsDetailCount', subCnt);
     if (this.#statsSelectedDay !== null) {
-      const selDate = new Date(mon);
-      selDate.setDate(mon.getDate() + this.#statsSelectedDay);
-      setTxt('statsDetailDate', selDate.getDate());
-    } else {
-      setTxt('statsDetailDate', '—');
-    }
+      const sel = new Date(mon); sel.setDate(mon.getDate() + this.#statsSelectedDay);
+      set('statsDetailDate', sel.getDate());
+    } else { set('statsDetailDate', '—'); }
 
     this._renderDayBars(weekW, mon);
   }
@@ -995,46 +959,23 @@ class App {
   _renderDayBars(weekWorkouts, mon) {
     const barsEl = document.getElementById('statsDetailBars');
     if (!barsEl) return;
-
     const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const kmPerDay   = Array(7).fill(0);
-    const typPerDay  = Array(7).fill('none');
-    const datePerDay = Array(7).fill(null);
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(mon);
-      d.setDate(mon.getDate() + i);
-      datePerDay[i] = d.getDate();
-    }
-
+    const kmPerDay  = Array(7).fill(0);
+    const typPerDay = Array(7).fill('none');
+    const datePerDay = Array(7);
+    for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); datePerDay[i] = d.getDate(); }
     weekWorkouts.forEach(w => {
-      const d    = new Date(w.date);
-      const diff = Math.floor((d - mon) / 86400000);
-      if (diff >= 0 && diff < 7) {
-        kmPerDay[diff]  += w.distance || 0;
-        typPerDay[diff]  = w.type;
-      }
+      const diff = Math.floor((new Date(w.date) - mon) / 86400000);
+      if (diff >= 0 && diff < 7) { kmPerDay[diff] += w.distance || 0; typPerDay[diff] = w.type; }
     });
-
     const maxKm = Math.max(...kmPerDay, 0.1);
-    const BAR_H = 48;
-
     barsEl.innerHTML = DAY_NAMES.map((name, i) => {
-      const km    = kmPerDay[i];
-      const h     = Math.round((km / maxKm) * BAR_H);
-      const color = typPerDay[i] === 'running'  ? '#00c46a'
-        : typPerDay[i] === 'cycling'  ? '#ffb545'
-          : '#3a4147';
-      const isActive = this.#statsSelectedDay === i;
-      return `
-        <div class="stats-detail__day-col${isActive ? ' active' : ''}" data-day="${i}">
-          <div class="stats-detail__bar" style="height:${Math.max(h, km > 0 ? 4 : 2)}px;background:${color}"></div>
-          <div class="stats-detail__day-name">${name}</div>
-          <div class="stats-detail__day-date">${datePerDay[i]}</div>
-        </div>`;
+      const km = kmPerDay[i];
+      const h = Math.round((km / maxKm) * 48);
+      const color = typPerDay[i] === 'running' ? '#00c46a' : typPerDay[i] === 'cycling' ? '#ffb545' : '#3a4147';
+      const act = this.#statsSelectedDay === i ? ' active' : '';
+      return `<div class="stats-detail__day-col${act}" data-day="${i}"><div class="stats-detail__bar" style="height:${Math.max(h, km > 0 ? 4 : 2)}px;background:${color}"></div><div class="stats-detail__day-name">${name}</div><div class="stats-detail__day-date">${datePerDay[i]}</div></div>`;
     }).join('');
-
-    // Click handler for day selection
     barsEl.querySelectorAll('.stats-detail__day-col').forEach(col => {
       col.addEventListener('click', e => {
         e.stopPropagation();
@@ -1046,26 +987,15 @@ class App {
   }
 
   _showGoalCelebration() {
-    // Animate stats panel border
     const panel = document.getElementById('statsPanel');
     panel?.classList.add('goal-reached');
     setTimeout(() => panel?.classList.remove('goal-reached'), 800);
-
-    // Show celebration toast
     document.querySelector('.stats-goal-toast')?.remove();
     const toast = document.createElement('div');
     toast.className = 'stats-goal-toast';
-    toast.innerHTML = `
-      <span class="stats-goal-toast__emoji">🏆</span>
-      <span class="stats-goal-toast__title">Weekly goal reached!</span>
-      <span class="stats-goal-toast__sub">Amazing work — you crushed your weekly target 🎉</span>
-    `;
+    toast.innerHTML = `<span class="stats-goal-toast__emoji">🏆</span><span class="stats-goal-toast__title">Weekly goal reached!</span><span class="stats-goal-toast__sub">Amazing — you crushed your weekly target 🎉</span>`;
     document.body.appendChild(toast);
-    setTimeout(() => {
-      toast.style.transition = 'opacity 0.5s ease';
-      toast.style.opacity = '0';
-      setTimeout(() => toast.remove(), 500);
-    }, 3500);
+    setTimeout(() => { toast.style.transition = 'opacity 0.5s ease'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 500); }, 3500);
   }
 
   // ─── POI SEARCH ──────────────────────────────────────────────────
@@ -1395,53 +1325,59 @@ class App {
 const app = new App();
 
 // ─── MOBILE SLIDING PANEL ────────────────────────────────────────
+// The drag bar is drawn by sidebar::before in CSS (one bar, no duplicates).
+// Sidebar has overflow-y: auto always — scroll works at every level.
+// Drag only activates when touchstart lands in the top HANDLE_ZONE (56px),
+// so scrolling the content below never interferes with dragging.
 (function initMobilePanel() {
   const sidebar = document.querySelector('.sidebar');
-  const HANDLE_ZONE = 56;
-  let startY = 0, startHeight = 0, isDragging = false;
+  const HANDLE_ZONE = 56; // px from top of sidebar
+  let startY = 0, startH = 0, isDragging = false;
 
   const isMobile = () => window.innerWidth <= 768;
-  const snapTo = h => {
-    sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
-    sidebar.style.height = h;
-    // Allow scroll at full height
-    sidebar.style.overflowY = h === '100vh' ? 'auto' : 'auto';
+  const VH = () => window.innerHeight;
+
+  const snapTo = (h, animate = true) => {
+    sidebar.style.transition = animate ? 'height 0.32s cubic-bezier(0.4,0,0.2,1)' : 'none';
+    sidebar.style.height = typeof h === 'number' ? h + 'px' : h;
   };
+
   const collapse = () => snapTo('5.5rem');
   const toHalf   = () => snapTo('55vh');
   const toTall   = () => snapTo('80vh');
-  const toFull   = () => snapTo('100vh');
+  const toFull   = () => snapTo('100dvh');
 
   if (isMobile()) toHalf();
 
   window.addEventListener('resize', () => {
     if (!isMobile()) { sidebar.style.height = ''; sidebar.style.transition = ''; }
-    else toHalf();
   });
 
   sidebar.addEventListener('touchstart', e => {
     if (!isMobile()) return;
     const touch = e.touches[0];
-    const rect = sidebar.getBoundingClientRect();
+    const rect  = sidebar.getBoundingClientRect();
+    // Only drag if touch is in the handle zone at the top
     if (touch.clientY - rect.top > HANDLE_ZONE) return;
     isDragging = true;
     startY = touch.clientY;
-    startHeight = sidebar.offsetHeight;
+    startH = sidebar.offsetHeight;
     sidebar.style.transition = 'none';
   }, { passive: true });
 
-  sidebar.addEventListener('touchmove', e => {
+  // Listen on document so drag continues even if finger leaves the handle
+  document.addEventListener('touchmove', e => {
     if (!isDragging || !isMobile()) return;
     const delta = startY - e.touches[0].clientY;
-    const newH = Math.min(Math.max(startHeight + delta, 50), window.innerHeight);
+    const newH  = Math.min(Math.max(startH + delta, 50), VH());
     sidebar.style.height = newH + 'px';
   }, { passive: true });
 
-  sidebar.addEventListener('touchend', () => {
+  document.addEventListener('touchend', () => {
     if (!isDragging) return;
     isDragging = false;
     const h  = sidebar.offsetHeight;
-    const vh = window.innerHeight;
+    const vh = VH();
     if      (h < vh * 0.18) collapse();
     else if (h < vh * 0.65) toHalf();
     else if (h < vh * 0.90) toTall();

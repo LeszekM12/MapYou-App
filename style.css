@@ -710,11 +710,13 @@ a:visited {
         flex-basis: auto;
         width: 100%;
         height: 55vh;
-        max-height: 88dvh;
+        max-height: 100dvh;
         padding: 0 2rem 2rem 2rem;
         border-radius: 2rem 2rem 0 0;
         box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
-        overflow: hidden;
+        overflow-y: auto;
+        overflow-x: hidden;
+        -webkit-overflow-scrolling: touch;
         transition: height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -1111,170 +1113,46 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 }
 
 /* ─── STATS PANEL ─── */
-.stats-panel {
-    background-color: var(--color-dark--2);
-    border: 1.5px solid var(--color-brand--2);
-    border-radius: 8px;
-    padding: 1.4rem 1.6rem;
-    margin-bottom: 1.2rem;
-    cursor: pointer;
-    transition: border-color 0.2s;
-}
+.stats-panel { background-color: var(--color-dark--2); border: 1.5px solid var(--color-brand--2); border-radius: 8px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; cursor: pointer; transition: border-color 0.2s; }
 .stats-panel:hover { border-color: #00a85a; }
-.stats-panel__label {
-    font-size: 1rem;
-    font-weight: 800;
-    color: var(--color-light--1);
-    letter-spacing: 0.1em;
-    text-align: center;
-    margin-bottom: 1.2rem;
-}
-.stats-panel__rings {
-    display: flex;
-    gap: 0.8rem;
-    margin-bottom: 1.2rem;
-    justify-content: space-between;
-    align-items: center;
-}
-.stats-ring-wrap {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
+.stats-panel__label { font-size: 1rem; font-weight: 800; color: var(--color-light--1); letter-spacing: 0.1em; text-align: center; margin-bottom: 1.2rem; }
+.stats-panel__rings { display: flex; gap: 0.8rem; margin-bottom: 1.2rem; justify-content: space-between; align-items: center; }
+.stats-ring-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; }
 .stats-ring-wrap svg { width: 100%; max-width: 9rem; height: auto; }
-
-/* Ring animation */
-@keyframes ringFill {
-    from { stroke-dashoffset: 175.9; }
-}
-.stats-ring-arc {
-    transition: stroke-dashoffset 1s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.stats-ring-arc.animate {
-    animation: ringFill 1s cubic-bezier(0.4, 0, 0.2, 1) both;
-}
-
+.stats-ring-arc { transition: stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1); }
 .stats-panel__goal { border-top: 1px solid rgba(255,255,255,0.07); padding-top: 1rem; }
 .stats-panel__goal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
 .stats-panel__goal-label { font-size: 1rem; font-weight: 800; color: var(--color-light--1); letter-spacing: 0.1em; }
 .stats-panel__goal-pct { font-size: 1.3rem; font-weight: 800; color: var(--color-light--2); }
 .stats-panel__goal-bar { height: 0.6rem; background: rgba(255,255,255,0.1); border-radius: 0.3rem; overflow: hidden; }
-.stats-panel__goal-fill {
-    height: 100%;
-    background: var(--color-brand--2);
-    border-radius: 0.3rem;
-    transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-}
+.stats-panel__goal-fill { height: 100%; background: var(--color-brand--2); border-radius: 0.3rem; transition: width 0.8s cubic-bezier(0.4,0,0.2,1); }
+@keyframes goalBounce { 0%{transform:scale(1)} 30%{transform:scale(1.05)} 60%{transform:scale(0.98)} 100%{transform:scale(1)} }
+.stats-panel.goal-reached { border-color: #ffb545; animation: goalBounce 0.7s ease; }
 
-/* 100% goal celebration */
-@keyframes goalCelebrate {
-    0%   { transform: scale(1); }
-    30%  { transform: scale(1.06); }
-    60%  { transform: scale(0.97); }
-    100% { transform: scale(1); }
-}
-.stats-panel.goal-reached {
-    border-color: #ffb545;
-    animation: goalCelebrate 0.6s ease forwards;
-}
-.stats-goal-toast {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0.8);
-    z-index: 10000;
-    background: var(--color-dark--1);
-    border: 2px solid #ffb545;
-    border-radius: 16px;
-    padding: 2.4rem 3rem;
-    text-align: center;
-    animation: goalToastIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    pointer-events: none;
-    max-width: 30rem;
-    width: 90vw;
-}
-@keyframes goalToastIn {
-    from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; }
-    to   { transform: translate(-50%, -50%) scale(1);   opacity: 1; }
-}
+.stats-goal-toast { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%) scale(0.8); z-index: 10001; background: var(--color-dark--1); border: 2px solid #ffb545; border-radius: 16px; padding: 2.4rem 3rem; text-align: center; max-width: 30rem; width: 90vw; animation: goalToastPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; pointer-events: none; }
+@keyframes goalToastPop { from{transform:translate(-50%,-50%) scale(0.6);opacity:0} to{transform:translate(-50%,-50%) scale(1);opacity:1} }
 .stats-goal-toast__emoji { font-size: 4rem; display: block; margin-bottom: 0.8rem; }
 .stats-goal-toast__title { font-size: 2rem; font-weight: 800; color: #ffb545; display: block; margin-bottom: 0.4rem; }
-.stats-goal-toast__sub   { font-size: 1.3rem; color: var(--color-light--1); }
+.stats-goal-toast__sub { font-size: 1.3rem; color: var(--color-light--1); }
 
-/* ─── STATS DETAIL ─── */
-.stats-detail {
-    background-color: var(--color-dark--2);
-    border-radius: 8px;
-    padding: 1.4rem 1.6rem;
-    margin-bottom: 1.2rem;
-}
+.stats-detail { background-color: var(--color-dark--2); border-radius: 8px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
 .stats-detail.hidden { display: none !important; }
-
-.stats-detail__header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 1.2rem;
-}
+.stats-detail__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem; }
 .stats-detail__title { font-size: 1.3rem; font-weight: 800; color: var(--color-light--2); }
-.stats-week-nav {
-    display: flex;
-    align-items: center;
-    gap: 0.6rem;
-}
-.stats-week-nav__btn {
-    background: var(--color-dark--1);
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 4px;
-    color: var(--color-light--1);
-    font-size: 1.2rem;
-    width: 2.4rem;
-    height: 2.4rem;
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.15s;
-}
+.stats-week-nav { display: flex; align-items: center; gap: 0.6rem; }
+.stats-week-nav__btn { background: var(--color-dark--1); border: 1px solid rgba(255,255,255,0.12); border-radius: 4px; color: var(--color-light--1); font-size: 1.4rem; width: 2.6rem; height: 2.6rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 .stats-week-nav__btn:hover { color: var(--color-light--2); }
 .stats-week-nav__btn:disabled { opacity: 0.3; cursor: default; }
-.stats-week-nav__label {
-    font-size: 1rem;
-    color: var(--color-light--1);
-    font-weight: 700;
-    min-width: 5rem;
-    text-align: center;
-}
-
+.stats-week-nav__label { font-size: 1rem; color: var(--color-light--1); font-weight: 700; min-width: 5rem; text-align: center; }
 .stats-detail__bars { display: flex; align-items: flex-end; gap: 0.5rem; height: 5.6rem; margin-bottom: 0.6rem; }
-.stats-detail__day-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 0.3rem;
-    height: 100%;
-    justify-content: flex-end;
-    cursor: pointer;
-    border-radius: 4px;
-    padding: 2px;
-    transition: background 0.15s;
-}
-.stats-detail__day-col:hover { background: rgba(255,255,255,0.04); }
-.stats-detail__day-col.active { background: rgba(255,255,255,0.08); }
-.stats-detail__bar { width: 100%; border-radius: 0.3rem 0.3rem 0 0; min-height: 0.3rem; transition: height 0.4s ease; }
+.stats-detail__day-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; height: 100%; justify-content: flex-end; cursor: pointer; border-radius: 4px; padding: 2px; transition: background 0.15s; }
+.stats-detail__day-col:hover { background: rgba(255,255,255,0.05); }
+.stats-detail__day-col.active { background: rgba(255,255,255,0.09); }
+.stats-detail__bar { width: 100%; border-radius: 0.3rem 0.3rem 0 0; transition: height 0.4s ease; }
 .stats-detail__day-name { font-size: 0.95rem; color: var(--color-light--1); font-weight: 700; }
-.stats-detail__day-date { font-size: 0.85rem; color: var(--color-light--1); opacity: 0.6; }
+.stats-detail__day-date { font-size: 0.8rem; color: var(--color-light--1); opacity: 0.55; }
 .stats-detail__day-col.active .stats-detail__day-name { color: var(--color-brand--2); }
-
-.stats-detail__totals {
-    display: flex;
-    justify-content: space-between;
-    padding-top: 1rem;
-    border-top: 1px solid rgba(255,255,255,0.07);
-    margin-top: 0.4rem;
-}
+.stats-detail__totals { display: flex; justify-content: space-between; padding-top: 1rem; border-top: 1px solid rgba(255,255,255,0.07); margin-top: 0.4rem; }
 .stats-detail__total-item { text-align: center; }
 .stats-detail__total-val { font-size: 1.5rem; font-weight: 800; color: var(--color-brand--2); display: block; }
 .stats-detail__total-val--amber { color: var(--color-brand--1); }
@@ -1282,80 +1160,39 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 .stats-detail__total-val--blue  { color: #5badea; }
 .stats-detail__total-label { font-size: 0.95rem; color: var(--color-light--1); }
 
-/* ─── GOAL EDITOR ─── */
 .stats-goal-editor { background-color: var(--color-dark--2); border-radius: 8px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
 .stats-goal-editor.hidden { display: none !important; }
 .stats-goal-editor__title { font-size: 1.1rem; font-weight: 800; color: var(--color-light--1); letter-spacing: 0.08em; margin-bottom: 1rem; }
 .stats-goal-editor__row { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.8rem; }
 .stats-goal-editor__row:last-child { margin-bottom: 0; }
 .stats-goal-editor__label { font-size: 1.2rem; color: var(--color-light--2); flex: 1; }
-.stats-goal-editor__input {
-    width: 6rem;
-    background: var(--color-dark--1);
-    border: 1px solid var(--color-light--1);
-    border-radius: 4px;
-    color: var(--color-light--2);
-    font-family: inherit;
-    font-size: 1.3rem;
-    font-weight: 800;
-    text-align: center;
-    padding: 0.4rem 0.6rem;
-}
+.stats-goal-editor__input { width: 6rem; background: var(--color-dark--1); border: 1px solid var(--color-light--1); border-radius: 4px; color: var(--color-light--2); font-family: inherit; font-size: 1.3rem; font-weight: 800; text-align: center; padding: 0.4rem 0.6rem; }
 .stats-goal-editor__input:focus { outline: none; border-color: var(--color-brand--2); }
 .stats-goal-editor__unit { font-size: 1.1rem; color: var(--color-light--1); min-width: 3rem; }
 
-/* ─── iOS INSTALL BANNER ─── */
-.ios-install-banner {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 9998;
-    background: var(--color-dark--1);
-    border-top: 1px solid rgba(255,255,255,0.12);
-    padding: 1.2rem 1.6rem 2.4rem;
-    display: flex;
-    align-items: flex-start;
-    gap: 1.2rem;
-    animation: bannerSlideUp 0.35s ease;
-}
-@keyframes bannerSlideUp {
-    from { transform: translateY(100%); }
-    to   { transform: translateY(0); }
-}
-.ios-install-banner__icon {
-    width: 4.8rem;
-    height: 4.8rem;
-    border-radius: 12px;
-    background: var(--color-brand--2);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 2.4rem;
-    flex-shrink: 0;
-}
-.ios-install-banner__text { flex: 1; }
-.ios-install-banner__title {
-    font-size: 1.3rem;
-    font-weight: 800;
-    color: var(--color-light--2);
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    margin-bottom: 0.3rem;
-}
-.ios-install-banner__sub { font-size: 1.2rem; color: var(--color-light--1); line-height: 1.5; }
-.ios-install-banner__close {
-    background: transparent;
-    border: none;
-    color: var(--color-light--1);
-    font-size: 1.6rem;
-    cursor: pointer;
-    padding: 0;
-    flex-shrink: 0;
-    margin-top: 0.2rem;
-}
+/* ─── POI FILTERS ─── */
+.poi-filters { display: flex; flex-wrap: nowrap; gap: 0.6rem; padding: 0.4rem 0 0.8rem; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; white-space: nowrap; }
+.poi-filters:active { cursor: grabbing; }
+.poi-filters::-webkit-scrollbar { display: none; }
 
-/* Mobile snap levels: 0=peek, 1=half, 2=tall, 3=full */
-@media (max-width: 768px) {
-    .sidebar { overflow-y: auto; }
-}
+/* ─── iOS INSTALL BANNER ─── */
+.ios-install-banner { position: fixed; bottom: 0; left: 0; right: 0; z-index: 9998; background: #1c2128; border-top: 1px solid rgba(255,255,255,0.14); padding: 1.4rem 1.6rem 2.8rem; display: flex; align-items: center; gap: 1.2rem; animation: iosBannerUp 0.35s ease; }
+.ios-install-banner.hidden { display: none !important; }
+@keyframes iosBannerUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+.ios-install-banner__icon { width: 5rem; height: 5rem; border-radius: 14px; background: #1a3828; border: 1.5px solid var(--color-brand--2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; overflow: hidden; }
+.ios-install-banner__icon img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+.ios-install-banner__text { flex: 1; }
+.ios-install-banner__title { font-size: 1.25rem; font-weight: 800; color: var(--color-light--2); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 0.3rem; }
+.ios-install-banner__sub { font-size: 1.2rem; color: var(--color-light--1); line-height: 1.5; }
+.ios-install-banner__close { background: rgba(255,255,255,0.14); border: none; border-radius: 50%; color: var(--color-light--1); font-size: 1.3rem; cursor: pointer; width: 2.8rem; height: 2.8rem; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* ─── ARRIVALS / TOASTS ─── */
+.arrival-toast { position: fixed; bottom: 3rem; left: 50%; transform: translateX(-50%); z-index: 9999; background-color: var(--color-dark--1); border-left: 4px solid var(--color-brand--2); border-radius: 8px; padding: 1.4rem 1.8rem; display: flex; align-items: center; gap: 1.2rem; box-shadow: 0 4px 24px rgba(0,0,0,0.5); animation: toastSlideUp 0.3s ease; min-width: 26rem; max-width: 90vw; }
+@keyframes toastSlideUp { from{transform:translateX(-50%) translateY(2rem);opacity:0} to{transform:translateX(-50%) translateY(0);opacity:1} }
+.arrival-toast__icon { font-size: 2.4rem; flex-shrink: 0; }
+.arrival-toast strong { display: block; font-size: 1.5rem; color: var(--color-light--2); font-weight: 800; }
+.arrival-toast p { font-size: 1.2rem; color: var(--color-light--1); margin: 0; }
+.arrival-toast__close { margin-left: auto; background: transparent; border: none; color: var(--color-light--1); font-size: 1.4rem; cursor: pointer; padding: 0.4rem; flex-shrink: 0; }
+
+/* ─── WAKE LOCK BADGE ─── */
+.wake-lock-badge { display: inline-block; font-size: 1rem; padding: 0.2rem 0.5rem; border-radius: 3px; background-color: rgba(0,196,106,0.2); color: var(--color-brand--2); margin-left: 0.6rem; font-weight: 800; letter-spacing: 0.05em; vertical-align: middle; }
