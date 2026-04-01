@@ -714,10 +714,15 @@ a:visited {
         padding: 0 2rem 2rem 2rem;
         border-radius: 2rem 2rem 0 0;
         box-shadow: 0 -4px 24px rgba(0,0,0,0.35);
+        overflow: hidden;
+        transition: height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* When user is done dragging and can scroll */
+    .sidebar.is-scrollable {
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
-        transition: height 0.32s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
     .sidebar::before {
@@ -1112,6 +1117,49 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     vertical-align: middle;
 }
 
+/* ─── STREAK BAR ─── */
+.streak-bar {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    background: var(--color-dark--2);
+    border-radius: 8px;
+    padding: 0.9rem 1.4rem;
+    margin-bottom: 1.2rem;
+}
+.streak-bar__flame {
+    font-size: 2rem;
+    line-height: 1;
+    flex-shrink: 0;
+}
+.streak-bar__text {
+    flex: 1;
+}
+.streak-bar__count {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: #ffb545;
+    line-height: 1.2;
+}
+.streak-bar__label {
+    font-size: 1.1rem;
+    color: var(--color-light--1);
+}
+.streak-bar__days {
+    display: flex;
+    gap: 0.4rem;
+}
+.streak-bar__dot {
+    width: 0.9rem;
+    height: 0.9rem;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.12);
+    transition: background 0.2s;
+}
+.streak-bar__dot.active {
+    background: #ffb545;
+}
+
 /* ─── STATS PANEL ─── */
 .stats-panel { background-color: var(--color-dark--2); border: 1.5px solid var(--color-brand--2); border-radius: 8px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; cursor: pointer; transition: border-color 0.2s; }
 .stats-panel:hover { border-color: #00a85a; }
@@ -1133,7 +1181,6 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 .stats-goal-toast__emoji { font-size: 4rem; display: block; margin-bottom: 0.8rem; }
 .stats-goal-toast__title { font-size: 2rem; font-weight: 800; color: #ffb545; display: block; margin-bottom: 0.4rem; }
 .stats-goal-toast__sub { font-size: 1.3rem; color: var(--color-light--1); }
-
 .stats-detail { background-color: var(--color-dark--2); border-radius: 8px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
 .stats-detail.hidden { display: none !important; }
 .stats-detail__header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.2rem; }
@@ -1158,7 +1205,6 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 .stats-detail__total-val--gray  { color: var(--color-light--2); }
 .stats-detail__total-val--blue  { color: #5badea; }
 .stats-detail__total-label { font-size: 0.95rem; color: var(--color-light--1); }
-
 .stats-goal-editor { background-color: var(--color-dark--2); border-radius: 8px; padding: 1.4rem 1.6rem; margin-bottom: 1.2rem; }
 .stats-goal-editor.hidden { display: none !important; }
 .stats-goal-editor__title { font-size: 1.1rem; font-weight: 800; color: var(--color-light--1); letter-spacing: 0.08em; margin-bottom: 1rem; }
@@ -1169,7 +1215,7 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 .stats-goal-editor__input:focus { outline: none; border-color: var(--color-brand--2); }
 .stats-goal-editor__unit { font-size: 1.1rem; color: var(--color-light--1); min-width: 3rem; }
 
-/* ─── POI FILTERS SCROLL ─── */
+/* ─── POI FILTERS ─── */
 .poi-filters { display: flex; flex-wrap: nowrap; gap: 0.6rem; padding: 0.4rem 0 0.8rem; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; -webkit-overflow-scrolling: touch; cursor: grab; white-space: nowrap; }
 .poi-filters:active { cursor: grabbing; }
 .poi-filters::-webkit-scrollbar { display: none; }

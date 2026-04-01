@@ -140,7 +140,6 @@ class App {
 
   #activitySpeeds = { running: 10, cycling: 20, walking: 5 };
 
-  // Goals loaded at field declaration — fixes reset-on-refresh bug
   #goalKm    = +(localStorage.getItem('goalKm')    || 35);
   #goalTime  = +(localStorage.getItem('goalTime')  || 300);
   #goalCount = +(localStorage.getItem('goalCount') || 7);
@@ -680,6 +679,7 @@ class App {
     this._hideForm();
     this._setLocalStorage();
     this._renderStats(true);
+    this._renderStreak();
   }
 
   _renderWorkoutMarker(workout) {
@@ -766,6 +766,7 @@ class App {
     }
     this._setLocalStorage();
     this._renderStats();
+    this._renderStreak();
   }
 
   _setLocalStorage() { localStorage.setItem('workouts', JSON.stringify(this.#workouts)); }
@@ -776,6 +777,7 @@ class App {
     this.#workouts = data;
     this.#workouts.forEach(work => this._renderWorkout(work));
     this._renderStats();
+    this._renderStreak();
   }
 
   reset() { localStorage.removeItem('workouts'); location.reload(); }
@@ -783,9 +785,9 @@ class App {
   // ─── iOS BANNER ──────────────────────────────────────────────────
   _initIOSBanner() {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = ('standalone' in navigator && navigator.standalone)
+    const standalone = ('standalone' in navigator && navigator.standalone)
       || window.matchMedia('(display-mode: standalone)').matches;
-    if (!isIOS || isStandalone || localStorage.getItem('iosBannerDismissed')) return;
+    if (!isIOS || standalone || localStorage.getItem('iosBannerDismissed')) return;
     const banner = document.getElementById('iosInstallBanner');
     const close  = document.getElementById('iosInstallClose');
     if (!banner) return;
@@ -794,6 +796,42 @@ class App {
       banner.classList.add('hidden');
       localStorage.setItem('iosBannerDismissed', '1');
     });
+  }
+
+  // ─── STREAK ──────────────────────────────────────────────────────
+  _renderStreak() {
+    const countEl = document.getElementById('streakCount');
+    const dotsEl  = document.getElementById('streakDots');
+    if (!countEl || !dotsEl) return;
+
+    // Build a set of unique dates (YYYY-MM-DD) that have workouts
+    const workoutDates = new Set(
+      this.#workouts.map(w => new Date(w.date).toDateString())
+    );
+
+    // Count consecutive days ending today (or yesterday if no workout today)
+    let streak = 0;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    for (let i = 0; i < 365; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      if (workoutDates.has(d.toDateString())) streak++;
+      else break;
+    }
+
+    countEl.textContent = streak;
+
+    // Show last 7 days as dots
+    dotsEl.innerHTML = '';
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(today.getDate() - i);
+      const active = workoutDates.has(d.toDateString());
+      const dot = document.createElement('div');
+      dot.className = 'streak-bar__dot' + (active ? ' active' : '');
+      dotsEl.appendChild(dot);
+    }
   }
 
   // ─── WEEKLY STATS ────────────────────────────────────────────────
@@ -853,17 +891,15 @@ class App {
       this._renderStats();
     });
 
-    const saveGoal = (field, key, el, fallback) => {
-      el?.addEventListener('change', () => {
-        this[field] = Math.max(1, +el.value || fallback);
-        el.value = this[field];
-        localStorage.setItem(key, this[field]);
-        this._renderStats();
-      });
-    };
-    saveGoal('#goalKm',    'goalKm',    inKm,   35);
-    saveGoal('#goalTime',  'goalTime',  inTime, 300);
-    saveGoal('#goalCount', 'goalCount', inCnt,  7);
+    const goal = (field, key, el, fb) => el?.addEventListener('change', () => {
+      this[field] = Math.max(1, +el.value || fb);
+      el.value = this[field];
+      localStorage.setItem(key, this[field]);
+      this._renderStats();
+    });
+    goal('#goalKm',    'goalKm',    inKm,   35);
+    goal('#goalTime',  'goalTime',  inTime, 300);
+    goal('#goalCount', 'goalCount', inCnt,  7);
   }
 
   _renderStats(animate = false) {
@@ -871,43 +907,42 @@ class App {
     const weekW = this._getWeekWorkouts(off);
     const { mon } = this._getWeekBounds(off);
 
-    const weekKm  = weekW.reduce((s, w) => s + (w.distance || 0), 0);
-    const weekMin = weekW.reduce((s, w) => s + (w.duration  || 0), 0);
-    const weekCnt = weekW.length;
+    const wKm  = weekW.reduce((s, w) => s + (w.distance || 0), 0);
+    const wMin = weekW.reduce((s, w) => s + (w.duration  || 0), 0);
+    const wCnt = weekW.length;
 
-    let subset = weekW;
+    let sub = weekW;
     if (this.#statsSelectedDay !== null)
-      subset = weekW.filter(w => Math.floor((new Date(w.date) - mon) / 86400000) === this.#statsSelectedDay);
-    const subKm  = subset.reduce((s, w) => s + (w.distance || 0), 0);
-    const subMin = subset.reduce((s, w) => s + (w.duration  || 0), 0);
-    const subCnt = subset.length;
+      sub = weekW.filter(w => Math.floor((new Date(w.date) - mon) / 86400000) === this.#statsSelectedDay);
+    const sKm  = sub.reduce((s, w) => s + (w.distance || 0), 0);
+    const sMin = sub.reduce((s, w) => s + (w.duration  || 0), 0);
+    const sCnt = sub.length;
 
     const CIRC = 226.2;
-    const setRing = (id, pct) => {
+    const ring = (id, pct) => {
       const el = document.getElementById(id);
       if (!el) return;
-      const target = Math.max(0, CIRC - Math.min(pct, 1) * CIRC);
+      const t = Math.max(0, CIRC - Math.min(pct, 1) * CIRC);
       if (animate) {
         el.style.transition = 'none';
         el.setAttribute('stroke-dashoffset', CIRC);
         void el.getBoundingClientRect();
         el.style.transition = 'stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1)';
       }
-      requestAnimationFrame(() => el.setAttribute('stroke-dashoffset', target.toFixed(1)));
+      requestAnimationFrame(() => el.setAttribute('stroke-dashoffset', t.toFixed(1)));
     };
-
-    setRing('statsRingKm',       weekKm  / this.#goalKm);
-    setRing('statsRingTime',     weekMin / this.#goalTime);
-    setRing('statsRingWorkouts', weekCnt / this.#goalCount);
+    ring('statsRingKm',       wKm  / this.#goalKm);
+    ring('statsRingTime',     wMin / this.#goalTime);
+    ring('statsRingWorkouts', wCnt / this.#goalCount);
 
     const fmtT = m => m >= 60 ? `${Math.floor(m/60)}h ${Math.round(m%60)}m` : `${Math.round(m)}m`;
     const set  = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
 
-    set('statsValKm',       weekKm.toFixed(1));
-    set('statsValTime',     fmtT(weekMin));
-    set('statsValWorkouts', weekCnt);
+    set('statsValKm',       wKm.toFixed(1));
+    set('statsValTime',     fmtT(wMin));
+    set('statsValWorkouts', wCnt);
 
-    const pct = Math.min(Math.round((weekKm / this.#goalKm) * 100), 100);
+    const pct = Math.min(Math.round((wKm / this.#goalKm) * 100), 100);
     set('statsGoalPct', pct + '%');
     const fill = document.getElementById('statsGoalFill');
     if (fill) fill.style.width = pct + '%';
@@ -915,24 +950,20 @@ class App {
     if (pct >= 100 && !this.#statsPrevGoalReached && animate) {
       this.#statsPrevGoalReached = true;
       this._showGoalCelebration();
-    } else if (pct < 100) {
-      this.#statsPrevGoalReached = false;
-    }
+    } else if (pct < 100) { this.#statsPrevGoalReached = false; }
 
-    const nextBtn = document.getElementById('statsWeekNext');
-    if (off === 0) {
-      set('statsWeekLabel', 'This week');
-      if (nextBtn) nextBtn.disabled = true;
-    } else {
+    const nxt = document.getElementById('statsWeekNext');
+    if (off === 0) { set('statsWeekLabel', 'This week'); if (nxt) nxt.disabled = true; }
+    else {
       const su = new Date(mon); su.setDate(mon.getDate() + 6);
       const fmt = d => d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
       set('statsWeekLabel', `${fmt(mon)}–${fmt(su)}`);
-      if (nextBtn) nextBtn.disabled = false;
+      if (nxt) nxt.disabled = false;
     }
 
-    set('statsDetailKm',    subKm.toFixed(1));
-    set('statsDetailTime',  fmtT(subMin));
-    set('statsDetailCount', subCnt);
+    set('statsDetailKm',    sKm.toFixed(1));
+    set('statsDetailTime',  fmtT(sMin));
+    set('statsDetailCount', sCnt);
     set('statsDetailDate',  this.#statsSelectedDay !== null
       ? (() => { const d = new Date(mon); d.setDate(mon.getDate() + this.#statsSelectedDay); return d.getDate(); })()
       : '—');
@@ -940,26 +971,21 @@ class App {
     this._renderDayBars(weekW, mon);
   }
 
-  _renderDayBars(weekWorkouts, mon) {
-    const barsEl = document.getElementById('statsDetailBars');
-    if (!barsEl) return;
-    const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const km  = Array(7).fill(0);
-    const typ = Array(7).fill('none');
-    const dates = Array(7);
-    for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); dates[i] = d.getDate(); }
-    weekWorkouts.forEach(w => {
-      const i = Math.floor((new Date(w.date) - mon) / 86400000);
-      if (i >= 0 && i < 7) { km[i] += w.distance || 0; typ[i] = w.type; }
-    });
+  _renderDayBars(ww, mon) {
+    const el = document.getElementById('statsDetailBars');
+    if (!el) return;
+    const N = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const km = Array(7).fill(0), tp = Array(7).fill('none'), dt = Array(7);
+    for (let i = 0; i < 7; i++) { const d = new Date(mon); d.setDate(mon.getDate() + i); dt[i] = d.getDate(); }
+    ww.forEach(w => { const i = Math.floor((new Date(w.date) - mon) / 86400000); if (i >= 0 && i < 7) { km[i] += w.distance || 0; tp[i] = w.type; } });
     const max = Math.max(...km, 0.1);
-    barsEl.innerHTML = DAYS.map((name, i) => {
+    el.innerHTML = N.map((name, i) => {
       const h = Math.round((km[i] / max) * 48);
-      const c = typ[i] === 'running' ? '#00c46a' : typ[i] === 'cycling' ? '#ffb545' : '#3a4147';
+      const c = tp[i] === 'running' ? '#00c46a' : tp[i] === 'cycling' ? '#ffb545' : '#3a4147';
       const a = this.#statsSelectedDay === i ? ' active' : '';
-      return `<div class="stats-detail__day-col${a}" data-day="${i}"><div class="stats-detail__bar" style="height:${Math.max(h, km[i] > 0 ? 4 : 2)}px;background:${c}"></div><div class="stats-detail__day-name">${name}</div><div class="stats-detail__day-date">${dates[i]}</div></div>`;
+      return `<div class="stats-detail__day-col${a}" data-day="${i}"><div class="stats-detail__bar" style="height:${Math.max(h,km[i]>0?4:2)}px;background:${c}"></div><div class="stats-detail__day-name">${name}</div><div class="stats-detail__day-date">${dt[i]}</div></div>`;
     }).join('');
-    barsEl.querySelectorAll('.stats-detail__day-col').forEach(col =>
+    el.querySelectorAll('.stats-detail__day-col').forEach(col =>
       col.addEventListener('click', e => {
         e.stopPropagation();
         const day = +col.dataset.day;
@@ -970,13 +996,13 @@ class App {
   }
 
   _showGoalCelebration() {
-    const panel = document.getElementById('statsPanel');
-    panel?.classList.add('goal-reached');
-    setTimeout(() => panel?.classList.remove('goal-reached'), 800);
+    const p = document.getElementById('statsPanel');
+    p?.classList.add('goal-reached');
+    setTimeout(() => p?.classList.remove('goal-reached'), 800);
     document.querySelector('.stats-goal-toast')?.remove();
     const t = document.createElement('div');
     t.className = 'stats-goal-toast';
-    t.innerHTML = `<span class="stats-goal-toast__emoji">🏆</span><span class="stats-goal-toast__title">Weekly goal reached!</span><span class="stats-goal-toast__sub">Amazing — you crushed your weekly target 🎉</span>`;
+    t.innerHTML = `<span class="stats-goal-toast__emoji">🏆</span><span class="stats-goal-toast__title">Weekly goal reached!</span><span class="stats-goal-toast__sub">Amazing — you crushed it 🎉</span>`;
     document.body.appendChild(t);
     setTimeout(() => { t.style.transition = 'opacity 0.5s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 500); }, 3500);
   }
@@ -1372,3 +1398,4 @@ const app = new App();
     else                     toFull();
   });
 })();
+
