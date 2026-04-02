@@ -140,6 +140,8 @@ class App {
 
   #activitySpeeds = { running: 10, cycling: 20, walking: 5 };
 
+  #activeWorkoutId = null; // currently selected workout (shown on map)
+
   #goalKm    = +(localStorage.getItem('goalKm')    || 35);
   #goalTime  = +(localStorage.getItem('goalTime')  || 300);
   #goalCount = +(localStorage.getItem('goalCount') || 7);
@@ -674,6 +676,10 @@ class App {
     }
 
     this.#workouts.push(workout);
+    // Save current route coords to this workout (if route was active)
+    if (this.#routeCoords && this.#routeCoords.length > 1) {
+      workout.routeCoords = [...this.#routeCoords];
+    }
     this._renderWorkoutMarker(workout);
     this._renderWorkout(workout);
     this._hideForm();
@@ -683,11 +689,10 @@ class App {
   }
 
   _renderWorkoutMarker(workout) {
-    const marker = L.marker(workout.coords)
+    const marker = L.marker(workout.coords, { opacity: 0 })
       .addTo(this.#map)
       .bindPopup(L.popup({ maxWidth: 250, minWidth: 100, autoClose: false, closeOnClick: false, className: `${workout.type}-popup` }))
-      .setPopupContent(`${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`)
-      .openPopup();
+      .setPopupContent(`${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`);
     this.#markers.set(workout.id, marker);
   }
 
@@ -748,9 +753,60 @@ class App {
     if (deleteBtn) { e.stopPropagation(); this._deleteWorkout(deleteBtn.dataset.id); return; }
     const workoutEl = e.target.closest('.workout');
     if (!workoutEl) return;
-    const workout = this.#workouts.find(work => work.id === workoutEl.dataset.id);
+    const workout = this.#workouts.find(w => w.id === workoutEl.dataset.id);
     if (!workout) return;
-    this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
+
+    const isSame = this.#activeWorkoutId === workout.id;
+
+    // Hide all markers and popups
+    this.#markers.forEach((m, id) => {
+      m.setOpacity(0);
+      m.closePopup();
+    });
+    // Clear stored route polyline if any
+    this._clearWorkoutRoute();
+
+    // Remove active highlight from all workout items
+    document.querySelectorAll('.workout').forEach(el => el.classList.remove('workout--active'));
+
+    if (isSame) {
+      // Clicking same workout → deselect
+      this.#activeWorkoutId = null;
+    } else {
+      // Select new workout
+      this.#activeWorkoutId = workout.id;
+      workoutEl.classList.add('workout--active');
+
+      // Show marker
+      const marker = this.#markers.get(workout.id);
+      if (marker) {
+        marker.setOpacity(1);
+        marker.openPopup();
+      }
+      this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
+
+      // Show saved route if this workout has one
+      if (workout.routeCoords && workout.routeCoords.length > 1) {
+        this._showWorkoutRoute(workout.routeCoords);
+      }
+    }
+  }
+
+  // Stored polyline for the currently shown workout route
+  #workoutRouteLayer = null;
+
+  _showWorkoutRoute(coords) {
+    this._clearWorkoutRoute();
+    this.#workoutRouteLayer = L.polyline(coords, {
+      color: '#00c46a', weight: 4, opacity: 0.75, dashArray: '8 6',
+    }).addTo(this.#map);
+  }
+
+  _clearWorkoutRoute() {
+    if (this.#workoutRouteLayer) {
+      this.#map.removeLayer(this.#workoutRouteLayer);
+      this.#workoutRouteLayer = null;
+    }
   }
 
   _deleteWorkout(id) {
@@ -969,6 +1025,14 @@ class App {
       : '—');
 
     this._renderDayBars(weekW, mon);
+    this._filterWorkoutsList(weekW);
+  }
+
+  _filterWorkoutsList(weekWorkouts) {
+    const weekIds = new Set(weekWorkouts.map(w => w.id));
+    document.querySelectorAll('.workout').forEach(el => {
+      el.style.display = weekIds.has(el.dataset.id) ? '' : 'none';
+    });
   }
 
   _renderDayBars(ww, mon) {
