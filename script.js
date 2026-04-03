@@ -609,7 +609,7 @@ class App {
 
   // ─── MAP CLICK ───────────────────────────────────────────────────
   _handleMapClick(mapE) {
-    if (this.#routeMode) this._handleRouteClick(mapE);
+    if (this.#routeMode && this.#routeStep < 3) this._handleRouteClick(mapE);
     else this._showForm(mapE);
   }
 
@@ -620,13 +620,10 @@ class App {
 
     if (window.innerWidth <= 768) {
       const sidebar = document.querySelector('.sidebar');
-      // Snap to 85vh so the form is always fully visible, then scroll form into view
       sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
-      sidebar.style.height = Math.min(window.innerHeight * 0.85, window.innerHeight) + 'px';
-      // After transition, scroll to ensure form is visible
-      setTimeout(() => {
-        form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-      }, 350);
+      sidebar.style.height = '100dvh';
+      sidebar.classList.add('is-scrollable');
+      setTimeout(() => form.scrollIntoView({ behavior: 'smooth', block: 'nearest' }), 350);
     }
   }
 
@@ -638,9 +635,10 @@ class App {
 
     if (window.innerWidth <= 768) {
       const sidebar = document.querySelector('.sidebar');
+      sidebar.classList.remove('is-scrollable');
+      sidebar.scrollTop = 0;
       sidebar.style.transition = 'height 0.32s cubic-bezier(0.4,0,0.2,1)';
       sidebar.style.height = '55vh';
-      sidebar.scrollTop = 0;
     }
   }
 
@@ -676,10 +674,11 @@ class App {
     }
 
     this.#workouts.push(workout);
-    // Save current route coords to this workout (if route was active)
     if (this.#routeCoords && this.#routeCoords.length > 1) {
       workout.routeCoords = [...this.#routeCoords];
     }
+    // Signal that this marker should be shown immediately (not hidden like load-from-storage)
+    this.#activeWorkoutId = '__pending__';
     this._renderWorkoutMarker(workout);
     this._renderWorkout(workout);
     this._hideForm();
@@ -688,12 +687,52 @@ class App {
     this._renderStreak();
   }
 
+  // ── Helpers: show / fully-hide a marker (invisible + not clickable) ──
+  _showMarker(marker) {
+    marker.setOpacity(1);
+    if (marker._icon)   marker._icon.style.pointerEvents   = '';
+    if (marker._shadow) marker._shadow.style.pointerEvents = '';
+    // Icons may not be in DOM yet (called right after addTo) — wait one tick
+    setTimeout(() => {
+      if (marker._icon)   marker._icon.style.pointerEvents   = '';
+      if (marker._shadow) marker._shadow.style.pointerEvents = '';
+    }, 0);
+  }
+
+  _hideMarker(marker) {
+    marker.setOpacity(0);
+    marker.closePopup();
+    setTimeout(() => {
+      if (marker._icon)   marker._icon.style.pointerEvents   = 'none';
+      if (marker._shadow) marker._shadow.style.pointerEvents = 'none';
+    }, 0);
+  }
+
   _renderWorkoutMarker(workout) {
-    const marker = L.marker(workout.coords, { opacity: 0 })
+    const marker = L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(L.popup({ maxWidth: 250, minWidth: 100, autoClose: false, closeOnClick: false, className: `${workout.type}-popup` }))
       .setPopupContent(`${workout.type === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${workout.description}`);
     this.#markers.set(workout.id, marker);
+
+    // If this is the newly added workout (called from _newWorkout, not _loadMap):
+    // show it immediately and make it the active one.
+    // If called from _loadMap on page load, hide all markers by default —
+    // user clicks a workout in the list to reveal its marker.
+    // We distinguish by checking whether _newWorkout is the caller:
+    // _newWorkout sets #activeWorkoutId to '__pending__' before calling us.
+    if (this.#activeWorkoutId === '__pending__') {
+      // Hide all previously visible markers
+      this.#markers.forEach((m, id) => {
+        if (id !== workout.id) this._hideMarker(m);
+      });
+      this._showMarker(marker);
+      marker.openPopup();
+      this.#activeWorkoutId = workout.id;
+    } else {
+      // Loading from storage — start hidden
+      this._hideMarker(marker);
+    }
   }
 
   _renderWorkout(workout) {
@@ -758,37 +797,25 @@ class App {
 
     const isSame = this.#activeWorkoutId === workout.id;
 
-    // Hide all markers and popups
-    this.#markers.forEach((m, id) => {
-      m.setOpacity(0);
-      m.closePopup();
-    });
-    // Clear stored route polyline if any
+    // Hide ALL markers (invisible + not clickable)
+    this.#markers.forEach(m => this._hideMarker(m));
     this._clearWorkoutRoute();
-
-    // Remove active highlight from all workout items
     document.querySelectorAll('.workout').forEach(el => el.classList.remove('workout--active'));
 
     if (isSame) {
-      // Clicking same workout → deselect
+      // Deselect — all markers stay hidden
       this.#activeWorkoutId = null;
     } else {
-      // Select new workout
+      // Select — show only this marker
       this.#activeWorkoutId = workout.id;
       workoutEl.classList.add('workout--active');
-
-      // Show marker
       const marker = this.#markers.get(workout.id);
       if (marker) {
-        marker.setOpacity(1);
+        this._showMarker(marker);
         marker.openPopup();
       }
       this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
-
-      // Show saved route if this workout has one
-      if (workout.routeCoords && workout.routeCoords.length > 1) {
-        this._showWorkoutRoute(workout.routeCoords);
-      }
+      if (workout.routeCoords?.length > 1) this._showWorkoutRoute(workout.routeCoords);
     }
   }
 
@@ -927,6 +954,15 @@ class App {
       this.#statsExpanded = !this.#statsExpanded;
       detail?.classList.toggle('hidden', !this.#statsExpanded);
       editor?.classList.toggle('hidden', !this.#statsExpanded);
+      if (window.innerWidth <= 768) {
+        const sidebar = document.querySelector('.sidebar');
+        if (this.#statsExpanded) {
+          sidebar?.classList.add('is-scrollable');
+        } else {
+          sidebar?.classList.remove('is-scrollable');
+          if (sidebar) sidebar.scrollTop = 0;
+        }
+      }
     });
     detail?.addEventListener('click', e => e.stopPropagation());
     editor?.addEventListener('click', e => e.stopPropagation());
@@ -1462,4 +1498,3 @@ const app = new App();
     else                     toFull();
   });
 })();
-
