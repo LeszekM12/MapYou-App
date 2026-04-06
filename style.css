@@ -218,6 +218,9 @@ a:visited {
 .cycling-popup .leaflet-popup-content-wrapper {
     border-left: 5px solid var(--color-brand--1);
 }
+.walking-popup .leaflet-popup-content-wrapper {
+    border-left: 5px solid #5badea;
+}
 
 /* ─── POI SEARCH ─── */
 .poi-search {
@@ -1528,7 +1531,8 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 /* Container sits absolute in top-right, no impact on grid */
 .workout__thumb-container {
     position: absolute;
-    top: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
     right: 2.25rem;
     width: 6rem;
     height: 6rem;
@@ -1557,9 +1561,7 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     height: 100%;
 }
 
-/* Walking — NO border colour by default (same as no class) */
-/* It gets the active green from workout--active like others */
+/* Walking — blue border matching the app's blue accent */
 .workout--walking {
-    border-left: 5px solid var(--color-light--1);
+    border-left: 5px solid #5badea;
 }
-

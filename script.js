@@ -665,11 +665,11 @@ class App {
           </div>
           <div class="workout-modal__row">
             <label class="workout-modal__label">Distance</label>
-            <input class="workout-modal__input" id="wm-distance" type="number" placeholder="km" min="0"/>
+            <input class="workout-modal__input" id="wm-distance" type="number" placeholder="km" min="0" step="0.1"/>
           </div>
           <div class="workout-modal__row">
             <label class="workout-modal__label">Duration</label>
-            <input class="workout-modal__input" id="wm-duration" type="number" placeholder="min" min="0"/>
+            <input class="workout-modal__input" id="wm-duration" type="number" placeholder="min" min="0" step="0.1"/>
           </div>
           <div class="workout-modal__row" id="wm-cadence-row">
             <label class="workout-modal__label">Cadence</label>
@@ -844,9 +844,12 @@ class App {
 
   _renderWorkoutMarker(workout) {
     const icon = workout.type === 'running' ? '🏃‍♂️' : workout.type === 'cycling' ? '🚴‍♀️' : '🚶';
+    const popupClass = workout.type === 'running' ? 'running-popup'
+      : workout.type === 'cycling' ? 'cycling-popup'
+        : 'walking-popup';
     const marker = L.marker(workout.coords)
       .addTo(this.#map)
-      .bindPopup(L.popup({ maxWidth: 250, minWidth: 100, autoClose: false, closeOnClick: false, className: `${workout.type}-popup` }))
+      .bindPopup(L.popup({ maxWidth: 250, minWidth: 100, autoClose: false, closeOnClick: false, className: popupClass }))
       .setPopupContent(`${icon} ${workout.description}`);
     this.#markers.set(workout.id, marker);
 
@@ -1272,7 +1275,7 @@ class App {
     const max = Math.max(...km, 0.1);
     el.innerHTML = N.map((name, i) => {
       const h = Math.round((km[i] / max) * 48);
-      const c = tp[i] === 'running' ? '#00c46a' : tp[i] === 'cycling' ? '#ffb545' : '#3a4147';
+      const c = tp[i] === 'running' ? '#00c46a' : tp[i] === 'cycling' ? '#ffb545' : tp[i] === 'walking' ? '#5badea' : '#3a4147';
       const a = this.#statsSelectedDay === i ? ' active' : '';
       return `<div class="stats-detail__day-col${a}" data-day="${i}"><div class="stats-detail__bar" style="height:${Math.max(h,km[i]>0?4:2)}px;background:${c}"></div><div class="stats-detail__day-name">${name}</div><div class="stats-detail__day-date">${dt[i]}</div></div>`;
     }).join('');
