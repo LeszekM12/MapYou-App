@@ -1,4 +1,4 @@
-const CACHE = 'mapty-v2.12';
+const CACHE = 'mapty-v3.0';
 
 const PRECACHE = [
   './',

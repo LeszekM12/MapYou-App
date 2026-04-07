@@ -145,6 +145,7 @@ class App {
 
   #markers = new Map();
   #clusterGroup = null;  // Leaflet.markercluster group for workout markers
+  #clusterEnabled = localStorage.getItem('clusterEnabled') === 'true'; // off by default
   #poiMarkers = [];
   #userCoords = null;
   #autocompleteTimer = null;
@@ -230,20 +231,21 @@ class App {
 
     this.#map.on('click', this._handleMapClick.bind(this));
 
-    // Create marker cluster group for workout markers
-    this.#clusterGroup = L.markerClusterGroup({
-      maxClusterRadius: 60,
-      iconCreateFunction: cluster => {
-        const count = cluster.getChildCount();
-        return L.divIcon({
-          html: `<div class="workout-cluster"><span>${count}</span></div>`,
-          className: '',
-          iconSize: [40, 40],
-          iconAnchor: [20, 20],
-        });
-      },
-    });
-    this.#map.addLayer(this.#clusterGroup);
+    if (this.#clusterEnabled) {
+      this.#clusterGroup = L.markerClusterGroup({
+        maxClusterRadius: 60,
+        iconCreateFunction: cluster => {
+          const count = cluster.getChildCount();
+          return L.divIcon({
+            html: `<div class="workout-cluster"><span>${count}</span></div>`,
+            className: '',
+            iconSize: [40, 40],
+            iconAnchor: [20, 20],
+          });
+        },
+      });
+      this.#map.addLayer(this.#clusterGroup);
+    }
     this.#workouts.forEach(work => this._renderWorkoutMarker(work));
 
     this.#map.on('mousedown touchstart', () => {
@@ -295,6 +297,18 @@ class App {
         });
       }
     });
+
+    // Cluster toggle
+    const clusterToggle = document.getElementById('clusterToggle');
+    if (this.#clusterEnabled) clusterToggle?.classList.add('active');
+    const doToggleCluster = () => {
+      this.#clusterEnabled = !this.#clusterEnabled;
+      localStorage.setItem('clusterEnabled', this.#clusterEnabled);
+      clusterToggle?.classList.toggle('active', this.#clusterEnabled);
+      location.reload();
+    };
+    document.getElementById('settingCluster')?.addEventListener('click', doToggleCluster);
+    clusterToggle?.addEventListener('click', e => { e.stopPropagation(); doToggleCluster(); });
   }
 
   _initPWAInstall() {
@@ -864,7 +878,6 @@ class App {
       : workout.type === 'cycling' ? 'cycling-popup'
         : 'walking-popup';
 
-    // Add to cluster group (or directly to map if cluster not ready yet)
     const target = this.#clusterGroup || this.#map;
     const marker = L.marker(workout.coords)
       .bindPopup(L.popup({ maxWidth: 250, minWidth: 100, autoClose: false, closeOnClick: false, className: popupClass }))
@@ -872,15 +885,24 @@ class App {
     target.addLayer(marker);
     this.#markers.set(workout.id, marker);
 
-    if (this.#activeWorkoutId === '__pending__') {
-      this.#markers.forEach((m, id) => {
-        if (id !== workout.id) this._hideMarker(m);
-      });
+    if (this.#clusterEnabled) {
+      // Cluster mode: all markers always visible — cluster handles grouping
       this._showMarker(marker);
-      marker.openPopup();
-      this.#activeWorkoutId = workout.id;
+      // If this is the newly added one, open its popup
+      if (this.#activeWorkoutId === '__pending__') {
+        this.#activeWorkoutId = workout.id;
+        marker.openPopup();
+      }
     } else {
-      this._hideMarker(marker);
+      // Non-cluster mode: hide all by default, reveal only when user clicks a workout card
+      if (this.#activeWorkoutId === '__pending__') {
+        this.#markers.forEach((m, id) => { if (id !== workout.id) this._hideMarker(m); });
+        this._showMarker(marker);
+        marker.openPopup();
+        this.#activeWorkoutId = workout.id;
+      } else {
+        this._hideMarker(marker);
+      }
     }
   }
 
@@ -1003,27 +1025,38 @@ class App {
     const workout = this.#workouts.find(w => w.id === workoutEl.dataset.id);
     if (!workout) return;
 
-    const isSame = this.#activeWorkoutId === workout.id;
-
-    // Hide ALL markers (invisible + not clickable)
-    this.#markers.forEach(m => this._hideMarker(m));
-    this._clearWorkoutRoute();
-    document.querySelectorAll('.workout').forEach(el => el.classList.remove('workout--active'));
-
-    if (isSame) {
-      // Deselect — all markers stay hidden
-      this.#activeWorkoutId = null;
-    } else {
-      // Select — show only this marker
-      this.#activeWorkoutId = workout.id;
-      workoutEl.classList.add('workout--active');
-      const marker = this.#markers.get(workout.id);
-      if (marker) {
-        this._showMarker(marker);
-        marker.openPopup();
+    if (this.#clusterEnabled) {
+      // Cluster mode: all markers always visible — just centre map and open popup
+      document.querySelectorAll('.workout').forEach(el => el.classList.remove('workout--active'));
+      this._clearWorkoutRoute();
+      if (this.#activeWorkoutId === workout.id) {
+        // Deselect
+        this.#activeWorkoutId = null;
+      } else {
+        this.#activeWorkoutId = workout.id;
+        workoutEl.classList.add('workout--active');
+        this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
+        const marker = this.#markers.get(workout.id);
+        if (marker) marker.openPopup();
+        if (workout.routeCoords?.length > 1) this._showWorkoutRoute(workout.routeCoords);
       }
-      this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
-      if (workout.routeCoords?.length > 1) this._showWorkoutRoute(workout.routeCoords);
+    } else {
+      // Non-cluster mode: hide all, show only selected
+      const isSame = this.#activeWorkoutId === workout.id;
+      this.#markers.forEach(m => this._hideMarker(m));
+      this._clearWorkoutRoute();
+      document.querySelectorAll('.workout').forEach(el => el.classList.remove('workout--active'));
+
+      if (isSame) {
+        this.#activeWorkoutId = null;
+      } else {
+        this.#activeWorkoutId = workout.id;
+        workoutEl.classList.add('workout--active');
+        const marker = this.#markers.get(workout.id);
+        if (marker) { this._showMarker(marker); marker.openPopup(); }
+        this.#map.setView(workout.coords, this.#mapZoomLevel, { animate: true, pan: { duration: 1 } });
+        if (workout.routeCoords?.length > 1) this._showWorkoutRoute(workout.routeCoords);
+      }
     }
   }
 
