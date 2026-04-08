@@ -242,38 +242,46 @@
   </ul>
 </div>
 
-<div id="map"></div>
-
-<!-- MAP SKELETON -->
-<div id="mapSkeleton" class="map-skeleton">
-  <div class="map-skeleton__shimmer"></div>
-  <div class="map-skeleton__msg hidden" id="skeletonMsg">
-    <p class="map-skeleton__text" id="skeletonText">Map is loading longer than usual…</p>
-    <button class="map-skeleton__btn" id="btnRetry">↺ Retry</button>
-  </div>
-</div>
-
-<!-- OFFLINE OVERLAY -->
-<div id="offlineOverlay" class="offline-overlay hidden">
-  <div class="offline-overlay__box">
-    <div class="offline-overlay__icon">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="1" y1="1" x2="23" y2="23"/>
-        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-        <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
-        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-        <circle cx="12" cy="20" r="1"/>
+<div id="map">
+  <!-- MAP SKELETON — inside #map, covers only the map area -->
+  <div id="mapSkeleton" class="map-skeleton">
+    <div class="map-skeleton__bg"></div>
+    <div class="map-skeleton__loader">
+      <svg class="map-skeleton__spinner" viewBox="0 0 50 50">
+        <circle class="map-skeleton__track"  cx="25" cy="25" r="20" fill="none" stroke-width="4"/>
+        <circle class="map-skeleton__arc"    cx="25" cy="25" r="20" fill="none" stroke-width="4"
+                stroke-dasharray="80 45" stroke-linecap="round"/>
       </svg>
+      <span class="map-skeleton__label">Loading map…</span>
     </div>
-    <h2 class="offline-overlay__title">Offline Mode</h2>
-    <p class="offline-overlay__sub">No internet connection.<br>Your workouts and stats are still available.</p>
-    <button class="offline-overlay__btn" id="btnTryAgain">↺ Try again</button>
+    <div class="map-skeleton__msg hidden" id="skeletonMsg">
+      <p class="map-skeleton__text">Map is loading longer than usual…</p>
+      <button class="map-skeleton__btn" id="btnRetry">↺ Retry</button>
+    </div>
+  </div>
+
+  <!-- OFFLINE OVERLAY — inside #map, covers only the map area -->
+  <div id="offlineOverlay" class="offline-overlay hidden">
+    <div class="offline-overlay__box">
+      <div class="offline-overlay__icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="1" y1="1" x2="23" y2="23"/>
+          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+          <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+          <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+          <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+          <circle cx="12" cy="20" r="1"/>
+        </svg>
+      </div>
+      <h2 class="offline-overlay__title">Offline Mode</h2>
+      <p class="offline-overlay__sub">No internet connection.<br>Your workouts and stats are still available.</p>
+      <button class="offline-overlay__btn" id="btnTryAgain">↺ Try again</button>
+    </div>
   </div>
 </div>
 
-<!-- OFFLINE BADGE (top-right corner) -->
+<!-- OFFLINE BADGE (top-right corner of the map) -->
 <div id="offlineBadge" class="offline-badge hidden">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <line x1="1" y1="1" x2="23" y2="23"/>
