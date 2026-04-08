@@ -457,7 +457,11 @@ class App {
     voiceToggle?.addEventListener('click', e => { e.stopPropagation(); this._toggleVoice(); });
 
     itemClear.addEventListener('click', () => {
-      if (confirm('Delete all workouts?')) { localStorage.removeItem('workouts'); location.reload(); }
+      if (confirm('Delete all workouts?')) {
+        clearAllWorkoutsFromDB()
+          .then(() => { localStorage.removeItem('workouts'); location.reload(); })
+          .catch(console.error);
+      }
     });
 
     itemInstall?.addEventListener('click', () => {
@@ -948,7 +952,8 @@ class App {
       this.#activeWorkoutId = '__pending__';
       this._renderWorkoutMarker(workout);
       this._renderWorkout(workout);
-      this._setLocalStorage();
+      // Zapisz nowy workout do IndexedDB
+      saveWorkoutToDB(workout).catch(console.error);
       this._renderStats(true);
       this._renderStreak();
     });
@@ -1013,12 +1018,12 @@ class App {
     if (this.#routeCoords && this.#routeCoords.length > 1) {
       workout.routeCoords = [...this.#routeCoords];
     }
-    // Signal that this marker should be shown immediately (not hidden like load-from-storage)
     this.#activeWorkoutId = '__pending__';
     this._renderWorkoutMarker(workout);
     this._renderWorkout(workout);
     this._hideForm();
-    this._setLocalStorage();
+    // Zapisz nowy workout do IndexedDB
+    saveWorkoutToDB(workout).catch(console.error);
     this._renderStats(true);
     this._renderStreak();
   }
@@ -1258,23 +1263,41 @@ class App {
       el.style.opacity = '0';
       setTimeout(() => el.remove(), 300);
     }
-    this._setLocalStorage();
+    // Usuń z IndexedDB
+    deleteWorkoutFromDB(id).catch(console.error);
     this._renderStats();
     this._renderStreak();
   }
 
-  _setLocalStorage() { localStorage.setItem('workouts', JSON.stringify(this.#workouts)); }
+  // Zapisuje jeden workout do IndexedDB (zastępuje stary localStorage.setItem)
+  _setLocalStorage() {
+    // Zachowana dla kompatybilności — teraz każdy workout zapisywany
+    // indywidualnie przez saveWorkoutToDB() przy tworzeniu/edycji.
+    // Ta metoda robi bulk-save całej tablicy (używana przy imporcie).
+    this.#workouts.forEach(w => saveWorkoutToDB(w).catch(console.error));
+  }
 
-  _getLocalStorage() {
-    const data = JSON.parse(localStorage.getItem('workouts'));
-    if (!data) return;
+  // Wczytuje workouty z IndexedDB (z migracją z localStorage jeśli potrzeba)
+  async _getLocalStorage() {
+    // Krok 1: Jeśli są stare dane w localStorage → zmigruj do IndexedDB
+    await migrateLocalStorageToIndexedDB();
+
+    // Krok 2: Wczytaj workouty z IndexedDB
+    const data = await loadWorkoutsFromDB();
+    if (!data || data.length === 0) return;
+
     this.#workouts = data;
     this.#workouts.forEach(work => this._renderWorkout(work));
     this._renderStats();
     this._renderStreak();
   }
 
-  reset() { localStorage.removeItem('workouts'); location.reload(); }
+  // Czyści wszystkie workouty (ustawienia → "Clear all workouts")
+  async reset() {
+    await clearAllWorkoutsFromDB();
+    localStorage.removeItem('workouts'); // na wszelki wypadek
+    location.reload();
+  }
 
   // ─── iOS BANNER ──────────────────────────────────────────────────
   _initIOSBanner() {
