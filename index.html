@@ -91,6 +91,14 @@
       </div>
       <span class="settings-item__arrow">›</span>
     </div>
+    <div class="settings-item" id="settingCluster">
+      <span class="settings-item__icon">📍</span>
+      <div class="settings-item__text">
+        <div class="settings-item__label">Cluster markers</div>
+        <div class="settings-item__sub">Group nearby workouts on map</div>
+      </div>
+      <div class="cluster-toggle" id="clusterToggle"><div class="cluster-toggle__knob"></div></div>
+    </div>
     <div class="settings-item" id="settingInstall" style="display:none">
       <span class="settings-item__icon">📱</span>
       <div class="settings-item__text">
@@ -243,13 +251,13 @@
 </div>
 
 <div id="map">
-  <!-- MAP SKELETON — inside #map, covers only the map area -->
+  <!-- SKELETON — scoped to map area only -->
   <div id="mapSkeleton" class="map-skeleton">
     <div class="map-skeleton__bg"></div>
     <div class="map-skeleton__loader">
       <svg class="map-skeleton__spinner" viewBox="0 0 50 50">
-        <circle class="map-skeleton__track"  cx="25" cy="25" r="20" fill="none" stroke-width="4"/>
-        <circle class="map-skeleton__arc"    cx="25" cy="25" r="20" fill="none" stroke-width="4"
+        <circle class="map-skeleton__track" cx="25" cy="25" r="20" fill="none" stroke-width="4"/>
+        <circle class="map-skeleton__arc"   cx="25" cy="25" r="20" fill="none" stroke-width="4"
                 stroke-dasharray="80 45" stroke-linecap="round"/>
       </svg>
       <span class="map-skeleton__label">Loading map…</span>
@@ -260,39 +268,19 @@
     </div>
   </div>
 
-  <!-- OFFLINE OVERLAY — inside #map, covers only the map area -->
-  <div id="offlineOverlay" class="offline-overlay hidden">
-    <div class="offline-overlay__box">
-      <div class="offline-overlay__icon">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="1" y1="1" x2="23" y2="23"/>
-          <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-          <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-          <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
-          <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-          <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-          <circle cx="12" cy="20" r="1"/>
-        </svg>
-      </div>
-      <h2 class="offline-overlay__title">Offline Mode</h2>
-      <p class="offline-overlay__sub">No internet connection.<br>Your workouts and stats are still available.</p>
-      <button class="offline-overlay__btn" id="btnTryAgain">↺ Try again</button>
-    </div>
+  <!-- OFFLINE BADGE — corner of map only -->
+  <div id="offlineBadge" class="offline-badge hidden">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="1" y1="1" x2="23" y2="23"/>
+      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+      <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+      <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+      <circle cx="12" cy="20" r="1"/>
+    </svg>
+    Offline
   </div>
-</div>
-
-<!-- OFFLINE BADGE (top-right corner of the map) -->
-<div id="offlineBadge" class="offline-badge hidden">
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-    <line x1="1" y1="1" x2="23" y2="23"/>
-    <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-    <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-    <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
-    <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-    <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-    <circle cx="12" cy="20" r="1"/>
-  </svg>
-  Offline
 </div>
 
 <div class="ios-install-banner hidden" id="iosInstallBanner">
@@ -312,23 +300,7 @@
 
 <script>
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').then(reg => {
-      // When a new SW is waiting, activate it immediately and reload
-      reg.addEventListener('updatefound', () => {
-        const newWorker = reg.installing;
-        newWorker?.addEventListener('statechange', () => {
-          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            newWorker.postMessage({ type: 'SKIP_WAITING' });
-          }
-        });
-      });
-    }).catch(() => {});
-
-    // When new SW takes control, reload to get fresh assets
-    let refreshing = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (!refreshing) { refreshing = true; location.reload(); }
-    });
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 </script>
 </body>
