@@ -194,8 +194,7 @@ a:visited {
 #map {
     flex: 1;
     height: 100%;
-    background-color: var(--color-dark--1);
-    position: relative; /* skeleton & offline overlay are children */
+    background-color: var(--color-light--1);
 }
 
 .leaflet-popup .leaflet-popup-content-wrapper {
@@ -1591,6 +1590,13 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     border-left: 5px solid #5badea;
 }
 /* ===========================
+   MAP — needs position:relative for children
+=========================== */
+#map {
+    position: relative;
+}
+
+/* ===========================
    SKELETON LOADER — inside #map only
 =========================== */
 .map-skeleton {
@@ -1607,13 +1613,11 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 }
 .map-skeleton.hidden { display: none; }
 
-/* Dark background in app colours */
 .map-skeleton__bg {
     position: absolute;
     inset: 0;
     background: var(--color-dark--1);
 }
-/* Elegant moving gradient wave */
 .map-skeleton__bg::after {
     content: '';
     position: absolute;
@@ -1622,7 +1626,7 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
             135deg,
             transparent 0%,
             rgba(0,196,106,0.07) 40%,
-            rgba(0,196,106,0.12) 50%,
+            rgba(0,196,106,0.13) 50%,
             rgba(0,196,106,0.07) 60%,
             transparent 100%
     );
@@ -1635,7 +1639,6 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     100% { background-position: 0% 50%; }
 }
 
-/* Spinner + label */
 .map-skeleton__loader {
     position: relative;
     z-index: 1;
@@ -1649,18 +1652,9 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     height: 5.6rem;
     animation: spinnerRotate 1.1s linear infinite;
 }
-@keyframes spinnerRotate {
-    100% { transform: rotate(360deg); }
-}
-.map-skeleton__track {
-    stroke: rgba(0,196,106,0.18);
-}
-.map-skeleton__arc {
-    stroke: var(--color-brand--2);
-    stroke-dasharray: 80 45;
-    stroke-linecap: round;
-    transform-origin: 25px 25px;
-}
+@keyframes spinnerRotate { 100% { transform: rotate(360deg); } }
+.map-skeleton__track { stroke: rgba(0,196,106,0.18); }
+.map-skeleton__arc   { stroke: var(--color-brand--2); stroke-dasharray: 80 45; stroke-linecap: round; }
 .map-skeleton__label {
     color: var(--color-light--1);
     font-size: 1.35rem;
@@ -1668,8 +1662,6 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     font-family: 'Manrope', sans-serif;
     letter-spacing: 0.04em;
 }
-
-/* Timeout message card */
 .map-skeleton__msg {
     position: relative;
     z-index: 1;
@@ -1705,86 +1697,51 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 }
 .map-skeleton__btn:hover { background: #00a85a; }
 
-/* map--hidden used when in offline mode */
-.map--hidden { visibility: hidden; }
-
 /* ===========================
-   OFFLINE OVERLAY — inside #map only
+   OFFLINE TOAST — 3s then fades
 =========================== */
-.offline-overlay {
+.offline-toast {
     position: absolute;
-    inset: 0;
-    z-index: 600;
-    background: rgba(30,34,38,0.93);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    backdrop-filter: blur(2px);
-}
-.offline-overlay.hidden { display: none; }
-
-.offline-overlay__box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.2rem;
-    padding: 3rem 3.4rem;
+    top: 10%;
+    left: 50%;
+    transform: translateX(-50%) translateY(-10px);
+    z-index: 800;
     background: var(--color-dark--1);
-    border: 1px solid rgba(255,255,255,0.08);
-    border-radius: 16px;
-    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
-    text-align: center;
-    max-width: 30rem;
-    width: 90%;
-}
-.offline-overlay__icon svg {
-    width: 5.2rem;
-    height: 5.2rem;
-    stroke: var(--color-light--1);
-    margin-bottom: 0.2rem;
-}
-.offline-overlay__title {
-    font-size: 1.9rem;
-    font-weight: 800;
-    color: var(--color-light--2);
+    border: 1.5px solid rgba(255,255,255,0.1);
+    border-radius: 99px;
+    padding: 1rem 2rem 1rem 1.4rem;
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
     font-family: 'Manrope', sans-serif;
-}
-.offline-overlay__sub {
-    font-size: 1.3rem;
-    color: var(--color-light--1);
-    font-family: 'Manrope', sans-serif;
-    line-height: 1.6;
-}
-.offline-overlay__btn {
-    background: var(--color-brand--2);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 0.95rem 2.2rem;
-    font-family: 'Manrope', sans-serif;
-    font-size: 1.4rem;
+    font-size: 1.35rem;
     font-weight: 700;
-    cursor: pointer;
-    margin-top: 0.4rem;
-    transition: background 0.2s;
+    color: var(--color-light--1);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    opacity: 0;
+    transition: opacity 0.4s ease, transform 0.4s ease;
+    white-space: nowrap;
+    pointer-events: none;
 }
-.offline-overlay__btn:hover { background: #00a85a; }
-
-@keyframes shake {
-    0%,100% { transform: translateX(0); }
-    20%,60%  { transform: translateX(-8px); }
-    40%,80%  { transform: translateX(8px); }
+.offline-toast--visible {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
 }
-.offline-overlay__box.shake { animation: shake 0.45s ease; }
+.offline-toast svg {
+    width: 1.7rem;
+    height: 1.7rem;
+    stroke: var(--color-light--1);
+    flex-shrink: 0;
+}
 
 /* ===========================
-   OFFLINE BADGE — corner of map
+   OFFLINE BADGE — stays in map corner
 =========================== */
 .offline-badge {
     position: absolute;
     top: 1.2rem;
     right: 1.2rem;
-    z-index: 10000;
+    z-index: 700;
     background: var(--color-dark--1);
     border: 1.5px solid var(--color-light--1);
     border-radius: 99px;
@@ -1796,7 +1753,7 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     font-size: 1.2rem;
     font-weight: 700;
     color: var(--color-light--1);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
 }
 .offline-badge.hidden { display: none; }
 .offline-badge svg {
@@ -1804,4 +1761,46 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
     height: 1.5rem;
     stroke: var(--color-light--1);
     flex-shrink: 0;
+}
+
+/* ===========================
+   CLUSTER TOGGLE — settings item
+=========================== */
+.cluster-toggle {
+    width: 3.6rem; height: 2rem;
+    background: var(--color-dark--1);
+    border: 2px solid var(--color-light--1);
+    border-radius: 99px;
+    position: relative;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    flex-shrink: 0;
+}
+.cluster-toggle.active { background: var(--color-brand--2); border-color: var(--color-brand--2); }
+.cluster-toggle__knob {
+    position: absolute; top: 50%; left: 0.2rem;
+    transform: translateY(-50%);
+    width: 1.2rem; height: 1.2rem;
+    background: var(--color-light--1);
+    border-radius: 50%;
+    transition: left 0.2s, background 0.2s;
+}
+.cluster-toggle.active .cluster-toggle__knob { left: 1.9rem; background: #fff; }
+
+/* ===========================
+   CLUSTER MARKER
+=========================== */
+.workout-cluster {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    background: var(--color-dark--1);
+    border: 3px solid var(--color-brand--2);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+}
+.workout-cluster span {
+    color: var(--color-light--2);
+    font-size: 1.3rem;
+    font-weight: 800;
+    font-family: 'Manrope', sans-serif;
 }
