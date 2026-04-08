@@ -117,12 +117,12 @@ function initOnlineDetector() {
 =========================== */
 function showSkeleton() {
   document.getElementById('mapSkeleton')?.classList.remove('hidden');
-  document.getElementById('map')?.classList.add('map--loading');
+
 }
 
 function hideSkeleton() {
   document.getElementById('mapSkeleton')?.classList.add('hidden');
-  document.getElementById('map')?.classList.remove('map--loading');
+
   clearMapTimeout();
 }
 
@@ -208,7 +208,7 @@ function enterOfflineMode(reason) {
   hideSkeleton();
   document.getElementById('offlineOverlay')?.classList.remove('hidden');
   document.getElementById('offlineBadge')?.classList.remove('hidden');
-  document.getElementById('map')?.classList.add('map--hidden');
+
 }
 
 function exitOfflineMode() {
@@ -216,7 +216,7 @@ function exitOfflineMode() {
   NetState.isOffline = false;
   document.getElementById('offlineOverlay')?.classList.add('hidden');
   document.getElementById('offlineBadge')?.classList.add('hidden');
-  document.getElementById('map')?.classList.remove('map--hidden');
+
   // If map was never loaded, start loading now
   if (!NetState.mapReady) {
     showSkeleton();
