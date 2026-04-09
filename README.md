@@ -5,9 +5,8 @@ A progressive web application for tracking running, cycling and walking workouts
 ---
 
 >
-> ![img_2.png](img_2.png)
-> 
-> ![img_3.png](img_3.png)
+> <img width="1536" height="1024" alt="Mapty" src="https://github.com/user-attachments/assets/1b3fbe38-69bb-4d68-9ea9-e92e3d70ea48" />
+
 > 
 
 ---
