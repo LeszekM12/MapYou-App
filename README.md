@@ -1,9 +1,16 @@
-# 🗺️ Mapty — Workout Tracking App
+# 🗺️ Mapty - Workout Tracking App
 
 A progressive web application for tracking running, cycling and walking workouts on an interactive map. Built with vanilla JavaScript, Leaflet.js and IndexedDB (Dexie.js).
 
 ---
 
+>
+> ![img_2.png](img_2.png)
+> 
+> ![img_3.png](img_3.png)
+> 
+
+---
 ## 📋 Table of Contents
 
 1. [Features Overview](#features-overview)
