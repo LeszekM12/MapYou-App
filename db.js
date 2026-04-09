@@ -2,10 +2,10 @@
 
 /* ============================================================
    MAPTY — DATABASE MODULE (IndexedDB via Dexie.js)
-
+   
    Zastępuje localStorage dla danych workoutów.
    Pozostałe dane (ustawienia, flagi UI) nadal w localStorage.
-
+   
    Użycie w script.js:
      await loadWorkoutsFromDB()      → tablica workoutów
      await saveWorkoutToDB(workout)  → zapisuje/nadpisuje jeden workout
@@ -47,7 +47,7 @@ db.version(1).stores({
 
 /* ============================================================
    2. NORMALIZACJA WORKOUTU
-
+   
    Zapewnia że każdy obiekt zapisany do DB ma kompletne pola,
    niezależnie od tego skąd pochodzi (localStorage, nowy formularz).
    ============================================================ */
@@ -87,10 +87,8 @@ function normalizeWorkout(raw) {
   // Pola specyficzne dla typu
   let cadence   = null;
   let pace      = null;
-
-  // POPRAWKA: domyślne wartości 0 zamiast null/undefined
-  let elevGain  = Number(raw.elevGain ?? raw.elevationGain ?? 0);
-  let speed     = Number(raw.speed ?? 0);
+  let elevGain  = null;
+  let speed     = null;
 
   if (type === 'running' || type === 'walking') {
     cadence  = Number(raw.cadence)  || null;
@@ -98,9 +96,8 @@ function normalizeWorkout(raw) {
   }
 
   if (type === 'cycling') {
-    // POPRAWKA: zawsze liczba, nigdy undefined/null
-    elevGain = Number(raw.elevGain ?? raw.elevationGain ?? 0);
-    speed    = Number(raw.speed) || (duration > 0 && distance > 0 ? distance / (duration / 60) : 0);
+    elevGain = Number(raw.elevGain ?? raw.elevationGain) || 0;
+    speed    = Number(raw.speed)    || (duration > 0 && distance > 0 ? distance / (duration / 60) : 0);
   }
 
   // Opcjonalne: zapisana trasa A→B
@@ -117,6 +114,7 @@ function normalizeWorkout(raw) {
     cadence,
     pace,
     elevGain,
+    elevationGain: elevGain,  // alias dla klasy Cycling i _renderWorkout
     speed,
     routeCoords,
   };
@@ -138,7 +136,7 @@ function _generateDescription(type, isoDate) {
 
 /* ============================================================
    3. MIGRACJA z localStorage → IndexedDB
-
+   
    Wywoływana JEDEN RAZ przy starcie.
    Po udanej migracji usuwa dane z localStorage,
    żeby przy kolejnym uruchomieniu nie migrować ponownie.
