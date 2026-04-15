@@ -19,7 +19,7 @@ import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
 import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryBtn, } from './modules/OfflineDetector.js';
 import { initWeatherWidget } from './modules/WeatherWidget.js';
-import { loadWorkoutsFromDB, saveWorkoutToDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db';
+import { loadWorkoutsFromDB, saveWorkoutToDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications } from './modules/PushNotifications.js';
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
 const form = document.querySelector('.form');

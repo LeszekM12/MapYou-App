@@ -17,7 +17,7 @@ import { initWeatherWidget } from './modules/WeatherWidget.js';
 import {
   loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB,
   clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB,
-} from './modules/db';
+} from './modules/db.js';
 import { initPushNotifications, testPushNotification } from './modules/PushNotifications.js';
 
 // ─── Leaflet plugin types ─────────────────────────────────────────────────────
