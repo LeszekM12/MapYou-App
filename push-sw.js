@@ -10,7 +10,7 @@ const BACKEND_URL = 'https://mapty-backend-lexb.onrender.com';
 self.addEventListener('push', event => {
   console.log('[Push SW] Push event received');
 
-  let data = { title: 'Mapty', body: 'Nowe powiadomienie', icon: '/icon-192.png', url: '/' };
+  let data = { title: 'Mapty', body: 'Nowe powiadomienie', icon: './icon-192.png', url: self.registration.scope };
 
   if (event.data) {
     try {
@@ -22,8 +22,8 @@ self.addEventListener('push', event => {
 
   const options = {
     body:    data.body,
-    icon:    data.icon  ?? '/icon-192.png',
-    badge:   data.badge ?? '/icon-192.png',
+    icon:    data.icon  ?? './icon-192.png',
+    badge:   data.badge ?? './icon-192.png',
     data:    { url: data.url ?? '/' },
     vibrate: [200, 100, 200],
     requireInteraction: false,
@@ -40,7 +40,7 @@ self.addEventListener('notificationclick', event => {
   console.log('[Push SW] Notification clicked');
   event.notification.close();
 
-  const targetUrl = event.notification.data?.url ?? '/';
+  const targetUrl = event.notification.data?.url ?? self.registration.scope;
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {

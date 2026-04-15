@@ -17,8 +17,10 @@ async function registerPushSW() {
     }
     try {
         // Rejestruj push-sw.js obok głównego sw.js
-        const reg = await navigator.serviceWorker.register('/push-sw.js', {
-            scope: '/',
+        // Ścieżka relative do lokalizacji aplikacji (działa zarówno na GitHub Pages jak i lokalnie)
+        const swPath = new URL('push-sw.js', window.location.href).pathname;
+        const reg = await navigator.serviceWorker.register(swPath, {
+            scope: new URL('./', window.location.href).pathname,
         });
         console.log('[Push] push-sw.js registered, scope:', reg.scope);
         return reg;
@@ -97,7 +99,7 @@ async function sendSubscriptionToBackend(subscription) {
 export async function unsubscribeFromPush() {
     if (!('serviceWorker' in navigator))
         return;
-    const reg = await navigator.serviceWorker.getRegistration('/push-sw.js');
+    const reg = await navigator.serviceWorker.getRegistration(new URL('push-sw.js', window.location.href).pathname);
     if (!reg)
         return;
     const sub = await reg.pushManager.getSubscription();
