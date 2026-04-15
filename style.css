@@ -1589,218 +1589,396 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 .workout--walking {
     border-left: 5px solid #5badea;
 }
-/* ===========================
-   MAP — needs position:relative for children
-=========================== */
+/* ══════════════════════════════════════════════════════
+   3-TAB BOTTOM NAV + MAP OVERLAYS
+══════════════════════════════════════════════════════ */
+
+body {
+    padding: 0 !important;
+    flex-direction: column !important;
+    height: 100dvh !important;
+    overflow: hidden !important;
+    background: var(--color-dark--1) !important;
+}
 #map {
-    position: relative;
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: 1 !important;
+    flex: none !important;
 }
 
-/* ===========================
-   SKELETON LOADER — inside #map only
-=========================== */
-.map-skeleton {
-    position: absolute;
-    inset: 0;
-    z-index: 500;
+/* ── Tab panels ── */
+.tab-panel {
+    position: fixed; inset: 0; bottom: 5.8rem;
+    z-index: 50; display: none;
+    flex-direction: column; justify-content: flex-end;
+    pointer-events: none;   /* always pass-through except tab-scroll */
+}
+.tab-panel--active {
     display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 2rem;
-    pointer-events: none;
-    overflow: hidden;
+    pointer-events: none;   /* STILL none — only .tab-scroll inside gets events */
 }
-.map-skeleton.hidden { display: none; }
+.tab-panel--active .tab-scroll {
+    pointer-events: all;    /* only the sheet itself is interactive */
+}
+.tab-panel--map,
+.tab-panel--map.tab-panel--active {
+    pointer-events: none !important; background: transparent !important;
+}
 
-.map-skeleton__bg {
-    position: absolute;
-    inset: 0;
+/* ── Scrollable panel ── */
+.tab-scroll {
+    width: 100%;
+    max-height: 88dvh;
     background: var(--color-dark--1);
+    border-radius: 2rem 2rem 0 0;
+    box-shadow: 0 -6px 40px rgba(0,0,0,0.55);
+    overflow-y: auto; overflow-x: hidden;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    padding: 0 2rem 1.5rem;
+    transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-.map-skeleton__bg::after {
+.tab-scroll::-webkit-scrollbar { display: none; }
+/* Collapsed state: only drag bar visible */
+.tab-scroll--collapsed {
+    max-height: 0 !important;
+    overflow: hidden !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+}
+/* Drag handle */
+.tab-scroll::before {
     content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(
-            135deg,
-            transparent 0%,
-            rgba(0,196,106,0.07) 40%,
-            rgba(0,196,106,0.13) 50%,
-            rgba(0,196,106,0.07) 60%,
-            transparent 100%
-    );
-    background-size: 300% 300%;
-    animation: mapWave 2.8s ease-in-out infinite;
+    display: block;
+    width: 4rem; height: 0.45rem;
+    background: rgba(255,255,255,0.22);
+    border-radius: 99px;
+    margin: 1.1rem auto 1rem;
+    flex-shrink: 0;
 }
-@keyframes mapWave {
-    0%   { background-position: 0% 50%; }
-    50%  { background-position: 100% 50%; }
-    100% { background-position: 0% 50%; }
+/* ── Tab header: logo + weather side by side ── */
+.tab-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0 1.2rem 0;
+    min-height: 4.8rem;
+}
+.tab-scroll .logo {
+    height: 3.8rem !important;
+    display: block;
+    margin: 0;
 }
 
-.map-skeleton__loader {
-    position: relative;
-    z-index: 1;
+/* ── Weather widget ── */
+.weather-widget {
     display: flex;
     flex-direction: column;
-    align-items: center;
-    gap: 1.6rem;
+    align-items: flex-end;
+    gap: 0.15rem;
+    user-select: none;
 }
-.map-skeleton__spinner {
-    width: 5.6rem;
-    height: 5.6rem;
-    animation: spinnerRotate 1.1s linear infinite;
+.weather-widget__icon {
+    font-size: 2rem;
+    line-height: 1;
 }
-@keyframes spinnerRotate { 100% { transform: rotate(360deg); } }
-.map-skeleton__track { stroke: rgba(0,196,106,0.18); }
-.map-skeleton__arc   { stroke: var(--color-brand--2); stroke-dasharray: 80 45; stroke-linecap: round; }
-.map-skeleton__label {
-    color: var(--color-light--1);
-    font-size: 1.35rem;
-    font-weight: 600;
+.weather-widget__sun {
+    font-size: 1.1rem;
+    font-weight: 700;
     font-family: 'Manrope', sans-serif;
+    color: var(--color-light--1);
     letter-spacing: 0.04em;
 }
-.map-skeleton__msg {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 1.2rem;
-    padding: 2rem 2.6rem;
-    background: rgba(42,48,53,0.96);
-    border: 1px solid rgba(0,196,106,0.2);
-    border-radius: 14px;
-    pointer-events: all;
+
+/* ── Bottom nav ── */
+.bottom-nav {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 200; height: 5.8rem;
+    background: var(--color-dark--1);
+    border-top: 1px solid rgba(255,255,255,0.08);
+    display: flex; align-items: stretch;
+    box-shadow: 0 -2px 20px rgba(0,0,0,0.4);
+    padding-bottom: env(safe-area-inset-bottom, 0);
 }
-.map-skeleton__msg.hidden { display: none; }
-.map-skeleton__text {
+.bottom-nav__item {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0.25rem;
+    background: none; border: none; cursor: pointer;
+    color: var(--color-light--1); font-family: 'Manrope', sans-serif;
+    padding: 0.6rem 0 0.9rem; transition: color 0.18s;
+    -webkit-tap-highlight-color: transparent;
+}
+.bottom-nav__item--active { color: var(--color-brand--2) !important; }
+.bottom-nav__icon { width: 2.2rem; height: 2.2rem; stroke: currentColor; }
+.bottom-nav__label { font-size: 1.05rem; font-weight: 700; letter-spacing: 0.02em; }
+
+/* ── Floating search bar ── */
+.map-search-bar {
+    position: fixed; top: 1.2rem; left: 1.2rem; right: 1.2rem;
+    z-index: 150;
+    transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.map-search-bar.msb--hidden-tab { opacity: 0; transform: translateY(-12px); pointer-events: none; }
+.map-search-bar.msb--hidden-route { opacity: 0; transform: translateY(-120%); pointer-events: none; }
+.map-search-bar.msb--visible { opacity: 1; transform: translateY(0); pointer-events: all; }
+
+.map-search-bar__inner {
+    background: rgba(20,24,27,0.42);
+    backdrop-filter: blur(0px);
+    -webkit-backdrop-filter: blur(24px);
+    border-radius: 1.6rem;
+    padding: 1rem 1.2rem 1rem;
+    box-shadow: 0 2px 20px rgba(0,0,0,0.45);
+    border: 1px solid rgba(255,255,255,0.10);
+}
+.map-search-bar__row {
+    display: flex; gap: 0.6rem; align-items: center;
+}
+/* More space between search row and filter pills */
+.map-search-bar .poi-filters {
+    margin-top: 1rem;
+}
+.map-search-bar .poi-results {
+    margin-top: 0.8rem;
+}
+
+/* ── Route mini pill (when panel collapsed with active route) ── */
+.route-mini-pill {
+    position: fixed;
+    bottom: 7rem; left: 50%; transform: translateX(-50%);
+    z-index: 160;
+    background: rgba(30,34,38,0.88);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(0,196,106,0.3);
+    border-radius: 99px;
+    padding: 0.7rem 1.6rem;
+    display: flex; align-items: center; gap: 1rem;
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.3rem; font-weight: 700;
     color: var(--color-light--2);
-    font-size: 1.4rem;
-    font-weight: 600;
-    font-family: 'Manrope', sans-serif;
-    text-align: center;
-}
-.map-skeleton__btn {
-    background: var(--color-brand--2);
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    padding: 0.85rem 2rem;
-    font-family: 'Manrope', sans-serif;
-    font-size: 1.35rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: background 0.2s;
-}
-.map-skeleton__btn:hover { background: #00a85a; }
-
-/* ===========================
-   OFFLINE TOAST — 3s then fades
-=========================== */
-.offline-toast {
-    position: absolute;
-    top: 10%;
-    left: 50%;
-    transform: translateX(-50%) translateY(-10px);
-    z-index: 800;
-    background: var(--color-dark--1);
-    border: 1.5px solid rgba(255,255,255,0.1);
-    border-radius: 99px;
-    padding: 1rem 2rem 1rem 1.4rem;
-    display: flex;
-    align-items: center;
-    gap: 0.8rem;
-    font-family: 'Manrope', sans-serif;
-    font-size: 1.35rem;
-    font-weight: 700;
-    color: var(--color-light--1);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
-    opacity: 0;
-    transition: opacity 0.4s ease, transform 0.4s ease;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.4);
     white-space: nowrap;
-    pointer-events: none;
+    transition: opacity 0.25s ease;
 }
-.offline-toast--visible {
-    opacity: 1;
-    transform: translateX(-50%) translateY(0);
-}
-.offline-toast svg {
-    width: 1.7rem;
-    height: 1.7rem;
-    stroke: var(--color-light--1);
-    flex-shrink: 0;
+.route-mini-pill.hidden { display: none; }
+.route-mini-pill__sep { color: rgba(255,255,255,0.3); font-size: 1rem; }
+
+/* ── Settings panel ── */
+.settings-panel {
+    position: fixed !important; inset: 0 !important;
+    z-index: 400 !important; overflow-y: auto;
 }
 
-/* ===========================
-   OFFLINE BADGE — stays in map corner
-=========================== */
-.offline-badge {
-    position: absolute;
-    top: 1.2rem;
-    right: 1.2rem;
-    z-index: 700;
-    background: var(--color-dark--1);
-    border: 1.5px solid var(--color-light--1);
-    border-radius: 99px;
-    padding: 0.5rem 1.1rem 0.5rem 0.7rem;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-family: 'Manrope', sans-serif;
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: var(--color-light--1);
-    box-shadow: 0 2px 8px rgba(0,0,0,0.35);
-}
-.offline-badge.hidden { display: none; }
-.offline-badge svg {
-    width: 1.5rem;
-    height: 1.5rem;
-    stroke: var(--color-light--1);
-    flex-shrink: 0;
-}
-
-/* ===========================
-   CLUSTER TOGGLE — settings item
-=========================== */
+/* ── Cluster toggle ── */
 .cluster-toggle {
     width: 3.6rem; height: 2rem;
-    background: var(--color-dark--1);
-    border: 2px solid var(--color-light--1);
-    border-radius: 99px;
-    position: relative;
-    cursor: pointer;
-    transition: background 0.2s, border-color 0.2s;
-    flex-shrink: 0;
+    background: var(--color-dark--1); border: 2px solid var(--color-light--1);
+    border-radius: 99px; position: relative; cursor: pointer;
+    transition: background 0.2s, border-color 0.2s; flex-shrink: 0;
 }
 .cluster-toggle.active { background: var(--color-brand--2); border-color: var(--color-brand--2); }
 .cluster-toggle__knob {
-    position: absolute; top: 50%; left: 0.2rem;
-    transform: translateY(-50%);
-    width: 1.2rem; height: 1.2rem;
-    background: var(--color-light--1);
-    border-radius: 50%;
-    transition: left 0.2s, background 0.2s;
+    position: absolute; top: 50%; left: 0.2rem; transform: translateY(-50%);
+    width: 1.2rem; height: 1.2rem; background: var(--color-light--1);
+    border-radius: 50%; transition: left 0.2s, background 0.2s;
 }
 .cluster-toggle.active .cluster-toggle__knob { left: 1.9rem; background: #fff; }
 
-/* ===========================
-   CLUSTER MARKER
-=========================== */
+/* ── Workout cluster marker ── */
 .workout-cluster {
-    width: 40px; height: 40px;
-    border-radius: 50%;
-    background: var(--color-dark--1);
-    border: 3px solid var(--color-brand--2);
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--color-dark--1); border: 3px solid var(--color-brand--2);
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 2px 8px rgba(0,0,0,0.4);
 }
-.workout-cluster span {
-    color: var(--color-light--2);
-    font-size: 1.3rem;
-    font-weight: 800;
-    font-family: 'Manrope', sans-serif;
+.workout-cluster span { color: var(--color-light--2); font-size: 1.3rem; font-weight: 800; font-family: 'Manrope',sans-serif; }
+
+/* ── Skeleton loader ── */
+.map-skeleton { position: absolute; inset: 0; z-index: 500; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2rem; pointer-events: none; overflow: hidden; }
+.map-skeleton.hidden { display: none; }
+.map-skeleton__bg { position: absolute; inset: 0; background: var(--color-dark--1); }
+.map-skeleton__bg::after { content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, transparent 0%, rgba(0,196,106,0.07) 40%, rgba(0,196,106,0.13) 50%, rgba(0,196,106,0.07) 60%, transparent 100%); background-size: 300% 300%; animation: mapWave 2.8s ease-in-out infinite; }
+@keyframes mapWave { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.map-skeleton__loader { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1.6rem; }
+.map-skeleton__spinner { width: 5.6rem; height: 5.6rem; animation: spinnerRotate 1.1s linear infinite; }
+@keyframes spinnerRotate { 100% { transform: rotate(360deg); } }
+.map-skeleton__track { stroke: rgba(0,196,106,0.18); }
+.map-skeleton__arc { stroke: var(--color-brand--2); }
+.map-skeleton__label { color: var(--color-light--1); font-size: 1.35rem; font-weight: 600; font-family: 'Manrope',sans-serif; letter-spacing: 0.04em; }
+.map-skeleton__msg { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; padding: 2rem 2.6rem; background: rgba(42,48,53,0.96); border: 1px solid rgba(0,196,106,0.2); border-radius: 14px; pointer-events: all; }
+.map-skeleton__msg.hidden { display: none; }
+.map-skeleton__text { color: var(--color-light--2); font-size: 1.4rem; font-weight: 600; font-family: 'Manrope',sans-serif; text-align: center; }
+.map-skeleton__btn { background: var(--color-brand--2); color: #fff; border: none; border-radius: 8px; padding: 0.85rem 2rem; font-family: 'Manrope',sans-serif; font-size: 1.35rem; font-weight: 700; cursor: pointer; }
+
+/* ── Offline badge + toast ── */
+.offline-badge { position: absolute; top: 1.2rem; right: 1.2rem; z-index: 700; background: var(--color-dark--1); border: 1.5px solid var(--color-light--1); border-radius: 99px; padding: 0.5rem 1.1rem 0.5rem 0.7rem; display: flex; align-items: center; gap: 0.5rem; font-family: 'Manrope',sans-serif; font-size: 1.2rem; font-weight: 700; color: var(--color-light--1); box-shadow: 0 2px 8px rgba(0,0,0,0.35); }
+.offline-badge.hidden { display: none; }
+.offline-badge svg { width: 1.5rem; height: 1.5rem; stroke: var(--color-light--1); flex-shrink: 0; }
+.offline-toast { position: absolute; top: 60%; left: 50%; transform: translateX(-50%) translateY(-10px); z-index: 800; background: var(--color-dark--1); border: 1.5px solid rgba(255,255,255,0.1); border-radius: 99px; padding: 1rem 2rem 1rem 1.4rem; display: flex; align-items: center; gap: 0.8rem; font-family: 'Manrope',sans-serif; font-size: 1.35rem; font-weight: 700; color: var(--color-light--1); box-shadow: 0 4px 20px rgba(0,0,0,0.5); opacity: 0; transition: opacity 0.4s ease, transform 0.4s ease; white-space: nowrap; pointer-events: none; }
+.offline-toast--visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+.offline-toast svg { width: 1.7rem; height: 1.7rem; stroke: var(--color-light--1); flex-shrink: 0; }
+
+/* ── Desktop ≥ 900px: restore classic sidebar ── */
+@media (min-width: 900px) {
+    body { padding: 2.5rem !important; flex-direction: row !important; overflow: visible !important; height: 100vh !important; background: #fff !important; }
+    #map { position: static !important; flex: 1 !important; height: 100% !important; z-index: auto !important; }
+    .tab-panel, .bottom-nav, .map-search-bar, .route-mini-pill { display: none !important; }
+}
+
+/* Fix 7: hide workout tiles in Workouts tab (visible only in Stats) */
+.workouts--hidden-in-tab .workout { display: none; }
+/* The form inside still works (rendered as modal on mobile) */
+
+
+/* ═══════════════════════════════════════════════════════════
+   WSZYSTKIE POPRAWKI
+   ═══════════════════════════════════════════════════════════ */
+
+@media (min-width: 900px) {
+    body {
+        flex-direction: row !important;
+        padding: 2.5rem !important;
+        height: 100vh !important;
+        overflow: hidden !important;
+        background: #fff !important;
+    }
+    #map {
+        position: relative !important;
+        flex: 1 !important;
+        height: 100% !important;
+        inset: auto !important;
+        width: auto !important;
+        z-index: auto !important;
+    }
+    .map-search-bar, .route-mini-pill, #tabMap,
+    #tabStats:not(.tab-panel--active) { display: none !important; }
+
+    #tabWorkouts {
+        position: static !important; inset: auto !important;
+        z-index: auto !important; pointer-events: all !important;
+        display: flex !important; flex-direction: column !important;
+        flex: 0 0 50rem !important; width: 50rem !important;
+        height: 100% !important;
+        background-color: var(--color-dark--1) !important;
+        padding: 3rem 2.5rem 7rem 2.5rem !important;
+        overflow-y: auto !important; overflow-x: hidden !important;
+        border-radius: 0 !important; box-shadow: none !important;
+    }
+    #tabWorkouts .tab-scroll {
+        max-height: none !important; border-radius: 0 !important;
+        box-shadow: none !important; background: transparent !important;
+        padding: 0 !important; overflow: hidden !important;
+        display: flex !important; flex-direction: column !important;
+        flex: 1 !important; pointer-events: all !important;
+        transition: none !important;
+    }
+    #tabWorkouts .tab-scroll::before { display: none !important; }
+    #tabWorkouts .tab-scroll .logo {
+        height: 5.2rem !important; display: block !important;
+        margin: 0 auto 3rem auto !important; align-self: center !important;
+    }
+    #tabWorkouts .tab-header { justify-content: center !important; }
+    #tabWorkouts .workouts--hidden-in-tab .workout { display: grid !important; }
+    #tabWorkouts .workouts {
+        height: auto !important; max-height: none !important;
+        overflow-y: auto !important; flex: 1 !important;
+    }
+    #tabStats {
+        position: fixed !important; top: 2.5rem !important;
+        left: 2.5rem !important; width: 50rem !important;
+        bottom: calc(2.5rem + 5.8rem) !important;
+        z-index: 10 !important; pointer-events: all !important;
+        display: none; flex-direction: column !important;
+        background-color: var(--color-dark--1) !important;
+        overflow-y: auto !important; overflow-x: hidden !important;
+        border-radius: 0 !important; box-shadow: none !important;
+    }
+    #tabStats.tab-panel--active { display: flex !important; }
+    #tabStats .tab-scroll {
+        max-height: none !important; border-radius: 0 !important;
+        box-shadow: none !important; background: transparent !important;
+        padding: 2rem 2.5rem !important; overflow-y: auto !important;
+        flex: 1 !important; display: flex !important;
+        flex-direction: column !important; pointer-events: all !important;
+        transition: none !important;
+    }
+    #tabStats .tab-scroll::before { display: none !important; }
+    #tabStats .tab-header { display: none !important; }
+    .bottom-nav {
+        position: fixed !important; bottom: 2.5rem !important;
+        left: 2.5rem !important; right: auto !important;
+        width: 50rem !important; height: 5.8rem !important;
+        z-index: 500 !important;
+        background: var(--color-dark--2) !important;
+        border-top: 1px solid rgba(255,255,255,0.10) !important;
+        box-shadow: none !important; display: flex !important;
+        padding: 0 !important;
+    }
+    .settings-panel {
+        position: static !important; inset: auto !important;
+        z-index: auto !important; overflow-y: visible !important;
+    }
+    .sidebar-search-bar {
+        display: block !important; margin-bottom: 1.2rem !important;
+    }
+    .sidebar-search-bar .poi-search__bar {
+        display: flex !important; gap: 0.6rem !important;
+        align-items: stretch !important; margin-bottom: 0.8rem !important;
+    }
+    .sidebar-search-bar .poi-search__btn,
+    .sidebar-search-bar .btn-settings-gear {
+        align-self: stretch !important;
+        padding-left: 1.1rem !important; padding-right: 1.1rem !important;
+    }
+    .sidebar-search-bar .poi-results {
+        max-height: 22rem !important; overflow-y: auto !important;
+        list-style: none !important;
+    }
+}
+
+@media (max-width: 899px) {
+    .sidebar-search-bar { display: none !important; }
+    #mapSearchBarMobile {
+        position: fixed !important;
+        top: 0 !important; left: 0 !important; right: 0 !important;
+        z-index: 1000 !important; pointer-events: all !important;
+        display: block !important;
+        opacity: 1 !important; transform: none !important;
+        transition: none !important;
+    }
+    #mapSearchBarMobile.msb--hidden-tab,
+    #mapSearchBarMobile.msb--hidden-route { display: none !important; }
+    #mapSearchBarMobile.msb--visible { display: block !important; }
+    #mapSearchBarMobile * { pointer-events: all !important; }
+}
+
+.sidebar-search-bar { display: none; }
+
+/* ── Desktop search bar (sidebar only) ── */
+.sidebar-search-bar { display: none; }
+@media (min-width: 900px) {
+    .sidebar-search-bar {
+        display: block !important;
+        margin-bottom: 1.2rem;
+    }
+    .sidebar-search-bar .poi-search__bar {
+        display: flex;
+        gap: 0.6rem;
+        align-items: stretch;
+        margin-bottom: 0.8rem;
+    }
+    .sidebar-search-bar .poi-search__btn,
+    .sidebar-search-bar .btn-settings-gear {
+        align-self: stretch;
+        padding-left: 1.1rem;
+        padding-right: 1.1rem;
+    }
+    .sidebar-search-bar .poi-results {
+        list-style: none;
+        max-height: 22rem;
+        overflow-y: auto;
+    }
 }

@@ -1,0 +1,16 @@
+{
+  "name": "mapty-ts",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "watch": "tsc --watch",
+    "clean": "rm -rf dist",
+    "dev": "http-server ."
+  },
+  "devDependencies": {
+    "@types/leaflet": "^1.9.0",
+    "http-server": "^14.1.1",
+    "typescript": "^5.4.0"
+  }
+}

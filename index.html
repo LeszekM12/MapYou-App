@@ -1,311 +1,461 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
-  <meta name="theme-color" content="#2d3439"/>
-  <meta name="description" content="Mapty — track your workouts on the map"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-  <meta name="apple-mobile-web-app-title" content="Mapty"/>
-  <link rel="apple-touch-icon" href="icon-192.png"/> <link rel="shortcut icon" type="image/png" href="icon-192.png"/> <link rel="manifest" href="manifest.json"/>
-
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="style.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
-        integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
-        crossorigin=""/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
-  <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
-          integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
-          crossorigin=""></script>
-  <script defer src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
-  <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-  <!-- Dexie.js — IndexedDB wrapper (musi być przed db.js i script.js) -->
-  <script src="https://unpkg.com/dexie@3/dist/dexie.min.js"></script>
-  <!-- Mapty database module -->
-  <script defer src="db.js"></script>
-  <script defer src="script.js"></script>
-  <title>Mapty - Workouts App</title>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <meta name="theme-color" content="#2d3439"/>
+    <meta name="description" content="Mapty — track your workouts on the map"/>
+    <meta name="apple-mobile-web-app-capable" content="yes"/>
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+    <meta name="apple-mobile-web-app-title" content="Mapty"/>
+    <link rel="apple-touch-icon" href="public/icon-192.png"/>
+    <link rel="shortcut icon" type="image/png" href="public/icon-192.png"/>
+    <link rel="manifest" href="public/manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="style.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+          integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+          crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+    <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+            integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+            crossorigin=""></script>
+    <script defer src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+    <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://unpkg.com/dexie@3/dist/dexie.min.js"></script>
+    <script type="module" src="./dist/main.js"></script>
+    <title>Mapty - Workouts App</title>
 </head>
 <body>
-<div class="sidebar">
-  <img src="logo.png" alt="Mapty logo" class="logo"/>
 
-  <div class="poi-search">
-    <div class="poi-search__bar">
-      <input class="poi-search__input" id="poiInput" type="text" placeholder="Search nearby…" autocomplete="off" list="poiSuggestions"/>
-      <datalist id="poiSuggestions"></datalist>
-      <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
-      <button class="btn-settings-gear" id="btnSettings" title="Settings">⚙️</button>
-    </div>
-    <div class="poi-filters" id="poiFilters">
-      <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
-      <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
-      <button class="poi-filter-btn" data-query="pharmacy">💊 Pharmacy</button>
-      <button class="poi-filter-btn" data-query="park">🌳 Park</button>
-      <button class="poi-filter-btn" data-query="Paczkomat InPost">📦 Paczkomat</button>
-      <button class="poi-filter-btn" data-query="restaurant">🍴 Restaurant</button>
-      <button class="poi-filter-btn" data-query="ATM">🏧 ATM</button>
-      <button class="poi-filter-btn" data-query="hotel">🏨 Hotel</button>
-      <button class="poi-filter-btn" data-query="church">⛪ Church</button>
-      <button class="poi-filter-btn" data-query="cafe">☕ Cafe</button>
-      <button class="poi-filter-btn" data-query="hospital">🏥 Hospital</button>
-    </div>
-    <ul class="poi-results hidden" id="poiResults"></ul>
-  </div>
 
-  <div class="settings-panel hidden" id="settingsPanel">
+<!-- FLOATING SEARCH BAR (Map tab only) -->
+<div id="mapSearchBar" class="map-search-bar msb--hidden-tab">
+    <div class="map-search-bar__inner">
+        <div class="map-search-bar__row">
+            <input class="poi-search__input" id="poiInput" type="text"
+                   placeholder="Search nearby…" autocomplete="off" list="poiSuggestions"/>
+            <datalist id="poiSuggestions"></datalist>
+            <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
+            <button class="btn-settings-gear" id="btnSettings" title="Settings">⚙️</button>
+        </div>
+        <div class="poi-filters" id="poiFilters">
+            <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
+            <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
+            <button class="poi-filter-btn" data-query="pharmacy">💊 Pharmacy</button>
+            <button class="poi-filter-btn" data-query="park">🌳 Park</button>
+            <button class="poi-filter-btn" data-query="Paczkomat InPost">📦 Paczkomat</button>
+            <button class="poi-filter-btn" data-query="restaurant">🍴 Restaurant</button>
+            <button class="poi-filter-btn" data-query="ATM">🏧 ATM</button>
+            <button class="poi-filter-btn" data-query="hotel">🏨 Hotel</button>
+            <button class="poi-filter-btn" data-query="church">⛪ Church</button>
+            <button class="poi-filter-btn" data-query="cafe">☕ Cafe</button>
+            <button class="poi-filter-btn" data-query="hospital">🏥 Hospital</button>
+        </div>
+        <ul class="poi-results hidden" id="poiResults"></ul>
+    </div>
+</div>
+
+<!-- Route mini-pill: shows distance+time when route drawn and panel collapsed -->
+<div id="routeMiniPill" class="route-mini-pill hidden">
+    <span class="route-mini-pill__item">📏 <span id="routeMiniDist">—</span> km</span>
+    <span class="route-mini-pill__sep">·</span>
+    <span class="route-mini-pill__item">⏱ <span id="routeMiniTime">—</span> min</span>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="settings-panel hidden" id="settingsPanel">
     <div class="settings-panel__header">
-      <button class="btn-settings-back" id="btnSettingsBack">←</button>
-      <span class="settings-panel__title">Settings</span>
+        <button class="btn-settings-back" id="btnSettingsBack">←</button>
+        <span class="settings-panel__title">Settings</span>
     </div>
     <div class="settings-item" id="settingShare">
-      <span class="settings-item__icon">📤</span>
-      <div class="settings-item__text">
-        <div class="settings-item__label">Share my location</div>
-        <div class="settings-item__sub">Send a Google Maps link</div>
-      </div>
-      <span class="settings-item__arrow">›</span>
+        <span class="settings-item__icon">📤</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Share my location</div>
+            <div class="settings-item__sub">Send a Google Maps link</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
     </div>
     <div class="settings-item" id="settingNight">
-      <span class="settings-item__icon">🌙</span>
-      <div class="settings-item__text">
-        <div class="settings-item__label">Night mode</div>
-        <div class="settings-item__sub">Dark UI + dark map tiles</div>
-      </div>
-      <div class="night-toggle" id="nightToggle"><div class="night-toggle__knob"></div></div>
+        <span class="settings-item__icon">🌙</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Night mode</div>
+            <div class="settings-item__sub">Dark UI + dark map tiles</div>
+        </div>
+        <div class="night-toggle" id="nightToggle">
+            <div class="night-toggle__knob"></div>
+        </div>
     </div>
     <div class="settings-item" id="settingVoice">
-      <span class="settings-item__icon">🔊</span>
-      <div class="settings-item__text">
-        <div class="settings-item__label">Voice stats</div>
-        <div class="settings-item__sub">Announce distance &amp; pace every km</div>
-      </div>
-      <div class="voice-toggle" id="voiceToggle"><div class="voice-toggle__knob"></div></div>
-    </div>
-    <div class="settings-item" id="settingClear">
-      <span class="settings-item__icon">🗑️</span>
-      <div class="settings-item__text">
-        <div class="settings-item__label">Clear all workouts</div>
-        <div class="settings-item__sub">Remove saved history</div>
-      </div>
-      <span class="settings-item__arrow">›</span>
+        <span class="settings-item__icon">🔊</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Voice stats</div>
+            <div class="settings-item__sub">Announce distance &amp; pace every km</div>
+        </div>
+        <div class="voice-toggle" id="voiceToggle">
+            <div class="voice-toggle__knob"></div>
+        </div>
     </div>
     <div class="settings-item" id="settingCluster">
-      <span class="settings-item__icon">📍</span>
-      <div class="settings-item__text">
-        <div class="settings-item__label">Cluster markers</div>
-        <div class="settings-item__sub">Group nearby workouts on map</div>
-      </div>
-      <div class="cluster-toggle" id="clusterToggle"><div class="cluster-toggle__knob"></div></div>
+        <span class="settings-item__icon">📍</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Cluster markers</div>
+            <div class="settings-item__sub">Group nearby workouts on map</div>
+        </div>
+        <div class="cluster-toggle" id="clusterToggle">
+            <div class="cluster-toggle__knob"></div>
+        </div>
+    </div>
+    <div class="settings-item" id="settingClear">
+        <span class="settings-item__icon">🗑️</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Clear all workouts</div>
+            <div class="settings-item__sub">Remove saved history</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
     </div>
     <div class="settings-item" id="settingInstall" style="display:none">
-      <span class="settings-item__icon">📱</span>
-      <div class="settings-item__text">
-        <div class="settings-item__label">Install app</div>
-        <div class="settings-item__sub">Add to home screen</div>
-      </div>
-      <span class="settings-item__arrow">›</span>
-    </div>
-  </div>
-
-  <div class="tracking-controls">
-    <button class="btn-track" id="btnTrack">📍 Start tracking</button>
-  </div>
-
-  <!-- STATS PANEL -->
-  <div class="stats-panel" id="statsPanel">
-    <div class="stats-panel__label">THIS WEEK'S SUMMARY</div>
-    <div class="stats-panel__rings">
-      <div class="stats-ring-wrap">
-        <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-          <circle id="statsRingKm" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none" stroke="#00c46a" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2" stroke-linecap="round" transform="rotate(-90 45 45)"/>
-          <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800" font-family="Manrope,sans-serif" id="statsValKm">0.0</text>
-          <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9" font-family="Manrope,sans-serif">KM</text>
-          <text x="45" y="25" text-anchor="middle" font-size="12">🏃</text>
-        </svg>
-      </div>
-      <div class="stats-ring-wrap">
-        <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-          <circle id="statsRingTime" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none" stroke="#aaa" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2" stroke-linecap="round" transform="rotate(-90 45 45)"/>
-          <text x="45" y="41" text-anchor="middle" fill="#ececec" font-size="11" font-weight="800" font-family="Manrope,sans-serif" id="statsValTime">0m</text>
-          <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9" font-family="Manrope,sans-serif">TIME</text>
-          <text x="45" y="25" text-anchor="middle" font-size="12">⏱</text>
-        </svg>
-      </div>
-      <div class="stats-ring-wrap">
-        <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-          <circle id="statsRingWorkouts" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none" stroke="#ffb545" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2" stroke-linecap="round" transform="rotate(-90 45 45)"/>
-          <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800" font-family="Manrope,sans-serif" id="statsValWorkouts">0</text>
-          <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9" font-family="Manrope,sans-serif">WORKOUTS</text>
-          <text x="45" y="25" text-anchor="middle" font-size="12">🚴</text>
-        </svg>
-      </div>
-    </div>
-    <div class="stats-panel__goal">
-      <div class="stats-panel__goal-header">
-        <span class="stats-panel__goal-label">WEEKLY GOAL</span>
-        <span class="stats-panel__goal-pct" id="statsGoalPct">0%</span>
-      </div>
-      <div class="stats-panel__goal-bar"><div class="stats-panel__goal-fill" id="statsGoalFill" style="width:0%"></div></div>
-    </div>
-  </div>
-  <div class="stats-detail hidden" id="statsDetail">
-    <div class="stats-detail__header">
-      <div class="stats-detail__title">📊 Weekly activity</div>
-      <div class="stats-week-nav">
-        <button class="stats-week-nav__btn" id="statsWeekPrev">‹</button>
-        <span class="stats-week-nav__label" id="statsWeekLabel">This week</span>
-        <button class="stats-week-nav__btn" id="statsWeekNext" disabled>›</button>
-      </div>
-    </div>
-    <div class="stats-detail__bars" id="statsDetailBars"></div>
-    <div class="stats-detail__totals">
-      <div class="stats-detail__total-item"><span class="stats-detail__total-val" id="statsDetailKm">0.0</span><span class="stats-detail__total-label">km</span></div>
-      <div class="stats-detail__total-item"><span class="stats-detail__total-val stats-detail__total-val--gray" id="statsDetailTime">0m</span><span class="stats-detail__total-label">time</span></div>
-      <div class="stats-detail__total-item"><span class="stats-detail__total-val stats-detail__total-val--amber" id="statsDetailCount">0</span><span class="stats-detail__total-label">workouts</span></div>
-      <div class="stats-detail__total-item"><span class="stats-detail__total-val stats-detail__total-val--blue" id="statsDetailDate">—</span><span class="stats-detail__total-label">day</span></div>
-    </div>
-  </div>
-  <div class="stats-goal-editor hidden" id="statsGoalEditor">
-    <div class="stats-goal-editor__title">⚙ WEEKLY GOAL</div>
-    <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Distance target</span><input class="stats-goal-editor__input" id="goalKmInput" type="number" min="1" max="500" value="35"/><span class="stats-goal-editor__unit">km</span></div>
-    <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Time target</span><input class="stats-goal-editor__input" id="goalTimeInput" type="number" min="1" max="2000" value="300"/><span class="stats-goal-editor__unit">min</span></div>
-    <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Workouts target</span><input class="stats-goal-editor__input" id="goalCountInput" type="number" min="1" max="30" value="7"/><span class="stats-goal-editor__unit">× /week</span></div>
-  </div>
-
-  <div class="route-controls">
-    <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
-    <div class="route-info hidden" id="routeInfo">
-      <div class="route-mode-selector">
-        <button class="route-mode-btn route-mode-btn--active" data-mode="running" title="Running">🏃‍♂️</button>
-        <button class="route-mode-btn" data-mode="cycling" title="Cycling">🚴‍♀️</button>
-        <button class="route-mode-btn" data-mode="walking" title="Walking">🚶</button>
-      </div>
-      <div class="route-info__steps">
-        <div class="route-info__step">
-          <span class="route-info__badge route-info__badge--a">A</span>
-          <span id="stepAText">Click the start point on the map</span>
+        <span class="settings-item__icon">📱</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Install app</div>
+            <div class="settings-item__sub">Add to home screen</div>
         </div>
-        <div class="route-info__step">
-          <span class="route-info__badge route-info__badge--b">B</span>
-          <span id="stepBText">Click the end point on the map</span>
-        </div>
-      </div>
-      <div class="route-loading hidden" id="routeLoading">
-        <div class="route-loading__spinner">
-          <div class="route-loading__dot"></div>
-          <div class="route-loading__dot"></div>
-          <div class="route-loading__dot"></div>
-        </div>
-        <span class="route-loading__text">Calculating route...</span>
-      </div>
-      <div class="route-result hidden" id="routeResult">
-        <div class="route-result__item">
-          <span class="route-result__icon">📏</span>
-          <span class="route-result__value" id="routeDist">—</span>
-          <span class="route-result__unit">km</span>
-        </div>
-        <div class="route-result__item">
-          <span class="route-result__icon">⏱</span>
-          <span class="route-result__value" id="routeTime">—</span>
-          <span class="route-result__unit">min</span>
-        </div>
-      </div>
-      <button class="btn-route-cancel" id="btnCancelRoute">✕ Cancel route</button>
+        <span class="settings-item__arrow">›</span>
     </div>
-  </div>
-
-  <ul class="workouts">
-    <form class="form hidden">
-      <div class="form__row">
-        <label class="form__label">Type</label>
-        <select class="form__input form__input--type">
-          <option value="running">Running</option>
-          <option value="cycling">Cycling</option>
-          <option value="walking">Walking</option>
-        </select>
-      </div>
-      <div class="form__row">
-        <label class="form__label">Distance</label>
-        <input class="form__input form__input--distance" placeholder="km" step="0.1"/>
-      </div>
-      <div class="form__row">
-        <label class="form__label">Duration</label>
-        <input class="form__input form__input--duration" placeholder="min" step="0.1"/>
-      </div>
-      <div class="form__row">
-        <label class="form__label">Cadence</label>
-        <input class="form__input form__input--cadence" placeholder="step/min"/>
-      </div>
-      <div class="form__row form__row--hidden">
-        <label class="form__label">Elev Gain</label>
-        <input class="form__input form__input--elevation" placeholder="meters"/>
-      </div>
-      <button class="form__btn">✓ Add Workout</button>
-    </form>
-  </ul>
 </div>
 
+<!-- TAB 1: WORKOUTS -->
+<div id="tabWorkouts" class="tab-panel tab-panel--active">
+    <div class="tab-scroll">
+        <div class="tab-header">
+            <img src="public/logo.png" alt="Mapty logo" class="logo"/>
+            <div class="weather-widget" id="weatherWidget">
+                <span class="weather-widget__icon" id="wIcon">—</span>
+                <span class="weather-widget__sun" id="wSunset">—</span>
+            </div>
+        </div>
+        <!-- Desktop search (hidden on mobile via CSS) -->
+        <div class="sidebar-search-bar">
+            <div class="poi-search__bar">
+                <input class="poi-search__input" id="poiInputDesktop" type="text" placeholder="Search nearby…"
+                       autocomplete="off"/>
+                <button class="poi-search__btn" id="poiSearchBtnDesktop">🔍</button>
+                <button class="btn-settings-gear" id="btnSettingsDesktop" title="Settings">⚙️</button>
+            </div>
+            <div class="poi-filters" id="poiFiltersDesktop">
+                <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
+                <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
+                <button class="poi-filter-btn" data-query="pharmacy">💊 Pharmacy</button>
+                <button class="poi-filter-btn" data-query="park">🌳 Park</button>
+                <button class="poi-filter-btn" data-query="Paczkomat InPost">📦 Paczkomat</button>
+                <button class="poi-filter-btn" data-query="restaurant">🍴 Restaurant</button>
+                <button class="poi-filter-btn" data-query="ATM">🏧 ATM</button>
+                <button class="poi-filter-btn" data-query="hotel">🏨 Hotel</button>
+                <button class="poi-filter-btn" data-query="church">⛪ Church</button>
+                <button class="poi-filter-btn" data-query="cafe">☕ Cafe</button>
+                <button class="poi-filter-btn" data-query="hospital">🏥 Hospital</button>
+            </div>
+            <ul class="poi-results hidden" id="poiResultsDesktop"></ul>
+        </div>
+
+        <div class="tracking-controls">
+            <button class="btn-track" id="btnTrack">📍 Start tracking</button>
+        </div>
+        <div class="route-controls">
+            <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
+            <div class="route-info hidden" id="routeInfo">
+                <div class="route-mode-selector">
+                    <button class="route-mode-btn route-mode-btn--active" data-mode="running" title="Running">🏃‍♂️
+                    </button>
+                    <button class="route-mode-btn" data-mode="cycling" title="Cycling">🚴‍♀️</button>
+                    <button class="route-mode-btn" data-mode="walking" title="Walking">🚶</button>
+                </div>
+                <div class="route-info__steps">
+                    <div class="route-info__step">
+                        <span class="route-info__badge route-info__badge--a">A</span>
+                        <span id="stepAText">Click the start point on the map</span>
+                    </div>
+                    <div class="route-info__step">
+                        <span class="route-info__badge route-info__badge--b">B</span>
+                        <span id="stepBText">Click the end point on the map</span>
+                    </div>
+                </div>
+                <div class="route-loading hidden" id="routeLoading">
+                    <div class="route-loading__spinner">
+                        <div class="route-loading__dot"></div>
+                        <div class="route-loading__dot"></div>
+                        <div class="route-loading__dot"></div>
+                    </div>
+                    <span class="route-loading__text">Calculating route...</span>
+                </div>
+                <div class="route-result hidden" id="routeResult">
+                    <div class="route-result__item">
+                        <span class="route-result__icon">📏</span>
+                        <span class="route-result__value" id="routeDist">—</span>
+                        <span class="route-result__unit">km</span>
+                    </div>
+                    <div class="route-result__item">
+                        <span class="route-result__icon">⏱</span>
+                        <span class="route-result__value" id="routeTime">—</span>
+                        <span class="route-result__unit">min</span>
+                    </div>
+                </div>
+                <button class="btn-route-cancel" id="btnCancelRoute">✕ Cancel route</button>
+            </div>
+        </div>
+        <!-- Form kept for JS functionality, rendered as modal on mobile -->
+        <ul class="workouts workouts--hidden-in-tab">
+            <form class="form hidden">
+                <div class="form__row">
+                    <label class="form__label">Type</label>
+                    <select class="form__input form__input--type">
+                        <option value="running">Running</option>
+                        <option value="cycling">Cycling</option>
+                        <option value="walking">Walking</option>
+                    </select>
+                </div>
+                <div class="form__row">
+                    <label class="form__label">Distance</label>
+                    <input class="form__input form__input--distance" placeholder="km" step="0.1"/>
+                </div>
+                <div class="form__row">
+                    <label class="form__label">Duration</label>
+                    <input class="form__input form__input--duration" placeholder="min" step="0.1"/>
+                </div>
+                <div class="form__row">
+                    <label class="form__label">Cadence</label>
+                    <input class="form__input form__input--cadence" placeholder="step/min"/>
+                </div>
+                <div class="form__row form__row--hidden">
+                    <label class="form__label">Elev Gain</label>
+                    <input class="form__input form__input--elevation" placeholder="meters"/>
+                </div>
+                <button class="form__btn">✓ Add Workout</button>
+            </form>
+        </ul>
+    </div>
+</div>
+
+<!-- MAP: always full screen, z-index 1 -->
 <div id="map">
-  <!-- SKELETON — scoped to map area only -->
-  <div id="mapSkeleton" class="map-skeleton">
-    <div class="map-skeleton__bg"></div>
-    <div class="map-skeleton__loader">
-      <svg class="map-skeleton__spinner" viewBox="0 0 50 50">
-        <circle class="map-skeleton__track" cx="25" cy="25" r="20" fill="none" stroke-width="4"/>
-        <circle class="map-skeleton__arc"   cx="25" cy="25" r="20" fill="none" stroke-width="4"
-                stroke-dasharray="80 45" stroke-linecap="round"/>
-      </svg>
-      <span class="map-skeleton__label">Loading map…</span>
+    <!-- Skeleton loader — inside map -->
+    <div id="mapSkeleton" class="map-skeleton">
+        <div class="map-skeleton__bg"></div>
+        <div class="map-skeleton__loader">
+            <svg class="map-skeleton__spinner" viewBox="0 0 50 50">
+                <circle class="map-skeleton__track" cx="25" cy="25" r="20" fill="none" stroke-width="4"/>
+                <circle class="map-skeleton__arc" cx="25" cy="25" r="20" fill="none" stroke-width="4"
+                        stroke-dasharray="80 45" stroke-linecap="round"/>
+            </svg>
+            <span class="map-skeleton__label">Loading map…</span>
+        </div>
+        <div class="map-skeleton__msg hidden" id="skeletonMsg">
+            <p class="map-skeleton__text">Map is loading longer than usual…</p>
+            <button class="map-skeleton__btn" id="btnRetry">↺ Retry</button>
+        </div>
     </div>
-    <div class="map-skeleton__msg hidden" id="skeletonMsg">
-      <p class="map-skeleton__text">Map is loading longer than usual…</p>
-      <button class="map-skeleton__btn" id="btnRetry">↺ Retry</button>
+    <!-- Offline badge — stays in map corner -->
+    <div id="offlineBadge" class="offline-badge hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+             stroke-linejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+            <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+            <circle cx="12" cy="20" r="1"/>
+        </svg>
+        Offline
     </div>
-  </div>
-
-  <!-- OFFLINE BADGE — corner of map only -->
-  <div id="offlineBadge" class="offline-badge hidden">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-      <line x1="1" y1="1" x2="23" y2="23"/>
-      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
-      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
-      <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
-      <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
-      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
-      <circle cx="12" cy="20" r="1"/>
-    </svg>
-    Offline
-  </div>
 </div>
+<!-- TAB 2: STATS -->
+<div id="tabStats" class="tab-panel">
+    <div class="tab-scroll">
+        <div class="tab-header">
+            <img src="logo.png" alt="Mapty logo" class="logo"/>
+            <div class="weather-widget" id="weatherWidgetStats">
+                <span class="weather-widget__icon" id="wIconStats">—</span>
+                <span class="weather-widget__sun" id="wSunsetStats">—</span>
+            </div>
+        </div>
+        <div class="stats-panel" id="statsPanel">
+            <div class="stats-panel__label">THIS WEEK'S SUMMARY</div>
+            <div class="stats-panel__rings">
+                <div class="stats-ring-wrap">
+                    <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
+                        <circle id="statsRingKm" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
+                                stroke="#00c46a" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
+                                stroke-linecap="round" transform="rotate(-90 45 45)"/>
+                        <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800"
+                              font-family="Manrope,sans-serif" id="statsValKm">0.0
+                        </text>
+                        <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9"
+                              font-family="Manrope,sans-serif">KM
+                        </text>
+                        <text x="45" y="25" text-anchor="middle" font-size="12">🏃</text>
+                    </svg>
+                </div>
+                <div class="stats-ring-wrap">
+                    <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
+                        <circle id="statsRingTime" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
+                                stroke="#aaa" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
+                                stroke-linecap="round" transform="rotate(-90 45 45)"/>
+                        <text x="45" y="41" text-anchor="middle" fill="#ececec" font-size="11" font-weight="800"
+                              font-family="Manrope,sans-serif" id="statsValTime">0m
+                        </text>
+                        <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9"
+                              font-family="Manrope,sans-serif">TIME
+                        </text>
+                        <text x="45" y="25" text-anchor="middle" font-size="12">⏱</text>
+                    </svg>
+                </div>
+                <div class="stats-ring-wrap">
+                    <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
+                        <circle id="statsRingWorkouts" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
+                                stroke="#ffb545" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
+                                stroke-linecap="round" transform="rotate(-90 45 45)"/>
+                        <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800"
+                              font-family="Manrope,sans-serif" id="statsValWorkouts">0
+                        </text>
+                        <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9"
+                              font-family="Manrope,sans-serif">WORKOUTS
+                        </text>
+                        <text x="45" y="25" text-anchor="middle" font-size="12">🚴</text>
+                    </svg>
+                </div>
+            </div>
+            <div class="stats-panel__goal">
+                <div class="stats-panel__goal-header">
+                    <span class="stats-panel__goal-label">WEEKLY GOAL</span>
+                    <span class="stats-panel__goal-pct" id="statsGoalPct">0%</span>
+                </div>
+                <div class="stats-panel__goal-bar">
+                    <div class="stats-panel__goal-fill" id="statsGoalFill" style="width:0%"></div>
+                </div>
+            </div>
+        </div>
+        <div class="stats-detail hidden" id="statsDetail">
+            <div class="stats-detail__header">
+                <div class="stats-detail__title">📊 Weekly activity</div>
+                <div class="stats-week-nav">
+                    <button class="stats-week-nav__btn" id="statsWeekPrev">‹</button>
+                    <span class="stats-week-nav__label" id="statsWeekLabel">This week</span>
+                    <button class="stats-week-nav__btn" id="statsWeekNext" disabled>›</button>
+                </div>
+            </div>
+            <div class="stats-detail__bars" id="statsDetailBars"></div>
+            <div class="stats-detail__totals">
+                <div class="stats-detail__total-item"><span class="stats-detail__total-val"
+                                                            id="statsDetailKm">0.0</span><span
+                        class="stats-detail__total-label">km</span></div>
+                <div class="stats-detail__total-item"><span
+                        class="stats-detail__total-val stats-detail__total-val--gray"
+                        id="statsDetailTime">0m</span><span class="stats-detail__total-label">time</span></div>
+                <div class="stats-detail__total-item"><span
+                        class="stats-detail__total-val stats-detail__total-val--amber"
+                        id="statsDetailCount">0</span><span class="stats-detail__total-label">workouts</span></div>
+                <div class="stats-detail__total-item"><span
+                        class="stats-detail__total-val stats-detail__total-val--blue" id="statsDetailDate">—</span><span
+                        class="stats-detail__total-label">day</span></div>
+            </div>
+        </div>
+        <div class="stats-goal-editor hidden" id="statsGoalEditor">
+            <div class="stats-goal-editor__title">⚙ WEEKLY GOAL</div>
+            <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Distance target</span><input
+                    class="stats-goal-editor__input" id="goalKmInput" type="number" min="1" max="500" value="35"/><span
+                    class="stats-goal-editor__unit">km</span></div>
+            <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Time target</span><input
+                    class="stats-goal-editor__input" id="goalTimeInput" type="number" min="1" max="2000"
+                    value="300"/><span class="stats-goal-editor__unit">min</span></div>
+            <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Workouts target</span><input
+                    class="stats-goal-editor__input" id="goalCountInput" type="number" min="1" max="30" value="7"/><span
+                    class="stats-goal-editor__unit">× /week</span></div>
+        </div>
+        <ul class="workouts" id="workoutListStats" style="list-style:none;padding:0"></ul>
+    </div>
+</div>
+
+<!-- TAB 3: MAP (transparent) -->
+<div id="tabMap" class="tab-panel tab-panel--map"></div>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav__item bottom-nav__item--active" data-tab="tabWorkouts">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+        </svg>
+        <span class="bottom-nav__label">Workouts</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabStats">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span class="bottom-nav__label">Stats</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabMap">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="11" r="3"/>
+            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>
+        </svg>
+        <span class="bottom-nav__label">Map</span>
+    </button>
+</nav>
 
 <div class="ios-install-banner hidden" id="iosInstallBanner">
-  <div class="ios-install-banner__icon">
-    <img src="icon-192.png" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/>
-    <span style="display:none;font-size:2.4rem">🗺️</span>
-  </div>
-  <div class="ios-install-banner__text">
-    <div class="ios-install-banner__title">Install Mapty on your phone</div>
-    <div class="ios-install-banner__sub">Tap
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin:0 1px;color:#ccc"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-      Share and &ldquo;Add to Home Screen&rdquo; +
+    <div class="ios-install-banner__icon"><img src="icon-192.png" alt=""
+                                               onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/><span
+            style="display:none;font-size:2.4rem">🗺️</span></div>
+    <div class="ios-install-banner__text">
+        <div class="ios-install-banner__title">Install Mapty on your phone</div>
+        <div class="ios-install-banner__sub">Tap
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round"
+                 style="display:inline-block;vertical-align:middle;margin:0 1px;color:#ccc">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+            Share and &ldquo;Add to Home Screen&rdquo; +
+        </div>
     </div>
-  </div>
-  <button class="ios-install-banner__close" id="iosInstallClose">✕</button>
+    <button class="ios-install-banner__close" id="iosInstallClose">✕</button>
 </div>
-
 <script>
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('sw.js').catch(() => {});
-  }
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('public/sw.js')
+                .then(reg => {
+                    if (reg.waiting) {
+                        reg.waiting.postMessage({type: 'SKIP_WAITING'});
+                    }
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                newWorker.postMessage({type: 'SKIP_WAITING'});
+                            }
+                        });
+                    });
+                });
+        });
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+        });
+    }
 </script>
+
 </body>
 </html>
