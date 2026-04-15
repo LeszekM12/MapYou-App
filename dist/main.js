@@ -19,7 +19,8 @@ import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
 import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryBtn, } from './modules/OfflineDetector.js';
 import { initWeatherWidget } from './modules/WeatherWidget.js';
-import { loadWorkoutsFromDB, saveWorkoutToDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
+import { loadWorkoutsFromDB, saveWorkoutToDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db';
+import { initPushNotifications } from './modules/PushNotifications.js';
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -175,6 +176,7 @@ class App {
         __classPrivateFieldGet(this, _App_map, "f").on('mouseup touchend', () => {
             __classPrivateFieldSet(this, _App_recenterTimer, setTimeout(() => { __classPrivateFieldSet(this, _App_userTouchingMap, false, "f"); }, 5000), "f");
         });
+        void initPushNotifications();
     }
     // ── SETTINGS ──────────────────────────────────────────────────────────────
     _initSettings() {

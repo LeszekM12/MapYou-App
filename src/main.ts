@@ -18,6 +18,7 @@ import {
   loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB,
   clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB,
 } from './modules/db';
+import { initPushNotifications, testPushNotification } from './modules/PushNotifications.js';
 
 // ─── Leaflet plugin types ─────────────────────────────────────────────────────
 
@@ -224,6 +225,7 @@ class App {
     this.#map.on('mouseup touchend', () => {
       this.#recenterTimer = setTimeout(() => { this.#userTouchingMap = false; }, 5000);
     });
+    void initPushNotifications();
   }
 
   // ── SETTINGS ──────────────────────────────────────────────────────────────
