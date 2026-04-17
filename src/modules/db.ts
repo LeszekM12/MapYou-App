@@ -4,13 +4,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { Coords, WorkoutType } from '../types/index.js';
+import type { ActivityRecord } from './Tracker.js';
 
 // ── Typy ──────────────────────────────────────────────────────────────────────
 
 export interface WorkoutRecord {
   id:           string;
   type:         WorkoutType;
-  date:         string;       // ISO string
+  date:         string;
   coords:       Coords;
   description:  string;
   distance:     number;
@@ -23,17 +24,24 @@ export interface WorkoutRecord {
   routeCoords:  Coords[] | null;
 }
 
-// ── Inicjalizacja Dexie (globalny z CDN) ─────────────────────────────────────
+// ── Inicjalizacja Dexie ───────────────────────────────────────────────────────
 
 declare const Dexie: any;
 
 const db = new Dexie('mapty');
 
+// version(1) — workouty (istniejące dane)
 db.version(1).stores({
   workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
 });
 
-// ── Normalizacja ──────────────────────────────────────────────────────────────
+// version(2) — dodajemy activities (NIGDY nie zmieniaj version 1!)
+db.version(2).stores({
+  workouts:   'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities: 'id, sport, date, distanceKm, durationSec',
+});
+
+// ── Normalizacja workoutu ─────────────────────────────────────────────────────
 
 function _generateDescription(type: string, isoDate: string): string {
   const months = [
@@ -111,7 +119,7 @@ export async function migrateLocalStorageToIndexedDB(): Promise<number> {
   return normalized.length;
 }
 
-// ── CRUD ──────────────────────────────────────────────────────────────────────
+// ── CRUD — workouty ───────────────────────────────────────────────────────────
 
 export async function loadWorkoutsFromDB(): Promise<WorkoutRecord[]> {
   try {
@@ -134,4 +142,39 @@ export async function deleteWorkoutFromDB(id: string): Promise<void> {
 
 export async function clearAllWorkoutsFromDB(): Promise<void> {
   await db.workouts.clear();
+}
+
+// ── CRUD — activities (Tracker) ───────────────────────────────────────────────
+
+export async function saveActivity(activity: ActivityRecord): Promise<string> {
+  try {
+    await db.activities.put(activity);
+    console.info(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
+    return activity.id;
+  } catch (err) {
+    console.error('[DB] Błąd zapisu aktywności:', err);
+    throw err;
+  }
+}
+
+export async function loadActivities(): Promise<ActivityRecord[]> {
+  try {
+    return await db.activities.orderBy('date').reverse().toArray();
+  } catch (err) {
+    console.error('[DB] Błąd wczytywania aktywności:', err);
+    return [];
+  }
+}
+
+export async function loadActivityById(id: string): Promise<ActivityRecord | undefined> {
+  try {
+    return await db.activities.get(id);
+  } catch (err) {
+    console.error('[DB] Błąd wczytywania aktywności:', err);
+    return undefined;
+  }
+}
+
+export async function deleteActivity(id: string): Promise<void> {
+  await db.activities.delete(id);
 }

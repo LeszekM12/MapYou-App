@@ -1,10 +1,16 @@
 // ─── DATABASE MODULE (IndexedDB via Dexie.js) ────────────────────────────────
 // Dexie jest ładowane z CDN w index.html jako globalny Dexie
 const db = new Dexie('mapty');
+// version(1) — workouty (istniejące dane)
 db.version(1).stores({
     workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
 });
-// ── Normalizacja ──────────────────────────────────────────────────────────────
+// version(2) — dodajemy activities (NIGDY nie zmieniaj version 1!)
+db.version(2).stores({
+    workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+    activities: 'id, sport, date, distanceKm, durationSec',
+});
+// ── Normalizacja workoutu ─────────────────────────────────────────────────────
 function _generateDescription(type, isoDate) {
     const months = [
         'January', 'February', 'March', 'April', 'May', 'June',
@@ -76,7 +82,7 @@ export async function migrateLocalStorageToIndexedDB() {
     localStorage.removeItem('workouts');
     return normalized.length;
 }
-// ── CRUD ──────────────────────────────────────────────────────────────────────
+// ── CRUD — workouty ───────────────────────────────────────────────────────────
 export async function loadWorkoutsFromDB() {
     try {
         return await db.workouts.orderBy('date').reverse().toArray();
@@ -96,5 +102,38 @@ export async function deleteWorkoutFromDB(id) {
 }
 export async function clearAllWorkoutsFromDB() {
     await db.workouts.clear();
+}
+// ── CRUD — activities (Tracker) ───────────────────────────────────────────────
+export async function saveActivity(activity) {
+    try {
+        await db.activities.put(activity);
+        console.info(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
+        return activity.id;
+    }
+    catch (err) {
+        console.error('[DB] Błąd zapisu aktywności:', err);
+        throw err;
+    }
+}
+export async function loadActivities() {
+    try {
+        return await db.activities.orderBy('date').reverse().toArray();
+    }
+    catch (err) {
+        console.error('[DB] Błąd wczytywania aktywności:', err);
+        return [];
+    }
+}
+export async function loadActivityById(id) {
+    try {
+        return await db.activities.get(id);
+    }
+    catch (err) {
+        console.error('[DB] Błąd wczytywania aktywności:', err);
+        return undefined;
+    }
+}
+export async function deleteActivity(id) {
+    await db.activities.delete(id);
 }
 //# sourceMappingURL=db.js.map

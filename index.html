@@ -382,6 +382,75 @@
 </div>
 
 <!-- TAB 3: MAP (transparent) -->
+
+<!-- TAB: TRACKER -->
+<div id="tabTracker" class="tab-panel">
+  <div class="tab-scroll tracker-tab">
+
+    <!-- Sport selector -->
+    <div class="tracker__sport-selector" id="trackerSportSelector">
+      <button class="tracker__sport-btn tracker__sport-btn--active" data-sport="running">
+        <span class="tracker__sport-emoji">🏃</span>
+        <span class="tracker__sport-label">Running</span>
+      </button>
+      <button class="tracker__sport-btn" data-sport="walking">
+        <span class="tracker__sport-emoji">🚶</span>
+        <span class="tracker__sport-label">Walking</span>
+      </button>
+      <button class="tracker__sport-btn" data-sport="cycling">
+        <span class="tracker__sport-emoji">🚴</span>
+        <span class="tracker__sport-label">Cycling</span>
+      </button>
+    </div>
+
+    <!-- Live stats (widoczne podczas nagrywania) -->
+    <div class="tracker__live hidden" id="trackerLive">
+      <div class="tracker__stat-row">
+        <div class="tracker__stat">
+          <span class="tracker__stat-val" id="trackerDist">0.00</span>
+          <span class="tracker__stat-label">km</span>
+        </div>
+        <div class="tracker__stat">
+          <span class="tracker__stat-val" id="trackerTime">00:00</span>
+          <span class="tracker__stat-label">time</span>
+        </div>
+        <div class="tracker__stat">
+          <span class="tracker__stat-val" id="trackerPace">--:--</span>
+          <span class="tracker__stat-label" id="trackerPaceLabel">min/km</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Przyciski kontrolne -->
+    <div class="tracker__controls">
+      <button class="tracker__btn tracker__btn--start" id="trackerBtnStart">
+        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        Start
+      </button>
+      <button class="tracker__btn tracker__btn--stop hidden" id="trackerBtnStop">
+        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
+        Stop
+      </button>
+      <button class="tracker__btn tracker__btn--discard hidden" id="trackerBtnDiscard">
+        Discard
+      </button>
+    </div>
+
+    <!-- GPS status -->
+    <div class="tracker__gps-status hidden" id="trackerGpsStatus">
+      <span class="tracker__gps-dot"></span>
+      <span id="trackerGpsText">Searching GPS...</span>
+    </div>
+
+    <!-- Historia aktywności -->
+    <div class="tracker__history">
+      <h3 class="tracker__history-title">Activity History</h3>
+      <div id="activityHistoryList" class="act-history"></div>
+    </div>
+
+  </div>
+</div>
+
 <div id="tabMap" class="tab-panel tab-panel--map"></div>
 
 <!-- BOTTOM NAV -->
@@ -409,6 +478,14 @@
             <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>
         </svg>
         <span class="bottom-nav__label">Map</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabTracker">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/>
+        </svg>
+        <span class="bottom-nav__label">Track</span>
     </button>
 </nav>
 

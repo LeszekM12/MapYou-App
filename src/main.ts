@@ -18,6 +18,7 @@ import { initWeatherWidget } from './modules/WeatherWidget.js';
 import {
   loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB,
   clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB,
+  saveActivity,
 } from './modules/db.js';
 import {
   initPushNotifications,
