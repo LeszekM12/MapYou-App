@@ -18,7 +18,16 @@ import {
   loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB,
   clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB,
 } from './modules/db.js';
-import { initPushNotifications, testPushNotification } from './modules/PushNotifications.js';
+import {
+  initPushNotifications,
+  testPushNotification,
+  sendWorkoutAddedPush,
+  sendWorkoutDeletedPush,
+  sendWelcomeBackPush,
+  sendLongBreakPush,
+  sendArrivedAtDestinationPush,
+  sendWeatherPush,
+} from './modules/PushNotifications.js';
 
 // ─── Leaflet plugin types ─────────────────────────────────────────────────────
 
@@ -225,7 +234,13 @@ class App {
     this.#map.on('mouseup touchend', () => {
       this.#recenterTimer = setTimeout(() => { this.#userTouchingMap = false; }, 5000);
     });
-    void initPushNotifications();
+    void initPushNotifications().then(async () => {
+      // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
+      const longBreakSent = await sendLongBreakPush();
+      if (!longBreakSent) void sendWelcomeBackPush();
+      // Push pogodowy jeśli warunki sprzyjają
+      void sendWeatherPush();
+    });
   }
 
   // ── SETTINGS ──────────────────────────────────────────────────────────────
@@ -524,6 +539,7 @@ class App {
     if (this.#nearDestCount >= App.#ARRIVAL_CONSEC && !this.#arrivedShown) {
       this.#arrivedShown = true; this._showArrivalToast();
       if (this.#voiceEnabled) this._speak('Dotarłeś na miejsce. Cel osiągnięty!');
+      void sendArrivedAtDestinationPush();
     }
   }
 
@@ -651,6 +667,7 @@ class App {
       this._setLocalStorage();
       this._renderStats(true);
       this._renderStreak();
+      void sendWorkoutAddedPush();
     });
     setTimeout(() => wmDist.focus(), 100);
   }
@@ -701,6 +718,7 @@ class App {
     this._setLocalStorage();
     this._renderStats(true);
     this._renderStreak();
+    void sendWorkoutAddedPush();
   }
 
   // ── MARKERS ───────────────────────────────────────────────────────────────
@@ -855,6 +873,7 @@ class App {
       setTimeout(() => el.remove(), 300);
     }
     this._setLocalStorage(); this._renderStats(); this._renderStreak();
+    void sendWorkoutDeletedPush();
   }
 
   _setLocalStorage(): void {

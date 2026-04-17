@@ -171,6 +171,94 @@ export async function testPushNotification(title = 'Mapty Test', body = 'Push no
         console.error('[Push] Test failed:', err);
     }
 }
+// ═══════════════════════════════════════════════════════════════════════════
+// PUSH TRIGGERS — wywoływane z main.ts
+// ═══════════════════════════════════════════════════════════════════════════
+async function sendPush(title, body) {
+    try {
+        await fetch(`${BACKEND_URL}/push/send`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, body }),
+        });
+    }
+    catch (err) {
+        console.warn('[Push] sendPush failed:', err);
+    }
+}
+// 1. Po dodaniu workoutu
+export async function sendWorkoutAddedPush() {
+    await sendPush('Nowy trening zapisany! 💪', 'Świetna robota! Tak trzymaj!');
+}
+// 2. Po usunięciu treningu
+export async function sendWorkoutDeletedPush() {
+    await sendPush('Trening usunięty.', 'Chcesz go przywrócić? Wróć do aplikacji.');
+}
+// 3. Przy każdym wejściu do aplikacji
+export async function sendWelcomeBackPush() {
+    await sendPush('Witaj ponownie! 👋', 'Gotowy na kolejny trening?');
+}
+// 4. Po dłuższej przerwie (> 24h od ostatniego otwarcia)
+// Zwraca true jeśli push został wysłany (przerwa > 24h)
+// Dzięki temu main.ts może pominąć sendWelcomeBackPush gdy longBreak już się odpalił
+export async function sendLongBreakPush() {
+    const LAST_OPEN_KEY = 'mapty_last_open';
+    const now = Date.now();
+    const lastOpen = Number(localStorage.getItem(LAST_OPEN_KEY) ?? 0);
+    const hoursSince = (now - lastOpen) / (1000 * 60 * 60);
+    // Zawsze zapisuj aktualny czas otwarcia
+    localStorage.setItem(LAST_OPEN_KEY, String(now));
+    // Wyślij push tylko jeśli przerwa > 24h i był poprzedni zapis
+    if (lastOpen > 0 && hoursSince > 24) {
+        await sendPush('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!');
+        return true;
+    }
+    return false;
+}
+// 5. Po dotarciu do celu trasy (wywołaj gdy arrivedShown = true)
+export async function sendArrivedAtDestinationPush() {
+    await sendPush('Dotarłeś na miejsce! 🎯', 'Chcesz zapisać trasę? Wróć do aplikacji.');
+}
+// 6. Push pogodowy — wysyłany gdy pogoda sprzyjająca
+//    Wywołaj raz przy starcie lub co kilka godzin
+export async function sendWeatherPush() {
+    const LAST_WEATHER_PUSH_KEY = 'mapty_last_weather_push';
+    const now = Date.now();
+    const lastPush = Number(localStorage.getItem(LAST_WEATHER_PUSH_KEY) ?? 0);
+    const hoursSince = (now - lastPush) / (1000 * 60 * 60);
+    // Wysyłaj max raz na 6 godzin żeby nie spamować
+    if (hoursSince < 6)
+        return;
+    try {
+        // Pobierz lokalizację
+        const coords = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(p => resolve(p.coords), reject, { timeout: 5000 }));
+        const { latitude: lat, longitude: lng } = coords;
+        // Pobierz pogodę z Open-Meteo (ten sam endpoint co WeatherWidget)
+        const url = [
+            'https://api.open-meteo.com/v1/forecast',
+            `?latitude=${lat}&longitude=${lng}`,
+            '&current=temperature_2m,weathercode,windspeed_10m',
+            '&timezone=auto',
+            '&forecast_days=1',
+        ].join('');
+        const res = await fetch(url);
+        const data = await res.json();
+        const { temperature_2m: temp, weathercode: code, windspeed_10m: wind } = data.current;
+        // Oceń czy pogoda sprzyja treningowi:
+        // kod 0-3 = bezchmurnie/lekkie chmury, temp 8-30°C, wiatr < 30 km/h
+        const goodWeather = code <= 3 && temp >= 8 && temp <= 30 && wind < 30;
+        if (!goodWeather)
+            return;
+        const icon = code === 0 ? '☀️' : '🌤️';
+        const tempStr = Math.round(temp);
+        const body = `${icon} ${tempStr}°C i ${wind} km/h wiatru — idealne warunki na trening!`;
+        await sendPush('Idealna pogoda na trening! 🏃', body);
+        localStorage.setItem(LAST_WEATHER_PUSH_KEY, String(now));
+    }
+    catch (err) {
+        console.warn('[Push] sendWeatherPush failed:', err);
+    }
+}
 // Eksponuj na window do testów z konsoli
 window.testPush = testPushNotification;
 //# sourceMappingURL=PushNotifications.js.map

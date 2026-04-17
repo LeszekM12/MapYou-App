@@ -20,7 +20,7 @@ import { WorkoutType } from './types/index.js';
 import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryBtn, } from './modules/OfflineDetector.js';
 import { initWeatherWidget } from './modules/WeatherWidget.js';
 import { loadWorkoutsFromDB, saveWorkoutToDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
-import { initPushNotifications } from './modules/PushNotifications.js';
+import { initPushNotifications, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, } from './modules/PushNotifications.js';
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -176,7 +176,14 @@ class App {
         __classPrivateFieldGet(this, _App_map, "f").on('mouseup touchend', () => {
             __classPrivateFieldSet(this, _App_recenterTimer, setTimeout(() => { __classPrivateFieldSet(this, _App_userTouchingMap, false, "f"); }, 5000), "f");
         });
-        void initPushNotifications();
+        void initPushNotifications().then(async () => {
+            // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
+            const longBreakSent = await sendLongBreakPush();
+            if (!longBreakSent)
+                void sendWelcomeBackPush();
+            // Push pogodowy jeśli warunki sprzyjają
+            void sendWeatherPush();
+        });
     }
     // ── SETTINGS ──────────────────────────────────────────────────────────────
     _initSettings() {
@@ -506,6 +513,7 @@ class App {
             this._showArrivalToast();
             if (__classPrivateFieldGet(this, _App_voiceEnabled, "f"))
                 this._speak('Dotarłeś na miejsce. Cel osiągnięty!');
+            void sendArrivedAtDestinationPush();
         }
     }
     _updateRemainingStats() {
@@ -653,6 +661,7 @@ class App {
             this._setLocalStorage();
             this._renderStats(true);
             this._renderStreak();
+            void sendWorkoutAddedPush();
         });
         setTimeout(() => wmDist.focus(), 100);
     }
@@ -704,6 +713,7 @@ class App {
         this._setLocalStorage();
         this._renderStats(true);
         this._renderStreak();
+        void sendWorkoutAddedPush();
     }
     // ── MARKERS ───────────────────────────────────────────────────────────────
     _showMarker(marker) {
@@ -891,6 +901,7 @@ class App {
         this._setLocalStorage();
         this._renderStats();
         this._renderStreak();
+        void sendWorkoutDeletedPush();
     }
     _setLocalStorage() {
         // Zapisuje ostatnio dodany workout do IndexedDB
