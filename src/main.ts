@@ -18,7 +18,6 @@ import { initWeatherWidget } from './modules/WeatherWidget.js';
 import {
   loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB,
   clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB,
-  saveActivity,
 } from './modules/db.js';
 import {
   initPushNotifications,
@@ -30,6 +29,9 @@ import {
   sendArrivedAtDestinationPush,
   sendWeatherPush,
 } from './modules/PushNotifications.js';
+import { Tracker, type SportType, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
+import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
+import { saveActivity } from './modules/db.js';
 
 // ─── Leaflet plugin types ─────────────────────────────────────────────────────
 
@@ -116,6 +118,9 @@ class App {
 
   #userTouchingMap = false;
   #recenterTimer: ReturnType<typeof setTimeout> | null = null;
+
+  #tracker:      Tracker | null = null;
+  #historyPanel: ActivityHistoryPanel | null = null;
 
   #nightMode = false;
   #wakeLock: WakeLockSentinel | null = null;
@@ -243,6 +248,7 @@ class App {
       // Push pogodowy jeśli warunki sprzyjają
       void sendWeatherPush();
     });
+    this._initTracker();
   }
 
   // ── SETTINGS ──────────────────────────────────────────────────────────────
@@ -894,6 +900,167 @@ class App {
     this.#workouts = data.map((d: any) => Workout.fromData(d));
     this.#workouts.forEach(w => this._renderWorkout(w));
     this._renderStats(); this._renderStreak();
+  }
+
+  // ── TRACKER ───────────────────────────────────────────────────────────────
+
+  _initTracker(): void {
+    const map = this.#map;
+
+    // Init tracker
+    this.#tracker = new Tracker(map, stats => {
+      const sport = this.#tracker?.currentSport ?? 'running';
+      const d = document.getElementById('trkDist');
+      const t = document.getElementById('trkTime');
+      const p = document.getElementById('trkPace');
+      const l = document.getElementById('trkPaceLbl');
+      if (d) d.textContent = formatDistance(stats.distanceKm);
+      if (t) t.textContent = formatDuration(stats.durationSec);
+      if (sport === 'cycling') {
+        if (p) p.textContent = stats.speedKmH.toFixed(1);
+        if (l) l.textContent = 'km/h';
+      } else {
+        if (p) p.textContent = formatPace(stats.paceMinKm);
+        if (l) l.textContent = 'min/km';
+      }
+    });
+
+    // Historia
+    const histEl = document.getElementById('activityHistoryList');
+    if (histEl) {
+      this.#historyPanel = new ActivityHistoryPanel(histEl, map);
+      void this.#historyPanel.render();
+    }
+
+    // History toggle
+    document.getElementById('trkHistoryToggle')?.addEventListener('click', () => {
+      document.getElementById('trkHistoryPanel')?.classList.toggle('hidden');
+    });
+    document.getElementById('trkHistoryClose')?.addEventListener('click', () => {
+      document.getElementById('trkHistoryPanel')?.classList.add('hidden');
+    });
+
+    // ── Permission ────────────────────────────────────────────────────────
+    const _showMain = () => {
+      document.getElementById('trkPermission')?.classList.add('hidden');
+    };
+
+    // Sprawdź uprawnienia
+    if (navigator.permissions) {
+      navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(r => {
+        if (r.state === 'granted') _showMain();
+        else document.getElementById('trkPermission')?.classList.remove('hidden');
+      }).catch(() => _showMain());
+    } else {
+      document.getElementById('trkPermission')?.classList.remove('hidden');
+    }
+
+    document.getElementById('trkPermAllow')?.addEventListener('click', () => {
+      navigator.geolocation.getCurrentPosition(
+        () => _showMain(),
+        () => _showMain(),
+        { timeout: 6000 },
+      );
+    });
+    document.getElementById('trkPermSkip')?.addEventListener('click', _showMain);
+
+    // ── Sport selector ────────────────────────────────────────────────────
+    document.getElementById('trackerSportSelector')?.addEventListener('click', e => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.trk-sport-tab');
+      if (!btn?.dataset.sport || this.#tracker?.isActive) return;
+      document.querySelectorAll('.trk-sport-tab').forEach(b => b.classList.remove('trk-sport-tab--active'));
+      btn.classList.add('trk-sport-tab--active');
+      this.#tracker?.setSport(btn.dataset.sport as SportType);
+      const color = SPORT_COLORS[btn.dataset.sport as SportType];
+      const sb = document.getElementById('trkBtnStart') as HTMLElement | null;
+      if (sb) { sb.style.background = color; sb.style.boxShadow = `0 6px 28px ${color}80`; }
+    });
+
+    // ── START ─────────────────────────────────────────────────────────────
+    document.getElementById('trkBtnStart')?.addEventListener('click', () => {
+      if (!this.#tracker) return;
+      this.#tracker.start();
+      this._enterTrackingView();
+    });
+
+    // ── PAUSE / RESUME ────────────────────────────────────────────────────
+    document.getElementById('trkBtnPause')?.addEventListener('click', () => {
+      if (!this.#tracker?.isActive) return;
+      if (this.#tracker.isPaused) {
+        this.#tracker.resume();
+        this._setTrackingState('active');
+      } else {
+        this.#tracker.pause();
+        this._setTrackingState('paused');
+      }
+    });
+
+    // ── STOP ──────────────────────────────────────────────────────────────
+    document.getElementById('trkBtnStop')?.addEventListener('click', () => {
+      if (!this.#tracker) return;
+      const activity = this.#tracker.stop();
+      this._exitTrackingView();
+      if (!activity) return;
+      showGoodJobSplash(() => {
+        showActivitySummary(
+          activity, map,
+          () => { this.#tracker?.reset(); },
+          async saved => {
+            await saveActivity(saved);
+            this.#tracker?.reset();
+            await this.#historyPanel?.render();
+          },
+        );
+      });
+    });
+
+    // ── DISCARD ───────────────────────────────────────────────────────────
+    document.getElementById('trkBtnDiscard')?.addEventListener('click', () => {
+      if (!confirm('Discard activity?')) return;
+      this.#tracker?.reset();
+      this._exitTrackingView();
+    });
+  }
+
+  _enterTrackingView(): void {
+    // Schowaj bottom nav
+    const nav = document.querySelector<HTMLElement>('.bottom-nav');
+    if (nav) nav.style.display = 'none';
+    // Schowaj search bar
+    document.getElementById('mapSearchBarMobile')?.classList.add('msb--hidden-tab');
+    // Aktywuj tabMap żeby mapa była widoczna
+    document.getElementById('tabMap')?.classList.add('tab-panel--active');
+    // Pokaż overlay trackera
+    document.getElementById('trackerOverlay')?.classList.remove('hidden');
+    this._setTrackingState('active');
+    setTimeout(() => window.app.invalidateMapSize(), 150);
+  }
+
+  _exitTrackingView(): void {
+    document.getElementById('trackerOverlay')?.classList.add('hidden');
+    document.getElementById('tabMap')?.classList.remove('tab-panel--active');
+    const nav = document.querySelector<HTMLElement>('.bottom-nav');
+    if (nav) nav.style.display = '';
+    this._setTrackingState('idle');
+  }
+
+  _setTrackingState(state: 'idle' | 'active' | 'paused'): void {
+    const sport = this.#tracker?.currentSport ?? 'running';
+    const color = SPORT_COLORS[sport];
+    const pauseBtn   = document.getElementById('trkBtnPause') as HTMLElement | null;
+    const stopBtn    = document.getElementById('trkBtnStop');
+    const discardBtn = document.getElementById('trkBtnDiscard');
+
+    if (state === 'active') {
+      if (pauseBtn)  { pauseBtn.textContent = '⏸ Pause'; pauseBtn.style.background = color; }
+      // Finish zawsze widoczny podczas nagrywania
+      stopBtn?.classList.remove('hidden');
+      discardBtn?.classList.add('hidden');
+    } else if (state === 'paused') {
+      if (pauseBtn)  { pauseBtn.textContent = '▶ Resume'; pauseBtn.style.background = '#555'; }
+      stopBtn?.classList.remove('hidden');
+      discardBtn?.classList.remove('hidden');
+    }
   }
 
   reset(): void { void clearAllWorkoutsFromDB().then(() => location.reload()); }
@@ -1553,6 +1720,17 @@ window.app = new App();
     if (activeTab === 'tabMap') {
       if (!routeActive) showMobileSearch();
       setTimeout(() => window.app.invalidateMapSize(), 80);
+    } else if (activeTab === 'tabTracker') {
+      hideMobileSearchTab();
+      // Pokaż permission jeśli nie mamy uprawnień
+      if (navigator.permissions) {
+        navigator.permissions.query({ name: 'geolocation' as PermissionName }).then(r => {
+          const perm = document.getElementById('trkPermission');
+          if (!perm) return;
+          if (r.state !== 'granted') perm.classList.remove('hidden');
+          else perm.classList.add('hidden');
+        }).catch(() => {});
+      }
     } else {
       hideMobileSearchTab();
     }

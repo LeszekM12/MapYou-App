@@ -127,6 +127,10 @@
 </div>
 
 <!-- TAB 1: WORKOUTS -->
+
+<!-- TRACKER OVERLAY — fullscreen nad mapą podczas nagrywania -->
+
+
 <div id="tabWorkouts" class="tab-panel tab-panel--active">
     <div class="tab-scroll">
         <div class="tab-header">
@@ -383,72 +387,62 @@
 
 <!-- TAB 3: MAP (transparent) -->
 
+
+
 <!-- TAB: TRACKER -->
-<div id="tabTracker" class="tab-panel">
-  <div class="tab-scroll tracker-tab">
+<div id="tabTracker" class="tab-panel tab-panel--tracker">
 
-    <!-- Sport selector -->
-    <div class="tracker__sport-selector" id="trackerSportSelector">
-      <button class="tracker__sport-btn tracker__sport-btn--active" data-sport="running">
-        <span class="tracker__sport-emoji">🏃</span>
-        <span class="tracker__sport-label">Running</span>
-      </button>
-      <button class="tracker__sport-btn" data-sport="walking">
-        <span class="tracker__sport-emoji">🚶</span>
-        <span class="tracker__sport-label">Walking</span>
-      </button>
-      <button class="tracker__sport-btn" data-sport="cycling">
-        <span class="tracker__sport-emoji">🚴</span>
-        <span class="tracker__sport-label">Cycling</span>
-      </button>
+  <!-- Permission overlay — widoczny gdy brak uprawnień GPS -->
+  <div class="trk-permission hidden" id="trkPermission">
+    <div class="trk-permission__sheet">
+      <div class="trk-permission__icon">📍</div>
+      <h2 class="trk-permission__title">Allow location access</h2>
+      <p class="trk-permission__desc">Mapty needs your precise location to track distance, pace and route.</p>
+      <button class="trk-permission__allow" id="trkPermAllow">Allow location</button>
+      <button class="trk-permission__skip"  id="trkPermSkip">Not now</button>
     </div>
-
-    <!-- Live stats (widoczne podczas nagrywania) -->
-    <div class="tracker__live hidden" id="trackerLive">
-      <div class="tracker__stat-row">
-        <div class="tracker__stat">
-          <span class="tracker__stat-val" id="trackerDist">0.00</span>
-          <span class="tracker__stat-label">km</span>
-        </div>
-        <div class="tracker__stat">
-          <span class="tracker__stat-val" id="trackerTime">00:00</span>
-          <span class="tracker__stat-label">time</span>
-        </div>
-        <div class="tracker__stat">
-          <span class="tracker__stat-val" id="trackerPace">--:--</span>
-          <span class="tracker__stat-label" id="trackerPaceLabel">min/km</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Przyciski kontrolne -->
-    <div class="tracker__controls">
-      <button class="tracker__btn tracker__btn--start" id="trackerBtnStart">
-        <svg viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-        Start
-      </button>
-      <button class="tracker__btn tracker__btn--stop hidden" id="trackerBtnStop">
-        <svg viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/></svg>
-        Stop
-      </button>
-      <button class="tracker__btn tracker__btn--discard hidden" id="trackerBtnDiscard">
-        Discard
-      </button>
-    </div>
-
-    <!-- GPS status -->
-    <div class="tracker__gps-status hidden" id="trackerGpsStatus">
-      <span class="tracker__gps-dot"></span>
-      <span id="trackerGpsText">Searching GPS...</span>
-    </div>
-
-    <!-- Historia aktywności -->
-    <div class="tracker__history">
-      <h3 class="tracker__history-title">Activity History</h3>
-      <div id="activityHistoryList" class="act-history"></div>
-    </div>
-
   </div>
+
+  <!-- Bottom bar — sport selector + start button -->
+  <div class="trk-bottom" id="trkBottom">
+    <div class="trk-sport-tabs" id="trackerSportSelector">
+      <button class="trk-sport-tab trk-sport-tab--active" data-sport="running">
+        <span class="trk-sport-tab__emoji">🏃</span>
+        <span class="trk-sport-tab__label">Running</span>
+      </button>
+      <button class="trk-sport-tab" data-sport="walking">
+        <span class="trk-sport-tab__emoji">🚶</span>
+        <span class="trk-sport-tab__label">Walking</span>
+      </button>
+      <button class="trk-sport-tab" data-sport="cycling">
+        <span class="trk-sport-tab__emoji">🚴</span>
+        <span class="trk-sport-tab__label">Cycling</span>
+      </button>
+    </div>
+    <button class="trk-start-btn" id="trkBtnStart">
+      <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36">
+        <polygon points="6,3 20,12 6,21"/>
+      </svg>
+    </button>
+  </div>
+
+  <!-- History toggle button -->
+  <button class="trk-history-toggle" id="trkHistoryToggle">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+      <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4"/>
+    </svg>
+    History
+  </button>
+
+  <!-- History panel -->
+  <div class="trk-history-panel hidden" id="trkHistoryPanel">
+    <div class="trk-history-panel__header">
+      <h3>Activity History</h3>
+      <button id="trkHistoryClose">✕</button>
+    </div>
+    <div id="activityHistoryList" class="act-history"></div>
+  </div>
+
 </div>
 
 <div id="tabMap" class="tab-panel tab-panel--map"></div>
@@ -487,6 +481,7 @@
         </svg>
         <span class="bottom-nav__label">Track</span>
     </button>
+    
 </nav>
 
 <div class="ios-install-banner hidden" id="iosInstallBanner">
@@ -531,6 +526,28 @@
         });
     }
 </script>
+
+<div id="trackerOverlay" class="tracker-overlay hidden" data-state="idle">
+  <div class="tracker-overlay__stats">
+    <div class="tracker-overlay__stat">
+      <span class="tracker-overlay__val" id="trkDist">0.00</span>
+      <span class="tracker-overlay__lbl">km</span>
+    </div>
+    <div class="tracker-overlay__stat tracker-overlay__stat--center">
+      <span class="tracker-overlay__val" id="trkTime">00:00</span>
+      <span class="tracker-overlay__lbl" id="trkStatus">Recording...</span>
+    </div>
+    <div class="tracker-overlay__stat">
+      <span class="tracker-overlay__val" id="trkPace">--:--</span>
+      <span class="tracker-overlay__lbl" id="trkPaceLbl">min/km</span>
+    </div>
+  </div>
+  <div class="tracker-overlay__controls">
+    <button class="tracker-overlay__discard hidden" id="trkBtnDiscard">Discard</button>
+    <button class="tracker-overlay__pause" id="trkBtnPause">⏸ Pause</button>
+    <button class="tracker-overlay__stop hidden" id="trkBtnStop">⏹ Finish</button>
+  </div>
+</div>
 
 </body>
 </html>
