@@ -812,7 +812,8 @@ class App {
   _renderWorkout(workout: Workout): void {
     const icon = workout.type === WorkoutType.Running ? '🏃‍♂️' : workout.type === WorkoutType.Cycling ? '🚴‍♀️' : '🚶';
     const thumb = this._buildRouteThumbnail(workout.routeCoords);
-    let html = `
+    const deleteId = workout.id;
+    let liHtml = `
       <li class="workout workout--${workout.type}" data-id="${workout.id}">
         <h2 class="workout__title">${workout.description}</h2>
         ${thumb ? `<div class="workout__thumb-container">${thumb}</div>` : ''}
@@ -820,18 +821,34 @@ class App {
         <div class="workout__details"><span class="workout__icon">⏱</span><span class="workout__value">${workout.duration}</span><span class="workout__unit">min</span></div>`;
 
     if (workout instanceof Running || workout instanceof Walking)
-      html += `
+      liHtml += `
         <div class="workout__details"><span class="workout__icon">⚡️</span><span class="workout__value">${workout.pace.toFixed(1)}</span><span class="workout__unit">min/km</span></div>
         <div class="workout__details"><span class="workout__icon">🦶🏼</span><span class="workout__value">${workout.cadence}</span><span class="workout__unit">spm</span></div>
       </li>`;
     else if (workout instanceof Cycling)
-      html += `
+      liHtml += `
         <div class="workout__details"><span class="workout__icon">⚡️</span><span class="workout__value">${workout.speed.toFixed(1)}</span><span class="workout__unit">km/h</span></div>
         <div class="workout__details"><span class="workout__icon">⛰</span><span class="workout__value">${workout.elevationGain}</span><span class="workout__unit">m</span></div>
       </li>`;
 
-    html = html.replace('</li>', `<button class="workout__delete" data-id="${workout.id}" title="Delete workout">✕</button></li>`);
-    form.insertAdjacentHTML('afterend', html);
+    form.insertAdjacentHTML('afterend', liHtml);
+
+    // Button tworzony przez createElement po dodaniu li do DOM
+    // Pozwala uniknąć problemu z display:grid stacking context
+    const liEl = document.querySelector<HTMLElement>(`.workout[data-id="${deleteId}"]`);
+    if (liEl) {
+      const delBtn = document.createElement('button');
+      delBtn.className = 'workout__delete';
+      delBtn.textContent = '✕';
+      delBtn.title = 'Delete';
+      delBtn.style.cssText = 'position:absolute;top:0.4rem;right:0.4rem;width:3.2rem;height:3.2rem;border-radius:50%;border:none;background:rgba(255,255,255,0.1);color:var(--color-light--1);font-size:1.4rem;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:9999;pointer-events:all;touch-action:manipulation;';
+      liEl.appendChild(delBtn);
+      delBtn.addEventListener('pointerdown', e => {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+        if (confirm('Delete this workout?')) this._deleteWorkout(deleteId);
+      });
+    }
   }
 
   _moveToPopup(e: Event): void {
