@@ -1,16 +1,16 @@
-# 🗺️ Mapty — Fitness Tracker & Workout Map
+# 🗺️ MapYou - Fitness Tracker & Workout Map
 
 > A full-featured **Progressive Web App** for tracking workouts, recording live GPS activities, planning routes and analysing weekly stats — all on an interactive map, right in your browser.
 
-**[🚀 Live Demo → leszekm12.github.io/Mapty-App](https://leszekm12.github.io/Mapty-App/)**
+**[🚀 Live Demo → leszekm12.github.io/MapYou-App/](https://leszekm12.github.io/MapYou-App/)**
 
 ---
 
 ## 📸 Preview
 
 | Activity Summary | Share Image |
-|---|---|
-|![Mapty-app.png](public/Mapty-app.png) |![Tracking.png](public/Tracking.png) |
+|--|-|
+|![dashboard.png](public/dashboard.png)|![Tracking.png](public/Tracking.png)|
 
 ---
 
@@ -75,12 +75,12 @@
 ### 🔔 Push Notifications
 - Web Push via **VAPID** + custom Node.js backend
 - Triggers:
-  - Workout saved (manual)
-  - **Activity finished** (GPS tracker) — *new*
-  - Workout deleted
-  - Welcome back after 24 h absence
-  - Ideal weather for a workout (Open-Meteo integration)
-  - Arrived at route destination
+    - Workout saved (manual)
+    - **Activity finished** (GPS tracker) — *new*
+    - Workout deleted
+    - Welcome back after 24 h absence
+    - Ideal weather for a workout (Open-Meteo integration)
+    - Arrived at route destination
 
 ### 🌤️ Weather Widget
 - Current weather icon + sunset time in the header
@@ -186,14 +186,6 @@ The app is deployed automatically from the `main` branch:
 3. Live at **[leszekm12.github.io/Mapty-App](https://leszekm12.github.io/Mapty-App/)**
 
 Push notifications require the **[mapty-backend](https://mapty-backend-lexb.onrender.com)** — a separate Node.js server hosted on Render that handles VAPID key management and `/push/subscribe`, `/push/send` endpoints.
-
----
-
-## 📄 Credits
-
-Original project concept by [Jonas Schmedtmann](https://twitter.com/jonasschmedtman) — used as a learning base.
-
-Evolved far beyond the original with: TypeScript rewrite, live GPS tracker, IndexedDB persistence, push notifications, weekly stats, route planner, POI search, share image export, PWA support, night mode, voice announcements and more.
 
 ---
 
