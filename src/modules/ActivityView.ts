@@ -4,6 +4,7 @@
 import type { ActivityRecord, SportType } from './Tracker.js';
 import { formatDuration, formatPace, formatDistance, SPORT_ICONS, SPORT_COLORS } from './Tracker.js';
 import { loadActivities, deleteActivity } from './db.js';
+import { sendActivityFinishedPush } from './PushNotifications.js';
 
 // ── Splash "Dobra robota!" ────────────────────────────────────────────────────
 
@@ -129,7 +130,10 @@ export function showActivitySummary(
   });
 
   modal.querySelector('#actSumSave')?.addEventListener('click', () => {
-    _closeModal(modal, () => onSave(activity));
+    _closeModal(modal, () => {
+      void sendActivityFinishedPush(activity.sport, activity.distanceKm, activity.durationSec);
+      onSave(activity);
+    });
   });
 }
 

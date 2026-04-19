@@ -2,6 +2,7 @@
 // src/modules/ActivityView.ts
 import { formatDuration, formatPace, formatDistance, SPORT_ICONS, SPORT_COLORS } from './Tracker.js';
 import { loadActivities, deleteActivity } from './db.js';
+import { sendActivityFinishedPush } from './PushNotifications.js';
 // ── Splash "Dobra robota!" ────────────────────────────────────────────────────
 export function showGoodJobSplash(onDone) {
     const el = document.createElement('div');
@@ -105,7 +106,10 @@ export function showActivitySummary(activity, map, onDiscard, onSave) {
         void generateShareImage(activity);
     });
     modal.querySelector('#actSumSave')?.addEventListener('click', () => {
-        _closeModal(modal, () => onSave(activity));
+        _closeModal(modal, () => {
+            void sendActivityFinishedPush(activity.sport, activity.distanceKm, activity.durationSec);
+            onSave(activity);
+        });
     });
 }
 function _closeModal(modal, cb) {

@@ -207,6 +207,19 @@ async function sendPush(title, body) {
 export async function sendWorkoutAddedPush() {
     await sendPush('Nowy trening zapisany! 💪', 'Świetna robota! Tak trzymaj!');
 }
+export async function sendActivityFinishedPush(sport, distanceKm, durationSec) {
+    const sportEmoji = {
+        running: '🏃',
+        walking: '🚶',
+        cycling: '🚴',
+    };
+    const emoji = sportEmoji[sport] ?? '🏅';
+    const h = Math.floor(durationSec / 3600);
+    const m = Math.floor((durationSec % 3600) / 60);
+    const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
+    const dist = distanceKm.toFixed(2);
+    await sendPush(`${emoji} Aktywność zakończona!`, `${dist} km · ${timeStr} — nieźle! Zapisano w historii.`);
+}
 export async function sendWorkoutDeletedPush() {
     await sendPush('Trening usunięty.', 'Chcesz go przywrócić? Wróć do aplikacji.');
 }
