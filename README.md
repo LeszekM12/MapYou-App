@@ -2,7 +2,7 @@
 
 > A full-featured **Progressive Web App** for tracking workouts, recording live GPS activities, planning routes and analysing weekly stats — all on an interactive map, right in your browser.
 
-**[🚀 Live Demo → leszekm12.github.io/Mapty-App](https://leszekm12.github.io/Mapty-App/)**
+**[🚀 Live Demo → leszekm12.github.io/MapYou-App/](https://leszekm12.github.io/MapYou-App/)**
 
 ---
 
