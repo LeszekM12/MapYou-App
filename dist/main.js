@@ -2177,16 +2177,21 @@ window.app = new App();
         if (timeEl)
             timeEl.textContent = t ?? '—';
         const hasRoute = !document.getElementById('routeResult')?.classList.contains('hidden');
-        const collapsed = !!document.querySelector('#tabWorkouts .tab-scroll.tab-scroll--collapsed');
-        pill?.classList.toggle('hidden', !(hasRoute && collapsed));
+        // Widoczny gdy: aktywna zakładka ma zwinięty pasek LUB tracker jest aktywny
+        const activePanel = document.querySelector('.tab-panel--active');
+        const collapsed = !!activePanel?.querySelector('.tab-scroll.tab-scroll--collapsed');
+        const trackerActive = !document.getElementById('trackerOverlay')?.classList.contains('hidden');
+        pill?.classList.toggle('hidden', !(hasRoute && (collapsed || trackerActive)));
     }
     const obs = new MutationObserver(sync);
     const rr = document.getElementById('routeResult');
     if (rr)
         obs.observe(rr, { attributes: true });
-    const sc = document.querySelector('#tabWorkouts .tab-scroll');
-    if (sc)
-        obs.observe(sc, { attributes: true });
+    document.querySelectorAll('.tab-scroll').forEach(sc => obs.observe(sc, { attributes: true }));
+    document.querySelectorAll('.tab-panel').forEach(p => obs.observe(p, { attributes: true }));
+    const trackerOv = document.getElementById('trackerOverlay');
+    if (trackerOv)
+        obs.observe(trackerOv, { attributes: true });
 })();
 // ─── WEATHER (delegated to WeatherWidget module) ──────────────────────────────
 initWeatherWidget();
