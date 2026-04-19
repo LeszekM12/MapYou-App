@@ -113,6 +113,133 @@ function _closeModal(modal, cb) {
     setTimeout(() => { modal.remove(); cb(); }, 300);
 }
 // ── Share image generator ─────────────────────────────────────────────────────
+// ── OSM tile helpers ──────────────────────────────────────────────────────────
+function _lngToTileX(lng, zoom) {
+    return Math.floor(((lng + 180) / 360) * Math.pow(2, zoom));
+}
+function _latToTileY(lat, zoom) {
+    const r = Math.PI / 180;
+    return Math.floor((1 - Math.log(Math.tan(lat * r) + 1 / Math.cos(lat * r)) / Math.PI) / 2 * Math.pow(2, zoom));
+}
+// Pixel offset of a lat/lng within the tile grid (at given zoom, 256px tiles)
+function _latLngToPixel(lat, lng, zoom) {
+    const n = Math.pow(2, zoom);
+    const x = ((lng + 180) / 360) * n * 256;
+    const r = Math.PI / 180;
+    const y = (1 - Math.log(Math.tan(lat * r) + 1 / Math.cos(lat * r)) / Math.PI) / 2 * n * 256;
+    return { x, y };
+}
+async function _loadImage(url) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null); // fail gracefully
+        img.src = url;
+    });
+}
+/**
+ * Render OSM tiles into a canvas region.
+ * Returns coordinate-to-canvas transform functions for drawing the route on top.
+ */
+async function _drawMapTiles(ctx, coords, canvasX, canvasY, canvasW, canvasH) {
+    if (!coords.length)
+        return null;
+    const lats = coords.map(c => c[0]);
+    const lngs = coords.map(c => c[1]);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    // Pick zoom so the route fits nicely in the map area
+    let zoom = 14;
+    for (let z = 16; z >= 8; z--) {
+        const txa = _lngToTileX(minLng, z);
+        const txb = _lngToTileX(maxLng, z);
+        const tya = _latToTileY(maxLat, z); // note: y increases southward
+        const tyb = _latToTileY(minLat, z);
+        const tilesW = txb - txa + 1;
+        const tilesH = tyb - tya + 1;
+        if (tilesW <= 6 && tilesH <= 6) {
+            zoom = z;
+            break;
+        }
+        if (z === 8)
+            zoom = 8;
+    }
+    // Tile range to cover the bounding box + 1-tile margin
+    const pad = 1;
+    const txMin = _lngToTileX(minLng, zoom) - pad;
+    const txMax = _lngToTileX(maxLng, zoom) + pad;
+    const tyMin = _latToTileY(maxLat, zoom) - pad; // maxLat → smaller tileY
+    const tyMax = _latToTileY(minLat, zoom) + pad;
+    // Pixel bounds of the entire tile grid we're about to fetch
+    const gridPixelX0 = txMin * 256;
+    const gridPixelY0 = tyMin * 256;
+    const gridPixelX1 = (txMax + 1) * 256;
+    const gridPixelY1 = (tyMax + 1) * 256;
+    // Centre of bounding box in world pixels
+    const cLat = (minLat + maxLat) / 2;
+    const cLng = (minLng + maxLng) / 2;
+    const centre = _latLngToPixel(cLat, cLng, zoom);
+    // We want the centre of the route to be at the centre of canvasW×canvasH
+    const srcCX = centre.x;
+    const srcCY = centre.y;
+    // Source rect in world-pixel space (centred on route, sized to canvas)
+    const srcX = srcCX - canvasW / 2;
+    const srcY = srcCY - canvasH / 2;
+    // Build a temporary off-screen canvas large enough for all tiles
+    const tmpW = (txMax - txMin + 1) * 256;
+    const tmpH = (tyMax - tyMin + 1) * 256;
+    const tmp = document.createElement('canvas');
+    tmp.width = tmpW;
+    tmp.height = tmpH;
+    const tctx = tmp.getContext('2d');
+    // Subdomains for OSM hot tile server
+    const subs = ['a', 'b', 'c'];
+    const tilePromises = [];
+    for (let tx = txMin; tx <= txMax; tx++) {
+        for (let ty = tyMin; ty <= tyMax; ty++) {
+            const sub = subs[(tx + ty) % 3];
+            const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
+            const dx = (tx - txMin) * 256;
+            const dy = (ty - tyMin) * 256;
+            tilePromises.push(_loadImage(url).then(img => {
+                if (img)
+                    tctx.drawImage(img, dx, dy, 256, 256);
+            }));
+        }
+    }
+    await Promise.all(tilePromises);
+    // Clip & draw the tile mosaic into the canvas map region
+    ctx.save();
+    ctx.beginPath();
+    if (ctx.roundRect) {
+        ctx
+            .roundRect(canvasX, canvasY, canvasW, canvasH, 16);
+    }
+    else {
+        ctx.rect(canvasX, canvasY, canvasW, canvasH);
+    }
+    ctx.clip();
+    // Offset: srcX/srcY in world-pixel space, relative to our tile grid origin
+    const drawSrcX = srcX - gridPixelX0;
+    const drawSrcY = srcY - gridPixelY0;
+    ctx.drawImage(tmp, drawSrcX, drawSrcY, canvasW, canvasH, canvasX, canvasY, canvasW, canvasH);
+    // Dark overlay so the coloured route pops
+    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    ctx.fillRect(canvasX, canvasY, canvasW, canvasH);
+    ctx.restore();
+    // Return transform: world-pixel → canvas coords
+    const toCanvasX = (lng) => {
+        const wp = _latLngToPixel(0, lng, zoom).x;
+        // horizontal: wp relative to srcX
+        return canvasX + (wp - srcX);
+    };
+    const toCanvasY = (lat) => {
+        const wp = _latLngToPixel(lat, 0, zoom).y;
+        return canvasY + (wp - srcY);
+    };
+    return { toCanvasX, toCanvasY };
+}
 export async function generateShareImage(activity) {
     const color = SPORT_COLORS[activity.sport];
     // Utwórz canvas
@@ -139,61 +266,94 @@ export async function generateShareImage(activity) {
     ctx.font = '18px Manrope, sans-serif';
     ctx.fillStyle = '#aaa';
     ctx.fillText(`${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`, 48, 104);
-    // Obszar mapy — zawsze rysuj ramkę
-    const mapY = 130, mapH = 480;
+    // Obszar mapy
+    const mapX = 24, mapY = 130, mapW = 752, mapH = 480;
+    // Fallback tło mapy (widoczne gdy brak GPS lub kafelki się nie załadują)
     ctx.fillStyle = '#242a30';
     ctx.beginPath();
     if (ctx.roundRect) {
-        ctx.roundRect(24, mapY, 752, mapH, 16);
+        ctx.roundRect(mapX, mapY, mapW, mapH, 16);
     }
     else {
-        ctx.rect(24, mapY, 752, mapH);
+        ctx.rect(mapX, mapY, mapW, mapH);
     }
     ctx.fill();
     // Trasa na mapie
     if (activity.coords.length > 1) {
-        {
-            // Normalizacja coords do canvas
-            const lats = activity.coords.map(c => c[0]);
-            const lngs = activity.coords.map(c => c[1]);
-            const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-            const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-            const pad = 40;
-            const scaleX = (752 - pad * 2) / (maxLng - minLng || 0.001);
-            const scaleY = (mapH - pad * 2) / (maxLat - minLat || 0.001);
-            const scale = Math.min(scaleX, scaleY);
-            const offX = 24 + pad + ((752 - pad * 2) - (maxLng - minLng) * scale) / 2;
-            const offY = mapY + pad + ((mapH - pad * 2) - (maxLat - minLat) * scale) / 2;
-            const toX = (lng) => offX + (lng - minLng) * scale;
-            const toY = (lat) => offY + (mapH - pad * 2) - (lat - minLat) * scale + (mapY - offY + pad);
-            // Linia trasy — glow effect
+        // 1. Narysuj kafelki OSM jako tło
+        const transform = await _drawMapTiles(ctx, activity.coords, mapX, mapY, mapW, mapH);
+        if (transform) {
+            // 2. Rysuj trasę używając prawdziwych współrzędnych geo → piksele canvas
+            const { toCanvasX, toCanvasY } = transform;
+            // Clip do obszaru mapy żeby trasa nie wychodziła poza zaokrąglone rogi
+            ctx.save();
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(mapX, mapY, mapW, mapH, 16);
+            }
+            else {
+                ctx.rect(mapX, mapY, mapW, mapH);
+            }
+            ctx.clip();
+            // Cień / glow
             ctx.shadowColor = color;
-            ctx.shadowBlur = 12;
+            ctx.shadowBlur = 14;
             ctx.strokeStyle = color;
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 5;
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.beginPath();
             activity.coords.forEach((c, i) => {
-                const x = toX(c[1]), y = toY(c[0]);
+                const x = toCanvasX(c[1]);
+                const y = toCanvasY(c[0]);
                 i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
             });
             ctx.stroke();
             ctx.shadowBlur = 0;
-            // Start/end dots
-            const [s0, s1] = [activity.coords[0], activity.coords[activity.coords.length - 1]];
-            ctx.fillStyle = '#00c46a';
+            // Biała obwódka trasy dla czytelności na jasnym tle
+            ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+            ctx.lineWidth = 8;
             ctx.beginPath();
-            ctx.arc(toX(s0[1]), toY(s0[0]), 8, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#e74c3c';
+            activity.coords.forEach((c, i) => {
+                const x = toCanvasX(c[1]);
+                const y = toCanvasY(c[0]);
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            // Kolorowa linia trasy na wierzch
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.arc(toX(s1[1]), toY(s1[0]), 8, 0, Math.PI * 2);
-            ctx.fill();
+            activity.coords.forEach((c, i) => {
+                const x = toCanvasX(c[1]);
+                const y = toCanvasY(c[0]);
+                i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+            });
+            ctx.stroke();
+            // Punkt startowy (zielony) i końcowy (czerwony)
+            const s0 = activity.coords[0];
+            const s1 = activity.coords[activity.coords.length - 1];
+            const drawDot = (lat, lng, fill) => {
+                const x = toCanvasX(lng), y = toCanvasY(lat);
+                ctx.beginPath();
+                ctx.arc(x, y, 9, 0, Math.PI * 2);
+                ctx.fillStyle = '#fff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, Math.PI * 2);
+                ctx.fillStyle = fill;
+                ctx.fill();
+            };
+            drawDot(s0[0], s0[1], '#00c46a');
+            drawDot(s1[0], s1[1], '#e74c3c');
+            ctx.restore();
+        }
+        else {
+            // Fallback: brak kafelków — rysuj trasę na ciemnym tle jak poprzednio
+            _drawRouteFallback(ctx, activity.coords, color, mapX, mapY, mapW, mapH);
         }
     }
     else {
-        // Brak GPS — wyświetl info
         ctx.font = '20px Manrope, sans-serif';
         ctx.fillStyle = 'rgba(255,255,255,0.3)';
         ctx.textAlign = 'center';
@@ -238,6 +398,42 @@ export async function generateShareImage(activity) {
     link.href = canvas.toDataURL('image/png');
     link.download = `mapty-${activity.sport}-${new Date(activity.date).toISOString().slice(0, 10)}.png`;
     link.click();
+}
+/** Fallback: draw route on dark background (no tiles) */
+function _drawRouteFallback(ctx, coords, color, mapX, mapY, mapW, mapH) {
+    const lats = coords.map(c => c[0]);
+    const lngs = coords.map(c => c[1]);
+    const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+    const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
+    const pad = 40;
+    const scaleX = (mapW - pad * 2) / (maxLng - minLng || 0.001);
+    const scaleY = (mapH - pad * 2) / (maxLat - minLat || 0.001);
+    const scale = Math.min(scaleX, scaleY);
+    const offX = mapX + pad + ((mapW - pad * 2) - (maxLng - minLng) * scale) / 2;
+    const offY = mapY + pad + ((mapH - pad * 2) - (maxLat - minLat) * scale) / 2;
+    const toX = (lng) => offX + (lng - minLng) * scale;
+    const toY = (lat) => offY + (mapH - pad * 2) - (lat - minLat) * scale;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 4;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    coords.forEach((c, i) => {
+        i === 0 ? ctx.moveTo(toX(c[1]), toY(c[0])) : ctx.lineTo(toX(c[1]), toY(c[0]));
+    });
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    const s0 = coords[0], s1 = coords[coords.length - 1];
+    ctx.fillStyle = '#00c46a';
+    ctx.beginPath();
+    ctx.arc(toX(s0[1]), toY(s0[0]), 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e74c3c';
+    ctx.beginPath();
+    ctx.arc(toX(s1[1]), toY(s1[0]), 8, 0, Math.PI * 2);
+    ctx.fill();
 }
 // ── Activity History Panel ────────────────────────────────────────────────────
 export class ActivityHistoryPanel {
