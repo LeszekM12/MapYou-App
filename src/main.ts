@@ -1047,6 +1047,7 @@ class App {
     document.getElementById('trkBtnStart')?.addEventListener('click', () => {
       if (!this.#tracker) return;
       this.#tracker.start();
+      void this._requestWakeLock();
       this._enterTrackingView();
     });
 
@@ -1066,6 +1067,7 @@ class App {
     document.getElementById('trkBtnStop')?.addEventListener('click', () => {
       if (!this.#tracker) return;
       const activity = this.#tracker.stop();
+      void this._releaseWakeLock();
       this._exitTrackingView();
       if (!activity) return;
       showGoodJobSplash(() => {
@@ -1085,6 +1087,7 @@ class App {
     document.getElementById('trkBtnDiscard')?.addEventListener('click', () => {
       if (!confirm('Discard activity?')) return;
       this.#tracker?.reset();
+      void this._releaseWakeLock();
       this._exitTrackingView();
     });
   }
@@ -1100,12 +1103,14 @@ class App {
     if (histBtn) histBtn.style.display = 'none';
     document.getElementById('tabMap')?.classList.add('tab-panel--active');
     document.getElementById('trackerOverlay')?.classList.remove('hidden');
+    document.getElementById('routeMiniPill')?.classList.add('pill--above-tracker');
     this._setTrackingState('active');
     setTimeout(() => window.app.invalidateMapSize(), 150);
   }
 
   _exitTrackingView(): void {
     document.getElementById('trackerOverlay')?.classList.add('hidden');
+    document.getElementById('routeMiniPill')?.classList.remove('pill--above-tracker');
     document.getElementById('tabMap')?.classList.remove('tab-panel--active');
     const nav = document.querySelector<HTMLElement>('.bottom-nav');
     if (nav) nav.style.display = '';
@@ -1941,15 +1946,20 @@ window.app = new App();
     const t = document.getElementById('routeTime')?.textContent;
     if (distEl) distEl.textContent = d ?? '—';
     if (timeEl) timeEl.textContent = t ?? '—';
-    const hasRoute  = !document.getElementById('routeResult')?.classList.contains('hidden');
-    const collapsed = !!document.querySelector('#tabWorkouts .tab-scroll.tab-scroll--collapsed');
-    pill?.classList.toggle('hidden', !(hasRoute && collapsed));
+    const hasRoute = !document.getElementById('routeResult')?.classList.contains('hidden');
+    // Widoczny gdy: aktywna zakładka ma zwinięty pasek LUB tracker jest aktywny
+    const activePanel = document.querySelector('.tab-panel--active');
+    const collapsed = !!activePanel?.querySelector('.tab-scroll.tab-scroll--collapsed');
+    const trackerActive = !document.getElementById('trackerOverlay')?.classList.contains('hidden');
+    pill?.classList.toggle('hidden', !(hasRoute && (collapsed || trackerActive)));
   }
   const obs = new MutationObserver(sync);
   const rr = document.getElementById('routeResult');
   if (rr) obs.observe(rr, { attributes: true });
-  const sc = document.querySelector('#tabWorkouts .tab-scroll');
-  if (sc) obs.observe(sc, { attributes: true });
+  document.querySelectorAll('.tab-scroll').forEach(sc => obs.observe(sc, { attributes: true }));
+  document.querySelectorAll('.tab-panel').forEach(p => obs.observe(p, { attributes: true }));
+  const trackerOv = document.getElementById('trackerOverlay');
+  if (trackerOv) obs.observe(trackerOv, { attributes: true });
 })();
 
 // ─── WEATHER (delegated to WeatherWidget module) ──────────────────────────────

@@ -2460,3 +2460,8 @@ body {
         overflow: hidden;
     }
 }
+
+/* ── Route mini pill nad tracker overlay ── */
+.route-mini-pill.pill--above-tracker {
+    bottom: 30vh;
+}
