@@ -19,7 +19,7 @@ import { MAPBOX_TOKEN } from './config.js';
 import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
 import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryBtn, } from './modules/OfflineDetector.js';
-import { initWeatherWidget } from './modules/WeatherWidget.js';
+import { initWeatherComponents } from './modules/initWeatherComponents.js';
 import { loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, } from './modules/PushNotifications.js';
 import { Tracker, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
@@ -2193,6 +2193,6 @@ window.app = new App();
     if (trackerOv)
         obs.observe(trackerOv, { attributes: true });
 })();
-// ─── WEATHER (delegated to WeatherWidget module) ──────────────────────────────
-initWeatherWidget();
+// ─── WEATHER COMPONENTS (top bar + modal) ────────────────────────────────────
+void initWeatherComponents(document.body);
 //# sourceMappingURL=main.js.map

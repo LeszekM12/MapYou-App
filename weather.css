@@ -1,0 +1,447 @@
+/* ─── WEATHER COMPONENTS — CSS ───────────────────────────────────────────────
+   Dark, premium, iOS-like glassmorphism.
+   Import once in your main stylesheet or index.html.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+/* ── CSS Variables ─────────────────────────────────────────────────────────── */
+:root {
+  --w-bg-base:       #0f1114;
+  --w-bg-sheet:      #16191e;
+  --w-bg-card:       #1e2229;
+  --w-bg-card-hover: #252b34;
+  --w-border:        rgba(255,255,255,0.07);
+  --w-green:         #4ade80;
+  --w-green-dim:     #22c55e;
+  --w-text-primary:  #f0f4f8;
+  --w-text-secondary:#8b95a1;
+  --w-text-muted:    #4e5a65;
+  --w-radius-sm:     10px;
+  --w-radius-md:     16px;
+  --w-radius-lg:     24px;
+  --w-shadow-sheet:  0 -8px 48px rgba(0,0,0,0.55), 0 -2px 12px rgba(0,0,0,0.3);
+  --w-font:          'Manrope', 'SF Pro Display', system-ui, sans-serif;
+  --w-ease:          cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TOP BAR
+══════════════════════════════════════════════════════════════════════════════ */
+
+.wtb {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+  width:           100%;
+  height:          52px;
+  padding:         0 16px;
+  background:      rgba(15, 17, 20, 0.82);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom:   1px solid var(--w-border);
+  cursor:          pointer;
+  user-select:     none;
+  font-family:     var(--w-font);
+  position:        relative;
+  z-index:         900;
+  transition:      background 0.2s ease;
+}
+
+.wtb:hover  { background: rgba(22, 25, 30, 0.92); }
+.wtb:active { background: rgba(30, 34, 41, 0.95); }
+
+/* Left — location */
+.wtb__left {
+  display:     flex;
+  align-items: center;
+  gap:         5px;
+  flex:        1;
+  min-width:   0;
+}
+.wtb__pin      { font-size: 13px; flex-shrink: 0; }
+.wtb__location {
+  font-size:     13px;
+  font-weight:   500;
+  color:         var(--w-text-secondary);
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.01em;
+}
+
+/* Center — logo */
+.wtb__center {
+  display:         flex;
+  align-items:     center;
+  gap:             6px;
+  flex-shrink:     0;
+}
+.wtb__brand {
+  font-size:   15px;
+  font-weight: 800;
+  color:       var(--w-text-primary);
+  letter-spacing: -0.02em;
+}
+
+/* Right — weather */
+.wtb__right {
+  display:     flex;
+  align-items: center;
+  gap:         5px;
+  flex:        1;
+  justify-content: flex-end;
+  min-width:   0;
+}
+.wtb__wicon { font-size: 18px; flex-shrink: 0; }
+.wtb__temp  {
+  font-size:   14px;
+  font-weight: 700;
+  color:       var(--w-text-primary);
+  flex-shrink: 0;
+}
+.wtb__desc  {
+  font-size:     12px;
+  color:         var(--w-text-secondary);
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+}
+
+/* Hide description on very small screens */
+@media (max-width: 380px) {
+  .wtb__desc     { display: none; }
+  .wtb__location { max-width: 90px; }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MODAL OVERLAY
+══════════════════════════════════════════════════════════════════════════════ */
+
+.wm-overlay {
+  position:   fixed;
+  inset:      0;
+  z-index:    2000;
+  background: rgba(0, 0, 0, 0);
+  pointer-events: none;
+  transition: background 0.3s ease;
+}
+
+.wm-overlay--visible {
+  background:     rgba(0, 0, 0, 0.6);
+  pointer-events: all;
+}
+
+/* ── Bottom sheet ──────────────────────────────────────────────────────────── */
+
+.wm-sheet {
+  position:        absolute;
+  bottom:          0;
+  left:            0;
+  right:           0;
+  max-height:      92dvh;
+  background:      var(--w-bg-sheet);
+  border-radius:   var(--w-radius-lg) var(--w-radius-lg) 0 0;
+  box-shadow:      var(--w-shadow-sheet);
+  transform:       translateY(100%);
+  transition:      transform 0.38s var(--w-ease);
+  display:         flex;
+  flex-direction:  column;
+  overflow:        hidden;
+  font-family:     var(--w-font);
+  will-change:     transform;
+}
+
+.wm-sheet--open {
+  transform: translateY(0);
+}
+
+/* Handle */
+.wm-handle {
+  width:         40px;
+  height:        4px;
+  background:    var(--w-text-muted);
+  border-radius: 2px;
+  margin:        12px auto 0;
+  flex-shrink:   0;
+  cursor:        grab;
+}
+.wm-handle:active { cursor: grabbing; }
+
+/* ── Header ────────────────────────────────────────────────────────────────── */
+
+.wm-header {
+  display:         flex;
+  align-items:     center;
+  justify-content: space-between;
+  gap:             8px;
+  padding:         14px 18px 14px;
+  border-bottom:   1px solid var(--w-border);
+  flex-shrink:     0;
+  position:        relative;
+}
+
+.wm-header__location {
+  display:     flex;
+  align-items: center;
+  gap:         5px;
+  flex:        1;
+  min-width:   0;
+}
+.wm-header__pin  { font-size: 13px; flex-shrink: 0; }
+.wm-header__city {
+  font-size:     13px;
+  font-weight:   500;
+  color:         var(--w-text-secondary);
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+}
+
+.wm-header__logo {
+  display:     flex;
+  align-items: center;
+  gap:         6px;
+  flex-shrink: 0;
+}
+.wm-header__brand {
+  font-size:      16px;
+  font-weight:    800;
+  color:          var(--w-text-primary);
+  letter-spacing: -0.02em;
+}
+
+.wm-header__weather {
+  display:     flex;
+  align-items: center;
+  gap:         5px;
+  flex:        1;
+  justify-content: flex-end;
+  min-width:   0;
+}
+.wm-header__wicon { font-size: 22px; flex-shrink: 0; }
+.wm-header__temp  {
+  font-size:   18px;
+  font-weight: 800;
+  color:       var(--w-text-primary);
+  flex-shrink: 0;
+}
+.wm-header__desc  {
+  font-size:     12px;
+  color:         var(--w-text-secondary);
+  white-space:   nowrap;
+  overflow:      hidden;
+  text-overflow: ellipsis;
+}
+
+.wm-close {
+  position:   absolute;
+  top:        10px;
+  right:      14px;
+  background: var(--w-bg-card);
+  border:     none;
+  color:      var(--w-text-secondary);
+  font-size:  14px;
+  width:      28px;
+  height:     28px;
+  border-radius: 50%;
+  cursor:     pointer;
+  display:    flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.wm-close:hover { background: var(--w-bg-card-hover); color: var(--w-text-primary); }
+
+/* ── Scrollable body ───────────────────────────────────────────────────────── */
+
+.wm-body {
+  overflow-y:  auto;
+  flex:        1;
+  padding:     0 0 env(safe-area-inset-bottom, 16px);
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.wm-body::-webkit-scrollbar { display: none; }
+
+/* ── Section wrapper ───────────────────────────────────────────────────────── */
+
+.wm-section {
+  padding:       16px 18px;
+  border-bottom: 1px solid var(--w-border);
+}
+.wm-section:last-child { border-bottom: none; }
+
+.wm-section__title {
+  font-size:      11px;
+  font-weight:    600;
+  color:          var(--w-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin:         0 0 12px;
+}
+
+/* ── Stats grid ────────────────────────────────────────────────────────────── */
+
+.wm-stats { display: flex; flex-direction: column; gap: 2px; }
+
+.wm-stats__row {
+  display:         grid;
+  grid-template-columns: 24px 1fr auto;
+  align-items:     center;
+  gap:             10px;
+  padding:         10px 14px;
+  background:      var(--w-bg-card);
+  border-radius:   var(--w-radius-sm);
+  transition:      background 0.15s;
+}
+.wm-stats__row:hover { background: var(--w-bg-card-hover); }
+
+.wm-stats__icon  { font-size: 16px; text-align: center; }
+.wm-stats__label {
+  font-size:   13px;
+  font-weight: 500;
+  color:       var(--w-text-secondary);
+}
+.wm-stats__value {
+  font-size:   13px;
+  font-weight: 700;
+  color:       var(--w-text-primary);
+  text-align:  right;
+}
+
+/* ── Hourly forecast ───────────────────────────────────────────────────────── */
+
+.wm-hourly {
+  display:    flex;
+  gap:        8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+}
+.wm-hourly::-webkit-scrollbar { display: none; }
+
+.wm-hourly__item {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            6px;
+  padding:        12px 14px;
+  background:     var(--w-bg-card);
+  border-radius:  var(--w-radius-md);
+  min-width:      62px;
+  flex-shrink:    0;
+  transition:     background 0.15s;
+}
+.wm-hourly__item:hover { background: var(--w-bg-card-hover); }
+
+.wm-hourly__time { font-size: 11px; font-weight: 600; color: var(--w-text-muted); }
+.wm-hourly__icon { font-size: 22px; }
+.wm-hourly__temp { font-size: 14px; font-weight: 700; color: var(--w-text-primary); }
+
+/* ── Daily forecast ────────────────────────────────────────────────────────── */
+
+.wm-daily { display: flex; flex-direction: column; gap: 4px; }
+
+.wm-daily__row {
+  display:         grid;
+  grid-template-columns: 48px 1fr auto;
+  align-items:     center;
+  gap:             12px;
+  padding:         11px 14px;
+  background:      var(--w-bg-card);
+  border-radius:   var(--w-radius-sm);
+  transition:      background 0.15s;
+}
+.wm-daily__row:hover { background: var(--w-bg-card-hover); }
+
+.wm-daily__day  { font-size: 13px; font-weight: 600; color: var(--w-text-secondary); }
+.wm-daily__icon { font-size: 20px; text-align: center; }
+
+.wm-daily__range { display: flex; align-items: center; gap: 3px; justify-content: flex-end; }
+.wm-daily__max   { font-size: 14px; font-weight: 700; color: var(--w-text-primary); }
+.wm-daily__sep   { font-size: 12px; color: var(--w-text-muted); }
+.wm-daily__min   { font-size: 14px; font-weight: 500; color: var(--w-text-muted); }
+
+/* ── Sunrise / Sunset bar ──────────────────────────────────────────────────── */
+
+.wm-sun {
+  display:     flex;
+  align-items: center;
+  gap:         12px;
+}
+
+.wm-sun__time {
+  font-size:   13px;
+  font-weight: 600;
+  color:       var(--w-text-secondary);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.wm-sun__bar  { flex: 1; padding: 8px 0; }
+
+.wm-sun__track {
+  height:        4px;
+  background:    var(--w-bg-card);
+  border-radius: 2px;
+  position:      relative;
+  overflow:      visible;
+}
+
+.wm-sun__dot {
+  position:     absolute;
+  top:          50%;
+  transform:    translate(-50%, -50%);
+  width:        14px;
+  height:       14px;
+  background:   linear-gradient(135deg, #fbbf24, #f59e0b);
+  border-radius: 50%;
+  box-shadow:   0 0 10px rgba(251,191,36,0.6);
+  transition:   left 0.5s var(--w-ease);
+  /* Keep dot within the track */
+  left: clamp(7px, var(--left, 50%), calc(100% - 7px));
+}
+
+/* ── Run advice ────────────────────────────────────────────────────────────── */
+
+.wm-advice {
+  padding:       14px 16px;
+  border-radius: var(--w-radius-md);
+  border-left:   3px solid transparent;
+}
+
+.wm-advice--ideal {
+  background:   rgba(74, 222, 128, 0.08);
+  border-color: var(--w-green);
+}
+.wm-advice--warn {
+  background:   rgba(251, 191, 36, 0.08);
+  border-color: #fbbf24;
+}
+
+.wm-advice__title {
+  font-size:   14px;
+  font-weight: 700;
+  color:       var(--w-text-primary);
+  margin:      0 0 4px;
+}
+.wm-advice__detail {
+  font-size:   13px;
+  color:       var(--w-text-secondary);
+  margin:      0;
+  line-height: 1.5;
+}
+
+/* ── Responsive adjustments ────────────────────────────────────────────────── */
+
+@media (max-width: 380px) {
+  .wm-header__desc { display: none; }
+  .wm-header__city { max-width: 80px; }
+  .wm-header__brand { display: none; }
+}
+
+@media (min-width: 600px) {
+  .wm-sheet     { max-width: 540px; margin: 0 auto; border-radius: var(--w-radius-lg); bottom: 24px; }
+  .wm-stats     { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+}
