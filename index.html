@@ -14,6 +14,7 @@
     <link rel="manifest" href="public/manifest.json">
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="style.css"/>
+    <link rel="stylesheet" href="weather.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
           integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
           crossorigin=""/>
@@ -133,11 +134,16 @@
 
 <div id="tabWorkouts" class="tab-panel tab-panel--active">
     <div class="tab-scroll">
-        <div class="tab-header">
-            <img src="public/logo.png" alt="Mapty logo" class="logo"/>
-            <div class="weather-widget" id="weatherWidget">
-                <span class="weather-widget__icon" id="wIcon">—</span>
-                <span class="weather-widget__sun" id="wSunset">—</span>
+        <div class="tab-header" id="weatherTopBar" role="button" tabindex="0" aria-label="Open weather details">
+            <div class="tab-header__location">
+                <span class="tab-header__pin">📍</span>
+                <span class="tab-header__city" id="bnwLocation">—</span>
+            </div>
+            <img src="public/logo.png" alt="MapYou logo" class="logo"/>
+            <div class="tab-header__weather">
+                <span class="tab-header__wicon" id="bnwIcon">—</span>
+                <span class="tab-header__temp"  id="bnwTemp">—</span>
+                <span class="tab-header__desc"  id="bnwDesc"></span>
             </div>
         </div>
         <!-- Desktop search (hidden on mobile via CSS) -->
@@ -481,7 +487,6 @@
         </svg>
         <span class="bottom-nav__label">Track</span>
     </button>
-    
 </nav>
 
 <div class="ios-install-banner hidden" id="iosInstallBanner">

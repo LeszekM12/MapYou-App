@@ -2465,3 +2465,64 @@ body {
 .route-mini-pill.pill--above-tracker {
     bottom: 30vh;
 }
+
+/* ─── TAB-HEADER WEATHER BAR ──────────────────────────────────────────────────
+   📍 Elbląg, Poland    [logo]    ☀️ 13°C  Clear sky
+   ─────────────────────────────────────────────────────────────────────────── */
+
+#weatherTopBar {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: opacity 0.15s;
+    user-select: none;
+}
+#weatherTopBar:active { opacity: 0.75; }
+
+/* Left — location */
+.tab-header__location {
+    display:     flex;
+    align-items: center;
+    gap:         0.35rem;
+    flex:        1;
+    min-width:   0;
+}
+.tab-header__pin  { font-size: 1.2rem; flex-shrink: 0; }
+.tab-header__city {
+    font-size:     1.2rem;
+    font-weight:   600;
+    color:         rgba(255,255,255,0.5);
+    white-space:   nowrap;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+}
+
+/* Right — weather */
+.tab-header__weather {
+    display:         flex;
+    align-items:     center;
+    justify-content: flex-end;
+    gap:             0.4rem;
+    flex:            1;
+    min-width:       0;
+}
+.tab-header__wicon { font-size: 1.8rem; flex-shrink: 0; line-height: 1; }
+.tab-header__temp  {
+    font-size:   1.4rem;
+    font-weight: 800;
+    color:       var(--color-light--1);
+    letter-spacing: -0.02em;
+    flex-shrink: 0;
+}
+.tab-header__desc  {
+    font-size:     1.1rem;
+    color:         rgba(255,255,255,0.45);
+    white-space:   nowrap;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+}
+
+/* Narrow screens — hide description */
+@media (max-width: 380px) {
+    .tab-header__desc { display: none; }
+    .tab-header__city { max-width: 8rem; }
+}

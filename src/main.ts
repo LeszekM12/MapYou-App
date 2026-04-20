@@ -14,7 +14,7 @@ import {
   NetState, showSkeleton, startMapTimeout,
   initOnlineDetector, initRetryBtn,
 } from './modules/OfflineDetector.js';
-import { initWeatherWidget } from './modules/WeatherWidget.js';
+import { initWeatherComponents } from './modules/initWeatherComponents.js';
 import {
   loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB,
   clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB,
@@ -1962,5 +1962,5 @@ window.app = new App();
   if (trackerOv) obs.observe(trackerOv, { attributes: true });
 })();
 
-// ─── WEATHER (delegated to WeatherWidget module) ──────────────────────────────
-initWeatherWidget();
+// ─── WEATHER COMPONENTS (top bar + modal) ────────────────────────────────────
+void initWeatherComponents();
