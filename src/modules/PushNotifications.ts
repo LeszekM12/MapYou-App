@@ -269,6 +269,10 @@ export async function sendLongBreakPush(): Promise<boolean> {
   return false;
 }
 
+export async function sendArrivedAtDestinationPush(): Promise<void> {
+  await sendPushToSelf('Dotarłeś na miejsce! 🎯', 'Chcesz zapisać trasę? Wróć do aplikacji.');
+}
+
 export async function sendWeatherPush(): Promise<void> {
   const KEY = 'mapty_last_weather_push';
   const now  = Date.now();

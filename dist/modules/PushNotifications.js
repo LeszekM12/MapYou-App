@@ -231,6 +231,9 @@ export async function sendLongBreakPush() {
     }
     return false;
 }
+export async function sendArrivedAtDestinationPush() {
+    await sendPushToSelf('Dotarłeś na miejsce! 🎯', 'Chcesz zapisać trasę? Wróć do aplikacji.');
+}
 export async function sendWeatherPush() {
     const KEY = 'mapty_last_weather_push';
     const now = Date.now();
