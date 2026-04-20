@@ -1,5 +1,5 @@
 /**
- * main.ts — Mapty TypeScript
+ * main.ts — MapYou TypeScript
  * Exact 1:1 translation of script.js.
  * Only types added — zero logic changes.
  */

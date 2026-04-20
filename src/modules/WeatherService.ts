@@ -14,7 +14,8 @@ import type { Coords } from '../types/index.js';
 
 interface WmoInfo { icon: string; description: string }
 
-const WMO: Record<number, WmoInfo> = {
+// Day icons
+const WMO_DAY: Record<number, WmoInfo> = {
   0:  { icon: '☀️',  description: 'Clear sky' },
   1:  { icon: '🌤️', description: 'Mainly clear' },
   2:  { icon: '⛅',  description: 'Partly cloudy' },
@@ -41,7 +42,18 @@ const WMO: Record<number, WmoInfo> = {
   99: { icon: '⛈️',  description: 'Thunderstorm + heavy hail' },
 };
 
-export function wmoInfo(code: number): WmoInfo {
+// Night icons — codes 0-2 get moon variants, rest stays the same
+const WMO_NIGHT: Record<number, WmoInfo> = {
+  ...WMO_DAY,
+  0:  { icon: '🌙',  description: 'Clear night' },
+  1:  { icon: '🌙',  description: 'Mainly clear' },
+  2:  { icon: '🌑',  description: 'Partly cloudy' },
+  3:  { icon: '☁️',  description: 'Overcast' },
+};
+
+/** Returns icon + description, using night variants when isNight=true */
+export function wmoInfo(code: number, isNight = false): WmoInfo {
+  const WMO = isNight ? WMO_NIGHT : WMO_DAY;
   if (WMO[code]) return WMO[code];
   if (code <= 1)  return WMO[1];
   if (code <= 3)  return WMO[3];
@@ -52,6 +64,16 @@ export function wmoInfo(code: number): WmoInfo {
   if (code <= 82) return WMO[82];
   if (code <= 86) return WMO[86];
   return WMO[95];
+}
+
+// ── Night detection ───────────────────────────────────────────────────────────
+
+/** Returns true if current time is before sunrise or after sunset */
+export function isNightTime(sunriseISO: string, sunsetISO: string): boolean {
+  const now  = Date.now();
+  const rise = new Date(sunriseISO).getTime();
+  const set_ = new Date(sunsetISO).getTime();
+  return now < rise || now > set_;
 }
 
 // ── UV index label ────────────────────────────────────────────────────────────
@@ -176,7 +198,9 @@ export async function fetchWeatherFull(coords: Coords): Promise<WeatherData> {
   const raw = await meteoRes.json() as OpenMeteoFull;
 
   const c = raw.current;
-  const info = wmoInfo(c.weathercode);
+  // Detect night using today's sunrise/sunset
+  const night = isNightTime(raw.daily.sunrise[0], raw.daily.sunset[0]);
+  const info  = wmoInfo(c.weathercode, night);
 
   const current: WeatherCurrent = {
     temp:        Math.round(c.temperature_2m),
@@ -205,10 +229,11 @@ export async function fetchWeatherFull(coords: Coords): Promise<WeatherData> {
   for (let i = 0; i < raw.hourly.time.length && hourly.length < 6; i++) {
     const h = new Date(raw.hourly.time[i]).getHours();
     if (new Date(raw.hourly.time[i]) > new Date()) {
+      const hNight = isNightTime(raw.daily.sunrise[0], raw.daily.sunset[0]);
       hourly.push({
         time:        fmtTime(raw.hourly.time[i]),
         temp:        Math.round(raw.hourly.temperature_2m[i]),
-        icon:        wmoInfo(raw.hourly.weathercode[i]).icon,
+        icon:        wmoInfo(raw.hourly.weathercode[i], hNight).icon,
         weatherCode: raw.hourly.weathercode[i],
       });
     }
