@@ -143,7 +143,10 @@
             <div class="tab-header__weather">
                 <span class="tab-header__wicon" id="bnwIcon">—</span>
                 <span class="tab-header__temp"  id="bnwTemp">—</span>
-                <span class="tab-header__desc"  id="bnwDesc"></span>
+                <div class="tab-header__weather-text">
+                    <span class="tab-header__desc"   id="bnwDesc"></span>
+                    <span class="tab-header__feels"  id="bnwFeels"></span>
+                </div>
             </div>
         </div>
         <!-- Desktop search (hidden on mobile via CSS) -->
@@ -284,12 +287,8 @@
 <!-- TAB 2: STATS -->
 <div id="tabStats" class="tab-panel">
     <div class="tab-scroll">
-        <div class="tab-header">
-            <img src="public/logo.png" alt="Mapty logo" class="logo"/>
-            <div class="weather-widget" id="weatherWidgetStats">
-                <span class="weather-widget__icon" id="wIconStats">—</span>
-                <span class="weather-widget__sun" id="wSunsetStats">—</span>
-            </div>
+        <div class="tab-header tab-header--logo-only">
+            <img src="public/logo.png" alt="MapYou logo" class="logo"/>
         </div>
         <div class="stats-panel" id="statsPanel">
             <div class="stats-panel__label">THIS WEEK'S SUMMARY</div>

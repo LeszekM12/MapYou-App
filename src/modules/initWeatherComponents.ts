@@ -24,10 +24,13 @@ function updateBottomBar(data: WeatherData): void {
   const temp = document.getElementById('bnwTemp');
   const desc = document.getElementById('bnwDesc');
 
-  if (loc)  loc.textContent  = data.location;
-  if (icon) icon.textContent = data.current.icon;
-  if (temp) temp.textContent = `${data.current.temp}°C`;
-  if (desc) desc.textContent = `${data.current.description} · Feels ${data.current.feelsLike}°`;
+  const feels = document.getElementById('bnwFeels');
+
+  if (loc)    loc.textContent    = data.location;
+  if (icon)   icon.textContent   = data.current.icon;
+  if (temp)   temp.textContent   = `${data.current.temp}°C`;
+  if (desc)   desc.textContent   = data.current.description;
+  if (feels)  feels.textContent  = `Feels ${data.current.feelsLike}°`;
 }
 
 // ── Wire bottom bar click → open modal ───────────────────────────────────────

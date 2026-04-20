@@ -2526,3 +2526,49 @@ body {
     .tab-header__desc { display: none; }
     .tab-header__city { max-width: 8rem; }
 }
+
+/* ─── TAB-HEADER WEATHER — two-line layout ───────────────────────────────────
+   ☀️  13°C  ┌ Clear sky
+             └ Feels 7°
+   ─────────────────────────────────────────────────────────────────────────── */
+
+/* Weather right block: icon + temp + two-line text */
+.tab-header__weather {
+    display:     flex;
+    align-items: center;
+    gap:         0.4rem;
+    flex:        1;
+    justify-content: flex-end;
+    min-width:   0;
+}
+
+/* Two-line text column */
+.tab-header__weather-text {
+    display:        flex;
+    flex-direction: column;
+    align-items:    flex-start;
+    min-width:      0;
+    line-height:    1.25;
+}
+
+.tab-header__desc {
+    font-size:     1.15rem;
+    font-weight:   600;
+    color:         rgba(255,255,255,0.55);
+    white-space:   nowrap;
+    overflow:      hidden;
+    text-overflow: ellipsis;
+    max-width:     10rem;
+}
+
+.tab-header__feels {
+    font-size:     1.05rem;
+    font-weight:   500;
+    color:         rgba(255,255,255,0.35);
+    white-space:   nowrap;
+}
+
+/* Stats tab — center logo only */
+.tab-header--logo-only {
+    justify-content: center !important;
+}
