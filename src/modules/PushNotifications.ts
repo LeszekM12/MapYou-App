@@ -1,10 +1,69 @@
-// ─── PUSH NOTIFICATIONS MODULE ───────────────────────────────────────────────
-// Plik: src/modules/PushNotifications.ts
-// Importuj i wywołaj initPushNotifications() po załadowaniu mapy.
+// ─── PUSH NOTIFICATIONS — FRONTEND ───────────────────────────────────────────
+// src/modules/PushNotifications.ts
+//
+// KLUCZOWA ZMIANA:
+//   • Każda przeglądarka generuje UUID userId i UUID deviceId przy pierwszym
+//     uruchomieniu i trzyma je w localStorage na stałe.
+//   • Subskrypcja jest wysyłana do backendu razem z userId + deviceId.
+//   • Powiadomienia są wysyłane TYLKO do tego userId (jego urządzeń).
+//   • Brak broadcastu — inne urządzenia/użytkownicy NIC nie dostają.
+//
+// Architektura identyfikatorów:
+//   userId   — reprezentuje "tę osobę" na wszystkich jej urządzeniach
+//   deviceId — reprezentuje "tę konkretną przeglądarkę/urządzenie"
+//   Klucz subskrypcji w DB = userId:deviceId (unikalny per urządzenie)
 
-const BACKEND_URL = 'https://mapty-backend-lexb.onrender.com';
+import { BACKEND_URL } from '../config.js';
 
-// ── Helper: konwersja base64 → Uint8Array (wymagane przez pushManager) ────────
+// ── Stałe ─────────────────────────────────────────────────────────────────────
+
+const LS_USER_ID   = 'mapty_userId';
+const LS_DEVICE_ID = 'mapty_deviceId';
+
+// ── UUID generator (crypto API — dostępna w każdej nowoczesnej przeglądarce) ──
+
+function generateUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback dla starszych przeglądarek
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+}
+
+// ── Pobierz lub utwórz identyfikatory ─────────────────────────────────────────
+
+/**
+ * Zwraca stały UUID użytkownika.
+ * Tworzony raz przy pierwszym uruchomieniu, potem zawsze ten sam.
+ */
+export function getUserId(): string {
+  let id = localStorage.getItem(LS_USER_ID);
+  if (!id) {
+    id = generateUUID();
+    localStorage.setItem(LS_USER_ID, id);
+    console.log(`[Push] New userId created: ${id}`);
+  }
+  return id;
+}
+
+/**
+ * Zwraca stały UUID urządzenia (tej konkretnej przeglądarki).
+ * Tworzony raz przy pierwszym uruchomieniu, potem zawsze ten sam.
+ */
+export function getDeviceId(): string {
+  let id = localStorage.getItem(LS_DEVICE_ID);
+  if (!id) {
+    id = generateUUID();
+    localStorage.setItem(LS_DEVICE_ID, id);
+    console.log(`[Push] New deviceId created: ${id}`);
+  }
+  return id;
+}
+
+// ── Helper: base64 → Uint8Array ───────────────────────────────────────────────
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
@@ -13,113 +72,100 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
 }
 
-// ── Krok 1: Rejestracja push-sw.js ───────────────────────────────────────────
+// ── Rejestracja Service Workera ───────────────────────────────────────────────
 
 async function registerPushSW(): Promise<ServiceWorkerRegistration | null> {
-  if (!('serviceWorker' in navigator)) {
-    console.warn('[Push] Service Worker not supported');
-    return null;
-  }
-
+  if (!('serviceWorker' in navigator)) return null;
   try {
-    // Rejestruj push-sw.js obok głównego sw.js
-    // Ścieżka relative do lokalizacji aplikacji (działa zarówno na GitHub Pages jak i lokalnie)
     const swPath = new URL('push-sw.js', window.location.href).pathname;
-    const reg = await navigator.serviceWorker.register(swPath, {
+    return await navigator.serviceWorker.register(swPath, {
       scope: new URL('./', window.location.href).pathname,
     });
-    console.log('[Push] push-sw.js registered, scope:', reg.scope);
-    return reg;
   } catch (err) {
     console.error('[Push] SW registration failed:', err);
     return null;
   }
 }
 
-// ── Krok 2: Pobierz klucz VAPID z backendu ────────────────────────────────────
+// ── Pobierz klucz VAPID ───────────────────────────────────────────────────────
 
 async function fetchVapidPublicKey(): Promise<string | null> {
   try {
     const res  = await fetch(`${BACKEND_URL}/push/vapid-public-key`);
     const data = await res.json() as { publicKey: string };
-    console.log('[Push] VAPID public key fetched');
     return data.publicKey;
-  } catch (err) {
-    console.error('[Push] Failed to fetch VAPID key:', err);
+  } catch {
     return null;
   }
 }
 
-// ── Krok 3: Poproś o zgodę na powiadomienia ───────────────────────────────────
+// ── Wyślij subskrypcję do backendu (z userId + deviceId) ─────────────────────
 
-async function requestPermission(): Promise<boolean> {
-  const permission = await Notification.requestPermission();
-  if (permission !== 'granted') {
-    console.warn('[Push] Notification permission denied:', permission);
-    return false;
-  }
-  console.log('[Push] Notification permission granted');
-  return true;
-}
-
-// ── Krok 4: Utwórz subskrypcję push ──────────────────────────────────────────
-
-async function subscribeToPush(
-  reg:           ServiceWorkerRegistration,
-  vapidPublicKey: string,
-): Promise<PushSubscription | null> {
-  try {
-    // Sprawdź czy już jest aktywna subskrypcja
-    const existing = await reg.pushManager.getSubscription();
-    if (existing) {
-      console.log('[Push] Already subscribed');
-      return existing;
-    }
-
-    const subscription = await reg.pushManager.subscribe({
-      userVisibleOnly:      true,
-      applicationServerKey: urlBase64ToUint8Array(vapidPublicKey).buffer as ArrayBuffer,
-    });
-
-    console.log('[Push] New subscription created');
-    return subscription;
-  } catch (err) {
-    console.error('[Push] Subscribe failed:', err);
-    return null;
-  }
-}
-
-// ── Krok 5: Wyślij subskrypcję do backendu ────────────────────────────────────
-
-async function sendSubscriptionToBackend(subscription: PushSubscription): Promise<boolean> {
+async function sendSubscriptionToBackend(
+  subscription: PushSubscription,
+  userId:       string,
+  deviceId:     string,
+): Promise<boolean> {
   try {
     const res = await fetch(`${BACKEND_URL}/push/subscribe`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(subscription),
+      // WAŻNE: wysyłamy userId i deviceId razem z subskrypcją
+      body: JSON.stringify({
+        userId,
+        deviceId,
+        ...subscription.toJSON(),
+      }),
     });
-
-    const data = await res.json() as { status: string; message: string; id?: string };
-
-    if (!res.ok) {
-      console.error('[Push] Backend rejected subscription:', data.message);
-      return false;
-    }
-
-    console.log('[Push] Subscription sent to backend:', data.message, data.id);
-    return true;
-  } catch (err) {
-    console.error('[Push] Failed to send subscription:', err);
+    return res.ok;
+  } catch {
     return false;
   }
 }
 
-// ── Krok 6: Wyrejestruj subskrypcję ──────────────────────────────────────────
+// ── Główna inicjalizacja ──────────────────────────────────────────────────────
+//
+// Wywołaj tę funkcję dopiero gdy użytkownik kliknie "Enable notifications"
+// (nie automatycznie przy starcie — przeglądarki blokują automatyczne prośby).
+
+export async function initPushNotifications(): Promise<void> {
+  if (!('Notification' in window) || !('PushManager' in window)) return;
+  if (Notification.permission === 'denied') return;
+
+  const reg = await registerPushSW();
+  if (!reg) return;
+
+  const vapidKey = await fetchVapidPublicKey();
+  if (!vapidKey) return;
+
+  if (Notification.permission !== 'granted') {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') return;
+  }
+
+  // Sprawdź czy istnieje już subskrypcja
+  let subscription = await reg.pushManager.getSubscription();
+
+  if (!subscription) {
+    subscription = await reg.pushManager.subscribe({
+      userVisibleOnly:      true,
+      applicationServerKey: urlBase64ToUint8Array(vapidKey).buffer as ArrayBuffer,
+    });
+  }
+
+  const userId   = getUserId();
+  const deviceId = getDeviceId();
+
+  await sendSubscriptionToBackend(subscription, userId, deviceId);
+  console.log(`[Push] Subscribed: userId=${userId} deviceId=${deviceId}`);
+}
+
+// ── Wyrejestrowanie ───────────────────────────────────────────────────────────
 
 export async function unsubscribeFromPush(): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
-
-  const reg = await navigator.serviceWorker.getRegistration(new URL('push-sw.js', window.location.href).pathname);
+  const swPath = new URL('push-sw.js', window.location.href).pathname;
+  const reg    = await navigator.serviceWorker.getRegistration(swPath);
   if (!reg) return;
 
   const sub = await reg.pushManager.getSubscription();
@@ -130,177 +176,132 @@ export async function unsubscribeFromPush(): Promise<void> {
     await fetch(`${BACKEND_URL}/push/unsubscribe`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ endpoint: sub.endpoint }),
+      body:    JSON.stringify({
+        userId:   getUserId(),
+        deviceId: getDeviceId(),
+      }),
     });
   } catch { /* ignoruj błąd sieciowy */ }
 
-  // Usuń lokalnie
   await sub.unsubscribe();
   console.log('[Push] Unsubscribed');
 }
 
-// ── Główna funkcja — wywołaj ją po załadowaniu aplikacji ─────────────────────
+// ── Re-subskrypcja po restarcie backendu ──────────────────────────────────────
 
-export async function initPushNotifications(): Promise<void> {
-  // Sprawdź wsparcie przeglądarki
-  if (!('Notification' in window)) {
-    console.warn('[Push] Notifications not supported');
-    return;
-  }
-  if (!('PushManager' in window)) {
-    console.warn('[Push] PushManager not supported');
-    return;
-  }
-
-  // Jeśli użytkownik już odrzucił — nie pytaj ponownie
-  if (Notification.permission === 'denied') {
-    console.warn('[Push] Notifications blocked by user');
-    return;
-  }
-
-  // Krok 1
-  const reg = await registerPushSW();
-  if (!reg) return;
-
-  // Krok 2
-  const vapidKey = await fetchVapidPublicKey();
-  if (!vapidKey) return;
-
-  // Krok 3 — poproś o zgodę tylko jeśli jeszcze nie udzielona
-  if (Notification.permission !== 'granted') {
-    const granted = await requestPermission();
-    if (!granted) return;
-  }
-
-  // Krok 4
-  const subscription = await subscribeToPush(reg, vapidKey);
-  if (!subscription) return;
-
-  // Krok 5
-  await sendSubscriptionToBackend(subscription);
-}
-
-// ── Testowa funkcja — wywołaj z konsoli przeglądarki ─────────────────────────
-// window.testPush('Trening ukończony!', 'Świetna robota! +5km 🏃')
-
-export async function testPushNotification(
-  title = 'Mapty Test',
-  body  = 'Push notifications działają! 🎉',
-): Promise<void> {
-  try {
-    const res = await fetch(`${BACKEND_URL}/push/send`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ title, body, url: '/' }),
-    });
-    const data = await res.json();
-    console.log('[Push] Test sent:', data);
-  } catch (err) {
-    console.error('[Push] Test failed:', err);
-  }
-}
-
-
-// ── Re-subskrypcja przy każdym starcie ────────────────────────────────────────
 export async function resubscribeIfNeeded(): Promise<void> {
   if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
   if (Notification.permission !== 'granted') return;
+
   try {
-    const reg = await navigator.serviceWorker.getRegistration(
-      new URL('push-sw.js', window.location.href).pathname
-    );
+    const swPath = new URL('push-sw.js', window.location.href).pathname;
+    const reg    = await navigator.serviceWorker.getRegistration(swPath);
     if (!reg) return;
+
     const sub = await reg.pushManager.getSubscription();
     if (!sub) return;
-    await sendSubscriptionToBackend(sub);
-    console.log('[Push] Re-subscribed after potential backend restart');
-  } catch (err) {
-    console.warn('[Push] resubscribeIfNeeded failed:', err);
-  }
+
+    // Odśwież rejestrację w backendzie (po restarcie Render traci dane w pamięci)
+    await sendSubscriptionToBackend(sub, getUserId(), getDeviceId());
+    console.log('[Push] Re-subscribed after backend restart');
+  } catch { /* ignoruj */ }
 }
 
-// ── Push triggers ─────────────────────────────────────────────────────────────
+// ── Wysyłanie powiadomień — TYLKO do bieżącego użytkownika ───────────────────
+//
+// Każda funkcja wysyła powiadomienie TYLKO na urządzenia userId z localStorage.
+// Backend dostaje userId i wysyła TYLKO do jego subskrypcji.
 
-async function sendPush(title: string, body: string): Promise<void> {
+async function sendPushToSelf(title: string, body: string, url = '/'): Promise<void> {
+  const userId = getUserId();
   try {
-    await fetch(`${BACKEND_URL}/push/send`, {
-      method: 'POST',
+    await fetch(`${BACKEND_URL}/push/notify/${encodeURIComponent(userId)}`, {
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, body }),
+      body:    JSON.stringify({ title, body, url }),
     });
   } catch (err) {
-    console.warn('[Push] sendPush failed:', err);
+    console.warn('[Push] sendPushToSelf failed:', err);
   }
 }
 
+// ── Publiczne triggery ────────────────────────────────────────────────────────
+
 export async function sendWorkoutAddedPush(): Promise<void> {
-  await sendPush('Nowy trening zapisany! 💪', 'Świetna robota! Tak trzymaj!');
-}
-
-export async function sendActivityFinishedPush(
-  sport: string,
-  distanceKm: number,
-  durationSec: number,
-): Promise<void> {
-  const sportEmoji: Record<string, string> = {
-    running: '🏃',
-    walking: '🚶',
-    cycling: '🚴',
-  };
-  const emoji = sportEmoji[sport] ?? '🏅';
-  const h = Math.floor(durationSec / 3600);
-  const m = Math.floor((durationSec % 3600) / 60);
-  const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
-  const dist = distanceKm.toFixed(2);
-
-  await sendPush(
-    `${emoji} Aktywność zakończona!`,
-    `${dist} km · ${timeStr} — nieźle! Zapisano w historii.`,
-  );
+  await sendPushToSelf('Nowy trening zapisany! 💪', 'Świetna robota! Tak trzymaj!');
 }
 
 export async function sendWorkoutDeletedPush(): Promise<void> {
-  await sendPush('Trening usunięty.', 'Chcesz go przywrócić? Wróć do aplikacji.');
+  await sendPushToSelf('Trening usunięty.', 'Chcesz go przywrócić? Wróć do aplikacji.');
+}
+
+export async function sendActivityFinishedPush(
+  sport:       string,
+  distanceKm:  number,
+  durationSec: number,
+): Promise<void> {
+  const icons: Record<string, string> = { running: '🏃', walking: '🚶', cycling: '🚴' };
+  const emoji   = icons[sport] ?? '🏅';
+  const h       = Math.floor(durationSec / 3600);
+  const m       = Math.floor((durationSec % 3600) / 60);
+  const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
+
+  await sendPushToSelf(
+    `${emoji} Aktywność zakończona!`,
+    `${distanceKm.toFixed(2)} km · ${timeStr} — nieźle! Zapisano w historii.`,
+  );
 }
 
 export async function sendWelcomeBackPush(): Promise<void> {
-  await sendPush('Witaj ponownie! 👋', 'Gotowy na kolejny trening?');
+  await sendPushToSelf('Witaj ponownie! 👋', 'Gotowy na kolejny trening?');
 }
 
 export async function sendLongBreakPush(): Promise<boolean> {
   const KEY = 'mapty_last_open';
-  const now = Date.now();
+  const now  = Date.now();
   const last = Number(localStorage.getItem(KEY) ?? 0);
   localStorage.setItem(KEY, String(now));
+
   if (last > 0 && (now - last) / (1000 * 60 * 60) > 24) {
-    await sendPush('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!');
+    await sendPushToSelf('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!');
     return true;
   }
   return false;
 }
 
-export async function sendArrivedAtDestinationPush(): Promise<void> {
-  await sendPush('Dotarłeś na miejsce! 🎯', 'Chcesz zapisać trasę? Wróć do aplikacji.');
-}
-
 export async function sendWeatherPush(): Promise<void> {
   const KEY = 'mapty_last_weather_push';
-  const now = Date.now();
+  const now  = Date.now();
   if ((now - Number(localStorage.getItem(KEY) ?? 0)) / (1000 * 60 * 60) < 6) return;
+
   try {
     const coords = await new Promise<GeolocationCoordinates>((res, rej) =>
-      navigator.geolocation.getCurrentPosition(p => res(p.coords), rej, { timeout: 5000 })
+      navigator.geolocation.getCurrentPosition(p => res(p.coords), rej, { timeout: 5000 }),
     );
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weathercode,windspeed_10m&timezone=auto&forecast_days=1`;
+    const url  = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weathercode,windspeed_10m&timezone=auto&forecast_days=1`;
     const data = await (await fetch(url)).json() as {
       current: { temperature_2m: number; weathercode: number; windspeed_10m: number };
     };
     const { temperature_2m: temp, weathercode: code, windspeed_10m: wind } = data.current;
     if (code > 3 || temp < 8 || temp > 30 || wind >= 30) return;
-    await sendPush('Idealna pogoda na trening! 🏃', `${code === 0 ? '☀️' : '🌤️'} ${Math.round(temp)}°C — wychodź!`);
+
+    await sendPushToSelf(
+      'Idealna pogoda na trening! 🌤️',
+      `${code === 0 ? '☀️' : '🌤️'} ${Math.round(temp)}°C — wychodź!`,
+    );
     localStorage.setItem(KEY, String(now));
-  } catch { /* ignore */ }
+  } catch { /* ignoruj */ }
 }
 
-// Eksponuj na window do testów z konsoli
+// ── Eksponuj do testów z konsoli ──────────────────────────────────────────────
+// Użycie: window.testPush('Test', 'Treść')
+
+export async function testPushNotification(
+  title = 'Mapty Test',
+  body  = 'Push notifications działają! 🎉',
+): Promise<void> {
+  await sendPushToSelf(title, body);
+}
+
 (window as unknown as Record<string, unknown>).testPush = testPushNotification;
+(window as unknown as Record<string, unknown>).getMyUserId = getUserId;
