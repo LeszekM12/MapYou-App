@@ -63,14 +63,19 @@ function buildModal(data) {
 
       <div class="wm-tile wm-tile--pressure">
         <div class="wm-tile__header"><span class="wm-tile__icon">📉</span><span class="wm-tile__label">PRESSURE</span></div>
-        <div class="wm-tile__main wm-tile__main--sm">${c.pressure}</div>
-        <div class="wm-tile__sub">hPa</div>
         <div class="wm-tile__pressure-arc">
-          <svg viewBox="0 0 80 50" fill="none">
-            <path d="M10 45 A35 35 0 0 1 70 45" stroke="rgba(255,255,255,0.1)" stroke-width="5" stroke-linecap="round"/>
-            <path d="M10 45 A35 35 0 0 1 70 45" stroke="#4ade80" stroke-width="5" stroke-linecap="round"
-              stroke-dasharray="110" stroke-dashoffset="${Math.round(110 - ((c.pressure - 980) / 60) * 110)}"/>
-            <text x="40" y="36" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.4)">${c.pressure < 1010 ? 'Low' : c.pressure < 1025 ? 'Normal' : 'High'}</text>
+          <svg viewBox="0 0 100 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <!-- Track arc: half circle, circumference ≈ 110 -->
+            <path d="M10 55 A40 40 0 0 1 90 55"
+              stroke="rgba(255,255,255,0.08)" stroke-width="7" stroke-linecap="round"/>
+            <!-- Filled arc: clamp pressure 980–1040 → 0–110 -->
+            <path d="M10 55 A40 40 0 0 1 90 55"
+              stroke="#4ade80" stroke-width="7" stroke-linecap="round"
+              stroke-dasharray="126"
+              stroke-dashoffset="${Math.round(126 - Math.min(Math.max((c.pressure - 980) / 60, 0), 1) * 126)}"/>
+            <!-- Center value -->
+            <text x="50" y="46" text-anchor="middle" font-size="13" font-weight="bold" fill="#f0f4f8">${c.pressure}</text>
+            <text x="50" y="57" text-anchor="middle" font-size="8" fill="rgba(255,255,255,0.4)">hPa · ${c.pressure < 1010 ? 'Low' : c.pressure < 1025 ? 'Normal' : 'High'}</text>
           </svg>
         </div>
       </div>
