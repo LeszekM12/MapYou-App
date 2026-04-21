@@ -33,6 +33,9 @@ import {
 import { Tracker, type SportType, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
+import { liveTracker }          from './modules/LiveTracker.js';
+import { FriendsView }          from './modules/FriendsView.js';
+import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
 
 // ─── Leaflet plugin types ─────────────────────────────────────────────────────
 
@@ -1047,6 +1050,7 @@ class App {
     document.getElementById('trkBtnStart')?.addEventListener('click', () => {
       if (!this.#tracker) return;
       this.#tracker.start();
+      void liveTracker.start();   // ← rozpocznij live tracking
       void this._requestWakeLock();
       this._enterTrackingView();
     });
@@ -1056,9 +1060,11 @@ class App {
       if (!this.#tracker?.isActive) return;
       if (this.#tracker.isPaused) {
         this.#tracker.resume();
+        void liveTracker.resume();   // ← wznów live tracking
         this._setTrackingState('active');
       } else {
         this.#tracker.pause();
+        void liveTracker.pause();    // ← pauza live trackingu
         this._setTrackingState('paused');
       }
     });
@@ -1067,6 +1073,7 @@ class App {
     document.getElementById('trkBtnStop')?.addEventListener('click', () => {
       if (!this.#tracker) return;
       const activity = this.#tracker.stop();
+      void liveTracker.finish();   // ← zakończ live tracking
       void this._releaseWakeLock();
       this._exitTrackingView();
       if (!activity) return;
@@ -1789,6 +1796,7 @@ window.app = new App();
       if (scroll) scroll.classList.toggle('tab-scroll--collapsed', !scroll.classList.contains('tab-scroll--collapsed'));
       return;
     }
+    document.querySelector<HTMLElement>(`#${activeTab} .tab-scroll`)?.classList.add('tab-scroll--collapsed'); // collapse leaving tab before hiding
     document.getElementById(activeTab)?.classList.remove('tab-panel--active');
     document.querySelector<HTMLElement>(`.bottom-nav__item[data-tab="${activeTab}"]`)?.classList.remove('bottom-nav__item--active');
     activeTab = tabId;
@@ -1808,6 +1816,13 @@ window.app = new App();
           if (r.state !== 'granted') perm.classList.remove('hidden');
           else perm.classList.add('hidden');
         }).catch(() => {});
+      }
+    } else if (activeTab === 'tabFriends') {
+      hideMobileSearchTab();
+      // Inicjalizuj FriendsView przy pierwszym wejściu
+      if (!friendsViewInited) {
+        friendsViewInited = true;
+        friendsView.init();
       }
     } else {
       hideMobileSearchTab();
@@ -1964,3 +1979,15 @@ window.app = new App();
 
 // ─── WEATHER COMPONENTS (top bar + modal) ────────────────────────────────────
 void initWeatherComponents();
+
+// ─── FRIENDS & LIVE TRACKING ─────────────────────────────────────────────────
+const friendsView     = new FriendsView();
+let   friendsViewInited = false;
+
+// Pokaż modal imienia przy pierwszym uruchomieniu
+void showNameModalIfNeeded();
+
+// Przycisk „Change name" w Settings
+document.getElementById('btnChangeName')?.addEventListener('click', () => {
+  openChangeNameModal();
+});

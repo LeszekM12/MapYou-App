@@ -15,6 +15,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
     <link rel="stylesheet" href="style.css"/>
     <link rel="stylesheet" href="weather.css"/>
+    <link rel="stylesheet" href="friends.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
           integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
           crossorigin=""/>
@@ -143,10 +144,7 @@
             <div class="tab-header__weather">
                 <span class="tab-header__wicon" id="bnwIcon">—</span>
                 <span class="tab-header__temp"  id="bnwTemp">—</span>
-                <div class="tab-header__weather-text">
-                    <span class="tab-header__desc"   id="bnwDesc"></span>
-                    <span class="tab-header__feels"  id="bnwFeels"></span>
-                </div>
+                <span class="tab-header__desc"  id="bnwDesc"></span>
             </div>
         </div>
         <!-- Desktop search (hidden on mobile via CSS) -->
@@ -287,8 +285,12 @@
 <!-- TAB 2: STATS -->
 <div id="tabStats" class="tab-panel">
     <div class="tab-scroll">
-        <div class="tab-header tab-header--logo-only">
-            <img src="public/logo.png" alt="MapYou logo" class="logo"/>
+        <div class="tab-header">
+            <img src="public/logo.png" alt="Mapty logo" class="logo"/>
+            <div class="weather-widget" id="weatherWidgetStats">
+                <span class="weather-widget__icon" id="wIconStats">—</span>
+                <span class="weather-widget__sun" id="wSunsetStats">—</span>
+            </div>
         </div>
         <div class="stats-panel" id="statsPanel">
             <div class="stats-panel__label">THIS WEEK'S SUMMARY</div>
@@ -453,6 +455,43 @@
 <div id="tabMap" class="tab-panel tab-panel--map"></div>
 
 <!-- BOTTOM NAV -->
+
+<!-- TAB: FRIENDS -->
+<div id="tabFriends" class="tab-panel">
+  <div class="tab-scroll">
+
+    <!-- Header -->
+    <div class="friends-header">
+      <span class="friends-header__title">Friends</span>
+      <div class="friends-header__actions">
+        <button class="friends-header__btn friends-header__btn--share" id="btnShareMyLink">
+          🔗 My Link
+        </button>
+        <button class="friends-header__btn" id="btnAddFriend">+ Add</button>
+      </div>
+    </div>
+
+    <!-- Friends list -->
+    <div class="friends-list" id="friendsList"></div>
+
+  </div><!-- /tab-scroll -->
+
+  <!-- Live view panel — absolute over the tab -->
+  <div id="friendsLivePanel" class="fls-panel hidden">
+    <div class="fls-header">
+      <span class="fls-header__name" id="friendsLiveName">Live Route</span>
+      <button class="fls-close" id="btnCloseLiveView">✕</button>
+    </div>
+    <div class="fls-status-bar">
+      <div id="friendsLiveStatus">
+        <span class="fls-status">Connecting...</span>
+      </div>
+    </div>
+    <div id="friendsLiveMapContainer"></div>
+  </div>
+
+</div>
+
 <nav class="bottom-nav" id="bottomNav">
     <button class="bottom-nav__item bottom-nav__item--active" data-tab="tabWorkouts">
         <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -485,6 +524,16 @@
           <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/>
         </svg>
         <span class="bottom-nav__label">Track</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabFriends">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span class="bottom-nav__label">Friends</span>
     </button>
 </nav>
 
