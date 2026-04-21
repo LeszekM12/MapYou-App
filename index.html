@@ -457,24 +457,27 @@
 <!-- BOTTOM NAV -->
 
 <!-- TAB: FRIENDS -->
-<div id="tabFriends" class="tab-panel" style="position:relative; overflow:hidden;">
+<div id="tabFriends" class="tab-panel">
+  <div class="tab-scroll">
 
-  <!-- Header -->
-  <div class="friends-header">
-    <span class="friends-header__title">Friends</span>
-    <div class="friends-header__actions">
-      <button class="friends-header__btn friends-header__btn--share" id="btnShareMyLink">
-        🔗 My Link
-      </button>
-      <button class="friends-header__btn" id="btnAddFriend">+ Add</button>
+    <!-- Header -->
+    <div class="friends-header">
+      <span class="friends-header__title">Friends</span>
+      <div class="friends-header__actions">
+        <button class="friends-header__btn friends-header__btn--share" id="btnShareMyLink">
+          🔗 My Link
+        </button>
+        <button class="friends-header__btn" id="btnAddFriend">+ Add</button>
+      </div>
     </div>
-  </div>
 
-  <!-- Friends list -->
-  <div class="friends-list" id="friendsList"></div>
+    <!-- Friends list -->
+    <div class="friends-list" id="friendsList"></div>
 
-  <!-- Live view panel (hidden by default) -->
-  <div id="friendsLivePanel" class="hidden">
+  </div><!-- /tab-scroll -->
+
+  <!-- Live view panel — absolute over the tab -->
+  <div id="friendsLivePanel" class="fls-panel hidden">
     <div class="fls-header">
       <span class="fls-header__name" id="friendsLiveName">Live Route</span>
       <button class="fls-close" id="btnCloseLiveView">✕</button>
