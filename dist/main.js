@@ -26,8 +26,6 @@ import { Tracker, formatDuration, formatPace, formatDistance, SPORT_COLORS } fro
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
 import { liveTracker } from './modules/LiveTracker.js';
-import { FriendsView } from './modules/FriendsView.js';
-import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -1089,7 +1087,7 @@ class App {
             if (!__classPrivateFieldGet(this, _App_tracker, "f"))
                 return;
             __classPrivateFieldGet(this, _App_tracker, "f").start();
-            void liveTracker.start(); // ← rozpocznij live tracking
+            void liveTracker.start();
             void this._requestWakeLock();
             this._enterTrackingView();
         });
@@ -1099,12 +1097,12 @@ class App {
                 return;
             if (__classPrivateFieldGet(this, _App_tracker, "f").isPaused) {
                 __classPrivateFieldGet(this, _App_tracker, "f").resume();
-                void liveTracker.resume(); // ← wznów live tracking
+                void liveTracker.resume();
                 this._setTrackingState('active');
             }
             else {
                 __classPrivateFieldGet(this, _App_tracker, "f").pause();
-                void liveTracker.pause(); // ← pauza live trackingu
+                void liveTracker.pause();
                 this._setTrackingState('paused');
             }
         });
@@ -1113,7 +1111,7 @@ class App {
             if (!__classPrivateFieldGet(this, _App_tracker, "f"))
                 return;
             const activity = __classPrivateFieldGet(this, _App_tracker, "f").stop();
-            void liveTracker.finish(); // ← zakończ live tracking
+            void liveTracker.finish();
             void this._releaseWakeLock();
             this._exitTrackingView();
             if (!activity)
@@ -1131,6 +1129,7 @@ class App {
             if (!confirm('Discard activity?'))
                 return;
             __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
+            void liveTracker.finish(); // ← zakończ live tracking przy discard
             void this._releaseWakeLock();
             this._exitTrackingView();
         });
@@ -2008,7 +2007,6 @@ window.app = new App();
                 scroll.classList.toggle('tab-scroll--collapsed', !scroll.classList.contains('tab-scroll--collapsed'));
             return;
         }
-        document.querySelector(`#${activeTab} .tab-scroll`)?.classList.add('tab-scroll--collapsed'); // collapse leaving tab before hiding
         document.getElementById(activeTab)?.classList.remove('tab-panel--active');
         document.querySelector(`.bottom-nav__item[data-tab="${activeTab}"]`)?.classList.remove('bottom-nav__item--active');
         activeTab = tabId;
@@ -2033,14 +2031,6 @@ window.app = new App();
                     else
                         perm.classList.add('hidden');
                 }).catch(() => { });
-            }
-        }
-        else if (activeTab === 'tabFriends') {
-            hideMobileSearchTab();
-            // Inicjalizuj FriendsView przy pierwszym wejściu
-            if (!friendsViewInited) {
-                friendsViewInited = true;
-                friendsView.init();
             }
         }
         else {
@@ -2211,13 +2201,4 @@ window.app = new App();
 })();
 // ─── WEATHER COMPONENTS (top bar + modal) ────────────────────────────────────
 void initWeatherComponents();
-// ─── FRIENDS & LIVE TRACKING ─────────────────────────────────────────────────
-const friendsView = new FriendsView();
-let friendsViewInited = false;
-// Pokaż modal imienia przy pierwszym uruchomieniu
-void showNameModalIfNeeded();
-// Przycisk „Change name" w Settings
-document.getElementById('btnChangeName')?.addEventListener('click', () => {
-    openChangeNameModal();
-});
 //# sourceMappingURL=main.js.map

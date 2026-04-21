@@ -204,4 +204,12 @@ export class LiveTracker {
 }
 // Singleton — jedna instancja na całą apkę
 export const liveTracker = new LiveTracker();
+// Przy zamknięciu/odświeżeniu strony — wyślij finish do backendu
+window.addEventListener('beforeunload', () => {
+    if (liveTracker.isActive && liveTracker.token) {
+        // synchroniczny fetch — jedyna opcja w beforeunload
+        navigator.sendBeacon(`${BACKEND_URL}/live/finish`, JSON.stringify({ token: liveTracker.token }));
+        localStorage.removeItem(LS_TOKEN_KEY);
+    }
+});
 //# sourceMappingURL=LiveTracker.js.map
