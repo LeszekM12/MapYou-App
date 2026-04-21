@@ -17,10 +17,10 @@
 
 /* ── Friends tab panel ──────────────────────────────────────────────────────── */
 
-#tabFriends {
+/* #tabFriends visibility is controlled by .tab-panel / .tab-panel--active in style.css */
+#tabFriends.tab-panel--active {
   display:        flex;
   flex-direction: column;
-  height:         100%;
   overflow:       hidden;
 }
 
@@ -31,7 +31,7 @@
   padding:         14px 16px 10px;
   border-bottom:   1px solid var(--f-border);
   flex-shrink:     0;
-  background:      var(--f-bg);
+  background:      var(--color-dark--1, #2d3439);
   position:        relative;
   z-index:         2;
 }
@@ -81,7 +81,7 @@
   flex-direction: column;
   gap:            8px;
   scrollbar-width: none;
-  background:     var(--f-bg);
+  background:     var(--color-dark--1, #2d3439);
 }
 .friends-list::-webkit-scrollbar { display: none; }
 
@@ -95,7 +95,7 @@
   padding:         48px 24px;
   text-align:      center;
   gap:             16px;
-  background:      var(--f-bg);
+  background:      var(--color-dark--1, #2d3439);
 }
 .friends-empty__icon { font-size: 56px; }
 .friends-empty p {
