@@ -131,36 +131,58 @@ export class FriendsView {
     }
     // ── Share my invite link ───────────────────────────────────────────────────
     async _shareMyLink() {
-        // Pobierz własną subskrypcję push
-        if (!('serviceWorker' in navigator)) {
-            alert('Push notifications not supported');
+        // 1. Sprawdź czy push jest obsługiwany
+        if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
+            this._showToast('Push notifications not supported on this device');
             return;
         }
-        const swPath = new URL('push-sw.js', window.location.href).pathname;
-        const reg = await navigator.serviceWorker.getRegistration(swPath);
-        if (!reg) {
-            alert('Please enable notifications first (Settings → Enable Notifications)');
-            return;
+        // 2. Znajdź subskrypcję — przeszukaj WSZYSTKIE rejestracje SW
+        let sub = null;
+        try {
+            const regs = await navigator.serviceWorker.getRegistrations();
+            for (const reg of regs) {
+                sub = await reg.pushManager.getSubscription();
+                if (sub)
+                    break;
+            }
         }
-        const sub = await reg.pushManager.getSubscription();
+        catch (err) {
+            console.warn('[FriendsView] getSubscription error:', err);
+        }
+        // 3. Brak subskrypcji — poinformuj użytkownika
         if (!sub) {
-            alert('Please enable notifications first (Settings → Enable Notifications)');
+            this._showToast('Enable notifications first in Settings ⚙️');
             return;
         }
+        // 4. Wygeneruj link z imieniem + subskrypcją push
         const name = getUserName();
-        const link = generateInviteLink(name, sub.toJSON());
-        // Użyj Web Share API jeśli dostępne
-        if (navigator.share) {
-            await navigator.share({
-                title: `Add ${name} on MapYou`,
-                text: `Track my workouts live on MapYou!`,
-                url: link,
-            });
+        const subJson = sub.toJSON();
+        const link = generateInviteLink(name, subJson);
+        // 5. Web Share API (natywny sheet na iOS/Android) lub clipboard fallback
+        try {
+            if (navigator.share) {
+                await navigator.share({
+                    title: `Add ${name} on MapYou`,
+                    text: `${name} invited you to track their workouts live! 🏃`,
+                    url: link,
+                });
+            }
+            else {
+                await navigator.clipboard.writeText(link);
+                this._showToast('Invite link copied! 📋');
+            }
         }
-        else {
-            // Fallback — skopiuj do schowka
-            await navigator.clipboard.writeText(link);
-            this._showToast('Invite link copied! 📋');
+        catch (err) {
+            // Użytkownik anulował share sheet — nie traktuj jako błąd
+            if (err.name !== 'AbortError') {
+                try {
+                    await navigator.clipboard.writeText(link);
+                    this._showToast('Invite link copied! 📋');
+                }
+                catch {
+                    this._showToast('Could not share — try again');
+                }
+            }
         }
     }
     // ── Add friend modal ───────────────────────────────────────────────────────
