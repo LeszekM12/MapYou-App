@@ -108,9 +108,8 @@ export class LiveMap {
   private _updateMap(data: LiveData): void {
     if (!this._map || !this._polyline) return;
 
-    // Aktualizuj trasę (guard — history może być undefined gdy sesja dopiero startuje)
-    const history = data.history ?? [];
-    const latLngs = history.map(p => L.latLng(p.lat, p.lng));
+    // Aktualizuj trasę
+    const latLngs = data.history.map(p => L.latLng(p.lat, p.lng));
     this._polyline.setLatLngs(latLngs);
 
     // Aktualizuj marker aktualnej pozycji
@@ -137,7 +136,7 @@ export class LiveMap {
     }
 
     // Dopasuj widok do trasy jeśli jest historia
-    if (latLngs.length > 1) {
+    if (latLngs.length > 1 && !this._marker) {
       this._map.fitBounds(this._polyline.getBounds(), { padding: [40, 40] });
     }
   }

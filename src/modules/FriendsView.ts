@@ -18,8 +18,7 @@ import { getUserName } from './LiveTracker.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 
-const STATUS_POLL_MS_ACTIVE = 5_000;   // co 5s gdy zakładka Friends otwarta
-const STATUS_POLL_MS_BG     = 30_000;  // co 30s w tle
+const STATUS_POLL_MS = 30_000;   // sprawdzaj status znajomych co 30s
 
 // ── FriendsView class ─────────────────────────────────────────────────────────
 
@@ -27,16 +26,6 @@ export class FriendsView {
   private _liveMap:    LiveMap     = new LiveMap();
   private _pollTimer:  ReturnType<typeof setInterval> | null = null;
   private _watchingId: number | null = null;   // id znajomego którego oglądamy
-
-  // ── Visibility / focus handlers ──────────────────────────────────────────────
-
-  private _onVisibility = () => {
-    if (document.visibilityState === 'visible') void this._pollFriendsStatus();
-  };
-
-  private _onFocus = () => {
-    void this._pollFriendsStatus();
-  };
 
   // ── Init ───────────────────────────────────────────────────────────────────
 
@@ -81,15 +70,11 @@ export class FriendsView {
     // Renderuj listę
     void this.render();
 
-    // Od razu zweryfikuj statusy
+    // Od razu zweryfikuj statusy — nie czekaj 30s
     void this._pollFriendsStatus();
 
-    // Szybki polling co 5s gdy zakładka Friends jest widoczna
-    this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS_ACTIVE);
-
-    // Sprawdź też gdy apka dostaje fokus (powrót z tła)
-    document.addEventListener('visibilitychange', this._onVisibility);
-    window.addEventListener('focus', this._onFocus);
+    // Polling statusu znajomych co 30s
+    this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
 
     // Odbieraj wiadomości z Service Workera (po kliknięciu powiadomienia)
     navigator.serviceWorker.addEventListener('message', (e: MessageEvent) => {
@@ -102,8 +87,6 @@ export class FriendsView {
   destroy(): void {
     if (this._pollTimer) clearInterval(this._pollTimer);
     this._liveMap.stop();
-    document.removeEventListener('visibilitychange', this._onVisibility);
-    window.removeEventListener('focus', this._onFocus);
   }
 
   // ── Render friends list ────────────────────────────────────────────────────
@@ -408,11 +391,6 @@ export class FriendsView {
           if (f.liveToken !== data.token) {
             await updateFriendLiveToken(f.subscriptionId, data.token);
             changed = true;
-            // Auto-otwórz live mapę jeśli zakładka Friends jest aktywna
-            const friendsTab = document.getElementById('tabFriends');
-            if (friendsTab?.classList.contains('tab-panel--active')) {
-              setTimeout(() => this._openLiveView(data.token!, f.name), 300);
-            }
           }
         } else {
           // Brak aktywnego treningu — wyczyść token jeśli był

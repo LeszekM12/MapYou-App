@@ -11,8 +11,7 @@ import { LiveMap } from './LiveMap.js';
 import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
-const STATUS_POLL_MS_ACTIVE = 5000; // co 5s gdy zakładka Friends otwarta
-const STATUS_POLL_MS_BG = 30000; // co 30s w tle
+const STATUS_POLL_MS = 30000; // sprawdzaj status znajomych co 30s
 // ── FriendsView class ─────────────────────────────────────────────────────────
 export class FriendsView {
     constructor() {
@@ -34,24 +33,6 @@ export class FriendsView {
             writable: true,
             value: null
         }); // id znajomego którego oglądamy
-        // ── Visibility / focus handlers ──────────────────────────────────────────────
-        Object.defineProperty(this, "_onVisibility", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: () => {
-                if (document.visibilityState === 'visible')
-                    void this._pollFriendsStatus();
-            }
-        });
-        Object.defineProperty(this, "_onFocus", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: () => {
-                void this._pollFriendsStatus();
-            }
-        });
     }
     // ── Init ───────────────────────────────────────────────────────────────────
     init() {
@@ -92,13 +73,10 @@ export class FriendsView {
         document.getElementById('btnCloseLiveView')?.addEventListener('click', () => this._closeLiveView());
         // Renderuj listę
         void this.render();
-        // Od razu zweryfikuj statusy
+        // Od razu zweryfikuj statusy — nie czekaj 30s
         void this._pollFriendsStatus();
-        // Szybki polling co 5s gdy zakładka Friends jest widoczna
-        this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS_ACTIVE);
-        // Sprawdź też gdy apka dostaje fokus (powrót z tła)
-        document.addEventListener('visibilitychange', this._onVisibility);
-        window.addEventListener('focus', this._onFocus);
+        // Polling statusu znajomych co 30s
+        this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
         // Odbieraj wiadomości z Service Workera (po kliknięciu powiadomienia)
         navigator.serviceWorker.addEventListener('message', (e) => {
             if (e.data?.type === 'OPEN_LIVE') {
@@ -110,8 +88,6 @@ export class FriendsView {
         if (this._pollTimer)
             clearInterval(this._pollTimer);
         this._liveMap.stop();
-        document.removeEventListener('visibilitychange', this._onVisibility);
-        window.removeEventListener('focus', this._onFocus);
     }
     // ── Render friends list ────────────────────────────────────────────────────
     async render() {
@@ -393,11 +369,6 @@ export class FriendsView {
                     if (f.liveToken !== data.token) {
                         await updateFriendLiveToken(f.subscriptionId, data.token);
                         changed = true;
-                        // Auto-otwórz live mapę jeśli zakładka Friends jest aktywna
-                        const friendsTab = document.getElementById('tabFriends');
-                        if (friendsTab?.classList.contains('tab-panel--active')) {
-                            setTimeout(() => this._openLiveView(data.token, f.name), 300);
-                        }
                     }
                 }
                 else {
