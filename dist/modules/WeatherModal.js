@@ -6,20 +6,96 @@ const MODAL_ID = 'weatherModal';
 // ── Build HTML ────────────────────────────────────────────────────────────────
 function buildModal(data) {
     const { current: c, sun, hourly, daily, advice, location } = data;
-    const statsRows = [
-        ['💨', 'Wind', `${c.windSpeed} km/h`],
-        ['💧', 'Humidity', `${c.humidity}%`],
-        ['🌫️', 'Visibility', `${c.visibility} km`],
-        ['📉', 'Pressure', `${c.pressure} hPa`],
-        ['🔆', 'UV Index', `${c.uvIndex} — ${uvLabel(c.uvIndex)}`],
-        ['🌡️', 'Dew Point', `${c.dewPoint}°C`],
-    ];
-    const hourlyHTML = hourly.map(h => `
+    // UV bar — gradient green→yellow→orange→red, dot position
+    const uvPct = Math.min(Math.round((c.uvIndex / 11) * 100), 100);
+    // Wind compass needle rotation (approximate from speed — no direction in free tier)
+    // Just show a static compass with speed
+    const windLabel = c.windSpeed < 6 ? 'Calm' : c.windSpeed < 20 ? 'Light breeze' : c.windSpeed < 40 ? 'Moderate' : 'Strong wind';
+    const humidityPct = c.humidity;
+    const tilesHTML = `
+    <div class="wm-tiles">
+
+      <div class="wm-tile wm-tile--uv">
+        <div class="wm-tile__header"><span class="wm-tile__icon">🔆</span><span class="wm-tile__label">UV INDEX</span></div>
+        <div class="wm-tile__main">${c.uvIndex}</div>
+        <div class="wm-tile__sub">${uvLabel(c.uvIndex)}</div>
+        <div class="wm-tile__uv-bar">
+          <div class="wm-tile__uv-track">
+            <div class="wm-tile__uv-dot" style="left:${uvPct}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wm-tile wm-tile--humidity">
+        <div class="wm-tile__header"><span class="wm-tile__icon">💧</span><span class="wm-tile__label">HUMIDITY</span></div>
+        <div class="wm-tile__main">${c.humidity}<span class="wm-tile__unit">%</span></div>
+        <div class="wm-tile__sub">${c.humidity < 30 ? 'Dry air' : c.humidity < 60 ? 'Comfortable' : 'Humid'}</div>
+        <div class="wm-tile__bar-wrap">
+          <div class="wm-tile__bar-track">
+            <div class="wm-tile__bar-fill wm-tile__bar-fill--blue" style="width:${humidityPct}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wm-tile wm-tile--wind">
+        <div class="wm-tile__header"><span class="wm-tile__icon">💨</span><span class="wm-tile__label">WIND</span></div>
+        <div class="wm-tile__sub">${windLabel}</div>
+        <div class="wm-tile__compass">
+          <div class="wm-tile__compass-ring">
+            <span class="wm-tile__compass-n">N</span>
+            <span class="wm-tile__compass-s">S</span>
+            <span class="wm-tile__compass-e">E</span>
+            <span class="wm-tile__compass-w">W</span>
+            <div class="wm-tile__compass-center">
+              <span class="wm-tile__compass-val">${c.windSpeed}</span>
+              <span class="wm-tile__compass-unit">km/h</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="wm-tile wm-tile--dew">
+        <div class="wm-tile__header"><span class="wm-tile__icon">🌡️</span><span class="wm-tile__label">DEW POINT</span></div>
+        <div class="wm-tile__main">${c.dewPoint}<span class="wm-tile__unit">°</span></div>
+        <div class="wm-tile__sub">${c.dewPoint < 0 ? 'Very dry air' : c.dewPoint < 10 ? 'Dry air' : c.dewPoint < 16 ? 'Comfortable' : 'Humid'}</div>
+      </div>
+
+      <div class="wm-tile wm-tile--pressure">
+        <div class="wm-tile__header"><span class="wm-tile__icon">📉</span><span class="wm-tile__label">PRESSURE</span></div>
+        <div class="wm-tile__main wm-tile__main--sm">${c.pressure}</div>
+        <div class="wm-tile__sub">hPa</div>
+        <div class="wm-tile__pressure-arc">
+          <svg viewBox="0 0 80 50" fill="none">
+            <path d="M10 45 A35 35 0 0 1 70 45" stroke="rgba(255,255,255,0.1)" stroke-width="5" stroke-linecap="round"/>
+            <path d="M10 45 A35 35 0 0 1 70 45" stroke="#4ade80" stroke-width="5" stroke-linecap="round"
+              stroke-dasharray="110" stroke-dashoffset="${Math.round(110 - ((c.pressure - 980) / 60) * 110)}"/>
+            <text x="40" y="36" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.4)">${c.pressure < 1010 ? 'Low' : c.pressure < 1025 ? 'Normal' : 'High'}</text>
+          </svg>
+        </div>
+      </div>
+
+      <div class="wm-tile wm-tile--visibility">
+        <div class="wm-tile__header"><span class="wm-tile__icon">👁️</span><span class="wm-tile__label">VISIBILITY</span></div>
+        <div class="wm-tile__main wm-tile__main--sm">${c.visibility}</div>
+        <div class="wm-tile__sub">km${c.visibility >= 10 ? ' — Clear' : c.visibility >= 5 ? ' — Good' : ' — Poor'}</div>
+      </div>
+
+    </div>`;
+    const hourlyHTML = hourly.map(h => {
+        if (h.isSunset)
+            return `
+    <div class="wm-hourly__item wm-hourly__item--sunset">
+      <span class="wm-hourly__time">${h.time}</span>
+      <span class="wm-hourly__icon">🌇</span>
+      <span class="wm-hourly__temp wm-hourly__sunset-lbl">Sunset</span>
+    </div>`;
+        return `
     <div class="wm-hourly__item">
       <span class="wm-hourly__time">${h.time}</span>
       <span class="wm-hourly__icon">${h.icon}</span>
       <span class="wm-hourly__temp">${h.temp}°</span>
-    </div>`).join('');
+    </div>`;
+    }).join('');
     const dailyHTML = daily.map(d => `
     <div class="wm-daily__row">
       <span class="wm-daily__day">${d.label}</span>
@@ -72,16 +148,9 @@ function buildModal(data) {
       <!-- Scrollable body -->
       <div class="wm-body">
 
-        <!-- Stats grid -->
+        <!-- Stats tiles -->
         <section class="wm-section">
-          <div class="wm-stats">
-            ${statsRows.map(([icon, label, val]) => `
-            <div class="wm-stats__row">
-              <span class="wm-stats__icon">${icon}</span>
-              <span class="wm-stats__label">${label}</span>
-              <span class="wm-stats__value">${val}</span>
-            </div>`).join('')}
-          </div>
+          ${tilesHTML}
         </section>
 
         <!-- Hourly forecast -->

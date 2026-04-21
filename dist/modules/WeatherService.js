@@ -201,20 +201,40 @@ export async function fetchWeatherFull(coords) {
         sunset: fmtTime(raw.daily.sunset[0]),
         progress: sunProgress(raw.daily.sunrise[0], raw.daily.sunset[0]),
     };
-    // Hourly — next 6 hours from now
-    const nowHour = new Date().getHours();
+    // Hourly — next 23 hours from now, with sunset marker inserted
+    const now24 = new Date();
+    const cutoff24 = new Date(now24.getTime() + 23 * 60 * 60 * 1000);
     const hourly = [];
-    for (let i = 0; i < raw.hourly.time.length && hourly.length < 6; i++) {
-        const h = new Date(raw.hourly.time[i]).getHours();
-        if (new Date(raw.hourly.time[i]) > new Date()) {
-            const hNight = isNightTime(raw.daily.sunrise[0], raw.daily.sunset[0]);
+    let sunsetInserted = false;
+    const sunsetISO = raw.daily.sunset[0];
+    const sunsetMs = new Date(sunsetISO).getTime();
+    for (let i = 0; i < raw.hourly.time.length && hourly.length < 24; i++) {
+        const slotTime = new Date(raw.hourly.time[i]);
+        if (slotTime <= now24)
+            continue; // skip past slots
+        if (slotTime > cutoff24)
+            break; // stop after 23h
+        // Insert sunset card between the two slots that straddle it
+        if (!sunsetInserted && slotTime.getTime() > sunsetMs && sunsetMs > now24.getTime()) {
+            sunsetInserted = true;
             hourly.push({
-                time: fmtTime(raw.hourly.time[i]),
+                time: fmtTime(sunsetISO),
                 temp: Math.round(raw.hourly.temperature_2m[i]),
-                icon: wmoInfo(raw.hourly.weathercode[i], hNight).icon,
-                weatherCode: raw.hourly.weathercode[i],
+                icon: '🌇',
+                weatherCode: -1, // special marker
+                isSunset: true,
             });
         }
+        const hNight = isNightTime(raw.daily.sunrise[0], raw.daily.sunset[0]);
+        // For future hours, check if that specific hour is night
+        const hIsNight = slotTime.getTime() > sunsetMs || slotTime.getTime() < new Date(raw.daily.sunrise[0]).getTime();
+        hourly.push({
+            time: fmtTime(raw.hourly.time[i]),
+            temp: Math.round(raw.hourly.temperature_2m[i]),
+            icon: wmoInfo(raw.hourly.weathercode[i], hIsNight).icon,
+            weatherCode: raw.hourly.weathercode[i],
+            isSunset: false,
+        });
     }
     // Daily — skip today (index 0), take next 3
     const daily = raw.daily.time.slice(1, 4).map((date, i) => ({
