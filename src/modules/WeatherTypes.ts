@@ -6,6 +6,7 @@ export interface WeatherCurrent {
   description:   string;       // e.g. "Sunny"
   icon:          string;       // emoji
   windSpeed:     number;       // km/h
+  windDirection: number;       // degrees 0-360
   humidity:      number;       // %
   visibility:    number;       // km
   pressure:      number;       // hPa
@@ -64,6 +65,7 @@ export interface OpenMeteoFull {
     apparent_temperature:   number;
     weathercode:            number;
     wind_speed_10m:         number;
+    wind_direction_10m:     number;
     relative_humidity_2m:   number;
     visibility:             number;
     pressure_msl:           number;

@@ -170,6 +170,7 @@ export async function fetchWeatherFull(coords) {
             'apparent_temperature',
             'weathercode',
             'wind_speed_10m',
+            'wind_direction_10m',
             'relative_humidity_2m',
             'visibility',
             'pressure_msl',
@@ -204,6 +205,7 @@ export async function fetchWeatherFull(coords) {
         description: info.description,
         icon: info.icon,
         windSpeed: Math.round(c.wind_speed_10m),
+        windDirection: Math.round(c.wind_direction_10m ?? 0),
         humidity: Math.round(c.relative_humidity_2m),
         visibility: Math.round((c.visibility ?? 10000) / 1000),
         pressure: Math.round(c.pressure_msl),
@@ -217,7 +219,7 @@ export async function fetchWeatherFull(coords) {
         sunset: fmtTime(raw.daily.sunset[0]),
         progress: sunProgress(raw.daily.sunrise[0], raw.daily.sunset[0]),
     };
-    // Hourly — next 23 hours with sunset + tomorrow sunrise markers
+    // Hourly — next 23 hours, with sunset marker inserted at correct position
     const now24 = new Date();
     const cutoff24 = new Date(now24.getTime() + 23 * 60 * 60 * 1000);
     const sunsetMs = new Date(raw.daily.sunset[0]).getTime();

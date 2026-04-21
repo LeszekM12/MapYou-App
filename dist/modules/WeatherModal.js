@@ -47,6 +47,12 @@ function buildModal(data) {
             <span class="wm-tile__compass-s">S</span>
             <span class="wm-tile__compass-e">E</span>
             <span class="wm-tile__compass-w">W</span>
+            <!-- Direction arrow rotated to wind direction -->
+            <svg class="wm-tile__compass-arrow" viewBox="0 0 40 40"
+              style="transform:rotate(${c.windDirection}deg)">
+              <polygon points="20,4 26,28 20,24 14,28" fill="#4ade80"/>
+              <polygon points="20,36 14,12 20,16 26,12" fill="rgba(255,255,255,0.2)"/>
+            </svg>
             <div class="wm-tile__compass-center">
               <span class="wm-tile__compass-val">${c.windSpeed}</span>
               <span class="wm-tile__compass-unit">km/h</span>
