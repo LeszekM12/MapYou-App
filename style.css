@@ -1616,6 +1616,10 @@ body {
     flex-direction: column; justify-content: flex-end;
     pointer-events: none;   /* always pass-through except tab-scroll */
 }
+/* Fix: Friends tab must never be visible when inactive */
+#tabFriends:not(.tab-panel--active) {
+    display: none !important;
+}
 .tab-panel--active {
     display: flex;
     pointer-events: none;   /* STILL none — only .tab-scroll inside gets events */

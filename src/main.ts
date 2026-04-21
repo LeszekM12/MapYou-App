@@ -1796,6 +1796,7 @@ window.app = new App();
       if (scroll) scroll.classList.toggle('tab-scroll--collapsed', !scroll.classList.contains('tab-scroll--collapsed'));
       return;
     }
+    document.querySelector<HTMLElement>(`#${activeTab} .tab-scroll`)?.classList.add('tab-scroll--collapsed'); // collapse leaving tab before hiding
     document.getElementById(activeTab)?.classList.remove('tab-panel--active');
     document.querySelector<HTMLElement>(`.bottom-nav__item[data-tab="${activeTab}"]`)?.classList.remove('bottom-nav__item--active');
     activeTab = tabId;
