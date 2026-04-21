@@ -91,18 +91,76 @@ export function closeWeatherModal(): void { _modal?.close(); }
 // Uses maximumAge=10min so it returns cached position instantly
 // if the app already requested GPS (avoids double waiting).
 
+/**
+ * Get coordinates with fallback strategy:
+ * 1. Try cached position first (instant, up to 30min old)
+ * 2. If no cache, try low-accuracy GPS (faster, 10s timeout)
+ * 3. If that fails, retry once with high-accuracy (15s timeout)
+ * 4. If all fail, use last known coords from localStorage
+ */
 function _getCoords(): Promise<Coords | null> {
-  return new Promise(resolve => {
-    if (!navigator.geolocation) { resolve(null); return; }
+  const LS_KEY = 'mapty_last_coords';
 
-    navigator.geolocation.getCurrentPosition(
-      pos  => resolve([pos.coords.latitude, pos.coords.longitude]),
-      _err => resolve(null),
-      {
-        enableHighAccuracy: false,        // faster — no GPS precision needed
-        timeout:            5000,         // 5s max
-        maximumAge:         10 * 60 * 1000, // accept 10min old cached position
-      },
-    );
-  });
+  // Save coords to localStorage whenever we get them
+  function saveCoords(coords: Coords): void {
+    localStorage.setItem(LS_KEY, JSON.stringify(coords));
+  }
+
+  // Load last known coords from localStorage
+  function loadLastCoords(): Coords | null {
+    try {
+      const raw = localStorage.getItem(LS_KEY);
+      return raw ? JSON.parse(raw) as Coords : null;
+    } catch { return null; }
+  }
+
+  function tryGet(opts: PositionOptions): Promise<Coords | null> {
+    return new Promise(resolve => {
+      if (!navigator.geolocation) { resolve(null); return; }
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          const coords: Coords = [pos.coords.latitude, pos.coords.longitude];
+          saveCoords(coords);
+          resolve(coords);
+        },
+        () => resolve(null),
+        opts,
+      );
+    });
+  }
+
+  return (async () => {
+    // 1. Try cached position (maximumAge = 30min, instant response)
+    const cached = await tryGet({
+      enableHighAccuracy: false,
+      timeout:            2000,
+      maximumAge:         30 * 60 * 1000,
+    });
+    if (cached) return cached;
+
+    // 2. Try fresh low-accuracy position (10s)
+    const fast = await tryGet({
+      enableHighAccuracy: false,
+      timeout:            10000,
+      maximumAge:         0,
+    });
+    if (fast) return fast;
+
+    // 3. Retry with high accuracy (15s)
+    const precise = await tryGet({
+      enableHighAccuracy: true,
+      timeout:            15000,
+      maximumAge:         0,
+    });
+    if (precise) return precise;
+
+    // 4. Fallback to last known coords from localStorage
+    const lastKnown = loadLastCoords();
+    if (lastKnown) {
+      console.warn('[Weather] GPS unavailable — using last known location');
+      return lastKnown;
+    }
+
+    return null;
+  })();
 }

@@ -164,9 +164,18 @@ function buildModal(data) {
       <!-- Scrollable body -->
       <div class="wm-body">
 
-        <!-- Stats tiles -->
-        <section class="wm-section">
-          ${tilesHTML}
+        <!-- Hero — big temp + description -->
+        <section class="wm-hero">
+          <div class="wm-hero__icon">${c.icon}</div>
+          <div class="wm-hero__temp">${c.temp}°</div>
+          <div class="wm-hero__desc">${c.description}</div>
+          <div class="wm-hero__meta">
+            <span>↑ ${daily[0]?.tempMax ?? '—'}°</span>
+            <span class="wm-hero__sep">·</span>
+            <span>↓ ${daily[0]?.tempMin ?? '—'}°</span>
+            <span class="wm-hero__sep">·</span>
+            <span>Feels ${c.feelsLike}°</span>
+          </div>
         </section>
 
         <!-- Hourly forecast -->
@@ -175,6 +184,11 @@ function buildModal(data) {
           <div class="wm-hourly">
             ${hourlyHTML}
           </div>
+        </section>
+
+        <!-- Stats tiles -->
+        <section class="wm-section">
+          ${tilesHTML}
         </section>
 
         <!-- 3-day forecast -->
