@@ -1,6 +1,7 @@
 // ─── WEATHER SERVICE ──────────────────────────────────────────────────────────
 // Fetches all required fields from Open-Meteo (free, no API key needed).
 // Replaces the old WeatherWidget.ts fetch logic.
+import { nightSvgIcon, nightIconKey, sunriseIcon, sunsetIcon } from './nightIcons.js';
 // Day icons
 const WMO_DAY = {
     0: { icon: '☀️', description: 'Clear sky' },
@@ -28,17 +29,32 @@ const WMO_DAY = {
     96: { icon: '⛈️', description: 'Thunderstorm + hail' },
     99: { icon: '⛈️', description: 'Thunderstorm + heavy hail' },
 };
-// Night icons — codes 0-2 get moon variants, rest stays the same
-const WMO_NIGHT = {
-    ...WMO_DAY,
-    0: { icon: '🌙', description: 'Clear night' },
-    1: { icon: '🌙', description: 'Mainly clear' },
-    2: { icon: '🌑', description: 'Partly cloudy' },
-    3: { icon: '☁️', description: 'Overcast' },
-};
-/** Returns icon + description, using night variants when isNight=true */
+/** Returns icon + description.
+ *  When isNight=true, icon is an <img> SVG tag instead of emoji. */
 export function wmoInfo(code, isNight = false) {
-    const WMO = isNight ? WMO_NIGHT : WMO_DAY;
+    if (isNight) {
+        const dayInfo = WMO_DAY[code] ?? (() => {
+            if (code <= 1)
+                return WMO_DAY[1];
+            if (code <= 3)
+                return WMO_DAY[3];
+            if (code <= 48)
+                return WMO_DAY[45];
+            if (code <= 55)
+                return WMO_DAY[55];
+            if (code <= 65)
+                return WMO_DAY[65];
+            if (code <= 77)
+                return WMO_DAY[77];
+            if (code <= 82)
+                return WMO_DAY[82];
+            if (code <= 86)
+                return WMO_DAY[86];
+            return WMO_DAY[95];
+        })();
+        return { icon: nightSvgIcon(nightIconKey(code)), description: dayInfo.description };
+    }
+    const WMO = WMO_DAY;
     if (WMO[code])
         return WMO[code];
     if (code <= 1)
@@ -201,20 +217,56 @@ export async function fetchWeatherFull(coords) {
         sunset: fmtTime(raw.daily.sunset[0]),
         progress: sunProgress(raw.daily.sunrise[0], raw.daily.sunset[0]),
     };
-    // Hourly — next 6 hours from now
-    const nowHour = new Date().getHours();
+    // Hourly — next 23 hours with sunset + tomorrow sunrise markers
+    const now24 = new Date();
+    const cutoff24 = new Date(now24.getTime() + 23 * 60 * 60 * 1000);
+    const sunsetMs = new Date(raw.daily.sunset[0]).getTime();
+    const sunriseMs = new Date(raw.daily.sunrise[0]).getTime();
+    const sunrise1Ms = raw.daily.sunrise[1]
+        ? new Date(raw.daily.sunrise[1]).getTime()
+        : sunriseMs + 24 * 60 * 60 * 1000;
     const hourly = [];
-    for (let i = 0; i < raw.hourly.time.length && hourly.length < 6; i++) {
-        const h = new Date(raw.hourly.time[i]).getHours();
-        if (new Date(raw.hourly.time[i]) > new Date()) {
-            const hNight = isNightTime(raw.daily.sunrise[0], raw.daily.sunset[0]);
+    let sunsetInserted = false;
+    let sunriseInserted = false;
+    for (let i = 0; i < raw.hourly.time.length; i++) {
+        const slotTime = new Date(raw.hourly.time[i]);
+        if (slotTime <= now24)
+            continue;
+        if (slotTime > cutoff24)
+            break;
+        const slotMs = slotTime.getTime();
+        // Insert today's sunset card
+        if (!sunsetInserted && slotMs > sunsetMs && sunsetMs > now24.getTime()) {
+            sunsetInserted = true;
             hourly.push({
-                time: fmtTime(raw.hourly.time[i]),
+                time: fmtTime(raw.daily.sunset[0]),
                 temp: Math.round(raw.hourly.temperature_2m[i]),
-                icon: wmoInfo(raw.hourly.weathercode[i], hNight).icon,
-                weatherCode: raw.hourly.weathercode[i],
+                icon: sunsetIcon(),
+                weatherCode: -1,
+                isSunset: true,
             });
         }
+        // Insert tomorrow's sunrise card
+        if (!sunriseInserted && slotMs > sunrise1Ms && sunrise1Ms > now24.getTime()) {
+            sunriseInserted = true;
+            hourly.push({
+                time: fmtTime(raw.daily.sunrise[1] ?? ''),
+                temp: Math.round(raw.hourly.temperature_2m[i]),
+                icon: sunriseIcon(),
+                weatherCode: -2,
+                isSunset: false,
+                isSunrise: true,
+            });
+        }
+        // Night = after today's sunset AND before tomorrow's sunrise
+        const hIsNight = slotMs > sunsetMs && slotMs < sunrise1Ms;
+        hourly.push({
+            time: fmtTime(raw.hourly.time[i]),
+            temp: Math.round(raw.hourly.temperature_2m[i]),
+            icon: wmoInfo(raw.hourly.weathercode[i], hIsNight).icon,
+            weatherCode: raw.hourly.weathercode[i],
+            isSunset: false,
+        });
     }
     // Daily — skip today (index 0), take next 3
     const daily = raw.daily.time.slice(1, 4).map((date, i) => ({

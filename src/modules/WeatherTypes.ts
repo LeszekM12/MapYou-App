@@ -26,6 +26,8 @@ export interface HourlyPoint {
   temp:        number;
   icon:        string;
   weatherCode: number;
+  isSunset?:   boolean;   // true for sunset marker card
+  isSunrise?:  boolean;   // true for sunrise marker card
 }
 
 export interface DailyPoint {
