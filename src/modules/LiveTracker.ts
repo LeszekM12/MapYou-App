@@ -8,7 +8,7 @@
 //   - integruje z push notifications do znajomych
 
 import { BACKEND_URL } from '../config.js';
-import { getAllFriends } from './FriendsDB.js';
+import { getAllFriends, updateFriendLiveToken } from './FriendsDB.js';
 import { getUserId } from './PushNotifications.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
@@ -93,6 +93,11 @@ export class LiveTracker {
       if (!this._paused && this._lastPos) void this._sendPosition();
     }, INTERVAL_MS);
 
+    // Zapisz token przy wszystkich znajomych — żeby pojawił się przycisk Watch
+    for (const f of friends) {
+      await updateFriendLiveToken(f.subscriptionId, this._token);
+    }
+
     console.log(`[LiveTracker] Started: ${this._token}`);
     return this._token;
   }
@@ -141,6 +146,14 @@ export class LiveTracker {
         body: JSON.stringify({ token: this._token }),
       });
     } catch { /* ignoruj */ }
+
+    // Wyczyść token u wszystkich znajomych
+    const allFriends = await getAllFriends();
+    for (const f of allFriends) {
+      if (f.liveToken === this._token) {
+        await updateFriendLiveToken(f.subscriptionId, null);
+      }
+    }
 
     localStorage.removeItem(LS_TOKEN_KEY);
     console.log(`[LiveTracker] Finished: ${this._token}`);

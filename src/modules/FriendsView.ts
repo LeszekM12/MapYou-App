@@ -8,7 +8,7 @@
 //   - polling statusu znajomych co 30s
 
 import {
-  getAllFriends, addFriend, deleteFriend,
+  getAllFriends, addFriend, deleteFriend, updateFriendLiveToken,
   generateInviteLink, fetchInviteByCode, parseInviteLink, checkInviteInUrl,
   type Friend,
 } from './FriendsDB.js';
@@ -72,6 +72,13 @@ export class FriendsView {
 
     // Polling statusu znajomych
     this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
+
+    // Odbieraj wiadomości z Service Workera (po kliknięciu powiadomienia)
+    navigator.serviceWorker.addEventListener('message', (e: MessageEvent) => {
+      if (e.data?.type === 'OPEN_LIVE') {
+        void this._handleLivePushUrl(e.data.url as string);
+      }
+    });
   }
 
   destroy(): void {
@@ -384,6 +391,42 @@ export class FriendsView {
     }
 
     if (changed) void this.render();
+  }
+
+  // ── Handle live push URL ─────────────────────────────────────────────────
+
+  private async _handleLivePushUrl(url: string): Promise<void> {
+    // Wyciągnij token z URL: #live=TOKEN
+    let token = '';
+    try {
+      token = new URL(url).hash.replace('#live=', '');
+    } catch {
+      if (url.includes('#live=')) token = url.split('#live=')[1];
+    }
+    if (!token) return;
+
+    // Znajdź znajomego po tokenie lub zaktualizuj pierwszego bez tokenu
+    const friends = await getAllFriends();
+    let friend = friends.find(f => f.liveToken === token);
+
+    if (!friend) {
+      // Zaktualizuj znajomego który zaczął trening (heurystyka: ostatnio dodany)
+      // lub zapisz token tymczasowo przy pierwszym znajomym
+      friend = friends[0];
+      if (friend) {
+        await updateFriendLiveToken(friend.subscriptionId, token);
+        void this.render();
+      }
+    }
+
+    const name = friend?.name ?? 'Friend';
+
+    // Przełącz na zakładkę Friends
+    const friendsBtn = document.querySelector<HTMLElement>('.bottom-nav__item[data-tab="tabFriends"]');
+    friendsBtn?.click();
+
+    // Otwórz live mapę
+    setTimeout(() => this._openLiveView(token, name), 300);
   }
 
   // ── Toast ──────────────────────────────────────────────────────────────────

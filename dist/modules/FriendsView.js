@@ -6,7 +6,7 @@
 //   - dodawanie znajomych przez link lub QR
 //   - live mapa wbudowana w zakładkę
 //   - polling statusu znajomych co 30s
-import { getAllFriends, addFriend, deleteFriend, generateInviteLink, fetchInviteByCode, parseInviteLink, checkInviteInUrl, } from './FriendsDB.js';
+import { getAllFriends, addFriend, deleteFriend, updateFriendLiveToken, generateInviteLink, fetchInviteByCode, parseInviteLink, checkInviteInUrl, } from './FriendsDB.js';
 import { LiveMap } from './LiveMap.js';
 import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
@@ -75,6 +75,12 @@ export class FriendsView {
         void this.render();
         // Polling statusu znajomych
         this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
+        // Odbieraj wiadomości z Service Workera (po kliknięciu powiadomienia)
+        navigator.serviceWorker.addEventListener('message', (e) => {
+            if (e.data?.type === 'OPEN_LIVE') {
+                void this._handleLivePushUrl(e.data.url);
+            }
+        });
     }
     destroy() {
         if (this._pollTimer)
@@ -367,6 +373,38 @@ export class FriendsView {
         }
         if (changed)
             void this.render();
+    }
+    // ── Handle live push URL ─────────────────────────────────────────────────
+    async _handleLivePushUrl(url) {
+        // Wyciągnij token z URL: #live=TOKEN
+        let token = '';
+        try {
+            token = new URL(url).hash.replace('#live=', '');
+        }
+        catch {
+            if (url.includes('#live='))
+                token = url.split('#live=')[1];
+        }
+        if (!token)
+            return;
+        // Znajdź znajomego po tokenie lub zaktualizuj pierwszego bez tokenu
+        const friends = await getAllFriends();
+        let friend = friends.find(f => f.liveToken === token);
+        if (!friend) {
+            // Zaktualizuj znajomego który zaczął trening (heurystyka: ostatnio dodany)
+            // lub zapisz token tymczasowo przy pierwszym znajomym
+            friend = friends[0];
+            if (friend) {
+                await updateFriendLiveToken(friend.subscriptionId, token);
+                void this.render();
+            }
+        }
+        const name = friend?.name ?? 'Friend';
+        // Przełącz na zakładkę Friends
+        const friendsBtn = document.querySelector('.bottom-nav__item[data-tab="tabFriends"]');
+        friendsBtn?.click();
+        // Otwórz live mapę
+        setTimeout(() => this._openLiveView(token, name), 300);
     }
     // ── Toast ──────────────────────────────────────────────────────────────────
     _showToast(msg) {
