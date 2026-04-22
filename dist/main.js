@@ -23,8 +23,10 @@ import { initWeatherComponents } from './modules/initWeatherComponents.js';
 import { loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, } from './modules/PushNotifications.js';
 import { Tracker, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
-import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
+import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
+import { homeView } from './modules/HomeView.js';
+import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker } from './modules/LiveTracker.js';
 import { FriendsView } from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
@@ -1119,10 +1121,16 @@ class App {
             if (!activity)
                 return;
             showGoodJobSplash(() => {
-                showActivitySummary(activity, map, () => { __classPrivateFieldGet(this, _App_tracker, "f")?.reset(); }, async (saved) => {
-                    await saveActivity(saved);
+                // Open save modal → user fills name, photo, intensity, notes
+                openSaveActivityModal(activity, async (enriched) => {
+                    // Save raw activity (backward compat with history panel)
+                    await saveActivity(activity);
                     __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
+                    // Refresh panels
                     await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
+                    await homeView.render();
+                    // Navigate to Home feed
+                    homeView.switchToHome();
                 });
             });
         });
@@ -2036,6 +2044,13 @@ window.app = new App();
                 }).catch(() => { });
             }
         }
+        else if (activeTab === 'tabHome') {
+            hideMobileSearchTab();
+            if (!homeViewInited) {
+                homeViewInited = true;
+                homeView.init();
+            }
+        }
         else if (activeTab === 'tabFriends') {
             hideMobileSearchTab();
             // Inicjalizuj FriendsView przy pierwszym wejściu
@@ -2215,6 +2230,7 @@ void initWeatherComponents();
 // ─── FRIENDS & LIVE TRACKING ─────────────────────────────────────────────────
 const friendsView = new FriendsView();
 let friendsViewInited = false;
+let homeViewInited = false;
 // Inicjalizuj FriendsView od razu — polling statusu znajomych musi działać
 // niezależnie od tego czy użytkownik wszedł w zakładkę Friends
 friendsView.init();

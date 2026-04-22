@@ -10,6 +10,12 @@ db.version(2).stores({
     workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
     activities: 'id, sport, date, distanceKm, durationSec',
 });
+// version(3) — enrichedActivities (feed Home)
+db.version(3).stores({
+    workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+    activities: 'id, sport, date, distanceKm, durationSec',
+    enrichedActivities: 'id, sport, date, name',
+});
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
 function _generateDescription(type, isoDate) {
     const months = [
@@ -135,5 +141,29 @@ export async function loadActivityById(id) {
 }
 export async function deleteActivity(id) {
     await db.activities.delete(id);
+}
+// ── CRUD — enrichedActivities (HomeView feed) ─────────────────────────────────
+export async function saveEnrichedActivity(activity) {
+    try {
+        await db.enrichedActivities.put(activity);
+        console.info(`[DB] ✅ EnrichedActivity saved: ${activity.id}`);
+        return activity.id;
+    }
+    catch (err) {
+        console.error('[DB] Błąd zapisu enrichedActivity:', err);
+        throw err;
+    }
+}
+export async function loadEnrichedActivities() {
+    try {
+        return await db.enrichedActivities.orderBy('date').reverse().toArray();
+    }
+    catch (err) {
+        console.error('[DB] Błąd wczytywania enrichedActivities:', err);
+        return [];
+    }
+}
+export async function deleteEnrichedActivity(id) {
+    await db.enrichedActivities.delete(id);
 }
 //# sourceMappingURL=db.js.map

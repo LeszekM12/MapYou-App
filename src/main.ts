@@ -33,6 +33,8 @@ import {
 import { Tracker, type SportType, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
+import { homeView } from './modules/HomeView.js';
+import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
@@ -1077,16 +1079,19 @@ class App {
       void this._releaseWakeLock();
       this._exitTrackingView();
       if (!activity) return;
+
       showGoodJobSplash(() => {
-        showActivitySummary(
-          activity, map,
-          () => { this.#tracker?.reset(); },
-          async saved => {
-            await saveActivity(saved);
-            this.#tracker?.reset();
-            await this.#historyPanel?.render();
-          },
-        );
+        // Open save modal → user fills name, photo, intensity, notes
+        openSaveActivityModal(activity, async (enriched) => {
+          // Save raw activity (backward compat with history panel)
+          await saveActivity(activity);
+          this.#tracker?.reset();
+          // Refresh panels
+          await this.#historyPanel?.render();
+          await homeView.render();
+          // Navigate to Home feed
+          homeView.switchToHome();
+        });
       });
     });
 
@@ -1818,6 +1823,12 @@ window.app = new App();
           else perm.classList.add('hidden');
         }).catch(() => {});
       }
+    } else if (activeTab === 'tabHome') {
+      hideMobileSearchTab();
+      if (!homeViewInited) {
+        homeViewInited = true;
+        homeView.init();
+      }
     } else if (activeTab === 'tabFriends') {
       hideMobileSearchTab();
       // Inicjalizuj FriendsView przy pierwszym wejściu
@@ -1984,6 +1995,7 @@ void initWeatherComponents();
 // ─── FRIENDS & LIVE TRACKING ─────────────────────────────────────────────────
 const friendsView     = new FriendsView();
 let   friendsViewInited = false;
+let   homeViewInited    = false;
 
 // Inicjalizuj FriendsView od razu — polling statusu znajomych musi działać
 // niezależnie od tego czy użytkownik wszedł w zakładkę Friends
