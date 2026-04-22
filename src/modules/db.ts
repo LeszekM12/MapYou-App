@@ -24,6 +24,23 @@ export interface WorkoutRecord {
   routeCoords:  Coords[] | null;
 }
 
+/** Rich activity saved after finishing a tracked workout (HomeView feed) */
+export interface EnrichedActivity {
+  id:          string;
+  sport:       string;          // 'running' | 'walking' | 'cycling'
+  date:        number;          // timestamp ms
+  name:        string;
+  description: string;
+  photoUrl:    string | null;   // data:image/… base64 string
+  distanceKm:  number;
+  durationSec: number;
+  paceMinKm:   number;
+  speedKmH:    number;
+  intensity:   number;          // 1–5
+  notes:       string;          // private notes
+  coords:      Array<[number, number]>;
+}
+
 // ── Inicjalizacja Dexie ───────────────────────────────────────────────────────
 
 declare const Dexie: any;
@@ -39,6 +56,13 @@ db.version(1).stores({
 db.version(2).stores({
   workouts:   'id, type, date, distance, duration, cadence, pace, elevGain, speed',
   activities: 'id, sport, date, distanceKm, durationSec',
+});
+
+// version(3) — enrichedActivities (feed Home)
+db.version(3).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
 });
 
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
@@ -177,4 +201,30 @@ export async function loadActivityById(id: string): Promise<ActivityRecord | und
 
 export async function deleteActivity(id: string): Promise<void> {
   await db.activities.delete(id);
+}
+
+// ── CRUD — enrichedActivities (HomeView feed) ─────────────────────────────────
+
+export async function saveEnrichedActivity(activity: EnrichedActivity): Promise<string> {
+  try {
+    await db.enrichedActivities.put(activity);
+    console.info(`[DB] ✅ EnrichedActivity saved: ${activity.id}`);
+    return activity.id;
+  } catch (err) {
+    console.error('[DB] Błąd zapisu enrichedActivity:', err);
+    throw err;
+  }
+}
+
+export async function loadEnrichedActivities(): Promise<EnrichedActivity[]> {
+  try {
+    return await db.enrichedActivities.orderBy('date').reverse().toArray();
+  } catch (err) {
+    console.error('[DB] Błąd wczytywania enrichedActivities:', err);
+    return [];
+  }
+}
+
+export async function deleteEnrichedActivity(id: string): Promise<void> {
+  await db.enrichedActivities.delete(id);
 }
