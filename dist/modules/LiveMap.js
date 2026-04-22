@@ -53,19 +53,23 @@ export class LiveMap {
             value: null
         });
     }
-    /** Inicjalizuje mapę w podanym kontenerze */
+    /** Zachowaj kontener i callback — mapę inicjujemy dopiero gdy kontener jest widoczny */
     init(container, onStatus) {
         this._container = container;
         this._onStatus = onStatus;
-        // Inicjalizuj mapę Leaflet
-        this._map = L.map(container, {
+        // NIE inicjujemy Leaflet tutaj — kontener ma display:none i mapa miałaby rozmiar 0x0
+    }
+    /** Inicjalizuj mapę Leaflet (lazy — wywołaj dopiero gdy kontener jest widoczny) */
+    _initMap() {
+        if (this._map || !this._container)
+            return;
+        this._map = L.map(this._container, {
             zoomControl: true,
             attributionControl: false,
         }).setView([52, 19], 13);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap',
         }).addTo(this._map);
-        // Polyline dla trasy
         this._polyline = L.polyline([], {
             color: ROUTE_COLOR,
             weight: 5,
@@ -76,6 +80,7 @@ export class LiveMap {
     watch(token) {
         this._token = token;
         this._stopPolling();
+        this._initMap(); // lazy init — mapa jest teraz widoczna
         void this._poll(); // natychmiastowe pobranie
         this._pollTimer = setInterval(() => void this._poll(), POLL_INTERVAL_MS);
     }

@@ -36,14 +36,19 @@ export class LiveMap {
   private _onStatus:   ((data: LiveData) => void) | null = null;
   private _container:  HTMLElement | null  = null;
 
-  /** Inicjalizuje mapę w podanym kontenerze */
+  /** Zachowaj kontener i callback — mapę inicjujemy dopiero gdy kontener jest widoczny */
   init(container: HTMLElement, onStatus: (data: LiveData) => void): void {
     this._container = container;
     this._onStatus  = onStatus;
+    // NIE inicjujemy Leaflet tutaj — kontener ma display:none i mapa miałaby rozmiar 0x0
+  }
 
-    // Inicjalizuj mapę Leaflet
-    this._map = L.map(container, {
-      zoomControl:       true,
+  /** Inicjalizuj mapę Leaflet (lazy — wywołaj dopiero gdy kontener jest widoczny) */
+  private _initMap(): void {
+    if (this._map || !this._container) return;
+
+    this._map = L.map(this._container, {
+      zoomControl:        true,
       attributionControl: false,
     }).setView([52, 19], 13);
 
@@ -51,7 +56,6 @@ export class LiveMap {
       attribution: '&copy; OpenStreetMap',
     }).addTo(this._map);
 
-    // Polyline dla trasy
     this._polyline = L.polyline([], {
       color:   ROUTE_COLOR,
       weight:  5,
@@ -63,6 +67,7 @@ export class LiveMap {
   watch(token: string): void {
     this._token = token;
     this._stopPolling();
+    this._initMap();   // lazy init — mapa jest teraz widoczna
     void this._poll();  // natychmiastowe pobranie
     this._pollTimer = setInterval(() => void this._poll(), POLL_INTERVAL_MS);
   }
