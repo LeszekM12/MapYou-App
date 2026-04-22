@@ -18,7 +18,7 @@ import { getUserName } from './LiveTracker.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 
-const STATUS_POLL_MS = 30_000;   // sprawdzaj status znajomych co 30s
+const STATUS_POLL_MS = 10_000;   // sprawdzaj status znajomych co 10s
 
 // ── FriendsView class ─────────────────────────────────────────────────────────
 

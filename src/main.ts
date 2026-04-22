@@ -1984,6 +1984,11 @@ void initWeatherComponents();
 const friendsView     = new FriendsView();
 let   friendsViewInited = false;
 
+// Inicjalizuj FriendsView od razu — polling statusu znajomych musi działać
+// niezależnie od tego czy użytkownik wszedł w zakładkę Friends
+friendsView.init();
+friendsViewInited = true;
+
 // Pokaż modal imienia przy pierwszym uruchomieniu
 void showNameModalIfNeeded();
 

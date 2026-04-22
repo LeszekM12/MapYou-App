@@ -11,7 +11,7 @@ import { LiveMap } from './LiveMap.js';
 import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
-const STATUS_POLL_MS = 30000; // sprawdzaj status znajomych co 30s
+const STATUS_POLL_MS = 10000; // sprawdzaj status znajomych co 10s
 // ── FriendsView class ─────────────────────────────────────────────────────────
 export class FriendsView {
     constructor() {
