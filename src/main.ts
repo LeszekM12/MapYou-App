@@ -1093,6 +1093,7 @@ class App {
     // ── DISCARD ───────────────────────────────────────────────────────────
     document.getElementById('trkBtnDiscard')?.addEventListener('click', () => {
       if (!confirm('Discard activity?')) return;
+      void liveTracker.finish();   // ← zakończ live tracking (jak przy Stop)
       this.#tracker?.reset();
       void this._releaseWakeLock();
       this._exitTrackingView();
