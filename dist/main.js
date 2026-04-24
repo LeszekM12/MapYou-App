@@ -30,6 +30,7 @@ import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker } from './modules/LiveTracker.js';
 import { FriendsView } from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
+import { initUserProfile } from './modules/UserProfile.js';
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -2240,6 +2241,8 @@ let homeViewInited = false;
 // niezależnie od tego czy użytkownik wszedł w zakładkę Friends
 friendsView.init();
 friendsViewInited = true;
+// Inicjalizuj profil użytkownika (userId + avatar w UI)
+initUserProfile();
 // Pokaż modal imienia przy pierwszym uruchomieniu
 void showNameModalIfNeeded();
 // Przycisk „Change name" w Settings

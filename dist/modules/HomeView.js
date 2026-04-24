@@ -3,6 +3,7 @@
 import { loadEnrichedActivities } from './db.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
+import { openProfileModal, loadProfileFromLocal } from './UserProfile.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function relativeDate(timestamp) {
     const diff = Date.now() - timestamp;
@@ -426,11 +427,28 @@ export class HomeView {
         greeting.className = 'home-greeting';
         const hour = new Date().getHours();
         const greet = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
-        const userName = localStorage.getItem('mapyou_userName') ?? 'Athlete';
+        const profile = loadProfileFromLocal();
+        const avatarHtml = profile.avatarB64
+            ? `<img src="${profile.avatarB64}" class="home-greeting__avatar-img" alt="avatar"/>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22">
+           <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+         </svg>`;
         greeting.innerHTML = `
-      <h2 class="home-greeting__text">${greet}, <strong>${userName}</strong> 👋</h2>
-      <p class="home-greeting__sub">${activities.length} activit${activities.length === 1 ? 'y' : 'ies'} recorded</p>`;
+      <div class="home-greeting__row">
+        <div class="home-greeting__text-wrap">
+          <h2 class="home-greeting__text">${greet}, <strong>${profile.name}</strong> 👋</h2>
+          <p class="home-greeting__sub">${activities.length} activit${activities.length === 1 ? 'y' : 'ies'} recorded</p>
+        </div>
+        <button class="home-greeting__profile-btn" id="profileNavAvatar" aria-label="Open profile">
+          ${avatarHtml}
+        </button>
+      </div>`;
         scroll.appendChild(greeting);
+        // Wire profile button — stopPropagation so it doesn't bubble to map
+        greeting.querySelector('#profileNavAvatar')?.addEventListener('click', e => {
+            e.stopPropagation();
+            openProfileModal();
+        });
         activities.forEach((act, idx) => {
             const card = buildCard(act);
             card.style.animationDelay = `${idx * 60}ms`;
