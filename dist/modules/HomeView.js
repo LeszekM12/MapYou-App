@@ -405,24 +405,7 @@ export class HomeView {
         }
         void this.render();
     }
-    async render() {
-        if (!this._inited)
-            this.init();
-        const scroll = this.container;
-        if (!scroll)
-            return;
-        scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
-        const activities = await loadEnrichedActivities();
-        if (activities.length === 0) {
-            scroll.innerHTML = `
-        <div class="home-empty">
-          <div class="home-empty__icon">🏃</div>
-          <h3 class="home-empty__title">No activities yet</h3>
-          <p class="home-empty__sub">Finish your first workout to see it here</p>
-        </div>`;
-            return;
-        }
-        scroll.innerHTML = '';
+    _buildGreeting(activityCount) {
         const greeting = document.createElement('div');
         greeting.className = 'home-greeting';
         const hour = new Date().getHours();
@@ -437,18 +420,39 @@ export class HomeView {
       <div class="home-greeting__row">
         <div class="home-greeting__text-wrap">
           <h2 class="home-greeting__text">${greet}, <strong>${profile.name}</strong> 👋</h2>
-          <p class="home-greeting__sub">${activities.length} activit${activities.length === 1 ? 'y' : 'ies'} recorded</p>
+          <p class="home-greeting__sub">${activityCount} activit${activityCount === 1 ? 'y' : 'ies'} recorded</p>
         </div>
         <button class="home-greeting__profile-btn" id="profileNavAvatar" aria-label="Open profile">
           ${avatarHtml}
         </button>
       </div>`;
-        scroll.appendChild(greeting);
-        // Wire profile button — stopPropagation so it doesn't bubble to map
         greeting.querySelector('#profileNavAvatar')?.addEventListener('click', e => {
             e.stopPropagation();
             openProfileModal();
         });
+        return greeting;
+    }
+    async render() {
+        if (!this._inited)
+            this.init();
+        const scroll = this.container;
+        if (!scroll)
+            return;
+        scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
+        const activities = await loadEnrichedActivities();
+        scroll.innerHTML = '';
+        // Greeting always rendered — regardless of activity count
+        scroll.appendChild(this._buildGreeting(activities.length));
+        if (activities.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'home-empty';
+            empty.innerHTML = `
+        <div class="home-empty__icon">🏃</div>
+        <h3 class="home-empty__title">No activities yet</h3>
+        <p class="home-empty__sub">Finish your first workout to see it here</p>`;
+            scroll.appendChild(empty);
+            return;
+        }
         activities.forEach((act, idx) => {
             const card = buildCard(act);
             card.style.animationDelay = `${idx * 60}ms`;
