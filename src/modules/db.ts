@@ -41,6 +41,14 @@ export interface EnrichedActivity {
   coords:      Array<[number, number]>;
 }
 
+/** Local user profile (stored in IndexedDB as backup, primary = localStorage) */
+export interface ProfileRecord {
+  userId:    string;    // primary key
+  name:      string;
+  bio:       string;
+  avatarB64: string | null;
+}
+
 // ── Inicjalizacja Dexie ───────────────────────────────────────────────────────
 
 declare const Dexie: any;
@@ -63,6 +71,14 @@ db.version(3).stores({
   workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
   activities:         'id, sport, date, distanceKm, durationSec',
   enrichedActivities: 'id, sport, date, name',
+});
+
+// version(4) — profile (local user profile)
+db.version(4).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
 });
 
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
@@ -227,4 +243,22 @@ export async function loadEnrichedActivities(): Promise<EnrichedActivity[]> {
 
 export async function deleteEnrichedActivity(id: string): Promise<void> {
   await db.enrichedActivities.delete(id);
+}
+// ── CRUD — profile ────────────────────────────────────────────────────────────
+
+export async function saveProfileToDB(profile: ProfileRecord): Promise<void> {
+  try {
+    await db.profile.put(profile);
+  } catch (err) {
+    console.warn('[DB] Profile save error:', err);
+  }
+}
+
+export async function loadProfileFromDB(): Promise<ProfileRecord | null> {
+  try {
+    const all = await db.profile.toArray();
+    return all[0] ?? null;
+  } catch {
+    return null;
+  }
 }

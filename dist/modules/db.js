@@ -16,6 +16,13 @@ db.version(3).stores({
     activities: 'id, sport, date, distanceKm, durationSec',
     enrichedActivities: 'id, sport, date, name',
 });
+// version(4) — profile (local user profile)
+db.version(4).stores({
+    workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+    activities: 'id, sport, date, distanceKm, durationSec',
+    enrichedActivities: 'id, sport, date, name',
+    profile: 'userId',
+});
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
 function _generateDescription(type, isoDate) {
     const months = [
@@ -165,5 +172,23 @@ export async function loadEnrichedActivities() {
 }
 export async function deleteEnrichedActivity(id) {
     await db.enrichedActivities.delete(id);
+}
+// ── CRUD — profile ────────────────────────────────────────────────────────────
+export async function saveProfileToDB(profile) {
+    try {
+        await db.profile.put(profile);
+    }
+    catch (err) {
+        console.warn('[DB] Profile save error:', err);
+    }
+}
+export async function loadProfileFromDB() {
+    try {
+        const all = await db.profile.toArray();
+        return all[0] ?? null;
+    }
+    catch {
+        return null;
+    }
 }
 //# sourceMappingURL=db.js.map

@@ -38,6 +38,7 @@ import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
+import { initUserProfile } from './modules/UserProfile.js';
 
 // ─── Leaflet plugin types ─────────────────────────────────────────────────────
 
@@ -2006,6 +2007,9 @@ let   homeViewInited    = false;
 // niezależnie od tego czy użytkownik wszedł w zakładkę Friends
 friendsView.init();
 friendsViewInited = true;
+
+// Inicjalizuj profil użytkownika (userId + avatar w UI)
+initUserProfile();
 
 // Pokaż modal imienia przy pierwszym uruchomieniu
 void showNameModalIfNeeded();
