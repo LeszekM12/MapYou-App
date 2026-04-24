@@ -202,6 +202,34 @@ function openSharePanel(card: HTMLElement, act: EnrichedActivity): void {
   }, 100);
 }
 
+// ── Lightbox ──────────────────────────────────────────────────────────────────
+
+function openLightbox(src: string): void {
+  const existing = document.getElementById('homeLightbox');
+  if (existing) existing.remove();
+
+  const lb = document.createElement('div');
+  lb.id = 'homeLightbox';
+  lb.className = 'home-lightbox';
+  lb.innerHTML = `
+    <div class="home-lightbox__backdrop"></div>
+    <div class="home-lightbox__inner">
+      <button class="home-lightbox__close" aria-label="Close">✕</button>
+      <img class="home-lightbox__img" src="${src}" alt="Activity photo"/>
+    </div>`;
+  document.body.appendChild(lb);
+
+  requestAnimationFrame(() => lb.classList.add('home-lightbox--open'));
+
+  const close = () => {
+    lb.classList.remove('home-lightbox--open');
+    setTimeout(() => lb.remove(), 280);
+  };
+  lb.querySelector('.home-lightbox__close')?.addEventListener('click', close);
+  lb.querySelector('.home-lightbox__backdrop')?.addEventListener('click', close);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); }, { once: true });
+}
+
 // ── Card builder ──────────────────────────────────────────────────────────────
 
 function buildCard(act: EnrichedActivity): HTMLElement {
@@ -222,7 +250,7 @@ function buildCard(act: EnrichedActivity): HTMLElement {
     : '';
 
   const photoHtml = act.photoUrl
-    ? `<div class="home-card__photo"><img src="${act.photoUrl}" alt="Activity photo" loading="lazy"/></div>`
+    ? `<div class="home-card__photo" data-photosrc="${act.photoUrl}"><img src="${act.photoUrl}" alt="Activity photo" loading="lazy"/></div>`
     : '';
 
   const notesHtml = act.notes
@@ -333,6 +361,16 @@ function buildCard(act: EnrichedActivity): HTMLElement {
       }
     });
   });
+
+  // ── Wire photo click → lightbox ──────────────────────────────────────────
+  const photoEl = card.querySelector<HTMLElement>('.home-card__photo[data-photosrc]');
+  if (photoEl) {
+    photoEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const src = photoEl.dataset.photosrc;
+      if (src) openLightbox(src);
+    });
+  }
 
   // Restore persisted likes
   const lsKey = `hc_likes_${act.id}`;
