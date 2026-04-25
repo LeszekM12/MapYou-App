@@ -14,6 +14,7 @@
 //   Klucz subskrypcji w DB = userId:deviceId (unikalny per urządzenie)
 
 import { BACKEND_URL } from '../config.js';
+import { getIPLocation, hasGPSPermission, getGPSLocation } from './LocationService.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 
@@ -279,10 +280,23 @@ export async function sendWeatherPush(): Promise<void> {
   if ((now - Number(localStorage.getItem(KEY) ?? 0)) / (1000 * 60 * 60) < 6) return;
 
   try {
-    const coords = await new Promise<GeolocationCoordinates>((res, rej) =>
-      navigator.geolocation.getCurrentPosition(p => res(p.coords), rej, { timeout: 5000 }),
-    );
-    const url  = `https://api.open-meteo.com/v1/forecast?latitude=${coords.latitude}&longitude=${coords.longitude}&current=temperature_2m,weathercode,windspeed_10m&timezone=auto&forecast_days=1`;
+    // Use GPS only if already granted, otherwise fall back to IP — never prompt
+    let lat: number, lon: number;
+    if (await hasGPSPermission()) {
+      try {
+        const gps = await getGPSLocation();
+        [lat, lon] = gps;
+      } catch {
+        const ip = await getIPLocation();
+        if (!ip) return;
+        [lat, lon] = ip.coords;
+      }
+    } else {
+      const ip = await getIPLocation();
+      if (!ip) return;
+      [lat, lon] = ip.coords;
+    }
+    const url  = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current=temperature_2m,weathercode,windspeed_10m&timezone=auto&forecast_days=1`;
     const data = await (await fetch(url)).json() as {
       current: { temperature_2m: number; weathercode: number; windspeed_10m: number };
     };
