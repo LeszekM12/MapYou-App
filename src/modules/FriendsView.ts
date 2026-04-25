@@ -172,48 +172,51 @@ export class FriendsView {
   private _cachingLink = false;
 
   async _precacheInviteLink(): Promise<void> {
-    if (this._cachedInviteLink || this._cachingLink) return;
+    if (this._cachingLink) return;
     this._cachingLink = true;
     const name = getUserName();
     const base = window.location.href.split('#')[0];
 
+    // Ustaw base64 link NATYCHMIAST — zawsze dostępny gdy user kliknie
+    const buildBase64 = (s: PushSubscription | null) => `${base}#invite=${btoa(JSON.stringify({
+      name,
+      pushSub: s?.toJSON() ?? {
+        endpoint: `local:${localStorage.getItem('mapyou_userId_profile') ?? Date.now()}`,
+        expirationTime: null,
+        keys: { p256dh: '', auth: '' },
+      },
+    }))}`;
+
+    // Znajdź push sub z krótkim timeoutem
     let sub: PushSubscription | null = null;
     try {
-      const timeout = new Promise<null>(r => setTimeout(() => r(null), 1500));
-      const lookup  = (async () => {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (const reg of regs) {
-          const s = await reg.pushManager.getSubscription();
-          if (s) return s;
-        }
-        return null;
-      })();
-      sub = await Promise.race([lookup, timeout]);
+      const regs = await Promise.race([
+        navigator.serviceWorker.getRegistrations(),
+        new Promise<ServiceWorkerRegistration[]>(r => setTimeout(() => r([]), 800)),
+      ]);
+      for (const reg of regs) {
+        sub = await reg.pushManager.getSubscription();
+        if (sub) break;
+      }
     } catch {}
 
-    if (sub) {
-      try {
-        const subJson = sub.toJSON() as Friend['pushSub'];
-        const tout = new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000));
-        this._cachedInviteLink = await Promise.race([
-          generateInviteLink(name, subJson, BACKEND_URL),
-          tout,
-        ]);
-      } catch {}
-    }
-
-    if (!this._cachedInviteLink) {
-      const payload = {
-        name,
-        pushSub: sub?.toJSON() ?? {
-          endpoint: `local:${localStorage.getItem('mapyou_userId_profile') ?? Date.now()}`,
-          expirationTime: null,
-          keys: { p256dh: '', auth: '' },
-        },
-      };
-      this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify(payload))}`;
-    }
+    // Ustaw base64 od razu (natychmiast dostępny)
+    this._cachedInviteLink = buildBase64(sub);
     this._cachingLink = false;
+
+    // Spróbuj zastąpić krótkim linkiem z backendu w tle (bez blokowania)
+    if (sub) {
+      void (async () => {
+        try {
+          const subJson = sub!.toJSON() as Friend['pushSub'];
+          const short = await Promise.race([
+            generateInviteLink(name, subJson, BACKEND_URL),
+            new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
+          ]);
+          this._cachedInviteLink = short; // nadpisz krótkim jeśli backend odpowiedział
+        } catch { /* zostaje base64 */ }
+      })();
+    }
   }
 
   private _shareMyLink(): void {
