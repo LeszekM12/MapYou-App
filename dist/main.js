@@ -19,7 +19,8 @@ import { MAPBOX_TOKEN } from './config.js';
 import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
 import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryBtn, } from './modules/OfflineDetector.js';
-import { initWeatherComponents } from './modules/initWeatherComponents.js';
+import { initWeatherComponents, switchToGPSWeather } from './modules/initWeatherComponents.js';
+import { getIPLocation, requestGPSPermission, subscribeToPermissionChanges, hasGPSPermission } from './modules/LocationService.js';
 import { loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, } from './modules/PushNotifications.js';
 import { Tracker, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
@@ -115,7 +116,7 @@ class App {
         _App_statsWeekOffset.set(this, 0);
         _App_statsSelectedDay.set(this, null);
         _App_statsPrevGoalReached.set(this, false);
-        this._getPosition();
+        void this._loadMapFromIP();
         void this._getLocalStorage();
         form.addEventListener('submit', this._newWorkout.bind(this));
         inputType.addEventListener('change', this._toggleElevationField);
@@ -143,13 +144,38 @@ class App {
         }
     }
     // ── GEOLOCATION ───────────────────────────────────────────────────────────
-    _getPosition() {
-        if (navigator.geolocation)
-            navigator.geolocation.getCurrentPosition(this._loadMap.bind(this), () => alert('Could not get your position'));
+    /** Load map using IP location — no GPS permission needed */
+    async _loadMapFromIP() {
+        const DEFAULT_COORDS = [52.237, 21.017]; // Warsaw fallback
+        let coords = DEFAULT_COORDS;
+        const ipLoc = await getIPLocation();
+        if (ipLoc) {
+            coords = ipLoc.coords;
+            console.info(`[Map] IP location: ${ipLoc.city}, ${ipLoc.country}`);
+        }
+        else {
+            console.warn('[Map] IP location failed — using default coords');
+        }
+        this._loadMap(coords);
+        // Subscribe to future GPS grants → auto re-center map + upgrade weather
+        // NOTE: never call getCurrentPosition here — that triggers the browser popup.
+        // Re-centering happens only after user explicitly clicks "Allow location" in Track tab.
+        subscribeToPermissionChanges((gpsCoords) => {
+            this._recenterMapToGPS(gpsCoords);
+        });
     }
-    _loadMap(position) {
-        const { latitude, longitude } = position.coords;
-        const coords = [latitude, longitude];
+    /** Center map on GPS coords (called after permission granted) */
+    _recenterMapToGPS(coords) {
+        __classPrivateFieldSet(this, _App_userCoords, coords, "f");
+        if (__classPrivateFieldGet(this, _App_map, "f")) {
+            __classPrivateFieldGet(this, _App_map, "f").setView(coords, __classPrivateFieldGet(this, _App_mapZoomLevel, "f"), { animate: true });
+        }
+    }
+    /** @deprecated Use _loadMapFromIP instead — kept for initRetryBtn compatibility */
+    _getPosition() {
+        void this._loadMapFromIP();
+    }
+    _loadMap(coords) {
         __classPrivateFieldSet(this, _App_userCoords, coords, "f");
         __classPrivateFieldSet(this, _App_map, L.map('map').setView(coords, __classPrivateFieldGet(this, _App_mapZoomLevel, "f")), "f");
         __classPrivateFieldGet(this, _App_map, "f").createPane('progressPane');
@@ -1058,25 +1084,56 @@ class App {
             document.getElementById('trkHistoryPanel')?.classList.add('hidden');
         });
         // ── Permission ────────────────────────────────────────────────────────
-        const _showMain = () => {
-            document.getElementById('trkPermission')?.classList.add('hidden');
+        const permEl = document.getElementById('trkPermission');
+        const allowBtn = document.getElementById('trkPermAllow');
+        const skipBtn = document.getElementById('trkPermSkip');
+        const _showMain = () => permEl?.classList.add('hidden');
+        const _showPerm = () => permEl?.classList.remove('hidden');
+        // Check current permission state — show/hide panel accordingly
+        const _checkPerm = async () => {
+            const granted = await hasGPSPermission();
+            if (granted)
+                _showMain();
+            else
+                _showPerm();
         };
-        // Sprawdź uprawnienia
-        if (navigator.permissions) {
-            navigator.permissions.query({ name: 'geolocation' }).then(r => {
-                if (r.state === 'granted')
-                    _showMain();
-                else
-                    document.getElementById('trkPermission')?.classList.remove('hidden');
-            }).catch(() => _showMain());
-        }
-        else {
-            document.getElementById('trkPermission')?.classList.remove('hidden');
-        }
-        document.getElementById('trkPermAllow')?.addEventListener('click', () => {
-            navigator.geolocation.getCurrentPosition(() => _showMain(), () => _showMain(), { timeout: 6000 });
+        void _checkPerm();
+        // "Allow location" button — requests GPS, then upgrades map + weather
+        allowBtn?.addEventListener('click', async () => {
+            if (allowBtn) {
+                allowBtn.disabled = true;
+                allowBtn.textContent = 'Requesting…';
+            }
+            const coords = await requestGPSPermission();
+            if (allowBtn) {
+                allowBtn.disabled = false;
+                allowBtn.textContent = 'Allow location';
+            }
+            if (coords) {
+                _showMain();
+                // Upgrade map center to GPS
+                this._recenterMapToGPS(coords);
+                // Upgrade weather to GPS
+                void switchToGPSWeather();
+                // Dispatch event so other modules know
+                window.dispatchEvent(new CustomEvent('mapyou:gps-granted', { detail: { coords } }));
+            }
+            else {
+                // Permission denied — show friendly message inside the panel
+                const msg = permEl?.querySelector('.trk-perm__denied');
+                if (msg) {
+                    msg.style.display = 'block';
+                }
+                else {
+                    const p = document.createElement('p');
+                    p.className = 'trk-perm__denied';
+                    p.textContent = 'Location access denied. Enable it in browser settings to use tracking.';
+                    permEl?.querySelector('.trk-perm__card')?.appendChild(p);
+                }
+            }
         });
-        document.getElementById('trkPermSkip')?.addEventListener('click', _showMain);
+        // "Not now" — dismiss panel, app works with IP location
+        skipBtn?.addEventListener('click', _showMain);
         // ── Sport selector ────────────────────────────────────────────────────
         document.getElementById('trackerSportSelector')?.addEventListener('click', e => {
             const btn = e.target.closest('.trk-sport-tab');
@@ -2037,18 +2094,16 @@ window.app = new App();
         }
         else if (activeTab === 'tabTracker') {
             hideMobileSearchTab();
-            // Pokaż permission jeśli nie mamy uprawnień
-            if (navigator.permissions) {
-                navigator.permissions.query({ name: 'geolocation' }).then(r => {
-                    const perm = document.getElementById('trkPermission');
-                    if (!perm)
-                        return;
-                    if (r.state !== 'granted')
-                        perm.classList.remove('hidden');
-                    else
-                        perm.classList.add('hidden');
-                }).catch(() => { });
-            }
+            // Show permission panel if GPS not yet granted
+            void hasGPSPermission().then(granted => {
+                const perm = document.getElementById('trkPermission');
+                if (!perm)
+                    return;
+                if (granted)
+                    perm.classList.add('hidden');
+                else
+                    perm.classList.remove('hidden');
+            });
         }
         else if (activeTab === 'tabHome') {
             hideMobileSearchTab();
@@ -2111,12 +2166,14 @@ window.app = new App();
     patchApp();
     hideSearchTab();
     // Start skeleton + offline detection (replaces script.js startApp())
-    initOnlineDetector(() => window.app._getPosition());
-    initRetryBtn(pos => window.app._loadMap(pos));
-    if (!navigator.onLine)
-        return;
+    // Map loads from IP — show skeleton while tiles load
     showSkeleton();
     startMapTimeout();
+    initOnlineDetector(() => void window.app._loadMapFromIP());
+    initRetryBtn(pos => {
+        const coords = [pos.coords.latitude, pos.coords.longitude];
+        window.app._loadMap(coords);
+    });
     // ── Wire desktop sidebar search ──────────────────────────────
     function initSidebarSearch() {
         if (!window.app?._searchPOI) {
