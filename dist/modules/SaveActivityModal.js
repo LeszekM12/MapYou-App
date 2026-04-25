@@ -152,7 +152,7 @@ function buildModalHtml(activity) {
 }
 // ── SaveActivityModal class ───────────────────────────────────────────────────
 export class SaveActivityModal {
-    constructor(_activity, _onSave) {
+    constructor(_activity, _onSave, _onCancel) {
         Object.defineProperty(this, "_activity", {
             enumerable: true,
             configurable: true,
@@ -164,6 +164,12 @@ export class SaveActivityModal {
             configurable: true,
             writable: true,
             value: _onSave
+        });
+        Object.defineProperty(this, "_onCancel", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: _onCancel
         });
         Object.defineProperty(this, "_el", {
             enumerable: true,
@@ -211,13 +217,15 @@ export class SaveActivityModal {
         this._bindEvents();
         this._initMiniMap();
     }
-    close() {
+    close(saved = false) {
         if (!this._el)
             return;
         const sheet = this._el.querySelector('.sam-sheet');
         sheet?.classList.remove('sam-sheet--open');
         this._el.classList.remove('sam-overlay--visible');
         setTimeout(() => { this._el?.remove(); this._el = null; }, 350);
+        if (!saved)
+            this._onCancel?.();
     }
     _initMiniMap() {
         const container = document.getElementById('samMapPreview');
@@ -366,13 +374,13 @@ export class SaveActivityModal {
             coords: this._activity.coords,
         };
         await saveEnrichedActivity(enriched);
-        this.close();
+        this.close(true); // saved=true → skip onCancel
         this._onSave(enriched);
     }
 }
 // ── Factory ───────────────────────────────────────────────────────────────────
-export function openSaveActivityModal(activity, onSave) {
-    const modal = new SaveActivityModal(activity, onSave);
+export function openSaveActivityModal(activity, onSave, onCancel) {
+    const modal = new SaveActivityModal(activity, onSave, onCancel);
     modal.open();
 }
 //# sourceMappingURL=SaveActivityModal.js.map

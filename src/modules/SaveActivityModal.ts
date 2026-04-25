@@ -171,7 +171,11 @@ export class SaveActivityModal {
   private _photoBlob: Blob | null = null;
   private _photoUrl: string | null = null;
 
-  constructor(private _activity: ActivityRecord, private _onSave: (ea: EnrichedActivity) => void) {
+  constructor(
+    private _activity: ActivityRecord,
+    private _onSave: (ea: EnrichedActivity) => void,
+    private _onCancel?: () => void,
+  ) {
     this._selectedSport = _activity.sport;
   }
 
@@ -192,12 +196,13 @@ export class SaveActivityModal {
     this._initMiniMap();
   }
 
-  close(): void {
+  close(saved = false): void {
     if (!this._el) return;
     const sheet = this._el.querySelector<HTMLElement>('.sam-sheet');
     sheet?.classList.remove('sam-sheet--open');
     this._el.classList.remove('sam-overlay--visible');
     setTimeout(() => { this._el?.remove(); this._el = null; }, 350);
+    if (!saved) this._onCancel?.();
   }
 
   private _initMiniMap(): void {
@@ -343,7 +348,7 @@ export class SaveActivityModal {
 
     await saveEnrichedActivity(enriched);
 
-    this.close();
+    this.close(true); // saved=true → skip onCancel
     this._onSave(enriched);
   }
 }
@@ -353,7 +358,8 @@ export class SaveActivityModal {
 export function openSaveActivityModal(
   activity: ActivityRecord,
   onSave: (ea: EnrichedActivity) => void,
+  onCancel?: () => void,
 ): void {
-  const modal = new SaveActivityModal(activity, onSave);
+  const modal = new SaveActivityModal(activity, onSave, onCancel);
   modal.open();
 }

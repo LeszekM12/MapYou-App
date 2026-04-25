@@ -147,6 +147,22 @@ class App {
     /** Load map using IP location — no GPS permission needed */
     async _loadMapFromIP() {
         const DEFAULT_COORDS = [52.237, 21.017]; // Warsaw fallback
+        // If GPS already granted from a previous session → use precise coords immediately
+        // (hasGPSPermission reads localStorage only — no browser prompt)
+        if (await hasGPSPermission()) {
+            try {
+                const { getGPSLocation } = await import('./modules/LocationService.js');
+                const gpsCoords = await getGPSLocation();
+                this._loadMap(gpsCoords, __classPrivateFieldGet(this, _App_mapZoomLevel, "f")); // precise zoom for GPS
+                console.info('[Map] Loaded with GPS (previously granted)');
+                subscribeToPermissionChanges((c) => this._recenterMapToGPS(c));
+                return;
+            }
+            catch {
+                console.warn('[Map] GPS failed despite permission — falling back to IP');
+            }
+        }
+        // No GPS permission yet → use IP location
         let coords = DEFAULT_COORDS;
         const ipLoc = await getIPLocation();
         if (ipLoc) {
@@ -156,10 +172,8 @@ class App {
         else {
             console.warn('[Map] IP location failed — using default coords');
         }
-        this._loadMap(coords);
-        // Subscribe to future GPS grants → auto re-center map + upgrade weather
-        // NOTE: never call getCurrentPosition here — that triggers the browser popup.
-        // Re-centering happens only after user explicitly clicks "Allow location" in Track tab.
+        this._loadMap(coords, 11); // zoom 11 for IP — "your area" without half of Poland
+        // Subscribe to future GPS grants → auto re-center when user allows in Track tab
         subscribeToPermissionChanges((gpsCoords) => {
             this._recenterMapToGPS(gpsCoords);
         });
@@ -175,9 +189,9 @@ class App {
     _getPosition() {
         void this._loadMapFromIP();
     }
-    _loadMap(coords) {
+    _loadMap(coords, zoom) {
         __classPrivateFieldSet(this, _App_userCoords, coords, "f");
-        __classPrivateFieldSet(this, _App_map, L.map('map').setView(coords, __classPrivateFieldGet(this, _App_mapZoomLevel, "f")), "f");
+        __classPrivateFieldSet(this, _App_map, L.map('map').setView(coords, zoom ?? __classPrivateFieldGet(this, _App_mapZoomLevel, "f")), "f");
         __classPrivateFieldGet(this, _App_map, "f").createPane('progressPane');
         const pane = __classPrivateFieldGet(this, _App_map, "f").getPane('progressPane');
         if (pane)
@@ -1185,15 +1199,18 @@ class App {
                 return;
             showGoodJobSplash(() => {
                 // Open save modal → user fills name, photo, intensity, notes
-                openSaveActivityModal(activity, async (enriched) => {
-                    // Save raw activity (backward compat with history panel)
+                openSaveActivityModal(activity, 
+                // onSave
+                async (enriched) => {
                     await saveActivity(activity);
                     __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
-                    // Refresh panels
                     await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
                     await homeView.render();
-                    // Navigate to Home feed
                     homeView.switchToHome();
+                }, 
+                // onCancel — user dismissed modal without saving → clear the route from map
+                () => {
+                    __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
                 });
             });
         });
@@ -2132,7 +2149,20 @@ window.app = new App();
         if (!src || !dest)
             return;
         dest.innerHTML = '';
-        src.querySelectorAll('.workout').forEach(el => {
+        const workouts = src.querySelectorAll('.workout');
+        if (workouts.length === 0) {
+            const empty = document.createElement('div');
+            empty.className = 'stats-empty';
+            empty.innerHTML = `
+        <div class="stats-empty__icon">🏃</div>
+        <p class="stats-empty__title">No workouts this week</p>
+        <p class="stats-empty__sub">Tap the map to add a workout and start tracking your progress</p>
+        <button class="stats-empty__btn" id="statsGoToMap">Go to Map</button>`;
+            dest.appendChild(empty);
+            document.getElementById('statsGoToMap')?.addEventListener('click', () => switchTab('tabMap'));
+            return;
+        }
+        workouts.forEach(el => {
             const clone = el.cloneNode(true);
             clone.addEventListener('click', () => {
                 switchTab('tabMap');
