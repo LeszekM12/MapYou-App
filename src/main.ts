@@ -35,6 +35,8 @@ import { Tracker, type SportType, formatDuration, formatPace, formatDistance, SP
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
 import { homeView } from './modules/HomeView.js';
+import { statsView } from './modules/StatsView.js';
+import { migrateToUnified, saveUnifiedWorkout } from './modules/UnifiedWorkout.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
@@ -1860,7 +1862,7 @@ window.app = new App();
       activeTab = tabId;
       if (tabId === 'tabStats') {
         document.getElementById('tabStats')?.classList.add('tab-panel--active');
-        mirrorWorkoutList();
+        void statsView.init();
       } else {
         document.getElementById('tabStats')?.classList.remove('tab-panel--active');
       }
@@ -1908,36 +1910,10 @@ window.app = new App();
     } else {
       hideMobileSearchTab();
     }
-    if (activeTab === 'tabStats') mirrorWorkoutList();
+    if (activeTab === 'tabStats') void statsView.init();
   }
 
-  function mirrorWorkoutList() {
-    const src  = document.querySelector<HTMLElement>('#tabWorkouts .workouts');
-    const dest = document.getElementById('workoutListStats');
-    if (!src || !dest) return;
-    dest.innerHTML = '';
-    const workouts = src.querySelectorAll<HTMLElement>('.workout');
-    if (workouts.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'stats-empty';
-      empty.innerHTML = `
-        <div class="stats-empty__icon">🏃</div>
-        <p class="stats-empty__title">No workouts this week</p>
-        <p class="stats-empty__sub">Tap the map to add a workout and start tracking your progress</p>
-        <button class="stats-empty__btn" id="statsGoToMap">Go to Map</button>`;
-      dest.appendChild(empty);
-      document.getElementById('statsGoToMap')?.addEventListener('click', () => switchTab('tabMap'));
-      return;
-    }
-    workouts.forEach(el => {
-      const clone = el.cloneNode(true) as HTMLElement;
-      clone.addEventListener('click', () => {
-        switchTab('tabMap');
-        document.querySelector<HTMLElement>(`#tabWorkouts .workout[data-id="${el.dataset.id}"]`)?.click();
-      });
-      dest.appendChild(clone);
-    });
-  }
+  // mirrorWorkoutList replaced by StatsView
 
   document.querySelectorAll<HTMLElement>('.bottom-nav__item').forEach(btn =>
     btn.addEventListener('click', () => switchTab(btn.dataset.tab!))
@@ -2089,6 +2065,10 @@ friendsViewInited = true;
 
 // Inicjalizuj profil użytkownika (userId + avatar w UI)
 initUserProfile();
+// Migracja danych do unified workouts model
+// Remove old migration flag so re-migration runs on every start (safe — uses upsert)
+localStorage.removeItem('mapyou_unified_migrated');
+void migrateToUnified();
 
 // Pokaż modal imienia przy pierwszym uruchomieniu
 void showNameModalIfNeeded();

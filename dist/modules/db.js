@@ -1,6 +1,6 @@
 // ─── DATABASE MODULE (IndexedDB via Dexie.js) ────────────────────────────────
 // Dexie jest ładowane z CDN w index.html jako globalny Dexie
-const db = new Dexie('mapty');
+export const db = new Dexie('mapty');
 // version(1) — workouty (istniejące dane)
 db.version(1).stores({
     workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
@@ -30,6 +30,15 @@ db.version(5).stores({
     enrichedActivities: 'id, sport, date, name',
     profile: 'userId',
     postsFeed: 'id, date',
+});
+// version(6) — unifiedWorkouts (Stats — single source of truth)
+db.version(6).stores({
+    workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+    activities: 'id, sport, date, distanceKm, durationSec',
+    enrichedActivities: 'id, sport, date, name',
+    profile: 'userId',
+    postsFeed: 'id, date',
+    unifiedWorkouts: 'id, type, source, date, distanceKm',
 });
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
 function _generateDescription(type, isoDate) {
@@ -219,5 +228,27 @@ export async function loadPosts() {
 }
 export async function deletePost(id) {
     await db.postsFeed.delete(id);
+}
+// ── CRUD — unifiedWorkouts ────────────────────────────────────────────────────
+export async function saveUnifiedWorkout(workout) {
+    try {
+        await db.unifiedWorkouts.put(workout);
+    }
+    catch (err) {
+        console.error('[DB] saveUnifiedWorkout error:', err);
+        throw err;
+    }
+}
+export async function loadUnifiedWorkouts() {
+    try {
+        return await db.unifiedWorkouts.orderBy('date').reverse().toArray();
+    }
+    catch (err) {
+        console.error('[DB] loadUnifiedWorkouts error:', err);
+        return [];
+    }
+}
+export async function deleteUnifiedWorkout(id) {
+    await db.unifiedWorkouts.delete(id);
 }
 //# sourceMappingURL=db.js.map

@@ -22,6 +22,9 @@
           crossorigin=""/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script>Chart.defaults.color = "rgba(255,255,255,0.5)"; Chart.defaults.borderColor = "rgba(255,255,255,0.06)";</script>
+    <link rel="stylesheet" href="stats_styles.css"/>
     <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
             integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
             crossorigin=""></script>
@@ -286,110 +289,6 @@
 <!-- TAB 2: STATS -->
 <div id="tabStats" class="tab-panel">
     <div class="tab-scroll">
-        <div class="tab-header">
-            <img src="public/logo.png" alt="Mapty logo" class="logo"/>
-            <div class="weather-widget" id="weatherWidgetStats">
-                <span class="weather-widget__icon" id="wIconStats">—</span>
-                <span class="weather-widget__sun" id="wSunsetStats">—</span>
-            </div>
-        </div>
-        <div class="stats-panel" id="statsPanel">
-            <div class="stats-panel__label">THIS WEEK'S SUMMARY</div>
-            <div class="stats-panel__rings">
-                <div class="stats-ring-wrap">
-                    <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-                        <circle id="statsRingKm" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
-                                stroke="#00c46a" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
-                                stroke-linecap="round" transform="rotate(-90 45 45)"/>
-                        <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800"
-                              font-family="Manrope,sans-serif" id="statsValKm">0.0
-                        </text>
-                        <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9"
-                              font-family="Manrope,sans-serif">KM
-                        </text>
-                        <text x="45" y="25" text-anchor="middle" font-size="12">🏃</text>
-                    </svg>
-                </div>
-                <div class="stats-ring-wrap">
-                    <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-                        <circle id="statsRingTime" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
-                                stroke="#aaa" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
-                                stroke-linecap="round" transform="rotate(-90 45 45)"/>
-                        <text x="45" y="41" text-anchor="middle" fill="#ececec" font-size="11" font-weight="800"
-                              font-family="Manrope,sans-serif" id="statsValTime">0m
-                        </text>
-                        <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9"
-                              font-family="Manrope,sans-serif">TIME
-                        </text>
-                        <text x="45" y="25" text-anchor="middle" font-size="12">⏱</text>
-                    </svg>
-                </div>
-                <div class="stats-ring-wrap">
-                    <svg viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg">
-                        <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
-                        <circle id="statsRingWorkouts" class="stats-ring-arc" cx="45" cy="45" r="36" fill="none"
-                                stroke="#ffb545" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
-                                stroke-linecap="round" transform="rotate(-90 45 45)"/>
-                        <text x="45" y="39" text-anchor="middle" fill="#ececec" font-size="13" font-weight="800"
-                              font-family="Manrope,sans-serif" id="statsValWorkouts">0
-                        </text>
-                        <text x="45" y="52" text-anchor="middle" fill="#aaa" font-size="9"
-                              font-family="Manrope,sans-serif">WORKOUTS
-                        </text>
-                        <text x="45" y="25" text-anchor="middle" font-size="12">🚴</text>
-                    </svg>
-                </div>
-            </div>
-            <div class="stats-panel__goal">
-                <div class="stats-panel__goal-header">
-                    <span class="stats-panel__goal-label">WEEKLY GOAL</span>
-                    <span class="stats-panel__goal-pct" id="statsGoalPct">0%</span>
-                </div>
-                <div class="stats-panel__goal-bar">
-                    <div class="stats-panel__goal-fill" id="statsGoalFill" style="width:0%"></div>
-                </div>
-            </div>
-        </div>
-        <div class="stats-detail hidden" id="statsDetail">
-            <div class="stats-detail__header">
-                <div class="stats-detail__title">📊 Weekly activity</div>
-                <div class="stats-week-nav">
-                    <button class="stats-week-nav__btn" id="statsWeekPrev">‹</button>
-                    <span class="stats-week-nav__label" id="statsWeekLabel">This week</span>
-                    <button class="stats-week-nav__btn" id="statsWeekNext" disabled>›</button>
-                </div>
-            </div>
-            <div class="stats-detail__bars" id="statsDetailBars"></div>
-            <div class="stats-detail__totals">
-                <div class="stats-detail__total-item"><span class="stats-detail__total-val"
-                                                            id="statsDetailKm">0.0</span><span
-                        class="stats-detail__total-label">km</span></div>
-                <div class="stats-detail__total-item"><span
-                        class="stats-detail__total-val stats-detail__total-val--gray"
-                        id="statsDetailTime">0m</span><span class="stats-detail__total-label">time</span></div>
-                <div class="stats-detail__total-item"><span
-                        class="stats-detail__total-val stats-detail__total-val--amber"
-                        id="statsDetailCount">0</span><span class="stats-detail__total-label">workouts</span></div>
-                <div class="stats-detail__total-item"><span
-                        class="stats-detail__total-val stats-detail__total-val--blue" id="statsDetailDate">—</span><span
-                        class="stats-detail__total-label">day</span></div>
-            </div>
-        </div>
-        <div class="stats-goal-editor hidden" id="statsGoalEditor">
-            <div class="stats-goal-editor__title">⚙ WEEKLY GOAL</div>
-            <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Distance target</span><input
-                    class="stats-goal-editor__input" id="goalKmInput" type="number" min="1" max="500" value="35"/><span
-                    class="stats-goal-editor__unit">km</span></div>
-            <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Time target</span><input
-                    class="stats-goal-editor__input" id="goalTimeInput" type="number" min="1" max="2000"
-                    value="300"/><span class="stats-goal-editor__unit">min</span></div>
-            <div class="stats-goal-editor__row"><span class="stats-goal-editor__label">Workouts target</span><input
-                    class="stats-goal-editor__input" id="goalCountInput" type="number" min="1" max="30" value="7"/><span
-                    class="stats-goal-editor__unit">× /week</span></div>
-        </div>
-        <ul class="workouts" id="workoutListStats" style="list-style:none;padding:0"></ul>
     </div>
 </div>
 

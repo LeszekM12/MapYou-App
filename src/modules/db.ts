@@ -41,6 +41,25 @@ export interface EnrichedActivity {
   coords:      Array<[number, number]>;
 }
 
+/** Unified workout — single model for manual + tracked workouts */
+export interface UnifiedWorkout {
+  id:          string;
+  type:        'running' | 'walking' | 'cycling';
+  source:      'manual' | 'tracking';
+  date:        string;
+  distanceKm:  number;
+  durationSec: number;
+  paceMinKm:   number;
+  speedKmH:    number;
+  elevGain:    number;
+  coords:      Array<[number, number]>;
+  name:        string;
+  description: string;
+  notes:       string;
+  intensity:   number;
+  photoUrl:    string | null;
+}
+
 /** Local user profile (stored in IndexedDB as backup, primary = localStorage) */
 export interface ProfileRecord {
   userId:    string;    // primary key
@@ -65,7 +84,7 @@ export interface PostRecord {
 
 declare const Dexie: any;
 
-const db = new Dexie('mapty');
+export const db = new Dexie('mapty');
 
 // version(1) — workouty (istniejące dane)
 db.version(1).stores({
@@ -100,6 +119,16 @@ db.version(5).stores({
   enrichedActivities: 'id, sport, date, name',
   profile:            'userId',
   postsFeed:          'id, date',
+});
+
+// version(6) — unifiedWorkouts (Stats — single source of truth)
+db.version(6).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
 });
 
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
@@ -305,4 +334,28 @@ export async function loadPosts(): Promise<PostRecord[]> {
 
 export async function deletePost(id: string): Promise<void> {
   await db.postsFeed.delete(id);
+}
+
+// ── CRUD — unifiedWorkouts ────────────────────────────────────────────────────
+
+export async function saveUnifiedWorkout(workout: UnifiedWorkout): Promise<void> {
+  try {
+    await db.unifiedWorkouts.put(workout);
+  } catch (err) {
+    console.error('[DB] saveUnifiedWorkout error:', err);
+    throw err;
+  }
+}
+
+export async function loadUnifiedWorkouts(): Promise<UnifiedWorkout[]> {
+  try {
+    return await db.unifiedWorkouts.orderBy('date').reverse().toArray();
+  } catch (err) {
+    console.error('[DB] loadUnifiedWorkouts error:', err);
+    return [];
+  }
+}
+
+export async function deleteUnifiedWorkout(id: string): Promise<void> {
+  await db.unifiedWorkouts.delete(id);
 }
