@@ -1,7 +1,7 @@
 // ─── WEATHER COMPONENTS — INIT ────────────────────────────────────────────────
 // Uses IP-based location on startup — zero GPS permission requests.
 // Switches to GPS automatically when permission is later granted.
-import { getWeather } from './WeatherService.js';
+import { getWeather, clearWeatherCache } from './WeatherService.js';
 import { WeatherModal } from './WeatherModal.js';
 import { getIPLocation, hasGPSPermission, getGPSLocation, subscribeToPermissionChanges, } from './LocationService.js';
 // ── Singletons ────────────────────────────────────────────────────────────────
@@ -64,6 +64,7 @@ async function loadWeather(coords) {
 export async function switchToGPSWeather() {
     try {
         const gpsCoords = await getGPSLocation();
+        clearWeatherCache(); // force fresh fetch — coords changed from IP to GPS
         await loadWeather(gpsCoords);
         console.info('[Weather] Switched to GPS location');
     }

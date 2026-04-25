@@ -307,13 +307,31 @@ export async function fetchWeatherFull(coords: Coords): Promise<WeatherData> {
 
 // ── Singleton cache (refresh every 30 min) ────────────────────────────────────
 
-let _cache:     WeatherData | null = null;
-let _cacheTime: number             = 0;
-const CACHE_TTL = 30 * 60 * 1000;
+let _cache:      WeatherData | null = null;
+let _cacheTime:  number             = 0;
+let _cacheCoords: Coords | null     = null;
+const CACHE_TTL  = 30 * 60 * 1000;
+const COORD_DIFF = 0.05; // ~5km — if coords change more than this, bust cache
+
+function _coordsChanged(a: Coords, b: Coords): boolean {
+  return Math.abs(a[0] - b[0]) > COORD_DIFF || Math.abs(a[1] - b[1]) > COORD_DIFF;
+}
 
 export async function getWeather(coords: Coords): Promise<WeatherData> {
-  if (_cache && Date.now() - _cacheTime < CACHE_TTL) return _cache;
-  _cache     = await fetchWeatherFull(coords);
-  _cacheTime = Date.now();
+  const cacheValid = _cache
+    && Date.now() - _cacheTime < CACHE_TTL
+    && _cacheCoords
+    && !_coordsChanged(_cacheCoords, coords); // bust cache if location changed significantly
+  if (cacheValid) return _cache!;
+  _cache       = await fetchWeatherFull(coords);
+  _cacheTime   = Date.now();
+  _cacheCoords = coords;
   return _cache;
+}
+
+/** Force-clear cache — call when switching from IP to GPS location */
+export function clearWeatherCache(): void {
+  _cache = null;
+  _cacheTime = 0;
+  _cacheCoords = null;
 }
