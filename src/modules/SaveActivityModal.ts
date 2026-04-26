@@ -53,7 +53,7 @@ async function captureMapPreview(
 
 // ── Modal HTML builder ────────────────────────────────────────────────────────
 
-function buildModalHtml(activity: ActivityRecord): string {
+function buildModalHtml(activity: ActivityRecord, isManual: boolean): string {
   const color = SPORT_COLORS[activity.sport] ?? '#00c46a';
   const icon  = SPORT_ICONS[activity.sport]  ?? '🏅';
 
@@ -104,6 +104,44 @@ function buildModalHtml(activity: ActivityRecord): string {
             <img class="sam-photo-preview hidden" id="samPhotoPreview" alt="Preview"/>
           </div>
         </div>
+
+        <!-- Activity Stats — only for manual (no GPS data) -->
+        ${isManual ? `
+        <div class="sam-field">
+          <label class="sam-label">Activity Stats</label>
+          <div class="sam-stats-grid">
+            <div class="sam-stats-row">
+              <label class="sam-stats-label">📅 Date</label>
+              <input class="sam-stats-input" id="samStatDate" type="date"
+                value="${new Date().toISOString().slice(0,10)}"/>
+            </div>
+            <div class="sam-stats-row">
+              <label class="sam-stats-label">🕐 Start time</label>
+              <input class="sam-stats-input" id="samStatTime" type="time"
+                value="${new Date().toTimeString().slice(0,5)}"/>
+            </div>
+            <div class="sam-stats-row">
+              <label class="sam-stats-label">⏱ Duration</label>
+              <div class="sam-stats-duration">
+                <input class="sam-stats-input sam-stats-input--sm" id="samStatDurH" type="number" min="0" max="23" placeholder="0" value="0"/>
+                <span class="sam-stats-sep">h</span>
+                <input class="sam-stats-input sam-stats-input--sm" id="samStatDurM" type="number" min="0" max="59" placeholder="0" value="0"/>
+                <span class="sam-stats-sep">min</span>
+              </div>
+            </div>
+            <div class="sam-stats-row">
+              <label class="sam-stats-label">📏 Distance</label>
+              <div class="sam-stats-dist">
+                <input class="sam-stats-input sam-stats-input--md" id="samStatDist" type="number" min="0" step="0.01" placeholder="0.00"/>
+                <span class="sam-stats-sep">km</span>
+              </div>
+            </div>
+            <div class="sam-stats-row">
+              <label class="sam-stats-label">⚡ Pace</label>
+              <div class="sam-stats-pace" id="samPaceDisplay">—:— min/km</div>
+            </div>
+          </div>
+        </div>` : ''}
 
         <!-- Activity type -->
         <div class="sam-field">
@@ -182,7 +220,8 @@ export class SaveActivityModal {
   open(): void {
     document.getElementById('saveActivityOverlay')?.remove();
     const wrapper = document.createElement('div');
-    wrapper.innerHTML = buildModalHtml(this._activity);
+    const isManual = this._activity.coords.length === 0;
+    wrapper.innerHTML = buildModalHtml(this._activity, isManual);
     const el = wrapper.firstElementChild as HTMLElement;
     document.body.appendChild(el);
     this._el = el;
@@ -292,6 +331,29 @@ export class SaveActivityModal {
     // Save
     el.querySelector('#samBtnSave')?.addEventListener('click', () => void this._save());
 
+    // Activity Stats — auto-calculate pace when duration or distance changes
+    const updatePace = () => {
+      const durH  = parseFloat((el.querySelector<HTMLInputElement>('#samStatDurH')?.value ?? '0')) || 0;
+      const durM  = parseFloat((el.querySelector<HTMLInputElement>('#samStatDurM')?.value ?? '0')) || 0;
+      const dist  = parseFloat((el.querySelector<HTMLInputElement>('#samStatDist')?.value ?? '0')) || 0;
+      const paceEl = el.querySelector<HTMLElement>('#samPaceDisplay');
+      if (!paceEl) return;
+      const totalMin = durH * 60 + durM;
+      if (dist > 0 && totalMin > 0) {
+        const pace = totalMin / dist;
+        const pm   = Math.floor(pace);
+        const ps   = Math.round((pace - pm) * 60);
+        paceEl.textContent = `${pm}:${String(ps).padStart(2,'0')} min/km`;
+        paceEl.style.color = '#00c46a';
+      } else {
+        paceEl.textContent = '—:— min/km';
+        paceEl.style.color = '';
+      }
+    };
+    el.querySelector('#samStatDurH')?.addEventListener('input', updatePace);
+    el.querySelector('#samStatDurM')?.addEventListener('input', updatePace);
+    el.querySelector('#samStatDist')?.addEventListener('input', updatePace);
+
     // Swipe to close
     const handle = el.querySelector<HTMLElement>('#saveActivityHandle')!;
     const sheet  = el.querySelector<HTMLElement>('.sam-sheet')!;
@@ -325,6 +387,24 @@ export class SaveActivityModal {
     const notes       = notesInput?.value.trim() || '';
     const intensity   = Number(slider?.value ?? 3);
 
+    // Manual activity stats
+    const isManual = this._activity.coords.length === 0;
+    let manualDate     = this._activity.date;
+    let manualDistKm   = this._activity.distanceKm;
+    let manualDurSec   = this._activity.durationSec;
+    let manualPaceMinKm = this._activity.paceMinKm;
+    if (isManual) {
+      const dateVal = el.querySelector<HTMLInputElement>('#samStatDate')?.value ?? '';
+      const timeVal = el.querySelector<HTMLInputElement>('#samStatTime')?.value ?? '00:00';
+      const durH    = parseFloat(el.querySelector<HTMLInputElement>('#samStatDurH')?.value ?? '0') || 0;
+      const durM    = parseFloat(el.querySelector<HTMLInputElement>('#samStatDurM')?.value ?? '0') || 0;
+      const dist    = parseFloat(el.querySelector<HTMLInputElement>('#samStatDist')?.value ?? '0') || 0;
+      if (dateVal) manualDate = new Date(`${dateVal}T${timeVal}:00`).toISOString();
+      manualDistKm  = dist;
+      manualDurSec  = Math.round((durH * 60 + durM) * 60);
+      manualPaceMinKm = dist > 0 && manualDurSec > 0 ? (manualDurSec / 60) / dist : 0;
+    }
+
     let photoDataUrl: string | null = null;
     if (this._photoBlob) {
       try { photoDataUrl = await blobToDataUrl(this._photoBlob); } catch {}
@@ -333,14 +413,14 @@ export class SaveActivityModal {
     const enriched: EnrichedActivity = {
       id:          this._activity.id,
       sport:       this._selectedSport,
-      date:        new Date(this._activity.date).getTime(),
+      date:        new Date(manualDate).getTime(),
       name,
       description,
       photoUrl:    photoDataUrl,
-      distanceKm:  this._activity.distanceKm,
-      durationSec: this._activity.durationSec,
-      paceMinKm:   this._activity.paceMinKm,
-      speedKmH:    this._activity.speedKmH,
+      distanceKm:  manualDistKm,
+      durationSec: manualDurSec,
+      paceMinKm:   manualPaceMinKm,
+      speedKmH:    manualDurSec > 0 ? manualDistKm / (manualDurSec / 3600) : 0,
       intensity,
       notes,
       coords:      this._activity.coords,
