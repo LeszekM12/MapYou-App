@@ -28,7 +28,8 @@ import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.
 import { saveActivity } from './modules/db.js';
 import { homeView } from './modules/HomeView.js';
 import { statsView } from './modules/StatsView.js';
-import { migrateToUnified } from './modules/UnifiedWorkout.js';
+import { notifyActivityAdded } from './modules/NotificationsService.js';
+import { migrateToUnified, saveUnifiedWorkout } from './modules/UnifiedWorkout.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker } from './modules/LiveTracker.js';
 import { FriendsView } from './modules/FriendsView.js';
@@ -777,6 +778,10 @@ class App {
         this._renderStats(true);
         this._renderStreak();
         void sendWorkoutAddedPush();
+        // Refresh Home feed + Stats + notify
+        notifyActivityAdded(workout.description ?? workout.type, workout.distance ?? 0, workout.type);
+        void homeView.render();
+        void statsView.render();
     }
     // ── MARKERS ───────────────────────────────────────────────────────────────
     _showMarker(marker) {
@@ -1205,10 +1210,29 @@ class App {
                 // onSave
                 async (enriched) => {
                     await saveActivity(activity);
+                    // Save to unified for Stats → Progress
+                    await saveUnifiedWorkout({
+                        id: enriched.id,
+                        type: enriched.sport,
+                        source: 'tracking',
+                        date: new Date(enriched.date).toISOString(),
+                        distanceKm: enriched.distanceKm,
+                        durationSec: enriched.durationSec,
+                        paceMinKm: enriched.paceMinKm,
+                        speedKmH: enriched.speedKmH,
+                        elevGain: 0,
+                        coords: enriched.coords,
+                        name: enriched.name,
+                        description: enriched.description,
+                        notes: enriched.notes,
+                        intensity: enriched.intensity,
+                        photoUrl: enriched.photoUrl,
+                    });
+                    notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);
                     __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
                     await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
+                    await statsView.render();
                     await homeView.render();
-                    await statsView.render(); // refresh Progress + History
                     homeView.switchToHome();
                 }, 
                 // onCancel — user dismissed modal without saving → clear the route from map

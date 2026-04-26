@@ -428,8 +428,8 @@ export class SaveActivityModal {
 
     await saveEnrichedActivity(enriched);
 
-    this.close(true); // saved=true → skip onCancel
-    this._onSave(enriched);
+    this._onSave(enriched);  // render first, then close
+    this.close(true);         // saved=true → skip onCancel
   }
 }
 

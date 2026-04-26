@@ -6,6 +6,10 @@ import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance }
 import type { SportType } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
+import {
+  getNotifications, getUnreadCount, markAllRead, markRead, clearAll,
+  onNotificationsChange, notifyActivityAdded, type AppNotification,
+} from './NotificationsService.js';
 import { profileView } from './ProfileView.js';
 import { openPostModal } from './PostModal.js';
 import { openSaveActivityModal } from './SaveActivityModal.js';
@@ -495,6 +499,88 @@ function buildCard(act: EnrichedActivity): HTMLElement {
 
 // ── HomeView class ────────────────────────────────────────────────────────────
 
+// ── Notification panel ────────────────────────────────────────────────────────
+
+function _relTimeNotif(ts: number): string {
+  const diff = Date.now() - ts;
+  const mins = Math.floor(diff / 60_000);
+  if (mins < 1)   return 'Just now';
+  if (mins < 60)  return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24)   return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  return `${days} day${days > 1 ? 's' : ''} ago`;
+}
+
+function _openNotifPanel(): void {
+  document.getElementById('homeNotifPanel')?.remove();
+  markAllRead();
+
+  const notifs   = getNotifications();
+  const panel    = document.createElement('div');
+  panel.id       = 'homeNotifPanel';
+  panel.className = 'hn-panel';
+
+  panel.innerHTML = `
+    <div class="hn-overlay" id="hnOverlay"></div>
+    <div class="hn-sheet" id="hnSheet">
+      <div class="hn-handle"></div>
+      <div class="hn-header">
+        <h2 class="hn-header__title">Notifications</h2>
+        <button class="hn-clear" id="hnClear">Clear all</button>
+      </div>
+      <div class="hn-list" id="hnList">
+        ${notifs.length === 0
+          ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
+          : notifs.map(n => `
+            <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
+              <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
+              <div class="hn-item__body">
+                <div class="hn-item__title">${n.title}</div>
+                <div class="hn-item__body-text">${n.body}</div>
+                <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
+              </div>
+            </div>`).join('')}
+      </div>
+    </div>`;
+
+  document.body.appendChild(panel);
+  requestAnimationFrame(() => {
+    panel.querySelector<HTMLElement>('#hnSheet')?.classList.add('hn-sheet--open');
+    panel.querySelector<HTMLElement>('#hnOverlay')?.classList.add('hn-overlay--visible');
+  });
+
+  const close = () => {
+    panel.querySelector('#hnSheet')?.classList.remove('hn-sheet--open');
+    panel.querySelector('#hnOverlay')?.classList.remove('hn-overlay--visible');
+    setTimeout(() => panel.remove(), 340);
+  };
+
+  panel.querySelector('#hnOverlay')?.addEventListener('click', close);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, { once: true });
+
+  panel.querySelector('#hnClear')?.addEventListener('click', () => {
+    clearAll();
+    panel.querySelector('#hnList')!.innerHTML =
+      '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
+  });
+
+  // Swipe to close
+  const sheet  = panel.querySelector<HTMLElement>('#hnSheet')!;
+  const handle = panel.querySelector<HTMLElement>('.hn-handle')!;
+  let startY = 0;
+  handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
+  handle.addEventListener('touchmove', e => {
+    const d = e.touches[0].clientY - startY;
+    if (d > 0) { sheet.style.transition = 'none'; sheet.style.transform = `translateY(${d}px)`; }
+  }, { passive: true });
+  handle.addEventListener('touchend', e => {
+    sheet.style.transition = '';
+    if (e.changedTouches[0].clientY - startY > 100) close();
+    else sheet.style.transform = '';
+  });
+}
+
 export class HomeView {
   private container: HTMLElement | null = null;
   private _inited = false;
@@ -603,6 +689,8 @@ export class HomeView {
       openSaveActivityModal(
         manualActivity,
         async (enriched) => {
+          // Fire in-app notification
+          notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);
           // Save to unifiedWorkouts so Stats → Progress sees it immediately
           await saveUnifiedWorkout({
             id:          enriched.id,
@@ -647,27 +735,64 @@ export class HomeView {
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22">
            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
          </svg>`;
+    const unread = getUnreadCount();
     greeting.innerHTML = `
       <div class="home-greeting__row">
         <div class="home-greeting__text-wrap">
           <h2 class="home-greeting__text">${greet}, <strong>${profile.name}</strong> 👋</h2>
           <p class="home-greeting__sub">${activityCount} activit${activityCount === 1 ? 'y' : 'ies'} recorded</p>
         </div>
-        <button class="home-greeting__profile-btn" id="profileNavAvatar" aria-label="Open profile">
-          ${avatarHtml}
-        </button>
+        <div class="home-greeting__actions">
+          <button class="home-greeting__bell-btn" id="homeNotifBell" aria-label="Notifications">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+            </svg>
+            ${unread > 0 ? `<span class="home-bell__badge">${unread > 9 ? '9+' : unread}</span>` : ''}
+          </button>
+          <button class="home-greeting__profile-btn" id="profileNavAvatar" aria-label="Open profile">
+            ${avatarHtml}
+          </button>
+        </div>
       </div>`;
+
     greeting.querySelector('#profileNavAvatar')?.addEventListener('click', e => {
       e.stopPropagation();
       void profileView.open();
     });
+
+    greeting.querySelector('#homeNotifBell')?.addEventListener('click', e => {
+      e.stopPropagation();
+      _openNotifPanel();
+    });
+
+    // Update badge when notifications change
+    onNotificationsChange(count => {
+      const bell  = document.getElementById('homeNotifBell');
+      if (!bell) return;
+      const badge = bell.querySelector('.home-bell__badge');
+      if (count > 0) {
+        if (badge) { badge.textContent = count > 9 ? '9+' : String(count); }
+        else {
+          const b = document.createElement('span');
+          b.className   = 'home-bell__badge';
+          b.textContent = count > 9 ? '9+' : String(count);
+          bell.appendChild(b);
+        }
+      } else {
+        badge?.remove();
+      }
+    });
+
     return greeting;
   }
 
   async render(): Promise<void> {
-    if (!this._inited) this.init();
+    // Always re-query container — it may have been null when init() was first called
+    this.container = document.querySelector<HTMLElement>('#tabHome .home-scroll');
+    if (!this.container) return;
+    this._inited = true;
     const scroll = this.container;
-    if (!scroll) return;
 
     scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
 

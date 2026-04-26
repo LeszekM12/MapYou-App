@@ -455,8 +455,8 @@ export class SaveActivityModal {
             coords: this._activity.coords,
         };
         await saveEnrichedActivity(enriched);
+        this._onSave(enriched); // render first, then close
         this.close(true); // saved=true → skip onCancel
-        this._onSave(enriched);
     }
 }
 // ── Factory ───────────────────────────────────────────────────────────────────

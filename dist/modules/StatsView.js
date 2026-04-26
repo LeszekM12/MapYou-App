@@ -6,6 +6,7 @@
 /// <reference types="leaflet" />
 import { loadUnifiedWorkouts, deleteUnifiedWorkout, formatDurSec, formatPaceSec, SPORT_ICONS_U, SPORT_COLORS_U, } from './UnifiedWorkout.js';
 import { recordWeeklyGoalWin } from './ProfileView.js';
+import { notifyWeeklyGoal } from './NotificationsService.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 const WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -290,8 +291,11 @@ export class StatsView {
         if (fill)
             fill.style.width = `${pct}%`;
         // Record weekly goal win (only for current week, deduped inside)
-        if (pct >= 100 && this._weekOffset === 0)
+        if (pct >= 100 && this._weekOffset === 0) {
             recordWeeklyGoalWin();
+            const wins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
+            notifyWeeklyGoal(wins);
+        }
         // Week label
         if (this._weekOffset === 0) {
             set('svWeekLabel', 'This week');

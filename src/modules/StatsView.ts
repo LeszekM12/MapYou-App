@@ -12,6 +12,7 @@ import {
   type UnifiedWorkout, type WorkoutType,
 } from './UnifiedWorkout.js';
 import { recordWeeklyGoalWin } from './ProfileView.js';
+import { notifyWeeklyGoal } from './NotificationsService.js';
 
 declare const Chart: any;
 
@@ -273,7 +274,11 @@ export class StatsView {
     const fill = document.getElementById('svGoalFill');
     if (fill) fill.style.width = `${pct}%`;
     // Record weekly goal win (only for current week, deduped inside)
-    if (pct >= 100 && this._weekOffset === 0) recordWeeklyGoalWin();
+    if (pct >= 100 && this._weekOffset === 0) {
+      recordWeeklyGoalWin();
+      const wins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
+      notifyWeeklyGoal(wins);
+    }
 
     // Week label
     if (this._weekOffset === 0) {
