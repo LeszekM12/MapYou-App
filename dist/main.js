@@ -21,7 +21,7 @@ import { WorkoutType } from './types/index.js';
 import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryBtn, } from './modules/OfflineDetector.js';
 import { initWeatherComponents, switchToGPSWeather } from './modules/initWeatherComponents.js';
 import { getIPLocation, requestGPSPermission, subscribeToPermissionChanges, hasGPSPermission } from './modules/LocationService.js';
-import { loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
+import { loadWorkoutsFromDB, saveWorkoutToDB, deleteWorkoutFromDB, saveEnrichedActivity, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, } from './modules/PushNotifications.js';
 import { Tracker, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
 import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.js';
@@ -726,6 +726,39 @@ class App {
             this._renderStats(true);
             this._renderStreak();
             void sendWorkoutAddedPush();
+            // Save to enrichedActivities + unifiedWorkouts + refresh views
+            const _wm = workout.toJSON();
+            const _wmDistKm = Number(_wm.distance) || 0;
+            const _wmDurSec = Math.round((Number(_wm.duration) || 0) * 60);
+            const _wmPace = _wmDurSec > 0 && _wmDistKm > 0 ? (_wmDurSec / 60) / _wmDistKm : 0;
+            const _wmSpeed = _wmDurSec > 0 && _wmDistKm > 0 ? _wmDistKm / (_wmDurSec / 3600) : 0;
+            const _wmType = (workout.type ?? 'running');
+            const _wmDate = workout.date ? new Date(workout.date).toISOString() : new Date().toISOString();
+            const _wmEnriched = {
+                id: String(workout.id),
+                sport: _wmType,
+                date: new Date(_wmDate).getTime(),
+                name: workout.description ?? '',
+                description: workout.description ?? '',
+                photoUrl: null,
+                distanceKm: _wmDistKm,
+                durationSec: _wmDurSec,
+                paceMinKm: _wmPace,
+                speedKmH: _wmSpeed,
+                intensity: 0,
+                notes: '',
+                coords: Array.isArray(_wm.routeCoords) ? _wm.routeCoords : [],
+            };
+            void saveEnrichedActivity(_wmEnriched);
+            void saveUnifiedWorkout({
+                ..._wmEnriched,
+                type: _wmType,
+                source: 'manual',
+                elevGain: Number(_wm.elevGain ?? 0) || 0,
+            });
+            notifyActivityAdded(workout.description ?? workout.type, _wmDistKm, workout.type);
+            void homeView.render();
+            void statsView.render();
         });
         setTimeout(() => wmDist.focus(), 100);
     }
@@ -778,8 +811,39 @@ class App {
         this._renderStats(true);
         this._renderStreak();
         void sendWorkoutAddedPush();
-        // Refresh Home feed + Stats + notify
-        notifyActivityAdded(workout.description ?? workout.type, workout.distance ?? 0, workout.type);
+        // Save to enrichedActivities (for Home feed) + unifiedWorkouts (for Stats)
+        const _w = workout.toJSON();
+        const _distKm = Number(_w.distance) || 0;
+        const _durMin = Number(_w.duration) || 0;
+        const _durSec = Math.round(_durMin * 60);
+        const _pace = _durMin > 0 && _distKm > 0 ? _durMin / _distKm : 0;
+        const _speed = _durSec > 0 && _distKm > 0 ? _distKm / (_durSec / 3600) : 0;
+        const _wType = (workout.type ?? 'running');
+        const _wDate = workout.date ? new Date(workout.date).toISOString() : new Date().toISOString();
+        const _enriched = {
+            id: String(workout.id),
+            sport: _wType,
+            date: new Date(_wDate).getTime(),
+            name: workout.description ?? '',
+            description: workout.description ?? '',
+            photoUrl: null,
+            distanceKm: _distKm,
+            durationSec: _durSec,
+            paceMinKm: _pace,
+            speedKmH: _speed,
+            intensity: 0,
+            notes: '',
+            coords: Array.isArray(_w.routeCoords) ? _w.routeCoords : [],
+        };
+        void saveEnrichedActivity(_enriched);
+        void saveUnifiedWorkout({
+            ..._enriched,
+            type: _wType,
+            source: 'manual',
+            elevGain: Number(_w.elevGain ?? 0) || 0,
+        });
+        // Notify + refresh views
+        notifyActivityAdded(workout.description ?? workout.type, _distKm, workout.type);
         void homeView.render();
         void statsView.render();
     }
@@ -2154,6 +2218,10 @@ window.app = new App();
             if (!homeViewInited) {
                 homeViewInited = true;
                 homeView.init();
+            }
+            else {
+                // Always re-render when switching to Home so new workouts appear immediately
+                void homeView.render();
             }
         }
         else if (activeTab === 'tabFriends') {
