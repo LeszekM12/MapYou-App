@@ -1,12 +1,12 @@
 // ─── BOTTOM NAV — 3-tab system ───────────────────────────────────────────────
 import { qidSafe } from '../utils/dom.js';
 
-export type TabId = 'tabWorkouts' | 'tabStats' | 'tabMap';
+export type TabId = 'tabHome' | 'tabMap' | 'tabTracker' | 'tabStats' | 'tabFriends';
 
 type OnTabChange = (tab: TabId) => void;
 
 export class BottomNav {
-  private activeTab:   TabId   = 'tabWorkouts';
+  private activeTab:   TabId   = 'tabMap';
   private routeActive: boolean = false;
   private searchBar:   HTMLElement | null;
   private onTabChange: OnTabChange;

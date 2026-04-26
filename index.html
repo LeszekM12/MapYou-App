@@ -137,7 +137,7 @@
 <!-- TRACKER OVERLAY — fullscreen nad mapą podczas nagrywania -->
 
 
-<div id="tabWorkouts" class="tab-panel tab-panel--active">
+<div id="tabMap" class="tab-panel tab-panel--active">
     <div class="tab-scroll">
         <div class="tab-header" id="weatherTopBar" role="button" tabindex="0" aria-label="Open weather details">
             <div class="tab-header__location">
@@ -391,23 +391,7 @@
       </svg>
       <span class="bottom-nav__label">Home</span>
     </button>
-    <button class="bottom-nav__item bottom-nav__item--active" data-tab="tabWorkouts">
-        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-        </svg>
-        <span class="bottom-nav__label">Workouts</span>
-    </button>
-    <button class="bottom-nav__item" data-tab="tabStats">
-        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-             stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="20" x2="18" y2="10"/>
-            <line x1="12" y1="20" x2="12" y2="4"/>
-            <line x1="6" y1="20" x2="6" y2="14"/>
-        </svg>
-        <span class="bottom-nav__label">Stats</span>
-    </button>
-    <button class="bottom-nav__item" data-tab="tabMap">
+    <button class="bottom-nav__item bottom-nav__item--active" data-tab="tabMap">
         <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="11" r="3"/>
@@ -422,6 +406,15 @@
           <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/>
         </svg>
         <span class="bottom-nav__label">Track</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabStats">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span class="bottom-nav__label">Stats</span>
     </button>
     <button class="bottom-nav__item" data-tab="tabFriends">
         <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"

@@ -1846,17 +1846,19 @@ body {
         background: #fff !important;
     }
     #map {
-        position: relative !important;
-        flex: 1 !important;
-        height: 100% !important;
-        inset: auto !important;
+        position: fixed !important;
+        left: 55rem !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
         width: auto !important;
-        z-index: auto !important;
+        height: 100% !important;
+        z-index: 1 !important;
     }
-    .map-search-bar, .route-mini-pill, #tabMap,
+    .map-search-bar, .route-mini-pill,
     #tabStats:not(.tab-panel--active) { display: none !important; }
 
-    #tabWorkouts {
+    #tabMap {
         position: static !important; inset: auto !important;
         z-index: auto !important; pointer-events: all !important;
         display: flex !important; flex-direction: column !important;
@@ -1867,7 +1869,7 @@ body {
         overflow-y: auto !important; overflow-x: hidden !important;
         border-radius: 0 !important; box-shadow: none !important;
     }
-    #tabWorkouts .tab-scroll {
+    #tabMap .tab-scroll {
         max-height: none !important; border-radius: 0 !important;
         box-shadow: none !important; background: transparent !important;
         padding: 0 !important; overflow: hidden !important;
@@ -1875,14 +1877,14 @@ body {
         flex: 1 !important; pointer-events: all !important;
         transition: none !important;
     }
-    #tabWorkouts .tab-scroll::before { display: none !important; }
-    #tabWorkouts .tab-scroll .logo {
+    #tabMap .tab-scroll::before { display: none !important; }
+    #tabMap .tab-scroll .logo {
         height: 5.2rem !important; display: block !important;
         margin: 0 auto 3rem auto !important; align-self: center !important;
     }
-    #tabWorkouts .tab-header { justify-content: center !important; }
-    #tabWorkouts .workouts--hidden-in-tab .workout { display: grid !important; }
-    #tabWorkouts .workouts {
+    #tabMap .tab-header { justify-content: center !important; }
+    #tabMap .workouts--hidden-in-tab .workout { display: grid !important; }
+    #tabMap .workouts {
         height: auto !important; max-height: none !important;
         overflow-y: auto !important; flex: 1 !important;
     }

@@ -2035,7 +2035,7 @@ window.app = new App();
 // ─── BOTTOM NAV (exact copy of script.js initBottomNav IIFE) ─────────────────
 (function initBottomNav() {
     const SEARCH_BAR = document.getElementById('mapSearchBar');
-    let activeTab = 'tabWorkouts';
+    let activeTab = 'tabMap';
     let routeActive = false;
     const MOBILE_SEARCH_BAR = document.getElementById('mapSearchBarMobile');
     function showSearch() {

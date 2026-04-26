@@ -6,7 +6,7 @@ export class BottomNav {
             enumerable: true,
             configurable: true,
             writable: true,
-            value: 'tabWorkouts'
+            value: 'tabMap'
         });
         Object.defineProperty(this, "routeActive", {
             enumerable: true,
