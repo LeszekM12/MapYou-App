@@ -6,6 +6,7 @@ import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { getNotifications, getUnreadCount, markAllRead, clearAll, onNotificationsChange, notifyActivityAdded, } from './NotificationsService.js';
 import { profileView } from './ProfileView.js';
+import { searchView } from './SearchView.js';
 import { openPostModal } from './PostModal.js';
 import { openSaveActivityModal } from './SaveActivityModal.js';
 import { loadUnifiedWorkouts, saveUnifiedWorkout } from './UnifiedWorkout.js';
@@ -845,6 +846,11 @@ export class HomeView {
           <p class="home-greeting__sub">${activityCount} activit${activityCount === 1 ? 'y' : 'ies'} recorded</p>
         </div>
         <div class="home-greeting__actions">
+          <button class="home-greeting__search-btn" id="homeSearchBtn" aria-label="Search friends & clubs">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+              <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+            </svg>
+          </button>
           <button class="home-greeting__bell-btn" id="homeNotifBell" aria-label="Notifications">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
               <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
@@ -860,6 +866,10 @@ export class HomeView {
         greeting.querySelector('#profileNavAvatar')?.addEventListener('click', e => {
             e.stopPropagation();
             void profileView.open();
+        });
+        greeting.querySelector('#homeSearchBtn')?.addEventListener('click', e => {
+            e.stopPropagation();
+            searchView.open();
         });
         greeting.querySelector('#homeNotifBell')?.addEventListener('click', e => {
             e.stopPropagation();

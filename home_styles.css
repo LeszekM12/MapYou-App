@@ -2071,3 +2071,20 @@
   color: rgba(255,255,255,0.7);
   font-weight: 700;
 }
+
+
+/* ── Search button in greeting ── */
+.home-greeting__search-btn {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.7);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: border-color 0.2s, background 0.2s;
+}
+.home-greeting__search-btn:hover {
+  border-color: var(--color-brand--2, #00c46a);
+  background: rgba(0,196,106,0.08);
+}
