@@ -389,7 +389,7 @@ function buildCard(act: EnrichedActivity): HTMLElement {
 
   card.innerHTML = `
     <div class="home-card__header">
-      <div class="home-card__avatar home-card__avatar--user" style="border-color:${color}40">
+      <div class="home-card__avatar home-card__avatar--user" style="border-color:${color}40;background:${color}20">
         ${userAvatarHtml}
       </div>
       <div class="home-card__meta">

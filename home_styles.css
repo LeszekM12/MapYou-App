@@ -1582,6 +1582,10 @@
    POST CARD extras
    ═══════════════════════════════════════════════════════════════════════════ */
 
+.home-card__avatar--user {
+  border-radius: 30% !important;
+  overflow: hidden !important;
+}
 .home-card--post .home-card__avatar--user {
   background: rgba(255,255,255,0.08);
   border-color: rgba(255,255,255,0.12);
