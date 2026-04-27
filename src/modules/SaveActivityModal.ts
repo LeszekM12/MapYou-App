@@ -208,6 +208,7 @@ export class SaveActivityModal {
   private _selectedSport: SportType;
   private _photoBlob: Blob | null = null;
   private _photoUrl: string | null = null;
+  private _pickedCoords: [number, number] | null = null;
 
   constructor(
     private _activity: ActivityRecord,
@@ -248,26 +249,74 @@ export class SaveActivityModal {
     const container = document.getElementById('samMapPreview');
     if (!container) return;
     const coords = this._activity.coords;
-    if (coords.length < 2) {
-      container.innerHTML = '<div class="sam-no-map">No GPS route data</div>';
-      return;
-    }
+    const isManual = coords.length === 0;
+    const color = SPORT_COLORS[this._activity.sport] ?? '#00c46a';
+
     setTimeout(() => {
-      const color = SPORT_COLORS[this._activity.sport];
-      const map = L.map(container, {
-        zoomControl: false, dragging: false, touchZoom: false,
-        scrollWheelZoom: false, doubleClickZoom: false,
-        boxZoom: false, keyboard: false, attributionControl: false,
-      });
-      L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(map);
-      const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), {
-        color, weight: 4, opacity: 0.95,
-      }).addTo(map);
-      map.fitBounds(line.getBounds(), { padding: [20, 20] });
-      const first = coords[0];
-      const last  = coords[coords.length - 1];
-      L.circleMarker([first[0], first[1]], { radius: 5, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
-      L.circleMarker([last[0], last[1]],   { radius: 5, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
+      if (isManual) {
+        // Interactive map — user clicks to place a pin
+        container.style.cursor = 'crosshair';
+        const hint = document.createElement('div');
+        hint.className = 'sam-map-hint';
+        hint.textContent = '📍 Tap map to set location';
+        container.appendChild(hint);
+
+        // Get last known coords for initial view
+        let initCoords: [number, number] = [52.237, 21.017];
+        try {
+          const raw = localStorage.getItem('mapty_last_coords') ?? localStorage.getItem('mapty_ip_coords');
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed) && parsed.length === 2) initCoords = parsed as [number, number];
+            else if (parsed?.coords) initCoords = parsed.coords as [number, number];
+          }
+        } catch {}
+
+        const map = L.map(container, {
+          zoomControl: true, dragging: true, touchZoom: true,
+          scrollWheelZoom: true, doubleClickZoom: false,
+          attributionControl: false,
+        });
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(map);
+        map.setView(initCoords, 13);
+
+        let marker: L.Marker | null = null;
+
+        const pinIcon = L.divIcon({
+          className: '',
+          html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="28" height="42">
+            <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z"
+              fill="${color}" stroke="white" stroke-width="1.5"/>
+            <circle cx="12" cy="12" r="5" fill="white"/>
+          </svg>`,
+          iconSize: [28, 42],
+          iconAnchor: [14, 42],
+        });
+
+        map.on('click', (e: L.LeafletMouseEvent) => {
+          const { lat, lng } = e.latlng;
+          this._pickedCoords = [lat, lng];
+          if (marker) marker.setLatLng([lat, lng]);
+          else marker = L.marker([lat, lng], { icon: pinIcon }).addTo(map);
+          hint.style.display = 'none';
+        });
+
+      } else if (coords.length >= 2) {
+        // GPS route — static map
+        const map = L.map(container, {
+          zoomControl: false, dragging: false, touchZoom: false,
+          scrollWheelZoom: false, doubleClickZoom: false,
+          boxZoom: false, keyboard: false, attributionControl: false,
+        });
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(map);
+        const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), {
+          color, weight: 4, opacity: 0.95,
+        }).addTo(map);
+        map.fitBounds(line.getBounds(), { padding: [20, 20] });
+        const first = coords[0], last = coords[coords.length - 1];
+        L.circleMarker([first[0], first[1]], { radius: 5, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
+        L.circleMarker([last[0], last[1]],   { radius: 5, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
+      }
     }, 200);
   }
 
@@ -423,7 +472,10 @@ export class SaveActivityModal {
       speedKmH:    manualDurSec > 0 ? manualDistKm / (manualDurSec / 3600) : 0,
       intensity,
       notes,
-      coords:      this._activity.coords,
+      // Use picked map point for manual, GPS coords for tracked
+      coords:      this._pickedCoords
+        ? [this._pickedCoords]
+        : this._activity.coords,
     };
 
     await saveEnrichedActivity(enriched);
