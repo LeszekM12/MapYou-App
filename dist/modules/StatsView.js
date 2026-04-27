@@ -564,7 +564,7 @@ export class StatsView {
             const third = w.type === 'cycling'
                 ? `${w.speedKmH.toFixed(1)} km/h`
                 : formatPaceSec(w.paceMinKm) + '/km';
-            const hasMap = w.coords.length > 1;
+            const hasMap = w.coords.length >= 1;
             return `
         <div class="sv-item" data-id="${w.id}" data-source="${w.source}">
           <div class="sv-item__color-bar" style="background:${color}"></div>
@@ -578,7 +578,7 @@ export class StatsView {
               <span>${w.distanceKm.toFixed(2)} km</span>
               <span>${formatDurSec(w.durationSec)}</span>
               <span>${third}</span>
-              ${hasMap ? '<span class="sv-item__has-map">📍 GPS</span>' : ''}
+              ${hasMap ? `<span class="sv-item__has-map">${w.coords.length === 1 ? '📍 point' : '📍 GPS'}</span>` : ''}
               <span class="sv-item__src sv-item__src--${w.source}">${w.source}</span>
             </div>
           </div>
@@ -660,7 +660,7 @@ export class StatsView {
           ${w.elevGain > 0 ? `<div class="sv-detail-stat"><span class="sv-detail-stat__val">${w.elevGain}m</span><span class="sv-detail-stat__lbl">elev</span></div>` : ''}
         </div>
 
-        ${w.coords.length > 1 ? `<div class="sv-detail-map" id="svDetailMap"></div>` : ''}
+        ${w.coords.length >= 1 ? `<div class="sv-detail-map" id="svDetailMap"></div>` : ''}
 
         ${w.notes ? `<div class="sv-detail-notes">🔒 ${w.notes}</div>` : ''}
         ${w.photoUrl ? `<div class="sv-detail-photo"><img src="${w.photoUrl}" alt=""/></div>` : ''}
@@ -703,7 +703,7 @@ export class StatsView {
                 panel.style.transform = '';
         });
         // Render map
-        if (w.coords.length > 1) {
+        if (w.coords.length >= 1) {
             setTimeout(() => {
                 const mapEl = document.getElementById('svDetailMap');
                 if (!mapEl)
@@ -712,13 +712,33 @@ export class StatsView {
                     zoomControl: false, dragging: true, attributionControl: false,
                 });
                 L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(this._detailMap);
-                const line = L.polyline(w.coords.map(c => L.latLng(c[0], c[1])), {
-                    color, weight: 4, opacity: 0.95,
-                }).addTo(this._detailMap);
-                this._detailMap.fitBounds(line.getBounds(), { padding: [24, 24] });
-                const first = w.coords[0], last = w.coords[w.coords.length - 1];
-                L.circleMarker([first[0], first[1]], { radius: 6, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(this._detailMap);
-                L.circleMarker([last[0], last[1]], { radius: 6, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(this._detailMap);
+                if (w.coords.length === 1) {
+                    // Single point — pin marker, zoom 15
+                    const [lat, lng] = w.coords[0];
+                    this._detailMap.setView([lat, lng], 15);
+                    L.marker([lat, lng], {
+                        icon: L.divIcon({
+                            className: '',
+                            html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="32" height="48">
+                <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z"
+                  fill="${color}" stroke="white" stroke-width="1.5"/>
+                <circle cx="12" cy="12" r="5" fill="white"/>
+              </svg>`,
+                            iconSize: [32, 48],
+                            iconAnchor: [16, 48],
+                        }),
+                    }).addTo(this._detailMap);
+                }
+                else {
+                    // Route — polyline with start/end markers
+                    const line = L.polyline(w.coords.map(c => L.latLng(c[0], c[1])), {
+                        color, weight: 4, opacity: 0.95,
+                    }).addTo(this._detailMap);
+                    this._detailMap.fitBounds(line.getBounds(), { padding: [24, 24] });
+                    const first = w.coords[0], last = w.coords[w.coords.length - 1];
+                    L.circleMarker([first[0], first[1]], { radius: 6, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(this._detailMap);
+                    L.circleMarker([last[0], last[1]], { radius: 6, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(this._detailMap);
+                }
             }, 200);
         }
     }

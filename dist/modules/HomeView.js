@@ -38,7 +38,7 @@ function intensityColor(n) {
 // ── Mini map ──────────────────────────────────────────────────────────────────
 const _activeMaps = new Map();
 function renderMiniMap(container, coords, sport) {
-    if (!coords || coords.length < 2) {
+    if (!coords || coords.length === 0) {
         container.innerHTML = '<div class="home-card__no-map">No GPS data</div>';
         return;
     }
@@ -57,14 +57,34 @@ function renderMiniMap(container, coords, sport) {
     _activeMaps.set(container.id, map);
     L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(map);
     const color = SPORT_COLORS[sport] ?? '#00c46a';
-    const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), {
-        color, weight: 4, opacity: 0.95,
-    }).addTo(map);
-    map.fitBounds(line.getBounds(), { padding: [16, 16] });
-    const first = coords[0];
-    const last = coords[coords.length - 1];
-    L.circleMarker([first[0], first[1]], { radius: 5, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
-    L.circleMarker([last[0], last[1]], { radius: 5, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
+    if (coords.length === 1) {
+        // Single point — show pin marker, no polyline
+        const [lat, lng] = coords[0];
+        map.setView([lat, lng], 15);
+        L.marker([lat, lng], {
+            icon: L.divIcon({
+                className: '',
+                html: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 36" width="28" height="42">
+          <path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 24 12 24s12-15 12-24C24 5.4 18.6 0 12 0z"
+            fill="${color}" stroke="white" stroke-width="1.5"/>
+          <circle cx="12" cy="12" r="5" fill="white"/>
+        </svg>`,
+                iconSize: [28, 42],
+                iconAnchor: [14, 42],
+            }),
+        }).addTo(map);
+    }
+    else {
+        // Route — polyline with start/end markers
+        const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), {
+            color, weight: 4, opacity: 0.95,
+        }).addTo(map);
+        map.fitBounds(line.getBounds(), { padding: [16, 16] });
+        const first = coords[0];
+        const last = coords[coords.length - 1];
+        L.circleMarker([first[0], first[1]], { radius: 5, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
+        L.circleMarker([last[0], last[1]], { radius: 5, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
+    }
 }
 // ── Comment panel ─────────────────────────────────────────────────────────────
 function openCommentPanel(card, actId) {

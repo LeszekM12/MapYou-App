@@ -757,7 +757,12 @@ class App {
         speedKmH:    _wmSpeed,
         intensity:   0,
         notes:       '',
-        coords:      Array.isArray(_wm.routeCoords) ? (_wm.routeCoords as import('./types/index.js').Coords[]) : [],
+        // Use routeCoords (planned route) if available, else fall back to workout point coords
+        coords:      Array.isArray(_wm.routeCoords) && (_wm.routeCoords as unknown[]).length > 0
+          ? (_wm.routeCoords as import('./types/index.js').Coords[])
+          : (Array.isArray(_wm.coords) && (_wm.coords as unknown[]).length === 2
+              ? [_wm.coords as import('./types/index.js').Coords]  // single point [lat,lng] → wrap in array
+              : []),
       };
       void saveEnrichedActivity(_wmEnriched);
       void saveUnifiedWorkout({
@@ -842,7 +847,11 @@ class App {
       speedKmH:    _speed,
       intensity:   0,
       notes:       '',
-      coords:      Array.isArray(_w.routeCoords) ? (_w.routeCoords as import('./types/index.js').Coords[]) : [],
+      coords:      Array.isArray(_w.routeCoords) && (_w.routeCoords as unknown[]).length > 0
+        ? (_w.routeCoords as import('./types/index.js').Coords[])
+        : (Array.isArray(_w.coords) && (_w.coords as unknown[]).length === 2
+            ? [_w.coords as import('./types/index.js').Coords]
+            : []),
     };
     void saveEnrichedActivity(_enriched);
     void saveUnifiedWorkout({

@@ -49,7 +49,13 @@ function _fromManual(w: Record<string, any>): UnifiedWorkout {
     paceMinKm:   type === 'cycling' ? 0 : pace,
     speedKmH:    speed,
     elevGain:    Number(w.elevGain ?? w.elevationGain ?? 0) || 0,
-    coords:      Array.isArray(w.routeCoords) ? w.routeCoords : [],
+    // routeCoords = planned route (array of [lat,lng])
+    // coords       = single click point [lat, lng] (flat, needs wrapping)
+    coords:      Array.isArray(w.routeCoords) && w.routeCoords.length > 0
+      ? w.routeCoords
+      : (Array.isArray(w.coords) && w.coords.length === 2 && typeof w.coords[0] === 'number'
+          ? [w.coords]   // wrap single point [lat,lng] → [[lat,lng]]
+          : []),
     name:        String(w.description ?? ''),
     description: String(w.description ?? ''),
     notes:       '',
