@@ -167,19 +167,16 @@ export class FriendsView {
 
   // ── Share my invite link ───────────────────────────────────────────────────
 
-  /** Pre-generate the invite link in background — called on Friends tab open */
   private _cachedInviteLink: string | null = null;
   private _cachingLink = false;
 
+  /** Pre-generuj link w tle — wywołaj przy wejściu w zakładkę Friends */
   async _precacheInviteLink(): Promise<void> {
     if (this._cachingLink) return;
     this._cachingLink = true;
     const name = getUserName();
 
-    // Ustaw base64 link NATYCHMIAST — zawsze dostępny gdy user kliknie
-    this._cachedInviteLink = this._buildFallbackLink(name);
-
-    // Znajdź push sub z krótkim timeoutem
+    // 1. Znajdź push sub (opcjonalnie — link działa też bez niego)
     let sub: PushSubscription | null = null;
     try {
       const regs = await Promise.race([
@@ -192,68 +189,64 @@ export class FriendsView {
       }
     } catch {}
 
-    // Zaktualizuj base64 z push sub jeśli dostępny
+    // 2. Spróbuj krótki link z backendu (działa z push sub lub bez)
     if (sub) {
-      const base = window.location.href.split('#')[0];
+      try {
+        const subJson = sub.toJSON() as Friend['pushSub'];
+        const short = await Promise.race([
+          generateInviteLink(name, subJson, BACKEND_URL),
+          new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
+        ]);
+        this._cachedInviteLink = short;
+        this._cachingLink = false;
+        return;
+      } catch {}
+    }
+
+    // 3. Backend niedostępny lub brak push sub
+    const base = window.location.href.split('#')[0];
+    if (sub) {
+      // Mamy push sub — base64 z pełnymi danymi (działa bez backendu)
       this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
         name,
         pushSub: sub.toJSON(),
       }))}`;
+    } else {
+      // Brak push sub — link tylko z imieniem (znajomy może dodać ale bez push)
+      this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
+        name,
+        pushSub: null,
+      }))}`;
     }
 
     this._cachingLink = false;
-
-    // Spróbuj zastąpić krótkim linkiem z backendu w tle (bez blokowania)
-    if (sub) {
-      void (async () => {
-        try {
-          const subJson = sub!.toJSON() as Friend['pushSub'];
-          const short = await Promise.race([
-            generateInviteLink(name, subJson, BACKEND_URL),
-            new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
-          ]);
-          this._cachedInviteLink = short; // nadpisz krótkim jeśli backend odpowiedział
-        } catch { /* zostaje base64 */ }
-      })();
-    }
-  }
-
-  /** Builds a fallback base64 invite link synchronously — always available instantly */
-  private _buildFallbackLink(name: string): string {
-    const base   = window.location.href.split('#')[0];
-    const userId = localStorage.getItem('mapyou_userId_profile') ?? String(Date.now());
-    return `${base}#invite=${btoa(JSON.stringify({
-      name,
-      pushSub: {
-        endpoint:       `local:${userId}`,
-        expirationTime: null,
-        keys:           { p256dh: '', auth: '' },
-      },
-    }))}`;
   }
 
   private _shareMyLink(): void {
+    // navigator.share() MUSI być wywołany synchronicznie w handlerze kliknięcia (wymóg iOS)
     const name = getUserName();
-    // Build link synchronously — NEVER await anything before navigator.share()
-    // navigator.share() MUST be called in the same call stack as the user gesture
-    const link = this._cachedInviteLink ?? this._buildFallbackLink(name);
+    const link = this._cachedInviteLink;
+
+    if (!link) {
+      // Link nie gotowy — pokaż toast i przygotuj na następne kliknięcie
+      this._showToast('Preparing link... tap again in a moment ⏳');
+      void this._precacheInviteLink();
+      return;
+    }
 
     if (typeof navigator.share === 'function') {
-      // Call share() directly — no await, no .then() before the call
       navigator.share({
         title: `Add ${name} on MapYou`,
         text:  `${name} invited you to track their workouts live! 🏃`,
         url:   link,
       }).catch((err: Error) => {
         if (err.name !== 'AbortError') {
-          // Share failed — copy to clipboard as fallback
           navigator.clipboard?.writeText(link)
             .then(() => this._showToast('Invite link copied! 📋'))
-            .catch(() => this._showToast(link.slice(0, 60) + '…'));
+            .catch(() => this._showToast('Could not share — try again'));
         }
       });
     } else {
-      // Desktop fallback — copy to clipboard
       navigator.clipboard?.writeText(link)
         .then(() => this._showToast('Invite link copied! 📋'))
         .catch(() => this._showToast('Could not share — try again'));
@@ -331,12 +324,14 @@ export class FriendsView {
         }
       }
 
-      if (!name || !sub) return;
+      if (!name) return;
 
+      // sub może być null gdy link wygenerowano bez push sub (np. laptop bez powiadomień)
+      const endpoint = sub?.endpoint ?? `local:${name}:${Date.now()}`;
       await addFriend({
         name,
-        subscriptionId: sub.endpoint,
-        pushSub:        sub,
+        subscriptionId: endpoint,
+        pushSub:        sub ?? { endpoint, expirationTime: null, keys: { p256dh: '', auth: '' } },
         liveToken:      null,
         lastSeen:       null,
         addedAt:        Date.now(),
