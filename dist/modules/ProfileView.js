@@ -41,6 +41,47 @@ function _activityTrophies(workouts) {
         icon: cnt >= m ? '⚡' : '🔒',
     }));
 }
+const LS_BEST_STREAK = 'mapyou_best_streak';
+export function updateBestStreak(currentStreak) {
+    const prev = parseInt(localStorage.getItem(LS_BEST_STREAK) ?? '0', 10);
+    if (currentStreak > prev)
+        localStorage.setItem(LS_BEST_STREAK, String(currentStreak));
+}
+export function getBestStreak() {
+    return parseInt(localStorage.getItem(LS_BEST_STREAK) ?? '0', 10);
+}
+function _streakTrophies() {
+    const best = getBestStreak();
+    // Every day from 7 onwards is its own trophy
+    const trophies = [];
+    if (best < 7) {
+        // Not yet unlocked — show locked milestone
+        trophies.push({
+            id: 'streak_7', label: '7-day streak', desc: 'Train 7 days in a row',
+            unlocked: false, count: 7, color: '#374151', icon: '🔒',
+        });
+        return trophies;
+    }
+    // Show unlocked from 7 up to best, then next locked one
+    for (let d = 7; d <= best; d++) {
+        trophies.push({
+            id: `streak_${d}`,
+            label: `${d}-day streak`,
+            desc: `You trained ${d} days in a row! 🔥`,
+            unlocked: true,
+            count: d,
+            color: d >= 30 ? '#eab308' : d >= 14 ? '#f97316' : '#00c46a',
+            icon: '🔥',
+        });
+    }
+    // Next locked milestone
+    trophies.push({
+        id: `streak_${best + 1}`, label: `${best + 1}-day streak`,
+        desc: `Train ${best + 1} days in a row`, unlocked: false,
+        count: best + 1, color: '#374151', icon: '🔒',
+    });
+    return trophies;
+}
 function _weeklyTrophies() {
     const wins = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);
     const milestones = [1, 4, 8, 12, 26, 52];
@@ -445,8 +486,10 @@ export class ProfileView {
     _renderTrophies(el) {
         const actTrophies = _activityTrophies(this._workouts);
         const wkTrophies = _weeklyTrophies();
-        const totalUnlocked = [...actTrophies, ...wkTrophies].filter(t => t.unlocked).length;
+        const streakTrophies = _streakTrophies();
+        const totalUnlocked = [...actTrophies, ...wkTrophies, ...streakTrophies].filter(t => t.unlocked).length;
         const weeklyWins = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);
+        const bestStreak = getBestStreak();
         el.innerHTML = `
       <div class="pv-trophy-summary">
         <span class="pv-trophy-summary__count">${totalUnlocked}</span>
@@ -466,7 +509,10 @@ export class ProfileView {
       <div class="pv-trophy-grid">${actTrophies.map(_buildTrophySVG).join('')}</div>
 
       <div class="pv-section-title" style="margin-top:24px">🏆 Weekly Goal Cups</div>
-      <div class="pv-trophy-grid">${wkTrophies.map(_buildTrophySVG).join('')}</div>`;
+      <div class="pv-trophy-grid">${wkTrophies.map(_buildTrophySVG).join('')}</div>
+
+      <div class="pv-section-title" style="margin-top:24px">🔥 Streak Records${bestStreak >= 7 ? ` <span style="color:#f97316;font-size:1.1rem">(Best: ${bestStreak} days)</span>` : ''}</div>
+      <div class="pv-trophy-grid pv-trophy-grid--scroll">${streakTrophies.map(_buildTrophySVG).join('')}</div>`;
     }
     // ── Posts ───────────────────────────────────────────────────────────────────
     _renderPosts(el) {
