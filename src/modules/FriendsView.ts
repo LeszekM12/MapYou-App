@@ -175,17 +175,9 @@ export class FriendsView {
     if (this._cachingLink) return;
     this._cachingLink = true;
     const name = getUserName();
-    const base = window.location.href.split('#')[0];
 
     // Ustaw base64 link NATYCHMIAST — zawsze dostępny gdy user kliknie
-    const buildBase64 = (s: PushSubscription | null) => `${base}#invite=${btoa(JSON.stringify({
-      name,
-      pushSub: s?.toJSON() ?? {
-        endpoint: `local:${localStorage.getItem('mapyou_userId_profile') ?? Date.now()}`,
-        expirationTime: null,
-        keys: { p256dh: '', auth: '' },
-      },
-    }))}`;
+    this._cachedInviteLink = this._buildFallbackLink(name);
 
     // Znajdź push sub z krótkim timeoutem
     let sub: PushSubscription | null = null;
@@ -200,8 +192,15 @@ export class FriendsView {
       }
     } catch {}
 
-    // Ustaw base64 od razu (natychmiast dostępny)
-    this._cachedInviteLink = buildBase64(sub);
+    // Zaktualizuj base64 z push sub jeśli dostępny
+    if (sub) {
+      const base = window.location.href.split('#')[0];
+      this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
+        name,
+        pushSub: sub.toJSON(),
+      }))}`;
+    }
+
     this._cachingLink = false;
 
     // Spróbuj zastąpić krótkim linkiem z backendu w tle (bez blokowania)
@@ -219,18 +218,28 @@ export class FriendsView {
     }
   }
 
+  /** Builds a fallback base64 invite link synchronously — always available instantly */
+  private _buildFallbackLink(name: string): string {
+    const base   = window.location.href.split('#')[0];
+    const userId = localStorage.getItem('mapyou_userId_profile') ?? String(Date.now());
+    return `${base}#invite=${btoa(JSON.stringify({
+      name,
+      pushSub: {
+        endpoint:       `local:${userId}`,
+        expirationTime: null,
+        keys:           { p256dh: '', auth: '' },
+      },
+    }))}`;
+  }
+
   private _shareMyLink(): void {
     const name = getUserName();
-    const link = this._cachedInviteLink;
 
-    if (!link) {
-      // Still generating — show toast and try again in 1s
-      this._showToast('Generating link... ⏳');
-      setTimeout(() => this._shareMyLink(), 1000);
-      return;
-    }
+    // FIX: Always use cached link or build fallback synchronously.
+    // Never defer with setTimeout — iOS/Safari requires navigator.share()
+    // to be called synchronously within the user gesture handler.
+    const link = this._cachedInviteLink ?? this._buildFallbackLink(name);
 
-    // Call share SYNCHRONOUSLY in user gesture context (required by iOS)
     if (navigator.share) {
       void navigator.share({
         title: `Add ${name} on MapYou`,
