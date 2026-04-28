@@ -2022,6 +2022,8 @@ window.app = new App();
         friendsViewInited = true;
         friendsView.init();
       }
+      // Pre-generuj link zaproszenia w tle żeby share był synchroniczny
+      void friendsView._precacheInviteLink();
     } else {
       hideMobileSearchTab();
     }
@@ -2173,8 +2175,10 @@ const friendsView     = new FriendsView();
 let   friendsViewInited = false;
 let   homeViewInited    = false;
 
-// FriendsView.init() wywoływane dopiero przy pierwszym wejściu w zakładkę Friends
-// (btnShareMyLink i inne przyciski muszą być widoczne w DOM gdy init() się wykona)
+// Inicjalizuj FriendsView od razu — polling statusu znajomych musi działać
+// niezależnie od tego czy użytkownik wszedł w zakładkę Friends
+friendsView.init();
+friendsViewInited = true;
 
 // Inicjalizuj profil użytkownika (userId + avatar w UI)
 initUserProfile();
