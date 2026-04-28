@@ -10,7 +10,7 @@ import {
   getNotifications, getUnreadCount, markAllRead, markRead, clearAll,
   onNotificationsChange, notifyActivityAdded, type AppNotification,
 } from './NotificationsService.js';
-import { profileView } from './ProfileView.js';
+import { profileView, updateBestStreak } from './ProfileView.js';
 import { searchView } from './SearchView.js';
 import { openPostModal } from './PostModal.js';
 import { openSaveActivityModal } from './SaveActivityModal.js';
@@ -978,6 +978,9 @@ export class HomeView {
         isToday: i === 0,
       });
     }
+
+    // Update best streak record (for trophies + personal records)
+    updateBestStreak(streak);
 
     wrap.innerHTML = `
       <div class="home-streak__inner">

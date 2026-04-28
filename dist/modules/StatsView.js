@@ -6,7 +6,7 @@
 /// <reference types="leaflet" />
 import { loadUnifiedWorkouts, deleteUnifiedWorkout, markWorkoutDeleted, formatDurSec, formatPaceSec, SPORT_ICONS_U, SPORT_COLORS_U, } from './UnifiedWorkout.js';
 import { deleteEnrichedActivity, deleteActivity, deleteWorkoutFromDB, } from './db.js';
-import { recordWeeklyGoalWin } from './ProfileView.js';
+import { recordWeeklyGoalWin, getBestStreak } from './ProfileView.js';
 import { notifyWeeklyGoal } from './NotificationsService.js';
 // homeView imported lazily to avoid circular deps
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -411,11 +411,13 @@ export class StatsView {
         const byDur = [...ws].sort((a, b) => b.durationSec - a.durationSec)[0];
         const byPace = ws.filter(w => w.type !== 'cycling' && w.paceMinKm > 0).sort((a, b) => a.paceMinKm - b.paceMinKm)[0];
         const byElev = [...ws].sort((a, b) => b.elevGain - a.elevGain)[0];
+        const bestStreak = getBestStreak();
         const records = [
             ['🏅', 'Longest run', byDist ? `${byDist.distanceKm.toFixed(2)} km` : '—', byDist ? relDate(byDist.date) : ''],
             ['⏱', 'Longest time', byDur ? formatDurSec(byDur.durationSec) : '—', byDur ? relDate(byDur.date) : ''],
             ['⚡', 'Best pace', byPace ? `${formatPaceSec(byPace.paceMinKm)}/km` : '—', byPace ? relDate(byPace.date) : ''],
             ['⛰', 'Most elevation', byElev && byElev.elevGain > 0 ? `${byElev.elevGain}m` : '—', byElev && byElev.elevGain > 0 ? relDate(byElev.date) : ''],
+            ['🔥', 'Best streak', bestStreak >= 1 ? `${bestStreak} days` : '—', bestStreak >= 1 ? 'All time' : ''],
         ];
         el.innerHTML = records.map(([icon, lbl, val, date]) => `
       <div class="sv-record">
