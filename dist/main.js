@@ -2413,10 +2413,8 @@ void initWeatherComponents();
 const friendsView = new FriendsView();
 let friendsViewInited = false;
 let homeViewInited = false;
-// Inicjalizuj FriendsView od razu — polling statusu znajomych musi działać
-// niezależnie od tego czy użytkownik wszedł w zakładkę Friends
-friendsView.init();
-friendsViewInited = true;
+// FriendsView.init() wywoływane dopiero przy pierwszym wejściu w zakładkę Friends
+// (btnShareMyLink i inne przyciski muszą być widoczne w DOM gdy init() się wykona)
 // Inicjalizuj profil użytkownika (userId + avatar w UI)
 initUserProfile();
 // Migracja danych do unified workouts model
