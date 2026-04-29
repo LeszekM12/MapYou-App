@@ -35,6 +35,7 @@ import { liveTracker } from './modules/LiveTracker.js';
 import { FriendsView } from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
 import { initUserProfile } from './modules/UserProfile.js';
+import { syncToMongoIfNeeded } from './modules/syncToMongo.js';
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
@@ -2431,4 +2432,6 @@ void showNameModalIfNeeded();
 document.getElementById('btnChangeName')?.addEventListener('click', () => {
     openChangeNameModal();
 });
+// ─── Sync do MongoDB Atlas (jednorazowa migracja z IndexedDB) ───────────────
+void syncToMongoIfNeeded();
 //# sourceMappingURL=main.js.map

@@ -43,6 +43,7 @@ import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal } from './modules/UserName.js';
 import { initUserProfile } from './modules/UserProfile.js';
+import { syncToMongoIfNeeded } from './modules/syncToMongo.js';
 
 // ─── Leaflet plugin types ─────────────────────────────────────────────────────
 
@@ -2194,3 +2195,5 @@ void showNameModalIfNeeded();
 document.getElementById('btnChangeName')?.addEventListener('click', () => {
   openChangeNameModal();
 });
+// ─── Sync do MongoDB Atlas (jednorazowa migracja z IndexedDB) ───────────────
+void syncToMongoIfNeeded();
