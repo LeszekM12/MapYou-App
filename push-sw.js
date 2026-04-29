@@ -1,6 +1,6 @@
 // ─── PUSH SERVICE WORKER ─────────────────────────────────────────────────────
 
-const BACKEND_URL = 'https://mapty-backend-lexb.onrender.com';
+const BACKEND_URL = 'https://mapty-backend.fly.dev';
 
 self.addEventListener('push', event => {
   let data = {

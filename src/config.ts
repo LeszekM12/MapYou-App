@@ -6,4 +6,4 @@
 export const MAPBOX_TOKEN =
   'pk.eyJ1IjoibGVzemVrLW1pa3J1dCIsImEiOiJjbW8ybm5jZ3IwYmZjMnFxd3VycjBtaHZ4In0.mpY8zJ-aEW8n5iZhf2GrWA';
 
-export const BACKEND_URL = 'https://mapty-backend-lexb.onrender.com';
+export const BACKEND_URL = 'https://mapty-backend.fly.dev';
