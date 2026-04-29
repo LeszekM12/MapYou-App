@@ -6,6 +6,37 @@ import { getUserId } from './PushNotifications.js';
 const LS_SYNCED_KEY = 'mapyou_mongo_synced';
 const LS_SYNC_FAILED = 'mapyou_mongo_sync_failed_at';
 const RETRY_AFTER_MS = 5 * 60 * 1000;
+// ── Kompresja zdjęcia przed uploadem ─────────────────────────────────────────
+// Zmniejsza do max 1920px, quality 0.85 — niewidoczna różnica, ~5x mniejszy plik
+async function compressImage(base64, maxPx = 1920, quality = 0.85) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+            let { width, height } = img;
+            // Skaluj tylko jeśli większe niż maxPx
+            if (width > maxPx || height > maxPx) {
+                if (width > height) {
+                    height = Math.round((height * maxPx) / width);
+                    width = maxPx;
+                }
+                else {
+                    width = Math.round((width * maxPx) / height);
+                    height = maxPx;
+                }
+            }
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            const compressed = canvas.toDataURL('image/jpeg', quality);
+            resolve(compressed);
+        };
+        img.onerror = () => resolve(base64); // fallback — zostaw oryginał
+        img.src = base64;
+    });
+}
+// ── Czekaj na gotowość Dexie ──────────────────────────────────────────────────
 async function waitForDexie(timeoutMs = 10000) {
     const start = Date.now();
     while (Date.now() - start < timeoutMs) {
@@ -20,14 +51,18 @@ async function waitForDexie(timeoutMs = 10000) {
     console.warn('[Sync] Dexie not ready after timeout');
     return false;
 }
+// ── Upload zdjęcia do Cloudinary przez backend ────────────────────────────────
 async function uploadImageToCloudinary(base64, userId, folder, publicId) {
     if (!base64 || !base64.startsWith('data:image/'))
         return base64 || null;
     try {
+        // Kompresuj przed uploadem
+        const compressed = await compressImage(base64);
+        console.log(`[Sync] Compressed: ${Math.round(base64.length / 1024)}KB → ${Math.round(compressed.length / 1024)}KB`);
         const res = await fetch(`${BACKEND_URL}/upload/image`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: base64, userId, folder, publicId }),
+            body: JSON.stringify({ image: compressed, userId, folder, publicId }),
             signal: AbortSignal.timeout(30000),
         });
         if (!res.ok)
@@ -39,6 +74,7 @@ async function uploadImageToCloudinary(base64, userId, folder, publicId) {
         return null;
     }
 }
+// ── Zamień base64 na URL ──────────────────────────────────────────────────────
 async function migratePhotos(userId, enrichedActivities, posts, profile) {
     console.log('[Sync] Uploading photos to Cloudinary...');
     const migratedActivities = await Promise.all(enrichedActivities.map(async (a) => {
@@ -60,8 +96,13 @@ async function migratePhotos(userId, enrichedActivities, posts, profile) {
             ? { ...profile, avatarB64: null, avatarUrl: url }
             : profile;
     }
-    return { enrichedActivities: migratedActivities, posts: migratedPosts, profile: migratedProfile };
+    return {
+        enrichedActivities: migratedActivities,
+        posts: migratedPosts,
+        profile: migratedProfile,
+    };
 }
+// ── Główna funkcja ────────────────────────────────────────────────────────────
 export async function syncToMongoIfNeeded() {
     if (localStorage.getItem(LS_SYNCED_KEY) === 'true')
         return;
@@ -128,7 +169,7 @@ export async function syncToMongoIfNeeded() {
         const migrateData = await migrateRes.json();
         if (migrateData.status === 'ok') {
             _markSynced();
-            console.log('[Sync] Migration complete:', migrateData.summary);
+            console.log('[Sync] Migration complete:', JSON.stringify(migrateData.summary));
         }
         else {
             _markFailed();
@@ -136,9 +177,10 @@ export async function syncToMongoIfNeeded() {
     }
     catch (err) {
         _markFailed();
-        console.warn('[Sync] Error:', err);
+        console.warn('[Sync] Error:', String(err));
     }
 }
+// ── Helpers ───────────────────────────────────────────────────────────────────
 function _markSynced() {
     localStorage.setItem(LS_SYNCED_KEY, 'true');
     localStorage.removeItem(LS_SYNC_FAILED);

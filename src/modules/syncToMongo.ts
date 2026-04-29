@@ -20,6 +20,42 @@ const LS_SYNCED_KEY  = 'mapyou_mongo_synced';
 const LS_SYNC_FAILED = 'mapyou_mongo_sync_failed_at';
 const RETRY_AFTER_MS = 5 * 60 * 1000;
 
+// ── Kompresja zdjęcia przed uploadem ─────────────────────────────────────────
+// Zmniejsza do max 1920px, quality 0.85 — niewidoczna różnica, ~5x mniejszy plik
+
+async function compressImage(base64: string, maxPx = 1920, quality = 0.85): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+
+      // Skaluj tylko jeśli większe niż maxPx
+      if (width > maxPx || height > maxPx) {
+        if (width > height) {
+          height = Math.round((height * maxPx) / width);
+          width  = maxPx;
+        } else {
+          width  = Math.round((width * maxPx) / height);
+          height = maxPx;
+        }
+      }
+
+      const canvas = document.createElement('canvas');
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      const compressed = canvas.toDataURL('image/jpeg', quality);
+      resolve(compressed);
+    };
+    img.onerror = () => resolve(base64); // fallback — zostaw oryginał
+    img.src = base64;
+  });
+}
+
+// ── Czekaj na gotowość Dexie ──────────────────────────────────────────────────
+
 async function waitForDexie(timeoutMs = 10_000): Promise<boolean> {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
@@ -34,32 +70,45 @@ async function waitForDexie(timeoutMs = 10_000): Promise<boolean> {
   return false;
 }
 
+// ── Upload zdjęcia do Cloudinary przez backend ────────────────────────────────
+
 async function uploadImageToCloudinary(
-  base64: string, userId: string,
-  folder: 'activities' | 'posts' | 'avatars',
+  base64:    string,
+  userId:    string,
+  folder:    'activities' | 'posts' | 'avatars',
   publicId?: string,
 ): Promise<string | null> {
   if (!base64 || !base64.startsWith('data:image/')) return base64 || null;
+
   try {
+    // Kompresuj przed uploadem
+    const compressed = await compressImage(base64);
+    console.log(`[Sync] Compressed: ${Math.round(base64.length/1024)}KB → ${Math.round(compressed.length/1024)}KB`);
+
     const res = await fetch(`${BACKEND_URL}/upload/image`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ image: base64, userId, folder, publicId }),
-      signal: AbortSignal.timeout(30_000),
+      body:    JSON.stringify({ image: compressed, userId, folder, publicId }),
+      signal:  AbortSignal.timeout(30_000),
     });
     if (!res.ok) return null;
     const data = await res.json() as { status: string; url: string };
     return data.status === 'ok' ? data.url : null;
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
 
+// ── Zamień base64 na URL ──────────────────────────────────────────────────────
+
 async function migratePhotos(
-  userId: string,
+  userId:             string,
   enrichedActivities: EnrichedActivity[],
-  posts: PostRecord[],
-  profile: ProfileRecord | null,
+  posts:              PostRecord[],
+  profile:            ProfileRecord | null,
 ) {
   console.log('[Sync] Uploading photos to Cloudinary...');
+
   const migratedActivities = await Promise.all(
     enrichedActivities.map(async (a) => {
       if (!a.photoUrl?.startsWith('data:image/')) return a;
@@ -67,6 +116,7 @@ async function migratePhotos(
       return { ...a, photoUrl: url };
     }),
   );
+
   const migratedPosts = await Promise.all(
     posts.map(async (p) => {
       if (!p.photoUrl?.startsWith('data:image/')) return p;
@@ -74,6 +124,7 @@ async function migratePhotos(
       return { ...p, photoUrl: url };
     }),
   );
+
   let migratedProfile = profile;
   if (profile?.avatarB64?.startsWith('data:image/')) {
     const url = await uploadImageToCloudinary(
@@ -84,8 +135,15 @@ async function migratePhotos(
       ? { ...profile, avatarB64: null, avatarUrl: url } as unknown as ProfileRecord
       : profile;
   }
-  return { enrichedActivities: migratedActivities as EnrichedActivity[], posts: migratedPosts as PostRecord[], profile: migratedProfile };
+
+  return {
+    enrichedActivities: migratedActivities as EnrichedActivity[],
+    posts:              migratedPosts as PostRecord[],
+    profile:            migratedProfile,
+  };
 }
+
+// ── Główna funkcja ────────────────────────────────────────────────────────────
 
 export async function syncToMongoIfNeeded(): Promise<void> {
   if (localStorage.getItem(LS_SYNCED_KEY) === 'true') return;
@@ -143,9 +201,9 @@ export async function syncToMongoIfNeeded(): Promise<void> {
       await migratePhotos(userId, enrichedActivities, posts, profile);
 
     const migrateRes = await fetch(`${BACKEND_URL}/migrate/bulk`, {
-      method: 'POST',
+      method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+      body:    JSON.stringify({
         userId, workouts, activities,
         enrichedActivities: migratedActivities,
         unifiedWorkouts, posts: migratedPosts,
@@ -159,14 +217,16 @@ export async function syncToMongoIfNeeded(): Promise<void> {
     const migrateData = await migrateRes.json() as { status: string; summary: Record<string, number> };
     if (migrateData.status === 'ok') {
       _markSynced();
-      console.log('[Sync] Migration complete:', migrateData.summary);
+      console.log('[Sync] Migration complete:', JSON.stringify(migrateData.summary));
     } else { _markFailed(); }
 
   } catch (err) {
     _markFailed();
-    console.warn('[Sync] Error:', err);
+    console.warn('[Sync] Error:', String(err));
   }
 }
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function _markSynced(): void {
   localStorage.setItem(LS_SYNCED_KEY, 'true');

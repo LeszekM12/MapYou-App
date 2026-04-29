@@ -2433,44 +2433,19 @@ document.getElementById('btnChangeName')?.addEventListener('click', () => {
     openChangeNameModal();
 });
 // ─── Sync to cloud button (Settings) ─────────────────────────────────────────
-document.getElementById('settingSync')?.addEventListener('click', async () => {
+document.getElementById('settingSync')?.addEventListener('click', () => {
     localStorage.removeItem('mapyou_mongo_synced');
     localStorage.removeItem('mapyou_mongo_sync_failed_at');
     const sub = document.querySelector('#settingSync .settings-item__sub');
-    // Zbierz logi wizualnie — widoczne na telefonie bez DevTools
-    const logs = [];
-    const origLog = console.log.bind(console);
-    const origWarn = console.warn.bind(console);
-    const origErr = console.error.bind(console);
-    console.log = (...a) => { logs.push(a.join(' ')); origLog(...a); };
-    console.warn = (...a) => { logs.push('WARN: ' + a.join(' ')); origWarn(...a); };
-    console.error = (...a) => { logs.push('ERR: ' + a.join(' ')); origErr(...a); };
     if (sub)
         sub.textContent = 'Syncing...';
-    try {
-        await syncToMongoIfNeeded();
-    }
-    catch (e) {
-        logs.push('CATCH: ' + String(e));
-    }
-    // Przywróć console
-    console.log = origLog;
-    console.warn = origWarn;
-    console.error = origErr;
-    // Pokaż logi w Settings zamiast w DevTools
-    const panel = document.getElementById('settingsPanel');
-    if (panel) {
-        const logDiv = document.createElement('div');
-        logDiv.style.cssText = 'background:#111;color:#0f0;font-size:11px;padding:12px;margin:8px;border-radius:8px;white-space:pre-wrap;word-break:break-all;max-height:300px;overflow:auto;';
-        logDiv.textContent = logs.join('\n') || 'No logs captured';
-        const existing = panel.querySelector('.sync-debug-log');
-        if (existing)
-            existing.remove();
-        logDiv.classList.add('sync-debug-log');
-        panel.appendChild(logDiv);
-    }
-    if (sub)
-        sub.textContent = logs.some(l => l.includes('complete')) ? 'Sync complete!' : 'Done — see log below';
+    syncToMongoIfNeeded().then(() => {
+        if (sub)
+            sub.textContent = 'Sync complete!';
+    }).catch(() => {
+        if (sub)
+            sub.textContent = 'Sync failed — try again';
+    });
 });
 // ─── Sync do MongoDB Atlas (jednorazowa migracja z IndexedDB) ───────────────
 void syncToMongoIfNeeded();
