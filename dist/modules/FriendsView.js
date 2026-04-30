@@ -6,7 +6,7 @@
 //   - dodawanie znajomych przez link lub QR
 //   - live mapa wbudowana w zakładkę
 //   - polling statusu znajomych co 30s
-import { getAllFriends, addFriend, deleteFriend, updateFriendLiveToken, generateInviteLink, fetchInviteByCode, parseInviteLink, checkInviteInUrl, } from './FriendsDB.js';
+import { getAllFriends, addFriend, deleteFriend, updateFriendLiveToken, updateFriendUserId, generateInviteLink, fetchInviteByCode, parseInviteLink, checkInviteInUrl, } from './FriendsDB.js';
 import { LiveMap } from './LiveMap.js';
 import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
@@ -100,6 +100,8 @@ export class FriendsView {
         document.getElementById('btnAddFriend')?.addEventListener('click', () => this._showAddFriendModal());
         document.getElementById('btnScanQR')?.addEventListener('click', () => this._scanQR());
         document.getElementById('btnCloseLiveView')?.addEventListener('click', () => this._closeLiveView());
+        // Napraw znajomych bez friendUserId
+        void this._fixMissingFriendUserIds();
         // Renderuj listę
         void this.render();
         // Od razu zweryfikuj statusy — nie czekaj 30s
@@ -119,6 +121,28 @@ export class FriendsView {
                 }
             }
         });
+    }
+    async _fixMissingFriendUserIds() {
+        const friends = await getAllFriends();
+        for (const f of friends) {
+            if (f.friendUserId || !f.subscriptionId || f.subscriptionId.startsWith('local:'))
+                continue;
+            try {
+                const res = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ endpoint: f.subscriptionId }),
+                });
+                if (res.ok) {
+                    const d = await res.json();
+                    if (d.userId) {
+                        await updateFriendUserId(f.subscriptionId, d.userId);
+                        console.log(`[Friends] Fixed friendUserId for ${f.name}: ${d.userId}`);
+                    }
+                }
+            }
+            catch { }
+        }
     }
     destroy() {
         if (this._pollTimer)
@@ -521,6 +545,22 @@ export class FriendsView {
                 lastSeen: null,
                 addedAt: Date.now(),
             });
+            // Spróbuj znaleźć friendUserId po endpoint jeśli nie mamy go z linku
+            if (!invFriendId && endpoint && !endpoint.startsWith('local:')) {
+                try {
+                    const lr = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ endpoint }),
+                    });
+                    if (lr.ok) {
+                        const ld = await lr.json();
+                        if (ld.userId)
+                            await updateFriendUserId(endpoint, ld.userId);
+                    }
+                }
+                catch { }
+            }
             modal.classList.remove('af-modal--visible');
             setTimeout(() => modal.remove(), 300);
             void this.render();

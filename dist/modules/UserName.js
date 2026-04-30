@@ -64,8 +64,8 @@ export async function showRecoveryCodeModal(userId) {
       <div class="name-modal__icon">🔑</div>
       <h2 class="name-modal__title">Your recovery code</h2>
       <p class="name-modal__sub">
-        Zapisz ten kod w bezpiecznym miejscu.<br/>
-        Użyj go żeby odzyskać dostęp do swoich danych na nowym urządzeniu.
+        Save this code somewhere safe.<br/>
+        Use it to recover your data on a new device.
       </p>
       <div class="recovery-code__display" id="recoveryCodeDisplay">
         ${code ? `<span class="recovery-code__digits">${code}</span>` : '<span style="color:#888">No server connection</span>'}

@@ -73,6 +73,9 @@ export class FriendsView {
     document.getElementById('btnScanQR')?.addEventListener('click',     () => this._scanQR());
     document.getElementById('btnCloseLiveView')?.addEventListener('click', () => this._closeLiveView());
 
+    // Napraw znajomych bez friendUserId
+    void this._fixMissingFriendUserIds();
+
     // Renderuj listę
     void this.render();
 
@@ -94,6 +97,27 @@ export class FriendsView {
         }
       }
     });
+  }
+
+  private async _fixMissingFriendUserIds(): Promise<void> {
+    const friends = await getAllFriends();
+    for (const f of friends) {
+      if (f.friendUserId || !f.subscriptionId || f.subscriptionId.startsWith('local:')) continue;
+      try {
+        const res = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ endpoint: f.subscriptionId }),
+        });
+        if (res.ok) {
+          const d = await res.json() as { userId: string };
+          if (d.userId) {
+            await updateFriendUserId(f.subscriptionId, d.userId);
+            console.log(`[Friends] Fixed friendUserId for ${f.name}: ${d.userId}`);
+          }
+        }
+      } catch {}
+    }
   }
 
   destroy(): void {
@@ -522,6 +546,21 @@ export class FriendsView {
         lastSeen:       null,
         addedAt:        Date.now(),
       });
+
+      // Spróbuj znaleźć friendUserId po endpoint jeśli nie mamy go z linku
+      if (!invFriendId && endpoint && !endpoint.startsWith('local:')) {
+        try {
+          const lr = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ endpoint }),
+          });
+          if (lr.ok) {
+            const ld = await lr.json() as { userId: string };
+            if (ld.userId) await updateFriendUserId(endpoint, ld.userId);
+          }
+        } catch {}
+      }
 
       modal.classList.remove('af-modal--visible');
       setTimeout(() => modal.remove(), 300);
