@@ -157,8 +157,6 @@ export class FriendsView {
                 });
             });
         }
-        // Renderuj feed znajomych
-        void this._renderFeed();
     }
     // ── Friends Feed ─────────────────────────────────────────────────────────────
     async _renderFeed() {

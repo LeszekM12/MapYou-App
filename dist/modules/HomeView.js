@@ -1,6 +1,7 @@
 // ─── HOME VIEW — Activity Feed ────────────────────────────────────────────────
 // src/modules/HomeView.ts
 import { loadEnrichedActivities } from './db.js';
+import { BACKEND_URL } from '../config.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
@@ -1008,6 +1009,169 @@ export class HomeView {
                 });
             }
         });
+        // Renderuj feed znajomych pod własnymi aktywnościami
+        void this._renderFriendsFeed();
+    }
+    async _renderFriendsFeed() {
+        const feedEl = document.getElementById('friendsFeed');
+        if (!feedEl)
+            return;
+        const userId = localStorage.getItem('mapyou_userId_profile');
+        if (!userId)
+            return;
+        try {
+            const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`);
+            if (!res.ok) {
+                feedEl.innerHTML = '';
+                return;
+            }
+            const data = await res.json();
+            // Filtruj tylko aktywności znajomych (nie własne)
+            const friendItems = data.data.filter(item => item.data.userId !== userId);
+            if (!friendItems.length) {
+                feedEl.innerHTML = '';
+                return;
+            }
+            const header = document.createElement('div');
+            header.className = 'friends-feed__header';
+            header.innerHTML = '<span>Friends Activity</span>';
+            feedEl.innerHTML = '';
+            feedEl.appendChild(header);
+            for (const item of friendItems) {
+                const card = this._buildFriendFeedCard(item.kind, item.data, userId);
+                feedEl.appendChild(card);
+            }
+        }
+        catch {
+            feedEl.innerHTML = '';
+        }
+    }
+    _buildFriendFeedCard(kind, data, userId) {
+        const card = document.createElement('div');
+        card.className = 'ff-card';
+        const itemId = (data.activityId ?? data.postId ?? data.id);
+        const itemType = kind === 'activity' ? 'activity' : 'post';
+        const authorName = (data.authorName ?? data.name ?? 'Friend');
+        const title = (data.title ?? data.description ?? '');
+        const body = (data.body ?? '');
+        const dateStr = new Date(data.date).toLocaleDateString('en', { month: 'short', day: 'numeric' });
+        const photoHtml = data.photoUrl ? `<img class="ff-card__photo" src="${data.photoUrl}" alt="" loading="lazy"/>` : '';
+        const statsHtml = kind === 'activity' ? `
+      <div class="ff-card__stats">
+        <span>${(+(data.distanceKm ?? 0)).toFixed(2)} km</span>
+        <span>${Math.floor((+(data.durationSec ?? 0)) / 60)} min</span>
+        <span>${(data.sport ?? '')}</span>
+      </div>` : '';
+        card.innerHTML = `
+      <div class="ff-card__header">
+        <div class="ff-card__avatar">${authorName.charAt(0).toUpperCase()}</div>
+        <div class="ff-card__meta">
+          <span class="ff-card__author">${authorName}</span>
+          <span class="ff-card__date">${dateStr}</span>
+        </div>
+        <span class="ff-card__type">${kind === 'activity' ? '🏃' : '📝'}</span>
+      </div>
+      ${title ? `<div class="ff-card__title">${title}</div>` : ''}
+      ${body ? `<div class="ff-card__body">${body}</div>` : ''}
+      ${photoHtml}
+      ${statsHtml}
+      <div class="ff-card__actions">
+        <button class="ff-card__like" data-item="${itemId}" data-type="${itemType}">❤️ <span class="ff-like-count">0</span></button>
+        <button class="ff-card__comment-btn" data-item="${itemId}">💬 <span class="ff-comment-count">0</span></button>
+      </div>
+      <div class="ff-card__comments" id="ffc-${itemId}" style="display:none">
+        <div class="ff-comments__list"></div>
+        <div class="ff-comment__input-row">
+          <input class="ff-comment__input" placeholder="Add a comment…" maxlength="200"/>
+          <button class="ff-comment__send">Send</button>
+        </div>
+      </div>`;
+        // Load likes + comments async
+        void this._loadFeedItemMeta(card, itemId, itemType, userId);
+        // Like
+        card.querySelector('.ff-card__like')?.addEventListener('click', async () => {
+            const btn = card.querySelector('.ff-card__like');
+            const res = await fetch(`${BACKEND_URL}/feed/like`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, itemId, itemType }),
+            });
+            if (res.ok) {
+                const d = await res.json();
+                btn.classList.toggle('ff-card__like--liked', d.liked);
+                const el = btn.querySelector('.ff-like-count');
+                if (el)
+                    el.textContent = String(d.count);
+            }
+        });
+        // Comment toggle
+        card.querySelector('.ff-card__comment-btn')?.addEventListener('click', () => {
+            const panel = card.querySelector(`#ffc-${itemId}`);
+            if (panel)
+                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        });
+        // Send comment
+        const sendComment = async () => {
+            const input = card.querySelector('.ff-comment__input');
+            const text = input?.value.trim();
+            if (!text)
+                return;
+            const name = localStorage.getItem('mapyou_userName') ?? 'Athlete';
+            const res = await fetch(`${BACKEND_URL}/feed/comment`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId, authorName: name, itemId, itemType, text }),
+            });
+            if (res.ok) {
+                const d = await res.json();
+                const list = card.querySelector('.ff-comments__list');
+                if (list) {
+                    const div = document.createElement('div');
+                    div.className = 'ff-comment';
+                    div.innerHTML = `<span class="ff-comment__author">${d.data.authorName}</span><span class="ff-comment__text">${d.data.text}</span>`;
+                    list.appendChild(div);
+                }
+                input.value = '';
+                const el = card.querySelector('.ff-comment-count');
+                if (el)
+                    el.textContent = String(parseInt(el.textContent ?? '0') + 1);
+            }
+        };
+        card.querySelector('.ff-comment__send')?.addEventListener('click', sendComment);
+        card.querySelector('.ff-comment__input')?.addEventListener('keydown', e => {
+            if (e.key === 'Enter')
+                void sendComment();
+        });
+        return card;
+    }
+    async _loadFeedItemMeta(card, itemId, itemType, userId) {
+        try {
+            const [lr, cr] = await Promise.all([
+                fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(itemId)}?userId=${encodeURIComponent(userId)}`),
+                fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(itemId)}`),
+            ]);
+            if (lr.ok) {
+                const ld = await lr.json();
+                const btn = card.querySelector('.ff-card__like');
+                if (btn) {
+                    btn.classList.toggle('ff-card__like--liked', ld.liked);
+                    const el = btn.querySelector('.ff-like-count');
+                    if (el)
+                        el.textContent = String(ld.count);
+                }
+            }
+            if (cr.ok) {
+                const cd = await cr.json();
+                const list = card.querySelector('.ff-comments__list');
+                if (list) {
+                    list.innerHTML = cd.data.map(c => `<div class="ff-comment"><span class="ff-comment__author">${c.authorName}</span><span class="ff-comment__text">${c.text}</span></div>`).join('');
+                }
+                const el = card.querySelector('.ff-comment-count');
+                if (el)
+                    el.textContent = String(cd.data.length);
+            }
+        }
+        catch { }
     }
     switchToHome() {
         const btn = document.querySelector('.bottom-nav__item[data-tab="tabHome"]');

@@ -124,6 +124,14 @@
         </div>
         <span class="settings-item__arrow">›</span>
     </div>
+    <div class="settings-item" id="settingRecovery">
+        <span class="settings-item__icon">🔑</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Recovery code</div>
+            <div class="settings-item__sub">Save your code to recover data</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
     <div class="settings-item" id="settingSync">
         <span class="settings-item__icon">☁️</span>
         <div class="settings-item__text">
@@ -369,12 +377,6 @@
     <!-- Friends list -->
     <div class="friends-list" id="friendsList"></div>
 
-    <!-- Friends feed — activities and posts from friends -->
-    <div class="friends-feed__header">
-      <span>Friends Activity</span>
-    </div>
-    <div id="friendsFeed"></div>
-
   </div><!-- /tab-scroll -->
 
   <!-- Live view panel — absolute over the tab -->
@@ -395,6 +397,7 @@
 
 <div id="tabHome" class="tab-panel">
   <div class="home-scroll"></div>
+  <div id="friendsFeed"></div>
 </div>
 
 <nav class="bottom-nav" id="bottomNav">
