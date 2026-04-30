@@ -80,25 +80,37 @@ async function apiGet(path) {
         return null;
     }
 }
-// ── Upload zdjęcia do Cloudinary jeśli base64 ─────────────────────────────────
-async function uploadIfBase64(base64, userId, folder, publicId) {
+async function uploadIfBase64(base64, userId, folder, fixedPublicId) {
     if (!base64 || !base64.startsWith('data:image/'))
-        return base64 ?? null;
+        return null;
     try {
         const res = await fetch(`${BACKEND_URL}/upload/image`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ image: base64, userId, folder, publicId }),
+            body: JSON.stringify({ image: base64, userId, folder, publicId: fixedPublicId }),
             signal: AbortSignal.timeout(30000),
         });
         if (!res.ok)
             return null;
         const data = await res.json();
-        return data.status === 'ok' ? data.url : null;
+        return data.status === 'ok' ? { url: data.url, publicId: data.publicId } : null;
     }
     catch {
         return null;
     }
+}
+async function deleteFromCloudinary(publicId) {
+    if (!isOnline())
+        return;
+    try {
+        await fetch(`${BACKEND_URL}/upload/image`, {
+            method: 'DELETE',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ publicId }),
+            signal: AbortSignal.timeout(10000),
+        });
+    }
+    catch { /* ignoruj błąd sieciowy */ }
 }
 // ── Hydratacja — pobierz dane z Atlas do IndexedDB przy starcie ───────────────
 const LS_HYDRATED_KEY = 'mapyou_hydrated_at';
@@ -244,20 +256,32 @@ export const CS = {
     async saveEnrichedActivity(activity) {
         const id = await saveEnrichedActivity(activity);
         const userId = getUserId();
-        // Upload zdjęcia do Cloudinary przed zapisem do Atlas
-        const photoUrl = await uploadIfBase64(activity.photoUrl, userId, 'activities');
+        // Upload zdjęcia do Cloudinary — zamień base64 na URL w IndexedDB
+        const uploaded = await uploadIfBase64(activity.photoUrl, userId, 'activities');
+        if (uploaded) {
+            // Zamień base64 na URL w IndexedDB (lżejsze dane lokalnie)
+            await saveEnrichedActivity({ ...activity, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
+        }
         void apiPost('/enriched-activities', {
             ...activity,
             activityId: activity.id,
             userId,
-            photoUrl: photoUrl ?? activity.photoUrl,
+            photoUrl: uploaded?.url ?? activity.photoUrl,
+            photoPublicId: uploaded?.publicId ?? null,
         });
         return id;
     },
     async deleteEnrichedActivity(id) {
+        // Pobierz publicId przed usunięciem
+        const activities = await loadEnrichedActivities();
+        const activity = activities.find(a => a.id === id);
+        const publicId = activity?.photoPublicId;
         await deleteEnrichedActivity(id);
         const userId = getUserId();
         void apiDelete(`/enriched-activities/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`);
+        // Usuń zdjęcie z Cloudinary
+        if (publicId)
+            void deleteFromCloudinary(publicId);
     },
     // ── UnifiedWorkouts (Stats) ──────────────────────────────────────────────────
     async saveUnifiedWorkout(workout) {
@@ -278,21 +302,30 @@ export const CS = {
     async savePost(post) {
         await savePost(post);
         const userId = getUserId();
-        // Upload zdjęcia do Cloudinary przed zapisem do Atlas
-        const photoUrl = await uploadIfBase64(post.photoUrl, userId, 'posts');
-        const avatarUrl = await uploadIfBase64(post.avatarB64, userId, 'avatars', `mapyou/avatars/${userId}/avatar`);
+        // Upload zdjęcia do Cloudinary — zamień base64 na URL w IndexedDB
+        const uploaded = await uploadIfBase64(post.photoUrl, userId, 'posts');
+        if (uploaded) {
+            await savePost({ ...post, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
+        }
         void apiPost('/posts', {
             ...post,
             postId: post.id,
             userId,
-            photoUrl: photoUrl ?? post.photoUrl,
-            avatarB64: avatarUrl ?? post.avatarB64,
+            photoUrl: uploaded?.url ?? post.photoUrl,
+            photoPublicId: uploaded?.publicId ?? null,
         });
     },
     async deletePost(id) {
+        // Pobierz publicId przed usunięciem
+        const posts = await loadPosts();
+        const post = posts.find(p => p.id === id);
+        const publicId = post?.photoPublicId;
         await deletePost(id);
         const userId = getUserId();
         void apiDelete(`/posts/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`);
+        // Usuń zdjęcie z Cloudinary
+        if (publicId)
+            void deleteFromCloudinary(publicId);
     },
     // ── Profile ──────────────────────────────────────────────────────────────────
     async saveProfile(profile) {

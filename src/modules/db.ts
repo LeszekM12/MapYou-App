@@ -31,7 +31,8 @@ export interface EnrichedActivity {
   date:        number;          // timestamp ms
   name:        string;
   description: string;
-  photoUrl:    string | null;   // data:image/… base64 string
+  photoUrl:    string | null;   // data:image/… or Cloudinary URL
+  photoPublicId?: string | null; // Cloudinary public_id (for deletion)
   distanceKm:  number;
   durationSec: number;
   paceMinKm:   number;
@@ -58,6 +59,7 @@ export interface UnifiedWorkout {
   notes:       string;
   intensity:   number;
   photoUrl:    string | null;
+  photoPublicId?: string | null;
 }
 
 /** Local user profile (stored in IndexedDB as backup, primary = localStorage) */
@@ -76,6 +78,7 @@ export interface PostRecord {
   title:      string;
   body:       string;
   photoUrl:   string | null;
+  photoPublicId?: string | null; // Cloudinary public_id (for deletion)
   authorName: string;
   avatarB64:  string | null;
 }
