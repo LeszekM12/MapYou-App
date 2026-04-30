@@ -101,22 +101,35 @@ export class FriendsView {
 
   private async _fixMissingFriendUserIds(): Promise<void> {
     const friends = await getAllFriends();
+    const myUserId = getUserId();
     for (const f of friends) {
-      if (f.friendUserId || !f.subscriptionId || f.subscriptionId.startsWith('local:')) continue;
-      try {
-        const res = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ endpoint: f.subscriptionId }),
-        });
-        if (res.ok) {
-          const d = await res.json() as { userId: string };
-          if (d.userId) {
-            await updateFriendUserId(f.subscriptionId, d.userId);
-            console.log(`[Friends] Fixed friendUserId for ${f.name}: ${d.userId}`);
+      let friendUserId = f.friendUserId;
+
+      // Znajdź friendUserId jeśli brakuje
+      if (!friendUserId && f.subscriptionId && !f.subscriptionId.startsWith('local:')) {
+        try {
+          const res = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify({ endpoint: f.subscriptionId }),
+          });
+          if (res.ok) {
+            const d = await res.json() as { userId: string };
+            if (d.userId) {
+              friendUserId = d.userId;
+              await updateFriendUserId(f.subscriptionId, d.userId);
+              console.log(`[Friends] Fixed friendUserId for ${f.name}: ${d.userId}`);
+            }
           }
-        }
-      } catch {}
+        } catch {}
+      }
+
+      // Zarejestruj znajomego w Atlas jeśli mamy jego userId
+      if (friendUserId) {
+        void fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(friendUserId)}`, {
+          method: 'POST',
+        }).catch(() => {});
+      }
     }
   }
 
@@ -548,7 +561,8 @@ export class FriendsView {
       });
 
       // Spróbuj znaleźć friendUserId po endpoint jeśli nie mamy go z linku
-      if (!invFriendId && endpoint && !endpoint.startsWith('local:')) {
+      let resolvedFriendId = invFriendId;
+      if (!resolvedFriendId && endpoint && !endpoint.startsWith('local:')) {
         try {
           const lr = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
             method:  'POST',
@@ -557,9 +571,20 @@ export class FriendsView {
           });
           if (lr.ok) {
             const ld = await lr.json() as { userId: string };
-            if (ld.userId) await updateFriendUserId(endpoint, ld.userId);
+            if (ld.userId) {
+              resolvedFriendId = ld.userId;
+              await updateFriendUserId(endpoint, ld.userId);
+            }
           }
         } catch {}
+      }
+
+      // Zapisz znajomego w Atlas (żeby feed działał)
+      if (resolvedFriendId) {
+        const myUserId = getUserId();
+        void fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(resolvedFriendId)}`, {
+          method: 'POST',
+        });
       }
 
       modal.classList.remove('af-modal--visible');
