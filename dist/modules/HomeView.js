@@ -339,19 +339,31 @@ function buildPostCard(post, onRefresh) {
             });
         }, 50);
     });
-    // Wire like
+    // Wire like — Atlas
     card.querySelector('[data-action="like"]')?.addEventListener('click', e => {
         e.stopPropagation();
         const btn = e.currentTarget;
-        const liked = btn.classList.toggle('home-card__action--liked');
-        const lsKey = `hc_likes_p_${post.id}`;
-        const next = Math.max(0, parseInt(localStorage.getItem(lsKey) ?? '0', 10) + (liked ? 1 : -1));
-        localStorage.setItem(lsKey, String(next));
-        const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
-        if (el)
-            el.textContent = String(next);
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
         btn.classList.add('home-card__action--pulse');
         setTimeout(() => btn.classList.remove('home-card__action--pulse'), 400);
+        void fetch(`${BACKEND_URL}/feed/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, itemId: post.id, itemType: 'post' }),
+        }).then(r => r.json()).then((d) => {
+            btn.classList.toggle('home-card__action--liked', d.liked);
+            const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
+            if (el)
+                el.textContent = String(d.count);
+        }).catch(() => {
+            const liked = btn.classList.toggle('home-card__action--liked');
+            const lsKey = `hc_likes_p_${post.id}`;
+            const next = Math.max(0, parseInt(localStorage.getItem(lsKey) ?? '0', 10) + (liked ? 1 : -1));
+            localStorage.setItem(lsKey, String(next));
+            const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
+            if (el)
+                el.textContent = String(next);
+        });
     });
     // Wire comment
     card.querySelector('[data-action="comment"]')?.addEventListener('click', e => {
@@ -375,15 +387,31 @@ function buildPostCard(post, onRefresh) {
                 openLightbox(src);
         });
     }
-    // Restore like count
-    const lsKey = `hc_likes_p_${post.id}`;
-    const lc = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
-    if (lc > 0) {
-        const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
-        if (el)
-            el.textContent = String(lc);
-        card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-    }
+    // Load post likes from Atlas async
+    void (async () => {
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        try {
+            const r = await fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(post.id)}?userId=${encodeURIComponent(userId)}`);
+            if (r.ok) {
+                const d = await r.json();
+                const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
+                if (el)
+                    el.textContent = String(d.count);
+                if (d.liked)
+                    card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
+            }
+        }
+        catch {
+            const lsKey = `hc_likes_p_${post.id}`;
+            const lc = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
+            if (lc > 0) {
+                const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
+                if (el)
+                    el.textContent = String(lc);
+                card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
+            }
+        }
+    })();
     card.addEventListener('click', e => { e.stopPropagation(); });
     return card;
 }
@@ -538,17 +566,28 @@ function buildCard(act) {
             e.stopPropagation(); // prevent Leaflet map click, but NOT preventDefault (breaks buttons)
             const action = btn.dataset.action;
             if (action === 'like') {
-                const liked = btn.classList.toggle('home-card__action--liked');
-                const lsKey = `hc_likes_${act.id}`;
-                const prev = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
-                const next = Math.max(0, prev + (liked ? 1 : -1));
-                localStorage.setItem(lsKey, String(next));
-                const el = card.querySelector(`[data-like-count="${act.id}"]`);
-                if (el)
-                    el.textContent = String(next);
-                // Pulse animation
                 btn.classList.add('home-card__action--pulse');
                 setTimeout(() => btn.classList.remove('home-card__action--pulse'), 400);
+                const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+                void fetch(`${BACKEND_URL}/feed/like`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, itemId: act.id, itemType: 'activity' }),
+                }).then(r => r.json()).then((d) => {
+                    btn.classList.toggle('home-card__action--liked', d.liked);
+                    const el = card.querySelector(`[data-like-count="${act.id}"]`);
+                    if (el)
+                        el.textContent = String(d.count);
+                }).catch(() => {
+                    // offline fallback
+                    const liked = btn.classList.toggle('home-card__action--liked');
+                    const lsKey = `hc_likes_${act.id}`;
+                    const next = Math.max(0, parseInt(localStorage.getItem(lsKey) ?? '0', 10) + (liked ? 1 : -1));
+                    localStorage.setItem(lsKey, String(next));
+                    const el = card.querySelector(`[data-like-count="${act.id}"]`);
+                    if (el)
+                        el.textContent = String(next);
+                });
             }
             if (action === 'comment') {
                 const existing = card.querySelector('.home-card__comment-panel');
@@ -582,15 +621,32 @@ function buildCard(act) {
                 openLightbox(src);
         });
     }
-    // Restore persisted likes
-    const lsKey = `hc_likes_${act.id}`;
-    const likeCount = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
-    if (likeCount > 0) {
-        const el = card.querySelector(`[data-like-count="${act.id}"]`);
-        if (el)
-            el.textContent = String(likeCount);
-        card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-    }
+    // Load likes from Atlas async
+    void (async () => {
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        try {
+            const r = await fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(act.id)}?userId=${encodeURIComponent(userId)}`);
+            if (r.ok) {
+                const d = await r.json();
+                const el = card.querySelector(`[data-like-count="${act.id}"]`);
+                if (el)
+                    el.textContent = String(d.count);
+                if (d.liked)
+                    card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
+            }
+        }
+        catch {
+            // offline fallback
+            const lsKey = `hc_likes_${act.id}`;
+            const likeCount = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
+            if (likeCount > 0) {
+                const el = card.querySelector(`[data-like-count="${act.id}"]`);
+                if (el)
+                    el.textContent = String(likeCount);
+                card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
+            }
+        }
+    })();
     // Restore comment count
     const commentKey = `hc_comments_${act.id}`;
     const comments = JSON.parse(localStorage.getItem(commentKey) ?? '[]');
@@ -957,7 +1013,6 @@ export class HomeView {
         return wrap;
     }
     async render() {
-        // Always re-query container — it may have been null when init() was first called
         this.container = document.querySelector('#tabHome .home-scroll');
         if (!this.container)
             return;
@@ -971,14 +1026,27 @@ export class HomeView {
         ]);
         this._workouts = workouts;
         scroll.innerHTML = '';
-        // Greeting always rendered — regardless of activity count
         scroll.appendChild(this._buildGreeting(activities.length + posts.length));
-        // Streak widget
         scroll.appendChild(this._buildStreakWidget());
-        const feed = [
-            ...activities.map(a => ({ kind: 'activity', date: a.date, data: a })),
-            ...posts.map(p => ({ kind: 'post', date: p.date, data: p })),
-        ].sort((a, b) => b.date - a.date);
+        // Pobierz unified feed z Atlas (własne + znajomych)
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        let serverFeed = [];
+        if (userId) {
+            try {
+                const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`);
+                if (res.ok) {
+                    const d = await res.json();
+                    serverFeed = d.data ?? [];
+                }
+            }
+            catch { /* offline */ }
+        }
+        const feed = serverFeed.length > 0
+            ? serverFeed
+            : [
+                ...activities.map(a => ({ kind: 'activity', date: a.date, data: a, isLocal: true })),
+                ...posts.map(p => ({ kind: 'post', date: p.date, data: p, isLocal: true })),
+            ].sort((a, b) => b.date - a.date);
         if (feed.length === 0) {
             const empty = document.createElement('div');
             empty.className = 'home-empty';
@@ -990,27 +1058,39 @@ export class HomeView {
             return;
         }
         feed.forEach((item, idx) => {
+            const isOwn = (item.data.userId === userId) || !!item.isLocal;
             let card;
-            if (item.kind === 'activity') {
-                card = buildCard(item.data);
+            if (isOwn && item.kind === 'activity') {
+                const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
+                card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
+            }
+            else if (isOwn && item.kind === 'post') {
+                const localPost = posts.find(p => p.id === (item.data.postId ?? item.data.id));
+                card = localPost
+                    ? buildPostCard(localPost, () => void this.render())
+                    : this._buildFriendFeedCard(item.kind, item.data, userId);
             }
             else {
-                card = buildPostCard(item.data, () => void this.render());
+                card = this._buildFriendFeedCard(item.kind, item.data, userId);
             }
             card.style.animationDelay = `${idx * 60}ms`;
             scroll.appendChild(card);
-            if (item.kind === 'activity') {
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        const mapEl = document.getElementById(`hcmap-${item.data.id}`);
-                        if (mapEl)
-                            renderMiniMap(mapEl, item.data.coords, item.data.sport);
-                    }, 80 + idx * 30);
-                });
+            if (isOwn && item.kind === 'activity') {
+                const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
+                if (localAct) {
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            const mapEl = document.getElementById(`hcmap-${localAct.id}`);
+                            if (mapEl)
+                                renderMiniMap(mapEl, localAct.coords, localAct.sport);
+                        }, 80 + idx * 30);
+                    });
+                }
             }
         });
-        // Renderuj feed znajomych pod własnymi aktywnościami
-        void this._renderFriendsFeed();
+        const friendsFeedEl = document.getElementById('friendsFeed');
+        if (friendsFeedEl)
+            friendsFeedEl.innerHTML = '';
     }
     async _renderFriendsFeed() {
         const feedEl = document.getElementById('friendsFeed');
