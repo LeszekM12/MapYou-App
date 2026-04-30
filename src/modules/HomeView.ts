@@ -871,6 +871,7 @@ export class HomeView {
       toggleMenu(false);
       openPostModal(async () => {
         await this.render();
+        setTimeout(() => void this.render(), 2000);
       });
     });
 
