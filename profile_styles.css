@@ -355,3 +355,15 @@
   scrollbar-width: none;
 }
 .pv-trophy-grid--scroll::-webkit-scrollbar { display: none; }
+
+/* ── Public Profile — Follow button ─────────────────────────────────────── */
+.pv-header__btn--follow {
+  background:  #4ade80;
+  color:       #0f1114;
+  border-color:#4ade80;
+}
+.pv-header__btn--active {
+  background:  rgba(255,255,255,0.08);
+  color:       rgba(255,255,255,0.6);
+  border-color:rgba(255,255,255,0.12);
+}

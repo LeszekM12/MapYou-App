@@ -2,6 +2,7 @@
 // src/modules/HomeView.ts
 
 import { loadEnrichedActivities, type EnrichedActivity } from './db.js';
+import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import type { SportType } from './Tracker.js';
@@ -1288,6 +1289,13 @@ export class HomeView {
 
       const card = buildPostCard(post, () => {});
       card.querySelector('.home-card__post-menu-btn')?.remove();
+
+      // Click avatar → open public profile
+      const postFriendId = (data.userId ?? '') as string;
+      card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (postFriendId) void openPublicProfile(postFriendId);
+      });
 
       const likeBtn = card.querySelector<HTMLElement>('.home-card__action--like');
       const newLike = likeBtn?.cloneNode(true) as HTMLElement;

@@ -2795,3 +2795,164 @@ body {
   margin-bottom: 8px;
   font-size:     13px;
 }
+
+/* ── Public Profile Modal ─────────────────────────────────────────────────── */
+
+.pp-overlay {
+  position:   fixed;
+  inset:      0;
+  z-index:    3000;
+  background: rgba(0,0,0,0);
+  pointer-events: none;
+  transition: background 0.3s;
+}
+.pp-overlay--visible {
+  background:     rgba(0,0,0,0.6);
+  pointer-events: all;
+}
+
+.pp-sheet {
+  position:       absolute;
+  bottom:         0;
+  left:           0;
+  right:          0;
+  background:     #16191e;
+  border-radius:  24px 24px 0 0;
+  padding:        0 0 40px;
+  transform:      translateY(100%);
+  transition:     transform 0.35s cubic-bezier(0.32,0.72,0,1);
+  min-height:     360px;
+}
+.pp-sheet--open { transform: translateY(0); }
+
+.pp-handle {
+  width:         40px;
+  height:        4px;
+  background:    rgba(255,255,255,0.2);
+  border-radius: 2px;
+  margin:        12px auto 0;
+}
+
+.pp-header {
+  display:         flex;
+  justify-content: flex-end;
+  padding:         12px 16px 0;
+}
+
+.pp-close {
+  background:    rgba(255,255,255,0.08);
+  border:        none;
+  border-radius: 50%;
+  color:         rgba(255,255,255,0.6);
+  width:         30px;
+  height:        30px;
+  cursor:        pointer;
+  font-size:     14px;
+}
+
+.pp-loading {
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  padding:         60px;
+}
+
+.pp-body {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  padding:        16px 24px 0;
+  text-align:     center;
+}
+
+.pp-avatar {
+  width:         88px;
+  height:        88px;
+  border-radius: 50%;
+  overflow:      hidden;
+  margin-bottom: 14px;
+  border:        2px solid rgba(255,255,255,0.1);
+}
+.pp-avatar__img {
+  width:      100%;
+  height:     100%;
+  object-fit: cover;
+}
+.pp-avatar__placeholder {
+  width:           100%;
+  height:          100%;
+  background:      rgba(74,222,128,0.15);
+  display:         flex;
+  align-items:     center;
+  justify-content: center;
+  font-size:       36px;
+  font-weight:     700;
+  color:           #4ade80;
+}
+
+.pp-name {
+  font-size:     20px;
+  font-weight:   800;
+  color:         #f0f4f8;
+  margin:        0 0 6px;
+}
+
+.pp-bio {
+  font-size:     14px;
+  color:         rgba(255,255,255,0.5);
+  margin:        0 0 20px;
+  line-height:   1.5;
+}
+
+.pp-stats {
+  display:       flex;
+  gap:           40px;
+  margin-bottom: 24px;
+}
+
+.pp-stat {
+  display:        flex;
+  flex-direction: column;
+  align-items:    center;
+  gap:            2px;
+}
+.pp-stat__val {
+  font-size:   20px;
+  font-weight: 700;
+  color:       #f0f4f8;
+}
+.pp-stat__lbl {
+  font-size: 12px;
+  color:     rgba(255,255,255,0.4);
+}
+
+.pp-follow-btn {
+  background:    #4ade80;
+  border:        none;
+  border-radius: 14px;
+  color:         #0f1114;
+  font-size:     16px;
+  font-weight:   700;
+  padding:       13px 48px;
+  cursor:        pointer;
+  font-family:   'Manrope', sans-serif;
+  transition:    background 0.2s;
+  width:         100%;
+  max-width:     280px;
+}
+.pp-follow-btn--following {
+  background: rgba(255,255,255,0.08);
+  color:      rgba(255,255,255,0.6);
+}
+
+/* ── Follow button active state ───────────────────────────────────────────── */
+.pv-header__btn--follow {
+  background:  #4ade80;
+  color:       #0f1114;
+  border-color:#4ade80;
+}
+.pv-header__btn--active {
+  background:  rgba(255,255,255,0.08);
+  color:       rgba(255,255,255,0.6);
+  border-color:rgba(255,255,255,0.12);
+}
