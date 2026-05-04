@@ -1081,7 +1081,7 @@ export class HomeView {
     if (userId) {
       try {
         const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-        if (res.ok) {
+        if (res.ok && res.status !== 304) {
           const d = await res.json() as { status: string; data: typeof serverFeed };
           serverFeed = d.data ?? [];
           try { localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(serverFeed)); } catch {}
@@ -1089,13 +1089,18 @@ export class HomeView {
       } catch {}
     }
 
-    // Krok 3: re-render ze świeżymi danymi
-    if (serverFeed.length > 0) {
-      scroll.innerHTML = '';
-      scroll.appendChild(this._buildGreeting(activities.length + posts.length));
-      scroll.appendChild(this._buildStreakWidget());
-      this._renderFeedItems(scroll, serverFeed, activities, posts, userId);
-    }
+    // Krok 3: re-render ze świeżymi danymi lub lokalnymi jako fallback
+    const feedToRender = serverFeed.length > 0
+      ? serverFeed
+      : [
+          ...activities.map(a => ({ kind: 'activity', date: a.date, data: a as unknown as Record<string, unknown>, isLocal: true })),
+          ...posts.map(p => ({ kind: 'post', date: p.date, data: p as unknown as Record<string, unknown>, isLocal: true })),
+        ].sort((a, b) => b.date - a.date);
+
+    scroll.innerHTML = '';
+    scroll.appendChild(this._buildGreeting(activities.length + posts.length));
+    scroll.appendChild(this._buildStreakWidget());
+    this._renderFeedItems(scroll, feedToRender, activities, posts, userId);
 
     const friendsFeedEl = document.getElementById('friendsFeed');
     if (friendsFeedEl) friendsFeedEl.innerHTML = '';
