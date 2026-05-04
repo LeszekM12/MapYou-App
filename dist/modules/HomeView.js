@@ -1014,48 +1014,43 @@ export class HomeView {
             loadUnifiedWorkouts(),
         ]);
         this._workouts = workouts;
-        scroll.innerHTML = '';
-        scroll.appendChild(this._buildGreeting(activities.length + posts.length));
-        scroll.appendChild(this._buildStreakWidget());
         const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-        // ── Cache — pokaż poprzedni feed natychmiast ──────────────────────────────
         const FEED_CACHE_KEY = 'mapyou_feed_cache';
-        const cached = localStorage.getItem(FEED_CACHE_KEY);
         let serverFeed = [];
+        // Krok 1: pokaż cache natychmiast
         scroll.innerHTML = '';
         scroll.appendChild(this._buildGreeting(activities.length + posts.length));
         scroll.appendChild(this._buildStreakWidget());
+        const cached = localStorage.getItem(FEED_CACHE_KEY);
         if (cached) {
             try {
                 const cachedFeed = JSON.parse(cached);
-                if (cachedFeed.length > 0) {
-                    // Pokaż stary feed natychmiast
+                if (cachedFeed.length > 0)
                     this._renderFeedItems(scroll, cachedFeed, activities, posts, userId);
-                }
             }
             catch { }
         }
-        // ── Pobierz świeży feed z Atlas w tle ────────────────────────────────────
+        // Krok 2: pobierz świeży feed
         if (userId) {
             try {
-                const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`);
+                const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
                 if (res.ok) {
                     const d = await res.json();
                     serverFeed = d.data ?? [];
-                    // Zapisz do cache
                     try {
                         localStorage.setItem(FEED_CACHE_KEY, JSON.stringify(serverFeed));
                     }
                     catch { }
                 }
             }
-            catch { /* offline — zostaje cache */ }
+            catch { }
         }
-        // ── Re-render z świeżymi danymi jeśli się zmieniły ────────────────────────
+        // Krok 3: re-render ze świeżymi danymi
         if (serverFeed.length > 0) {
             scroll.innerHTML = '';
             scroll.appendChild(this._buildGreeting(activities.length + posts.length));
             scroll.appendChild(this._buildStreakWidget());
+            this._renderFeedItems(scroll, serverFeed, activities, posts, userId);
         }
         const friendsFeedEl = document.getElementById('friendsFeed');
         if (friendsFeedEl)
