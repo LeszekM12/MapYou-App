@@ -332,11 +332,11 @@ export const CS = {
         await saveProfileToDB(profile);
         const userId = getUserId();
         // Upload avatara do Cloudinary przed zapisem do Atlas
-        const avatarUrl = await uploadIfBase64(profile.avatarB64, userId, 'avatars', `mapyou/avatars/${userId}/avatar`);
+        const uploaded = await uploadIfBase64(profile.avatarB64, userId, 'avatars', `mapyou/avatars/${userId}/avatar`);
         void apiPost('/users', {
             ...profile,
             userId,
-            avatarB64: avatarUrl ?? profile.avatarB64,
+            avatarB64: uploaded?.url ?? profile.avatarB64,
         });
     },
     // ── Hydratacja przy starcie ───────────────────────────────────────────────────
