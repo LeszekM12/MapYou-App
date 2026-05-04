@@ -1179,15 +1179,21 @@ export class HomeView {
                 coords: [],
             };
             const card = buildCard(act);
-            // Override avatar with friend's
+            // Override avatar and name with friend's
             const avatarEl = card.querySelector('.home-card__avatar--user');
+            const authorName = (data.authorName ?? '');
             if (avatarEl) {
                 const avatar = (data.authorAvatarUrl ?? null);
-                const name = (data.authorName ?? '');
                 avatarEl.innerHTML = avatar
                     ? `<img src="${avatar}" class="home-card__avatar-img" alt="avatar"/>`
-                    : `<span style="font-size:16px;font-weight:700">${name.charAt(0).toUpperCase()}</span>`;
+                    : `<span style="font-size:16px;font-weight:700">${authorName.charAt(0).toUpperCase()}</span>`;
+                avatarEl.style.background = 'rgba(74,222,128,0.15)';
+                avatarEl.style.borderColor = 'rgba(74,222,128,0.3)';
             }
+            // Override name shown in header
+            const nameEl = card.querySelector('.home-card__name');
+            if (nameEl && authorName)
+                nameEl.textContent = act.name || authorName;
             // Override like button to use Atlas
             const likeBtn = card.querySelector('.home-card__action--like');
             const newLike = likeBtn?.cloneNode(true);
