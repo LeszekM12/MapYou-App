@@ -871,7 +871,6 @@ export class HomeView {
       toggleMenu(false);
       openPostModal(async () => {
         await this.render();
-        setTimeout(() => void this.render(), 2000);
       });
     });
 
@@ -1186,118 +1185,46 @@ export class HomeView {
     data:   Record<string, unknown>,
     userId: string,
   ): HTMLElement {
-    const card     = document.createElement('article');
-    card.className = kind === 'activity' ? 'home-card' : 'home-card home-card--post';
-    const itemId   = (data.activityId ?? data.postId ?? data.id) as string;
-    const itemType = kind === 'activity' ? 'activity' : 'post';
-
+    const card       = document.createElement('div');
+    card.className   = 'ff-card';
+    const itemId     = (data.activityId ?? data.postId ?? data.id) as string;
+    const itemType   = kind === 'activity' ? 'activity' : 'post';
     const authorName = (data.authorName ?? data.name ?? 'Friend') as string;
-    const dateTs     = data.date as number;
-    const diff       = Date.now() - dateTs;
-    const mins       = Math.floor(diff / 60000);
-    const timeStr    = mins < 60 ? `${mins}m ago`
-      : mins < 1440 ? `${Math.floor(mins/60)}h ago`
-      : new Date(dateTs).toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    const title      = (data.title ?? data.description ?? '') as string;
+    const body       = (data.body ?? '') as string;
+    const dateStr    = new Date(data.date as number).toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    const photoHtml  = data.photoUrl ? `<img class="ff-card__photo" src="${data.photoUrl}" alt="" loading="lazy"/>` : '';
+    const statsHtml  = kind === 'activity' ? `
+      <div class="ff-card__stats">
+        <span>${(+(data.distanceKm ?? 0)).toFixed(2)} km</span>
+        <span>${Math.floor((+(data.durationSec ?? 0)) / 60)} min</span>
+        <span>${(data.sport ?? '') as string}</span>
+      </div>` : '';
 
-    const avatarHtml = `<div class="home-card__avatar home-card__avatar--user" style="background:rgba(74,222,128,0.15);border-color:rgba(74,222,128,0.3)">
-      <span style="font-size:16px;font-weight:700">${authorName.charAt(0).toUpperCase()}</span>
-    </div>`;
-
-    const photoHtml = data.photoUrl
-      ? `<div class="home-card__photo" data-photosrc="${data.photoUrl}"><img src="${data.photoUrl}" alt="" loading="lazy"/></div>`
-      : '';
-
-    if (kind === 'activity') {
-      const sport    = (data.sport ?? 'running') as string;
-      const distFmt  = (+(data.distanceKm ?? 0)).toFixed(2);
-      const durSec   = +(data.durationSec ?? 0);
-      const durFmt   = durSec >= 3600
-        ? `${Math.floor(durSec/3600)}h ${Math.floor((durSec%3600)/60)}m`
-        : `${Math.floor(durSec/60)}m`;
-      const pace     = +(data.paceMinKm ?? 0);
-      const paceFmt  = pace > 0 ? `${Math.floor(pace)}:${String(Math.round((pace%1)*60)).padStart(2,'0')}` : '--:--';
-      const paceLabel = sport !== 'cycling' ? 'min/km' : 'km/h';
-      const title    = (data.name ?? data.description ?? '') as string;
-      const notes    = (data.notes ?? '') as string;
-
-      card.innerHTML = `
-        <div class="home-card__header">
-          ${avatarHtml}
-          <div class="home-card__meta">
-            <h3 class="home-card__name">${title}</h3>
-            <span class="home-card__time">${timeStr}</span>
-          </div>
-          <div class="home-card__badges">
-            <span class="home-card__sport-badge">${sport}</span>
-          </div>
+    card.innerHTML = `
+      <div class="ff-card__header">
+        <div class="ff-card__avatar">${authorName.charAt(0).toUpperCase()}</div>
+        <div class="ff-card__meta">
+          <span class="ff-card__author">${authorName}</span>
+          <span class="ff-card__date">${dateStr}</span>
         </div>
-        ${photoHtml}
-        <div class="home-card__stats">
-          <div class="home-card__stat"><span class="home-card__stat-val">${distFmt}</span><span class="home-card__stat-lbl">km</span></div>
-          <div class="home-card__stat-sep"></div>
-          <div class="home-card__stat"><span class="home-card__stat-val">${durFmt}</span><span class="home-card__stat-lbl">time</span></div>
-          <div class="home-card__stat-sep"></div>
-          <div class="home-card__stat"><span class="home-card__stat-val">${paceFmt}</span><span class="home-card__stat-lbl">${paceLabel}</span></div>
+        <span class="ff-card__type">${kind === 'activity' ? '🏃' : '📝'}</span>
+      </div>
+      ${title ? `<div class="ff-card__title">${title}</div>` : ''}
+      ${body ? `<div class="ff-card__body">${body}</div>` : ''}
+      ${photoHtml}
+      ${statsHtml}
+      <div class="ff-card__actions">
+        <button class="ff-card__like" data-item="${itemId}" data-type="${itemType}">❤️ <span class="ff-like-count">0</span></button>
+        <button class="ff-card__comment-btn" data-item="${itemId}">💬 <span class="ff-comment-count">0</span></button>
+      </div>
+      <div class="ff-card__comments" id="ffc-${itemId}" style="display:none">
+        <div class="ff-comments__list"></div>
+        <div class="ff-comment__input-row">
+          <input class="ff-comment__input" placeholder="Add a comment…" maxlength="200"/>
+          <button class="ff-comment__send">Send</button>
         </div>
-        ${notes ? `<p class="home-card__notes">🔒 ${notes}</p>` : ''}
-        <div class="home-card__footer">
-          <button class="home-card__action ff-card__like" data-item="${itemId}" data-type="${itemType}" aria-label="Like">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            <span class="ff-like-count">0</span>
-          </button>
-          <button class="home-card__action ff-card__comment-btn" data-item="${itemId}" aria-label="Comment">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span class="ff-comment-count">0</span>
-          </button>
-        </div>
-        <div class="ff-card__comments" id="ffc-${itemId}" style="display:none">
-          <div class="ff-comments__list"></div>
-          <div class="ff-comment__input-row">
-            <input class="ff-comment__input" placeholder="Add a comment…" maxlength="200"/>
-            <button class="ff-comment__send">Send</button>
-          </div>
-        </div>`;
-    } else {
-      // Post
-      const title = (data.title ?? '') as string;
-      const body  = (data.body ?? '') as string;
-      card.innerHTML = `
-        <div class="home-card__header">
-          ${avatarHtml}
-          <div class="home-card__meta">
-            <h3 class="home-card__name">${authorName}</h3>
-            <span class="home-card__time">${timeStr}</span>
-          </div>
-          <span class="home-card__post-badge">Post</span>
-        </div>
-        ${title ? `<h4 class="home-card__post-title">${title}</h4>` : ''}
-        ${body ? `<p class="home-card__desc home-card__post-body">${body}</p>` : ''}
-        ${photoHtml}
-        <div class="home-card__footer" style="border-top:1px solid rgba(255,255,255,0.06)">
-          <button class="home-card__action ff-card__like" data-item="${itemId}" data-type="${itemType}" aria-label="Like">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            <span class="ff-like-count">0</span>
-          </button>
-          <button class="home-card__action ff-card__comment-btn" data-item="${itemId}" aria-label="Comment">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-            <span class="ff-comment-count">0</span>
-          </button>
-        </div>
-        <div class="ff-card__comments" id="ffc-${itemId}" style="display:none">
-          <div class="ff-comments__list"></div>
-          <div class="ff-comment__input-row">
-            <input class="ff-comment__input" placeholder="Add a comment…" maxlength="200"/>
-            <button class="ff-comment__send">Send</button>
-          </div>
-        </div>`;
-    }
-
-    // Wire photo lightbox
-    card.querySelector('.home-card__photo[data-photosrc]')?.addEventListener('click', e => {
-      e.stopPropagation();
-      const src = (e.currentTarget as HTMLElement).dataset.photosrc;
-      if (src) openLightbox(src);
-    });
+      </div>`;
 
     // Load likes + comments async
     void this._loadFeedItemMeta(card, itemId, itemType, userId);
@@ -1312,7 +1239,7 @@ export class HomeView {
       });
       if (res.ok) {
         const d = await res.json() as { liked: boolean; count: number };
-        btn.classList.toggle('ff-card__like--liked', d.liked);
+        btn.classList.toggle('home-card__action--liked', d.liked);
         const el = btn.querySelector('.ff-like-count');
         if (el) el.textContent = String(d.count);
       }
@@ -1373,7 +1300,7 @@ export class HomeView {
         const ld = await lr.json() as { count: number; liked: boolean };
         const btn = card.querySelector('.ff-card__like');
         if (btn) {
-          btn.classList.toggle('ff-card__like--liked', ld.liked);
+          btn.classList.toggle('home-card__action--liked', ld.liked);
           const el = btn.querySelector('.ff-like-count');
           if (el) el.textContent = String(ld.count);
         }
