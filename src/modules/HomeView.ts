@@ -419,8 +419,11 @@ function buildPostCard(post: PostRecord, onRefresh: () => void): HTMLElement {
     });
   }
 
-  // Load post likes from Atlas async
-  void (async () => {
+  // Load post likes lazily
+  let _postLikesLoaded = false;
+  card.querySelector('.home-card__action--like')?.addEventListener('mouseenter', async () => {
+    if (_postLikesLoaded) return;
+    _postLikesLoaded = true;
     const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     try {
       const r = await fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(post.id)}?userId=${encodeURIComponent(userId)}`);
@@ -430,16 +433,8 @@ function buildPostCard(post: PostRecord, onRefresh: () => void): HTMLElement {
         if (el) el.textContent = String(d.count);
         if (d.liked) card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
       }
-    } catch {
-      const lsKey = `hc_likes_p_${post.id}`;
-      const lc = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
-      if (lc > 0) {
-        const el = card.querySelector<HTMLElement>(`[data-like-count="p_${post.id}"]`);
-        if (el) el.textContent = String(lc);
-        card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-      }
-    }
-  })();
+    } catch {}
+  }, { once: true });
 
   card.addEventListener('click', e => { e.stopPropagation(); });
   return card;
@@ -665,8 +660,11 @@ function buildCard(act: EnrichedActivity): HTMLElement {
     });
   }
 
-  // Load likes from Atlas async
-  void (async () => {
+  // Load likes lazily on first interaction (not on card render)
+  let _likesLoaded = false;
+  card.querySelector('.home-card__action--like')?.addEventListener('mouseenter', async () => {
+    if (_likesLoaded) return;
+    _likesLoaded = true;
     const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     try {
       const r = await fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(act.id)}?userId=${encodeURIComponent(userId)}`);
@@ -676,17 +674,8 @@ function buildCard(act: EnrichedActivity): HTMLElement {
         if (el) el.textContent = String(d.count);
         if (d.liked) card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
       }
-    } catch {
-      // offline fallback
-      const lsKey = `hc_likes_${act.id}`;
-      const likeCount = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
-      if (likeCount > 0) {
-        const el = card.querySelector<HTMLElement>(`[data-like-count="${act.id}"]`);
-        if (el) el.textContent = String(likeCount);
-        card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-      }
-    }
-  })();
+    } catch {}
+  }, { once: true });
 
   // Restore comment count
   const commentKey = `hc_comments_${act.id}`;
@@ -1063,8 +1052,7 @@ export class HomeView {
     this._inited = true;
     const scroll = this.container;
 
-    scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
-
+    // Pokaż lokalne dane natychmiast (skeleton approach)
     const [activities, posts, workouts] = await Promise.all([
       loadEnrichedActivities(),
       loadPosts(),
@@ -1076,7 +1064,15 @@ export class HomeView {
     scroll.appendChild(this._buildGreeting(activities.length + posts.length));
     scroll.appendChild(this._buildStreakWidget());
 
-    // Pobierz unified feed z Atlas (własne + znajomych)
+    // Renderuj własne dane od razu z IndexedDB
+    const localFeed = [
+      ...activities.map(a => ({ kind: 'activity', date: a.date, data: a as unknown as Record<string, unknown>, isLocal: true })),
+      ...posts.map(p => ({ kind: 'post', date: p.date, data: p as unknown as Record<string, unknown>, isLocal: true })),
+    ].sort((a, b) => b.date - a.date);
+
+    this._renderFeedItems(scroll, localFeed, activities, posts, localStorage.getItem('mapyou_userId_profile') ?? '');
+
+    // Pobierz unified feed z Atlas w tle (własne + znajomych)
     const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     let serverFeed: Array<{ kind: string; date: number; data: Record<string, unknown> }> = [];
     if (userId) {
@@ -1086,18 +1082,28 @@ export class HomeView {
           const d = await res.json() as { status: string; data: typeof serverFeed };
           serverFeed = d.data ?? [];
         }
-      } catch { /* offline */ }
+      } catch { /* offline — zostają lokalne dane */ }
     }
 
-    type FeedItem = { kind: string; date: number; data: Record<string, unknown>; isLocal?: boolean };
+    // Re-render z danymi z Atlas (zawiera też znajomych)
+    if (serverFeed.length > 0) {
+      scroll.innerHTML = '';
+      scroll.appendChild(this._buildGreeting(activities.length + posts.length));
+      scroll.appendChild(this._buildStreakWidget());
+      this._renderFeedItems(scroll, serverFeed, activities, posts, userId);
+    }
 
-    const feed: FeedItem[] = serverFeed.length > 0
-      ? serverFeed
-      : [
-          ...activities.map(a => ({ kind: 'activity', date: a.date, data: a as unknown as Record<string, unknown>, isLocal: true })),
-          ...posts.map(p => ({ kind: 'post', date: p.date, data: p as unknown as Record<string, unknown>, isLocal: true })),
-        ].sort((a, b) => b.date - a.date);
+    const friendsFeedEl = document.getElementById('friendsFeed');
+    if (friendsFeedEl) friendsFeedEl.innerHTML = '';
+  }
 
+  private _renderFeedItems(
+    scroll:     HTMLElement,
+    feed:       Array<{ kind: string; date: number; data: Record<string, unknown>; isLocal?: boolean }>,
+    activities: import('./db.js').EnrichedActivity[],
+    posts:      import('./db.js').PostRecord[],
+    userId:     string,
+  ): void {
     if (feed.length === 0) {
       const empty = document.createElement('div');
       empty.className = 'home-empty';
@@ -1125,6 +1131,18 @@ export class HomeView {
         card = this._buildFriendFeedCard(item.kind, item.data, userId);
       }
 
+      // Ustaw preloaded lajki z feed response (bez dodatkowego requesta)
+      const preloadedLikes    = (item.data._likeCount ?? 0) as number;
+      const preloadedComments = (item.data._commentCount ?? 0) as number;
+      if (preloadedLikes > 0) {
+        const likeEl = card.querySelector<HTMLElement>('[data-like-count], .ff-like-count, .home-card__action-count');
+        if (likeEl) likeEl.textContent = String(preloadedLikes);
+      }
+      if (preloadedComments > 0) {
+        const commentEl = card.querySelector<HTMLElement>('[data-comment-count], .ff-comment-count');
+        if (commentEl) commentEl.textContent = String(preloadedComments);
+      }
+
       card.style.animationDelay = `${idx * 60}ms`;
       scroll.appendChild(card);
 
@@ -1140,9 +1158,6 @@ export class HomeView {
         }
       }
     });
-
-    const friendsFeedEl = document.getElementById('friendsFeed');
-    if (friendsFeedEl) friendsFeedEl.innerHTML = '';
   }
 
   private async _renderFriendsFeed(): Promise<void> {
@@ -1183,71 +1198,105 @@ export class HomeView {
   private _buildFriendFeedCard(
     kind:   string,
     data:   Record<string, unknown>,
-    myUserId: string,
+    userId: string,
   ): HTMLElement {
-    // Map Atlas data to local format and use same card builders
-    if (kind === 'activity') {
-      // Map to EnrichedActivity format
-      const act = {
-        id:          (data.activityId ?? data.id ?? '') as string,
-        sport:       (data.sport ?? 'running') as string,
-        date:        data.date as number,
-        name:        (data.name ?? data.description ?? '') as string,
-        description: (data.description ?? '') as string,
-        photoUrl:    (data.photoUrl ?? null) as string | null,
-        distanceKm:  +(data.distanceKm ?? 0),
-        durationSec: +(data.durationSec ?? 0),
-        paceMinKm:   +(data.paceMinKm ?? 0),
-        speedKmH:    +(data.speedKmH ?? 0),
-        intensity:   +(data.intensity ?? 0),
-        notes:       (data.notes ?? '') as string,
-        coords:      (data.coords ?? []) as Array<[number, number]>,
-        // Avatar from friend
-        _authorName:    (data.authorName ?? '') as string,
-        _authorAvatar:  (data.authorAvatarUrl ?? null) as string | null,
-      } as unknown as import('./db.js').EnrichedActivity;
+    const card       = document.createElement('div');
+    card.className   = 'ff-card';
+    const itemId     = (data.activityId ?? data.postId ?? data.id) as string;
+    const itemType   = kind === 'activity' ? 'activity' : 'post';
+    const authorName = (data.authorName ?? data.name ?? 'Friend') as string;
+    const title      = (data.title ?? data.description ?? '') as string;
+    const body       = (data.body ?? '') as string;
+    const dateStr    = new Date(data.date as number).toLocaleDateString('en', { month: 'short', day: 'numeric' });
+    const photoHtml  = data.photoUrl ? `<img class="ff-card__photo" src="${data.photoUrl}" alt="" loading="lazy"/>` : '';
+    const statsHtml  = kind === 'activity' ? `
+      <div class="ff-card__stats">
+        <span>${(+(data.distanceKm ?? 0)).toFixed(2)} km</span>
+        <span>${Math.floor((+(data.durationSec ?? 0)) / 60)} min</span>
+        <span>${(data.sport ?? '') as string}</span>
+      </div>` : '';
 
-      const card = buildCard(act);
+    card.innerHTML = `
+      <div class="ff-card__header">
+        <div class="ff-card__avatar">${authorName.charAt(0).toUpperCase()}</div>
+        <div class="ff-card__meta">
+          <span class="ff-card__author">${authorName}</span>
+          <span class="ff-card__date">${dateStr}</span>
+        </div>
+        <span class="ff-card__type">${kind === 'activity' ? '🏃' : '📝'}</span>
+      </div>
+      ${title ? `<div class="ff-card__title">${title}</div>` : ''}
+      ${body ? `<div class="ff-card__body">${body}</div>` : ''}
+      ${photoHtml}
+      ${statsHtml}
+      <div class="ff-card__actions">
+        <button class="ff-card__like" data-item="${itemId}" data-type="${itemType}">❤️ <span class="ff-like-count">0</span></button>
+        <button class="ff-card__comment-btn" data-item="${itemId}">💬 <span class="ff-comment-count">0</span></button>
+      </div>
+      <div class="ff-card__comments" id="ffc-${itemId}" style="display:none">
+        <div class="ff-comments__list"></div>
+        <div class="ff-comment__input-row">
+          <input class="ff-comment__input" placeholder="Add a comment…" maxlength="200"/>
+          <button class="ff-comment__send">Send</button>
+        </div>
+      </div>`;
 
-      // Override avatar with friend's avatar
-      const avatarEl = card.querySelector<HTMLElement>('.home-card__avatar--user');
-      if (avatarEl) {
-        const avatar = (data.authorAvatarUrl ?? null) as string | null;
-        const name   = (data.authorName ?? '') as string;
-        avatarEl.style.background = 'rgba(74,222,128,0.15)';
-        avatarEl.style.borderColor = 'rgba(74,222,128,0.3)';
-        avatarEl.innerHTML = avatar
-          ? `<img src="${avatar}" class="home-card__avatar-img" alt="avatar"/>`
-          : `<span style="font-size:16px;font-weight:700">${name.charAt(0).toUpperCase()}</span>`;
+    // Lajki i komentarze ładowane z feed response (_likeCount, _commentCount)
+
+    // Like
+    card.querySelector('.ff-card__like')?.addEventListener('click', async () => {
+      const btn = card.querySelector('.ff-card__like')!;
+      const res = await fetch(`${BACKEND_URL}/feed/like`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId, itemId, itemType }),
+      });
+      if (res.ok) {
+        const d = await res.json() as { liked: boolean; count: number };
+        btn.classList.toggle('ff-card__like--liked', d.liked);
+        const el = btn.querySelector('.ff-like-count');
+        if (el) el.textContent = String(d.count);
       }
+    });
 
-      // Override author name in header
-      const nameEl = card.querySelector<HTMLElement>('.home-card__name');
-      const authorName = (data.authorName ?? data.name ?? '') as string;
-      if (nameEl && authorName) nameEl.textContent = authorName;
+    // Comment toggle
+    card.querySelector('.ff-card__comment-btn')?.addEventListener('click', () => {
+      const panel = card.querySelector(`#ffc-${itemId}`) as HTMLElement;
+      if (panel) panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+    });
 
-      return card;
-    } else {
-      // Map to PostRecord format
-      const post = {
-        id:         (data.postId ?? data.id ?? '') as string,
-        type:       'post' as const,
-        date:       data.date as number,
-        title:      (data.title ?? '') as string,
-        body:       (data.body ?? '') as string,
-        photoUrl:   (data.photoUrl ?? null) as string | null,
-        authorName: (data.authorName ?? '') as string,
-        avatarB64:  (data.authorAvatarUrl ?? null) as string | null,
-      };
+    // Send comment
+    const sendComment = async () => {
+      const input = card.querySelector('.ff-comment__input') as HTMLInputElement;
+      const text  = input?.value.trim();
+      if (!text) return;
+      const name = localStorage.getItem('mapyou_userName') ?? 'Athlete';
+      const res  = await fetch(`${BACKEND_URL}/feed/comment`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId, authorName: name, itemId, itemType, text }),
+      });
+      if (res.ok) {
+        const d  = await res.json() as { data: { authorName: string; text: string } };
+        const list = card.querySelector('.ff-comments__list');
+        if (list) {
+          const div = document.createElement('div');
+          div.className = 'ff-comment';
+          div.innerHTML = `<span class="ff-comment__author">${d.data.authorName}</span><span class="ff-comment__text">${d.data.text}</span>`;
+          list.appendChild(div);
+        }
+        input.value = '';
+        const el = card.querySelector('.ff-comment-count');
+        if (el) el.textContent = String(parseInt(el.textContent ?? '0') + 1);
+      }
+    };
 
-      // For friend posts we don't have edit/delete so pass empty refresh
-      const card = buildPostCard(post as import('./db.js').PostRecord, () => {});
+    card.querySelector('.ff-comment__send')?.addEventListener('click', sendComment);
+    card.querySelector('.ff-comment__input')?.addEventListener('keydown', e => {
+      if ((e as KeyboardEvent).key === 'Enter') void sendComment();
+    });
 
-      // Remove edit/delete menu for friend posts
-      card.querySelector('.home-card__post-menu-btn')?.remove();
-
-      return card;
-    }
+    return card;
   }
 
   private async _loadFeedItemMeta(
