@@ -26,7 +26,7 @@ export async function openPublicProfile(targetUserId) {
     document.body.appendChild(modal);
     requestAnimationFrame(() => {
         modal.classList.add('pv-overlay--visible');
-        setTimeout(() => modal.querySelector('.pp-sheet')?.classList.add('pv-sheet--open'), 10);
+        setTimeout(() => modal.querySelector('.pv-sheet')?.classList.add('pv-sheet--open'), 10);
     });
     // Close on backdrop click
     modal.addEventListener('click', e => { if (e.target === modal)
@@ -35,9 +35,18 @@ export async function openPublicProfile(targetUserId) {
         closePublicProfile(); }, { once: true });
     // Fetch profile
     try {
-        const res = await fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`);
+        const res = await fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' });
         if (!res.ok) {
-            closePublicProfile();
+            // User not in Atlas yet — show basic modal with just userId
+            _renderProfile(modal, {
+                userId: targetUserId,
+                name: 'MapYou User',
+                bio: '',
+                avatarB64: null,
+                followersCount: 0,
+                followingCount: 0,
+                isFollowing: false,
+            }, myUserId);
             return;
         }
         const d = await res.json();
@@ -52,7 +61,7 @@ export async function openPublicProfile(targetUserId) {
     }
 }
 function _renderProfile(modal, profile, myUserId) {
-    const sheet = modal.querySelector('.pp-sheet');
+    const sheet = modal.querySelector('.pv-sheet');
     const avatarHtml = profile.avatarB64
         ? `<img src="${profile.avatarB64}" class="pv-avatar__img" alt="avatar"/>`
         : `<div class="pv-avatar">${profile.name.charAt(0).toUpperCase()}</div>`;
@@ -131,7 +140,7 @@ export function closePublicProfile() {
     const modal = document.getElementById('publicProfileModal');
     if (!modal)
         return;
-    modal.querySelector('.pp-sheet')?.classList.remove('pv-sheet--open');
+    modal.querySelector('.pv-sheet')?.classList.remove('pv-sheet--open');
     modal.classList.remove('pv-overlay--visible');
     setTimeout(() => modal.remove(), 350);
 }
