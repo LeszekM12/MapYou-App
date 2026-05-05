@@ -1,17 +1,3 @@
-
-// ── Static Map URL ────────────────────────────────────────────────────────────
-function generateStaticMapUrl(coords: Array<[number, number]>): string | null {
-  if (!coords || coords.length < 2) return null;
-  const lats = coords.map(p => p[0]);
-  const lons  = coords.map(p => p[1]);
-  const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
-  const step    = Math.max(1, Math.floor(coords.length / 80));
-  const sampled = coords.filter((_, i) => i % step === 0);
-  const path    = sampled.map(p => `${p[0]},${p[1]}`).join('|');
-  return `https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLon}&zoom=14&size=400x200&maptype=mapnik&path=color:0x00c46aFF|weight:3|${path}`;
-}
-
 // ─── CLOUD SYNC ──────────────────────────────────────────────────────────────
 // src/modules/cloudSync.ts
 //
@@ -105,8 +91,9 @@ async function apiGet<T>(path: string): Promise<T[] | null> {
   try {
     const res = await fetch(`${BACKEND_URL}${path}`, {
       signal: AbortSignal.timeout(10_000),
+      cache: 'no-store',
     });
-    if (!res.ok) return null;
+    if (!res.ok || res.status === 304) return null;
     const data = await res.json() as { status: string; data: T[] };
     return data.status === 'ok' ? data.data : null;
   } catch {
@@ -266,21 +253,16 @@ async function _pushMissingToAtlas(
       } catch {}
     }
 
-    // Napraw brakujące minimapUrl w Atlas
-    const enrichedWithCoords = enriched.filter(a =>
-      atlasEnrichedIds.has(a.id) &&
-      !(a as unknown as Record<string,unknown>).minimapUrl &&
-      a.coords && a.coords.length > 1
+    // Napraw brakujące minimapUrl
+    const enrichedMissingMinimap = enriched.filter(a =>
+      atlasEnrichedIds.has(a.id) && !a.minimapUrl && a.coords && a.coords.length > 1
     );
-    for (const activity of enrichedWithCoords) {
+    for (const activity of enrichedMissingMinimap) {
       try {
         const minimapUrl = generateStaticMapUrl(activity.coords);
         if (minimapUrl) {
-          await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
-            userId, minimapUrl,
-          });
-          (activity as unknown as Record<string,unknown>).minimapUrl = minimapUrl;
-          await saveEnrichedActivity({ ...activity } as EnrichedActivity);
+          await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, { userId, minimapUrl });
+          await saveEnrichedActivity({ ...activity, minimapUrl } as EnrichedActivity);
           console.log(`[CloudSync] 🗺️ Generated minimapUrl for: ${activity.name}`);
         }
       } catch {}
@@ -300,6 +282,20 @@ async function _pushMissingToAtlas(
     console.warn('[CloudSync] _pushMissingToAtlas error:', err);
   }
 }
+
+// ── Static Map URL (Mapbox) ───────────────────────────────────────────────────
+function generateStaticMapUrl(coords: Array<[number, number]>): string | null {
+  if (!coords || coords.length < 2) return null;
+  const lats = coords.map(p => p[0]);
+  const lons  = coords.map(p => p[1]);
+  const clat  = (Math.min(...lats) + Math.max(...lats)) / 2;
+  const clon  = (Math.min(...lons) + Math.max(...lons)) / 2;
+  const step  = Math.max(1, Math.floor(coords.length / 100));
+  const pts   = coords.filter((_, i) => i % step === 0);
+  const geo   = JSON.stringify({type:'Feature',geometry:{type:'LineString',coordinates:pts.map(p=>[p[1],p[0]])},properties:{stroke:'#00c46a','stroke-width':3}});
+  return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/geojson(${encodeURIComponent(geo)})/${clon},${clat},13,0/400x200?access_token=pk.eyJ1IjoibGVzemVrLW1pa3J1dCIsImEiOiJjbW8ybm5jZ3IwYmZjMnFxd3VycjBtaHZ4In0.mpY8zJ-aEW8n5iZhf2GrWA`;
+}
+
 
 export async function hydrate(): Promise<void> {
   if (!isOnline()) return;
@@ -464,7 +460,6 @@ export const CS = {
   // ── EnrichedActivities (Home feed) ───────────────────────────────────────────
 
   async saveEnrichedActivity(activity: EnrichedActivity): Promise<string> {
-    // Generuj minimapUrl z coords jeśli nie ma
     if (!activity.minimapUrl && activity.coords && activity.coords.length > 1) {
       (activity as unknown as Record<string, unknown>).minimapUrl = generateStaticMapUrl(activity.coords);
     }
