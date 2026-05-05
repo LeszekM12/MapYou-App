@@ -338,6 +338,11 @@ function buildPostCard(post, onRefresh) {
                 moreBtn.textContent = expanded ? 'mniej' : '…więcej';
         });
     }
+    // Click avatar → open own profile
+    card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
+        e.stopPropagation();
+        import('./ProfileView.js').then(m => m.profileView.open()).catch(() => { });
+    });
     // ⋯ menu — edit / delete
     card.querySelector(`#pmenu-${post.id}`)?.addEventListener('click', e => {
         e.stopPropagation();
@@ -1195,6 +1200,13 @@ export class HomeView {
             const nameEl = card.querySelector('.home-card__name');
             if (nameEl && authorName)
                 nameEl.textContent = act.name || authorName;
+            // Click avatar → open public profile
+            const friendUserId = (data.userId ?? '');
+            avatarEl?.addEventListener('click', e => {
+                e.stopPropagation();
+                if (friendUserId)
+                    void openPublicProfile(friendUserId);
+            });
             // Override like button to use Atlas
             const likeBtn = card.querySelector('.home-card__action--like');
             const newLike = likeBtn?.cloneNode(true);

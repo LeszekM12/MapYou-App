@@ -366,6 +366,12 @@ function buildPostCard(post: PostRecord, onRefresh: () => void): HTMLElement {
     });
   }
 
+  // Click avatar → open own profile
+  card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
+    e.stopPropagation();
+    import('./ProfileView.js').then(m => m.profileView.open()).catch(() => {});
+  });
+
   // ⋯ menu — edit / delete
   card.querySelector(`#pmenu-${post.id}`)?.addEventListener('click', e => {
     e.stopPropagation();
@@ -1253,6 +1259,13 @@ export class HomeView {
       // Override name shown in header
       const nameEl = card.querySelector<HTMLElement>('.home-card__name');
       if (nameEl && authorName) nameEl.textContent = act.name || authorName;
+
+      // Click avatar → open public profile
+      const friendUserId = (data.userId ?? '') as string;
+      avatarEl?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (friendUserId) void openPublicProfile(friendUserId);
+      });
 
       // Override like button to use Atlas
       const likeBtn = card.querySelector<HTMLElement>('.home-card__action--like');
