@@ -1,128 +1,71 @@
 // ─── PUBLIC PROFILE ──────────────────────────────────────────────────────────
 // src/modules/PublicProfile.ts
-//
-// Modal pokazujący profil innego użytkownika z przyciskiem Follow.
-// Kliknięcie avatara w feedzie → otwiera ten modal.
 import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
-// ── Open public profile modal ─────────────────────────────────────────────────
+const SPORT_ICONS = { running: '🏃', walking: '🚶', cycling: '🚴' };
+const SPORT_COLORS = { running: '#00c46a', walking: '#5badea', cycling: '#ffb545' };
+function _relDate(ts) {
+    return new Date(typeof ts === 'number' ? ts : ts).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function _fmtDur(sec) {
+    const m = Math.floor(sec / 60);
+    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}m`;
+}
 export async function openPublicProfile(targetUserId) {
     const myUserId = getUserId();
-    // Własny profil — nie otwieraj publicznego
     if (targetUserId === myUserId)
         return;
-    document.getElementById('publicProfileModal')?.remove();
-    // Loading skeleton
-    const modal = document.createElement('div');
-    modal.id = 'publicProfileModal';
-    modal.className = 'pv-overlay';
-    modal.innerHTML = `
+    document.getElementById('publicProfileOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'publicProfileOverlay';
+    overlay.className = 'pv-overlay';
+    overlay.innerHTML = `
     <div class="pv-sheet" id="ppSheet">
       <div class="pv-handle"></div>
-      <div class="pv-empty">
+      <div class="pv-header">
+        <button class="pv-back" id="ppBack">←</button>
+        <div class="pv-header__actions">
+          <button class="pv-header__btn pv-header__btn--follow" id="ppFollowBtn" disabled>Follow</button>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:center;padding:60px">
         <div class="home-loading__spinner"></div>
       </div>
     </div>`;
-    document.body.appendChild(modal);
+    document.body.appendChild(overlay);
     requestAnimationFrame(() => {
-        modal.classList.add('pv-overlay--visible');
-        setTimeout(() => modal.querySelector('.pv-sheet')?.classList.add('pv-sheet--open'), 10);
+        overlay.classList.add('pv-overlay--visible');
+        setTimeout(() => overlay.querySelector('.pv-sheet')?.classList.add('pv-sheet--open'), 10);
     });
-    // Close on backdrop click
-    modal.addEventListener('click', e => { if (e.target === modal)
+    overlay.querySelector('#ppBack')?.addEventListener('click', closePublicProfile);
+    overlay.addEventListener('click', e => { if (e.target === overlay)
         closePublicProfile(); });
-    document.addEventListener('keydown', e => { if (e.key === 'Escape')
-        closePublicProfile(); }, { once: true });
-    // Fetch profile
+    const sheet = overlay.querySelector('.pv-sheet');
+    _bindSwipe(sheet);
     try {
-        const res = await fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' });
-        if (!res.ok) {
-            // User not in Atlas yet — show basic modal with just userId
-            _renderProfile(modal, {
-                userId: targetUserId,
-                name: 'MapYou User',
-                bio: '',
-                avatarB64: null,
-                followersCount: 0,
-                followingCount: 0,
-                isFollowing: false,
-            }, myUserId);
-            return;
-        }
-        const d = await res.json();
-        if (d.status !== 'ok') {
-            closePublicProfile();
-            return;
-        }
-        _renderProfile(modal, d.data, myUserId);
+        const [profileRes, feedRes] = await Promise.all([
+            fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
+            fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(targetUserId)}`, { cache: 'no-store' }),
+        ]);
+        const profile = profileRes.ok
+            ? (await profileRes.json()).data
+            : { userId: targetUserId, name: 'MapYou User', bio: '', avatarB64: null, followersCount: 0, followingCount: 0, isFollowing: false };
+        const feedData = feedRes.ok
+            ? (await feedRes.json()).data ?? []
+            : [];
+        const userItems = feedData.filter(f => f.data.userId === targetUserId);
+        const activities = userItems.filter(f => f.kind === 'activity');
+        const posts = userItems.filter(f => f.kind === 'post');
+        _renderFull(overlay, sheet, profile, activities, posts, myUserId);
     }
     catch {
         closePublicProfile();
     }
 }
-function _renderProfile(modal, profile, myUserId) {
-    const sheet = modal.querySelector('.pv-sheet');
-    const avatarHtml = profile.avatarB64
-        ? `<img src="${profile.avatarB64}" class="pv-avatar__img" alt="avatar"/>`
-        : `<div style="width:100%;height:100%;background:rgba(74,222,128,0.15);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:#4ade80">${profile.name.charAt(0).toUpperCase()}</div>`;
-    const tmp = document.createElement('div');
-    tmp.innerHTML = `
-    <div class="pv-handle"></div>
-    <div class="pv-header">
-      <button class="pv-back" id="ppClose">‹</button>
-      <div class="pv-header__actions">
-        <button class="pv-header__btn ${profile.isFollowing ? 'pv-header__btn--active' : 'pv-header__btn--follow'}" id="ppFollowBtn">
-          ${profile.isFollowing ? 'Following ✓' : 'Follow'}
-        </button>
-      </div>
-    </div>
-    <div class="pv-content">
-      <div class="pv-hero">
-        <div class="pv-avatar">${avatarHtml}</div>
-        <div class="pv-hero__info">
-          <h2 class="pv-name">${profile.name}</h2>
-          ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
-        </div>
-      </div>
-      <div class="pv-stats-row">
-        <div class="pv-stats-row__item">
-          <span class="pv-stats-row__val" id="ppFollowersCount">${profile.followersCount}</span>
-          <span class="pv-stats-row__lbl">Followers</span>
-        </div>
-        <div class="pv-stats-row__item">
-          <span class="pv-stats-row__val">${profile.followingCount}</span>
-          <span class="pv-stats-row__lbl">Following</span>
-        </div>
-      </div>
-    </div>`;
-    // Zachowaj pv-sheet--open — podmień tylko dzieci
-    sheet.innerHTML = '';
-    while (tmp.firstChild)
-        sheet.appendChild(tmp.firstChild);
-    sheet.querySelector('#ppClose')?.addEventListener('click', closePublicProfile);
-    const followBtn = sheet.querySelector('#ppFollowBtn');
-    let isFollowing = profile.isFollowing;
-    followBtn.addEventListener('click', async () => {
-        followBtn.disabled = true;
-        try {
-            const method = isFollowing ? 'DELETE' : 'POST';
-            const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(profile.userId)}`, { method });
-            if (res.ok) {
-                isFollowing = !isFollowing;
-                followBtn.textContent = isFollowing ? 'Following ✓' : 'Follow';
-                followBtn.classList.toggle('pv-header__btn--active', isFollowing);
-                followBtn.classList.toggle('pv-header__btn--follow', !isFollowing);
-                const followerEl = sheet.querySelector('#ppFollowersCount');
-                if (followerEl) {
-                    const current = parseInt(followerEl.textContent ?? '0', 10);
-                    followerEl.textContent = String(isFollowing ? current + 1 : Math.max(0, current - 1));
-                }
-            }
-        }
-        catch { }
-        followBtn.disabled = false;
-    });
+function _bindSwipe(sheet) {
     const handle = sheet.querySelector('.pv-handle');
+    if (!handle)
+        return;
     let startY = 0;
     handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
     handle.addEventListener('touchmove', e => {
@@ -134,18 +77,140 @@ function _renderProfile(modal, profile, myUserId) {
     }, { passive: true });
     handle.addEventListener('touchend', e => {
         sheet.style.transition = '';
-        if (e.changedTouches[0].clientY - startY > 100)
+        if (e.changedTouches[0].clientY - startY > 120)
             closePublicProfile();
         else
             sheet.style.transform = '';
     });
 }
-export function closePublicProfile() {
-    const modal = document.getElementById('publicProfileModal');
-    if (!modal)
+function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
+    const totalKm = activities.reduce((s, a) => s + (+(a.data.distanceKm ?? 0)), 0);
+    const avatarHtml = profile.avatarB64
+        ? `<img src="${profile.avatarB64}" class="pv-avatar__img" alt="avatar"/>`
+        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="44" height="44"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
+    const tmp = document.createElement('div');
+    tmp.innerHTML = `
+    <div class="pv-handle"></div>
+    <div class="pv-header">
+      <button class="pv-back" id="ppBack">←</button>
+      <div class="pv-header__actions">
+        <button class="pv-header__btn ${profile.isFollowing ? '' : 'pv-header__btn--follow'}" id="ppFollowBtn">
+          ${profile.isFollowing ? '✓ Following' : 'Follow'}
+        </button>
+      </div>
+    </div>
+    <div class="pv-hero">
+      <div class="pv-avatar">${avatarHtml}</div>
+      <div class="pv-hero__info">
+        <h2 class="pv-name">${profile.name}</h2>
+        ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
+      </div>
+    </div>
+    <div class="pv-stats-row">
+      <div class="pv-stats-row__item">
+        <span class="pv-stats-row__val" id="ppFollowersCount">${profile.followersCount}</span>
+        <span class="pv-stats-row__lbl">Followers</span>
+      </div>
+      <div class="pv-stats-row__item">
+        <span class="pv-stats-row__val">${profile.followingCount}</span>
+        <span class="pv-stats-row__lbl">Following</span>
+      </div>
+      <div class="pv-stats-row__item">
+        <span class="pv-stats-row__val">${activities.length}</span>
+        <span class="pv-stats-row__lbl">Activities</span>
+      </div>
+      <div class="pv-stats-row__item">
+        <span class="pv-stats-row__val">${totalKm.toFixed(0)}</span>
+        <span class="pv-stats-row__lbl">km total</span>
+      </div>
+    </div>
+    <div class="pv-subtabs">
+      <button class="pv-subtab pv-subtab--active" data-pp="activities">Activities</button>
+      <button class="pv-subtab" data-pp="posts">Posts</button>
+    </div>
+    <div class="pv-content" id="ppContent"></div>`;
+    sheet.innerHTML = '';
+    while (tmp.firstChild)
+        sheet.appendChild(tmp.firstChild);
+    sheet.querySelector('#ppBack')?.addEventListener('click', closePublicProfile);
+    _bindSwipe(sheet);
+    // Follow
+    const followBtn = sheet.querySelector('#ppFollowBtn');
+    let isFollowing = profile.isFollowing;
+    followBtn.addEventListener('click', async () => {
+        followBtn.disabled = true;
+        try {
+            const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(profile.userId)}`, { method: isFollowing ? 'DELETE' : 'POST' });
+            if (res.ok) {
+                isFollowing = !isFollowing;
+                followBtn.textContent = isFollowing ? '✓ Following' : 'Follow';
+                followBtn.classList.toggle('pv-header__btn--follow', !isFollowing);
+                const el = sheet.querySelector('#ppFollowersCount');
+                if (el)
+                    el.textContent = String(Math.max(0, parseInt(el.textContent ?? '0', 10) + (isFollowing ? 1 : -1)));
+            }
+        }
+        catch { }
+        followBtn.disabled = false;
+    });
+    // Sub-tabs
+    const content = sheet.querySelector('#ppContent');
+    _renderActivitiesTab(content, activities);
+    sheet.querySelectorAll('.pv-subtab').forEach(btn => {
+        btn.addEventListener('click', () => {
+            sheet.querySelectorAll('.pv-subtab').forEach(b => b.classList.remove('pv-subtab--active'));
+            btn.classList.add('pv-subtab--active');
+            if (btn.dataset.pp === 'activities')
+                _renderActivitiesTab(content, activities);
+            else
+                _renderPostsTab(content, posts);
+        });
+    });
+}
+function _renderActivitiesTab(el, activities) {
+    if (!activities.length) {
+        el.innerHTML = `<div class="pv-empty"><div class="pv-empty__icon">🏁</div><p>No activities yet</p></div>`;
         return;
-    modal.querySelector('.pv-sheet')?.classList.remove('pv-sheet--open');
-    modal.classList.remove('pv-overlay--visible');
-    setTimeout(() => modal.remove(), 350);
+    }
+    el.innerHTML = `<div class="pv-act-list">${activities.slice(0, 20).map(a => {
+        const d = a.data;
+        const sport = (d.sport ?? 'running');
+        return `<div class="pv-act-item">
+      <span class="pv-act-item__icon">${SPORT_ICONS[sport] ?? '🏅'}</span>
+      <div class="pv-act-item__info">
+        <span class="pv-act-item__name">${(d.name ?? d.description ?? sport)}</span>
+        <span class="pv-act-item__date">${_relDate(a.date)}</span>
+      </div>
+      <div class="pv-act-item__stats">
+        <span style="color:${SPORT_COLORS[sport] ?? '#00c46a'}">${(+(d.distanceKm ?? 0)).toFixed(2)} km</span>
+        <span class="pv-act-item__time">${_fmtDur(+(d.durationSec ?? 0))}</span>
+      </div>
+    </div>`;
+    }).join('')}</div>`;
+}
+function _renderPostsTab(el, posts) {
+    if (!posts.length) {
+        el.innerHTML = `<div class="pv-empty"><div class="pv-empty__icon">📝</div><p>No posts yet</p></div>`;
+        return;
+    }
+    el.innerHTML = `<div class="pv-posts-list">${posts.map(p => {
+        const d = p.data;
+        return `<div class="pv-post-item">
+      ${d.photoUrl ? `<div class="pv-post-item__photo"><img src="${d.photoUrl}" loading="lazy"/></div>` : ''}
+      <div class="pv-post-item__body">
+        <span class="pv-post-item__title">${(d.title ?? '')}</span>
+        <span class="pv-post-item__date">${_relDate(p.date)}</span>
+        ${d.body ? `<p class="pv-post-item__text">${d.body.slice(0, 120)}${d.body.length > 120 ? '…' : ''}</p>` : ''}
+      </div>
+    </div>`;
+    }).join('')}</div>`;
+}
+export function closePublicProfile() {
+    const overlay = document.getElementById('publicProfileOverlay');
+    if (!overlay)
+        return;
+    overlay.querySelector('.pv-sheet')?.classList.remove('pv-sheet--open');
+    overlay.classList.remove('pv-overlay--visible');
+    setTimeout(() => overlay.remove(), 360);
 }
 //# sourceMappingURL=PublicProfile.js.map

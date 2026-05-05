@@ -8,6 +8,7 @@
 // - Heatmap (day × hour) + activity type pie chart
 
 import { loadUnifiedWorkouts, type UnifiedWorkout, SPORT_ICONS_U, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
+import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, type ProfileData } from './UserProfile.js';
 import { loadPosts, type PostRecord } from './db.js';
 
@@ -251,6 +252,21 @@ export class ProfileView {
 
     this._bindEvents(el);
     this._renderSubTab('activities', el);
+
+    // Pobierz followers/following z Atlas w tle
+    const userId = profile.userId;
+    if (userId) {
+      fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, { cache: 'no-store' })
+        .then(r => r.json())
+        .then((d: { status: string; data: { followers?: string[]; following?: string[] } }) => {
+          if (d.status !== 'ok') return;
+          const followersEl = el.querySelector<HTMLElement>('.pv-stats-row__item:nth-child(1) .pv-stats-row__val');
+          const followingEl = el.querySelector<HTMLElement>('.pv-stats-row__item:nth-child(2) .pv-stats-row__val');
+          if (followersEl) followersEl.textContent = String(d.data.followers?.length ?? 0);
+          if (followingEl) followingEl.textContent = String(d.data.following?.length ?? 0);
+        }).catch(() => {});
+    }
+    return;
   }
 
   close(): void {
