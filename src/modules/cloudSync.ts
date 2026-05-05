@@ -485,8 +485,18 @@ export async function hydrate(): Promise<void> {
 
   if (hasLocalData && Date.now() - lastHydrated < HYDRATE_MAX_AGE) {
     console.log('[CloudSync] ✅ IndexedDB has data, skipping hydration');
+    // Wyczyść stare minimapUrl z IndexedDB (usunięte z Cloudinary)
+    for (const activity of enriched) {
+      const url = (activity as unknown as Record<string,unknown>).minimapUrl as string | undefined;
+      if (url && (url.includes('staticmap.openstreetmap') || url.includes('api.mapbox.com'))) {
+        const cleaned = { ...activity };
+        delete (cleaned as unknown as Record<string,unknown>).minimapUrl;
+        await saveEnrichedActivity(cleaned as EnrichedActivity);
+      }
+    }
     // Ale zawsze sprawdź czy lokalne dane są w Atlas — push brakujących
-    void _pushMissingToAtlas(userId, enriched, unified, posts);
+    const enrichedFresh = await loadEnrichedActivities();
+    void _pushMissingToAtlas(userId, enrichedFresh, unified, posts);
     return;
   }
 
