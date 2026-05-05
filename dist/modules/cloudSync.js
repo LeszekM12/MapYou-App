@@ -115,6 +115,102 @@ async function deleteFromCloudinary(publicId) {
 // ── Hydratacja — pobierz dane z Atlas do IndexedDB przy starcie ───────────────
 const LS_HYDRATED_KEY = 'mapyou_hydrated_at';
 const HYDRATE_MAX_AGE = 24 * 60 * 60 * 1000; // re-hydrate max raz na dobę
+// ── Push lokalnych danych których brakuje w Atlas ────────────────────────────
+// Odpala się przy każdym starcie — naprawia braki bez ręcznego sync
+async function _pushMissingToAtlas(userId, enriched, unified, posts) {
+    if (!isOnline() || !userId)
+        return;
+    try {
+        // Pobierz co już jest w Atlas
+        const [atlasEnriched, atlasUnified, atlasPosts] = await Promise.all([
+            apiGet(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
+            apiGet(`/unified-workouts?userId=${encodeURIComponent(userId)}`),
+            apiGet(`/posts?userId=${encodeURIComponent(userId)}`),
+        ]);
+        const atlasEnrichedIds = new Set((atlasEnriched ?? []).map(a => a.activityId));
+        const atlasUnifiedIds = new Set((atlasUnified ?? []).map(w => w.workoutId));
+        const atlasPostIds = new Set((atlasPosts ?? []).map(p => p.postId));
+        // Push brakujących enriched activities
+        const missingEnriched = enriched.filter(a => !atlasEnrichedIds.has(a.id));
+        for (const activity of missingEnriched) {
+            try {
+                const uploaded = await uploadIfBase64(activity.photoUrl, userId, 'activities', `activities/${userId}/${activity.id}`);
+                const toSave = uploaded
+                    ? { ...activity, photoUrl: uploaded.url, photoPublicId: uploaded.publicId }
+                    : activity;
+                await apiPost('/enriched-activities', { ...toSave, userId, activityId: toSave.id });
+                console.log(`[CloudSync] 📤 Pushed missing activity: ${activity.id}`);
+            }
+            catch { }
+        }
+        // Napraw istniejące rekordy w Atlas z photoUrl: null — uploaduj z lokalnego IndexedDB
+        const existingEnriched = enriched.filter(a => atlasEnrichedIds.has(a.id) && a.photoUrl && a.photoUrl.startsWith('data:'));
+        for (const activity of existingEnriched) {
+            try {
+                const uploaded = await uploadIfBase64(activity.photoUrl, userId, 'activities', `activities/${userId}/${activity.id}`);
+                if (uploaded) {
+                    // Zaktualizuj IndexedDB
+                    await saveEnrichedActivity({ ...activity, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
+                    // Zaktualizuj Atlas
+                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
+                        userId, photoUrl: uploaded.url, photoPublicId: uploaded.publicId,
+                    });
+                    console.log(`[CloudSync] 🖼️ Fixed photo for activity: ${activity.id}`);
+                }
+            }
+            catch { }
+        }
+        // Napraw posty z photoUrl: null w Atlas
+        const existingPosts = posts.filter(p => atlasPostIds.has(p.id) && p.photoUrl && p.photoUrl.startsWith('data:'));
+        for (const post of existingPosts) {
+            try {
+                const uploaded = await uploadIfBase64(post.photoUrl, userId, 'posts', `posts/${userId}/${post.id}`);
+                if (uploaded) {
+                    await savePost({ ...post, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
+                    await apiPost(`/posts/${encodeURIComponent(post.id)}/photo`, {
+                        userId, photoUrl: uploaded.url, photoPublicId: uploaded.publicId,
+                    });
+                    console.log(`[CloudSync] 🖼️ Fixed photo for post: ${post.id}`);
+                }
+            }
+            catch { }
+        }
+        // Push brakujących unified workouts
+        const missingUnified = unified.filter(w => !atlasUnifiedIds.has(w.id));
+        for (const workout of missingUnified) {
+            try {
+                await apiPost('/unified-workouts', { ...workout, userId, workoutId: workout.id });
+                console.log(`[CloudSync] 📤 Pushed missing workout: ${workout.id}`);
+            }
+            catch { }
+        }
+        // Push brakujących posts
+        const missingPosts = posts.filter(p => !atlasPostIds.has(p.id));
+        for (const post of missingPosts) {
+            try {
+                const uploaded = await uploadIfBase64(post.photoUrl, userId, 'posts', `posts/${userId}/${post.id}`);
+                const toSave = uploaded
+                    ? { ...post, photoUrl: uploaded.url, photoPublicId: uploaded.publicId }
+                    : post;
+                await apiPost('/posts', { ...toSave, userId, postId: toSave.id });
+                console.log(`[CloudSync] 📤 Pushed missing post: ${post.id}`);
+            }
+            catch { }
+        }
+        // Push stats (weeklyWins, bestStreak) — zawsze aktualizuj
+        const weeklyWins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
+        const bestStreak = parseInt(localStorage.getItem('mapyou_best_streak') ?? '0', 10);
+        if (weeklyWins > 0 || bestStreak > 0) {
+            await apiPost('/users', { userId, weeklyWins, bestStreak }).catch(() => { });
+        }
+        if (missingEnriched.length + missingUnified.length + missingPosts.length > 0) {
+            console.log(`[CloudSync] ✅ Pushed ${missingEnriched.length} activities, ${missingUnified.length} workouts, ${missingPosts.length} posts`);
+        }
+    }
+    catch (err) {
+        console.warn('[CloudSync] _pushMissingToAtlas error:', err);
+    }
+}
 export async function hydrate() {
     if (!isOnline())
         return;
@@ -131,6 +227,8 @@ export async function hydrate() {
     const hasLocalData = workouts.length + activities.length + enriched.length + unified.length + posts.length > 0;
     if (hasLocalData && Date.now() - lastHydrated < HYDRATE_MAX_AGE) {
         console.log('[CloudSync] ✅ IndexedDB has data, skipping hydration');
+        // Ale zawsze sprawdź czy lokalne dane są w Atlas — push brakujących
+        void _pushMissingToAtlas(userId, enriched, unified, posts);
         return;
     }
     console.log('[CloudSync] 🔄 Hydrating from Atlas...');
