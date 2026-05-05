@@ -119,8 +119,32 @@ const HYDRATE_MAX_AGE = 24 * 60 * 60 * 1000; // re-hydrate max raz na dobę
 // ── Push lokalnych danych których brakuje w Atlas ────────────────────────────
 // Odpala się przy każdym starcie — naprawia braki bez ręcznego sync
 // ── Generate minimap PNG on canvas and upload to Cloudinary ──────────────────
-// Draws GPS route on canvas (no external libs, no CORS issues)
-// Returns Cloudinary URL or null
+// Fetches OSM tiles via backend proxy, draws GPS route, uploads to Cloudinary
+function _latLonToTile(lat, lon, zoom) {
+    const n = Math.pow(2, zoom);
+    const tx = Math.floor((lon + 180) / 360 * n);
+    const ty = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
+    return { tx, ty };
+}
+function _tileToPixel(tx, ty, zoom, originTx, originTy) {
+    return { px: (tx - originTx) * 256, py: (ty - originTy) * 256 };
+}
+function _latLonToPixel(lat, lon, zoom, originTx, originTy) {
+    const n = Math.pow(2, zoom);
+    const px = ((lon + 180) / 360 * n - originTx) * 256;
+    const py = ((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n - originTy) * 256;
+    return { px, py };
+}
+async function _loadImage(url) {
+    return new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = () => resolve(null);
+        img.src = url;
+        setTimeout(() => resolve(null), 5000);
+    });
+}
 async function generateAndUploadMinimap(activity, userId) {
     const coords = activity.coords;
     if (!coords || coords.length === 0)
@@ -133,74 +157,123 @@ async function generateAndUploadMinimap(activity, userId) {
         canvas.width = W;
         canvas.height = H;
         const ctx = canvas.getContext('2d');
-        // Background — dark map style
-        ctx.fillStyle = '#e8e0d8';
-        ctx.fillRect(0, 0, W, H);
         // Calculate bounds
         const lats = coords.map(p => p[0]);
         const lons = coords.map(p => p[1]);
         const minLat = Math.min(...lats), maxLat = Math.max(...lats);
         const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-        const pad = 24;
-        const latSpan = (maxLat - minLat) || 0.001;
-        const lonSpan = (maxLon - minLon) || 0.001;
-        // Keep aspect ratio
-        const scaleX = (W - pad * 2) / lonSpan;
-        const scaleY = (H - pad * 2) / latSpan;
-        const scale = Math.min(scaleX, scaleY);
-        const offX = (W - lonSpan * scale) / 2;
-        const offY = (H - latSpan * scale) / 2;
-        const toX = (lon) => offX + (lon - minLon) * scale;
-        const toY = (lat) => offY + (maxLat - lat) * scale;
+        const cLat = (minLat + maxLat) / 2;
+        const cLon = (minLon + maxLon) / 2;
+        // Choose zoom level
+        const latSpan = maxLat - minLat || 0.001;
+        const lonSpan = maxLon - minLon || 0.001;
+        let zoom = 15;
+        for (let z = 16; z >= 10; z--) {
+            const n = Math.pow(2, z);
+            const pxSpanLon = lonSpan / 360 * n * 256;
+            const pxSpanLat = latSpan / 360 * n * 256;
+            if (pxSpanLon < W * 0.7 && pxSpanLat < H * 0.7) {
+                zoom = z;
+                break;
+            }
+        }
+        // Get origin tile
+        const centerTile = _latLonToTile(cLat, cLon, zoom);
+        const tilesX = Math.ceil(W / 256) + 1;
+        const tilesY = Math.ceil(H / 256) + 1;
+        const originTx = centerTile.tx - Math.floor(tilesX / 2);
+        const originTy = centerTile.ty - Math.floor(tilesY / 2);
+        // Draw tiles
+        const tilePromises = [];
+        for (let dx = 0; dx < tilesX + 1; dx++) {
+            for (let dy = 0; dy < tilesY + 1; dy++) {
+                const tx = originTx + dx;
+                const ty = originTy + dy;
+                const px = dx * 256 - (centerTile.tx - originTx) * 256 + W / 2 - 128;
+                const py = dy * 256 - (centerTile.ty - originTy) * 256 + H / 2 - 128;
+                const url = `${BACKEND_URL}/upload/tile?z=${zoom}&x=${tx}&y=${ty}`;
+                tilePromises.push(_loadImage(url).then(img => {
+                    if (img)
+                        ctx.drawImage(img, Math.round(px), Math.round(py), 256, 256);
+                }));
+            }
+        }
+        await Promise.all(tilePromises);
+        // Fallback background if tiles failed
+        const imgData = ctx.getImageData(0, 0, 1, 1);
+        if (imgData.data[3] === 0) {
+            ctx.fillStyle = '#e8e0d8';
+            ctx.fillRect(0, 0, W, H);
+        }
+        // Convert coords to pixels
+        const toP = (lat, lon) => {
+            const p = _latLonToPixel(lat, lon, zoom, originTx, originTy);
+            // Offset to center
+            const offX = W / 2 - (centerTile.tx - originTx + 0.5) * 256;
+            const offY = H / 2 - (centerTile.ty - originTy + 0.5) * 256;
+            return { x: p.px + offX + 128, y: p.py + offY + 128 };
+        };
         const color = activity.sport === 'cycling' ? '#ffb545'
             : activity.sport === 'walking' ? '#5badea'
                 : '#00c46a';
         if (coords.length === 1) {
-            // Single point — draw pin
-            const x = toX(coords[0][1]);
-            const y = toY(coords[0][0]);
+            const { x, y } = toP(coords[0][0], coords[0][1]);
+            // Draw pin SVG-style
             ctx.beginPath();
-            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.arc(x, y - 8, 10, 0, Math.PI * 2);
             ctx.fillStyle = color;
             ctx.fill();
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 2;
             ctx.stroke();
+            // Pin tip
+            ctx.beginPath();
+            ctx.moveTo(x - 6, y - 4);
+            ctx.lineTo(x, y + 4);
+            ctx.lineTo(x + 6, y - 4);
+            ctx.fillStyle = color;
+            ctx.fill();
         }
         else {
-            // Draw route line
+            // Draw route
             ctx.beginPath();
-            ctx.moveTo(toX(coords[0][1]), toY(coords[0][0]));
+            const p0 = toP(coords[0][0], coords[0][1]);
+            ctx.moveTo(p0.x, p0.y);
             for (let i = 1; i < coords.length; i++) {
-                ctx.lineTo(toX(coords[i][1]), toY(coords[i][0]));
+                const p = toP(coords[i][0], coords[i][1]);
+                ctx.lineTo(p.x, p.y);
             }
             ctx.strokeStyle = color;
             ctx.lineWidth = 3;
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.stroke();
-            // Start dot (green/blue/yellow filled)
-            const sx = toX(coords[0][1]), sy = toY(coords[0][0]);
+            // Start pin
+            const ps = toP(coords[0][0], coords[0][1]);
             ctx.beginPath();
-            ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+            ctx.arc(ps.x, ps.y - 6, 7, 0, Math.PI * 2);
             ctx.fillStyle = color;
             ctx.fill();
             ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
-            // End dot (red)
-            const ex = toX(coords[coords.length - 1][1]), ey = toY(coords[coords.length - 1][0]);
             ctx.beginPath();
-            ctx.arc(ex, ey, 6, 0, Math.PI * 2);
+            ctx.moveTo(ps.x - 4, ps.y - 1);
+            ctx.lineTo(ps.x, ps.y + 5);
+            ctx.lineTo(ps.x + 4, ps.y - 1);
+            ctx.fillStyle = color;
+            ctx.fill();
+            // End dot
+            const pe = toP(coords[coords.length - 1][0], coords[coords.length - 1][1]);
+            ctx.beginPath();
+            ctx.arc(pe.x, pe.y, 5, 0, Math.PI * 2);
             ctx.fillStyle = '#e74c3c';
             ctx.fill();
             ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
+            ctx.lineWidth = 1.5;
             ctx.stroke();
         }
-        // Export as JPEG base64
         const base64 = canvas.toDataURL('image/jpeg', 0.85);
-        // Upload to Cloudinary
         const uploaded = await uploadIfBase64(base64, userId, 'activities', `minimaps/${userId}/${activity.id}`);
         return uploaded?.url ?? null;
     }
