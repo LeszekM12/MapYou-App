@@ -459,27 +459,7 @@ function buildPostCard(post: PostRecord, onRefresh: () => void): HTMLElement {
     });
   }
 
-  // Load post likes from Atlas async
-  void (async () => {
-    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-    try {
-      const r = await fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(post.id)}?userId=${encodeURIComponent(userId)}`);
-      if (r.ok) {
-        const d = await r.json() as { count: number; liked: boolean };
-        const el = card.querySelector<HTMLElement>(`[data-like-count="p_${post.id}"]`);
-        if (el) el.textContent = String(d.count);
-        if (d.liked) card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-      }
-    } catch {
-      const lsKey = `hc_likes_p_${post.id}`;
-      const lc = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
-      if (lc > 0) {
-        const el = card.querySelector<HTMLElement>(`[data-like-count="p_${post.id}"]`);
-        if (el) el.textContent = String(lc);
-        card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-      }
-    }
-  })();
+  // Like count loaded from feed response batch
 
   card.addEventListener('click', e => { e.stopPropagation(); });
 
@@ -712,38 +692,9 @@ function buildCard(act: EnrichedActivity): HTMLElement {
     });
   }
 
-  // Load likes from Atlas async
-  void (async () => {
-    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-    try {
-      const r = await fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(act.id)}?userId=${encodeURIComponent(userId)}`);
-      if (r.ok) {
-        const d = await r.json() as { count: number; liked: boolean };
-        const el = card.querySelector<HTMLElement>(`[data-like-count="${act.id}"]`);
-        if (el) el.textContent = String(d.count);
-        if (d.liked) card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-      }
-    } catch {
-      // offline fallback
-      const lsKey = `hc_likes_${act.id}`;
-      const likeCount = parseInt(localStorage.getItem(lsKey) ?? '0', 10);
-      if (likeCount > 0) {
-        const el = card.querySelector<HTMLElement>(`[data-like-count="${act.id}"]`);
-        if (el) el.textContent = String(likeCount);
-        card.querySelector('.home-card__action--like')?.classList.add('home-card__action--liked');
-      }
-    }
-  })();
+  // Like count loaded from feed response batch
 
-  // Load comment count from Atlas async
-  void fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(act.id)}`)
-    .then(r => r.json())
-    .then((d: { data: unknown[] }) => {
-      if (d.data?.length > 0) {
-        const el = card.querySelector<HTMLElement>(`[data-comment-count="${act.id}"]`);
-        if (el) el.textContent = String(d.data.length);
-      }
-    }).catch(() => {});
+  // Comment count loaded from feed response batch
 
   // Click avatar → open own profile
   card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
@@ -839,9 +790,13 @@ function _openNotifPanel(): void {
 }
 
 export class HomeView {
-  private container: HTMLElement | null = null;
-  private _inited = false;
-  private _workouts: UnifiedWorkout[] = [];
+  private container:     HTMLElement | null        = null;
+  private _inited:       boolean                   = false;
+  private _workouts:     UnifiedWorkout[]           = [];
+  private _feedCursor:   number                    = Date.now();
+  private _feedHasMore:  boolean                   = true;
+  private _feedLoading:  boolean                   = false;
+  private _feedObserver: IntersectionObserver|null = null;
 
   init(): void {
     this.container = document.querySelector('#tabHome .home-scroll');
@@ -1135,12 +1090,15 @@ export class HomeView {
     // Pobierz unified feed z Atlas (własne + znajomych)
     const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     let serverFeed: Array<{ kind: string; date: number; data: Record<string, unknown> }> = [];
+    let serverRes: { hasMore?: boolean } = {};
     if (userId) {
       try {
         const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`);
         if (res.ok) {
-          const d = await res.json() as { status: string; data: typeof serverFeed };
+          const d = await res.json() as { status: string; hasMore: boolean; data: typeof serverFeed };
           serverFeed = d.data ?? [];
+          this._feedHasMore = d.hasMore ?? false;
+          if (serverFeed.length > 0) this._feedCursor = serverFeed[serverFeed.length - 1].date as number;
         }
       } catch { /* offline */ }
     }
@@ -1199,6 +1157,70 @@ export class HomeView {
 
     const friendsFeedEl = document.getElementById('friendsFeed');
     if (friendsFeedEl) friendsFeedEl.innerHTML = '';
+
+    // Infinite scroll
+    this._setupInfiniteScroll(scroll, activities, posts, userId);
+  }
+
+  private _setupInfiniteScroll(scroll: HTMLElement, activities: import('./db.js').EnrichedActivity[], posts: import('./db.js').PostRecord[], userId: string): void {
+    this._feedObserver?.disconnect();
+    document.getElementById('feedSentinel')?.remove();
+    if (!this._feedHasMore) return;
+    const sentinel = document.createElement('div');
+    sentinel.id = 'feedSentinel';
+    sentinel.style.height = '1px';
+    scroll.appendChild(sentinel);
+    this._feedObserver = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && !this._feedLoading && this._feedHasMore) {
+        void this._loadMoreFeed(scroll, activities, posts, userId);
+      }
+    }, { rootMargin: '300px' });
+    this._feedObserver.observe(sentinel);
+  }
+
+  private async _loadMoreFeed(scroll: HTMLElement, activities: import('./db.js').EnrichedActivity[], posts: import('./db.js').PostRecord[], userId: string): Promise<void> {
+    if (this._feedLoading || !this._feedHasMore) return;
+    this._feedLoading = true;
+    const spinner = document.createElement('div');
+    spinner.id = 'feedLoadMore';
+    spinner.className = 'home-loading';
+    spinner.innerHTML = '<div class="home-loading__spinner"></div>';
+    document.getElementById('feedSentinel')?.before(spinner);
+    try {
+      const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}&before=${this._feedCursor}`, { cache: 'no-store' });
+      if (res.ok) {
+        const d = await res.json() as { status: string; hasMore: boolean; data: Array<{ kind: string; date: number; data: Record<string, unknown> }> };
+        const newItems = d.data ?? [];
+        this._feedHasMore = d.hasMore ?? false;
+        if (newItems.length > 0) {
+          this._feedCursor = newItems[newItems.length - 1].date;
+          document.getElementById('feedLoadMore')?.remove();
+          document.getElementById('feedSentinel')?.remove();
+          newItems.forEach((item, idx) => {
+            const isOwn = item.data.userId === userId;
+            let card: HTMLElement;
+            if (isOwn && item.kind === 'activity') {
+              const local = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
+              card = local ? buildCard(local) : this._buildFriendFeedCard(item.kind, item.data, userId);
+            } else if (isOwn && item.kind === 'post') {
+              const local = posts.find(p => p.id === (item.data.postId ?? item.data.id));
+              card = local ? buildPostCard(local, () => void this.render()) : this._buildFriendFeedCard(item.kind, item.data, userId);
+            } else {
+              card = this._buildFriendFeedCard(item.kind, item.data, userId);
+            }
+            const lc = (item.data._likeCount ?? 0) as number;
+            if (lc > 0) { const id = (item.data.activityId ?? item.data.postId ?? item.data.id) as string; const el = card.querySelector<HTMLElement>('[data-like-count="' + id + '"], [data-like-count="p_' + id + '"]'); if (el) el.textContent = String(lc); }
+            card.style.animationDelay = String(idx * 60) + 'ms';
+            scroll.appendChild(card);
+          });
+          if (this._feedHasMore) this._setupInfiniteScroll(scroll, activities, posts, userId);
+        } else {
+          this._feedHasMore = false;
+        }
+      }
+    } catch {}
+    document.getElementById('feedLoadMore')?.remove();
+    this._feedLoading = false;
   }
 
   private async _renderFriendsFeed(): Promise<void> {
