@@ -49,7 +49,7 @@ export async function openPublicProfile(targetUserId) {
         ]);
         const profile = profileRes.ok
             ? (await profileRes.json()).data
-            : { userId: targetUserId, name: 'MapYou User', bio: '', avatarB64: null, followersCount: 0, followingCount: 0, isFollowing: false };
+            : { userId: targetUserId, name: 'MapYou User', bio: '', avatarB64: null, followersCount: 0, followingCount: 0, isFollowing: false, weeklyWins: 0, bestStreak: 0 };
         const feedData = feedRes.ok
             ? (await feedRes.json()).data ?? []
             : [];
@@ -171,10 +171,115 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
             else if (tab === 'efforts')
                 _renderEffortsTab(content, activities);
             else if (tab === 'trophies')
-                _renderTrophiesTab(content, activities);
+                _renderTrophiesTab(content, activities, profile.weeklyWins ?? 0, profile.bestStreak ?? 0);
             else
                 _renderPostsTab(content, posts);
         });
+    });
+}
+function _nth(n) {
+    if (n === 1)
+        return 'st';
+    if (n === 2)
+        return 'nd';
+    if (n === 3)
+        return 'rd';
+    return 'th';
+}
+function _activityTrophies(count) {
+    const milestones = [1, 3, 5, 10, 25, 50, 100];
+    return milestones.map(m => ({
+        id: `act_${m}`,
+        label: m === 1 ? 'First activity' : `${m}${_nth(m)} activity`,
+        desc: m === 1 ? 'You started your journey!' : `Completed ${m} activities`,
+        unlocked: count >= m, count: m,
+        color: count >= m ? '#f97316' : '#374151',
+        icon: count >= m ? '⚡' : '🔒',
+    }));
+}
+function _streakTrophies(best) {
+    if (best < 7)
+        return [{
+                id: 'streak_7', label: '7-day streak', desc: 'Train 7 days in a row',
+                unlocked: false, count: 7, color: '#374151', icon: '🔒',
+            }];
+    const trophies = [];
+    for (let d = 7; d <= best; d++) {
+        trophies.push({
+            id: `streak_${d}`, label: `${d}-day streak`,
+            desc: `Trained ${d} days in a row! 🔥`, unlocked: true, count: d,
+            color: d >= 30 ? '#eab308' : d >= 14 ? '#f97316' : '#00c46a', icon: '🔥',
+        });
+    }
+    trophies.push({
+        id: `streak_${best + 1}`, label: `${best + 1}-day streak`,
+        desc: `Train ${best + 1} days in a row`, unlocked: false,
+        count: best + 1, color: '#374151', icon: '🔒',
+    });
+    return trophies;
+}
+function _weeklyTrophies(wins) {
+    const milestones = [1, 4, 8, 12, 26, 52];
+    const labels = ['First week goal', '1 month streak', '2 month streak', '3 month streak', 'Half year', '1 year!'];
+    return milestones.map((m, i) => ({
+        id: `wk_${m}`, label: labels[i],
+        desc: wins >= m ? `${wins} weekly goals reached!` : `Reach your weekly goal ${m} time${m > 1 ? 's' : ''}`,
+        unlocked: wins >= m, count: m,
+        color: wins >= m ? '#eab308' : '#374151',
+        icon: wins >= m ? '🏆' : '🔒',
+    }));
+}
+function _buildTrophySVG(trophy) {
+    const fill = trophy.unlocked ? trophy.color : '#1f2937';
+    const glow = trophy.unlocked ? `filter:drop-shadow(0 0 8px ${trophy.color}88)` : '';
+    const count = trophy.count ?? '?';
+    return `
+  <div class="pv-trophy ${trophy.unlocked ? 'pv-trophy--unlocked' : ''}" title="${trophy.desc}">
+    <div class="pv-trophy__gem" style="${glow}">
+      <svg viewBox="0 0 80 90" width="64" height="72">
+        <polygon points="40,2 78,22 78,68 40,88 2,68 2,22"
+          fill="${fill}" stroke="${trophy.unlocked ? trophy.color : '#374151'}" stroke-width="2"/>
+        ${trophy.unlocked
+        ? `<polygon points="40,12 68,28 68,62 40,78 12,62 12,28" fill="${fill}cc"/>
+             <text x="40" y="50" text-anchor="middle" font-size="22" font-weight="900"
+               font-family="Manrope,sans-serif" fill="white">${count}</text>
+             <text x="40" y="65" text-anchor="middle" font-size="11"
+               font-family="Manrope,sans-serif" fill="rgba(255,255,255,0.7)">${trophy.icon === '🏆' ? '🏆' : '⚡'}</text>`
+        : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`}
+      </svg>
+    </div>
+    <span class="pv-trophy__label">${trophy.label}</span>
+  </div>`;
+}
+function _fmtTime(sec) {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    if (h > 0)
+        return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    return `${m}:${String(s).padStart(2, '0')}`;
+}
+function _bestEffortsFromFeed(activities) {
+    const distances = [
+        { label: '400 m', m: 400 }, { label: '1 km', m: 1000 },
+        { label: '1 mile', m: 1609 }, { label: '5 km', m: 5000 }, { label: '10 km', m: 10000 },
+    ];
+    return distances.map(({ label, m }) => {
+        let bestSec = null;
+        let bestDate = null;
+        activities
+            .filter(a => a.data.sport === 'running' && +(a.data.distanceKm ?? 0) * 1000 >= m)
+            .forEach(a => {
+            const pace = +(a.data.paceMinKm ?? 0);
+            if (pace > 0 && pace < 30) {
+                const sec = Math.round(pace * 60 * (m / 1000));
+                if (bestSec === null || sec < bestSec) {
+                    bestSec = sec;
+                    bestDate = String(a.date);
+                }
+            }
+        });
+        return { label, distM: m, timeStr: bestSec !== null ? _fmtTime(bestSec) : null, date: bestDate };
     });
 }
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -221,86 +326,51 @@ function _renderStatsTab(el, activities) {
     </div>`;
 }
 function _renderEffortsTab(el, activities) {
-    const runActs = activities.filter(a => a.data.sport === 'running');
-    const dists = [1, 5, 10, 21.1, 42.2];
-    const labels = ['1 km', '5 km', '10 km', 'Half Marathon', 'Marathon'];
-    const efforts = dists.map((dist, i) => {
-        const candidates = runActs.filter(a => +(a.data.distanceKm ?? 0) >= dist);
-        if (!candidates.length)
-            return { label: labels[i], timeStr: '', date: '' };
-        const best = candidates.reduce((b, a) => {
-            const pace = +(a.data.paceMinKm ?? 0);
-            return pace > 0 && pace < (+(b.data.paceMinKm ?? 999)) ? a : b;
-        });
-        const sec = Math.round(+(best.data.paceMinKm ?? 0) * 60 * dist);
-        const h = Math.floor(sec / 3600);
-        const m = Math.floor((sec % 3600) / 60);
-        const s = sec % 60;
-        const timeStr = h > 0
-            ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-            : `${m}:${String(s).padStart(2, '0')}`;
-        return { label: labels[i], timeStr, date: _relDate(best.date) };
-    });
+    const efforts = _bestEffortsFromFeed(activities);
     el.innerHTML = `
     <div class="pv-section-title">Personal Bests (Running)</div>
     <div class="pv-efforts">
       ${efforts.map(e => `
-        <div class="pv-effort">
+        <div class="pv-effort ${e.timeStr ? 'pv-effort--set' : ''}">
           <span class="pv-effort__dist">${e.label}</span>
           <div class="pv-effort__right">
             ${e.timeStr
         ? `<span class="pv-effort__time">${e.timeStr}</span>
-                 <span class="pv-effort__date">${e.date}</span>`
+                 <span class="pv-effort__date">${e.date ? _relDate(Number(e.date)) : ''}</span>`
         : `<span class="pv-effort__empty">—</span>`}
           </div>
         </div>`).join('')}
     </div>
     <p class="pv-efforts__note">Calculated from GPS-tracked running activities only.</p>`;
 }
-function _renderTrophiesTab(el, activities) {
-    const totalKm = activities.reduce((s, a) => s + +(a.data.distanceKm ?? 0), 0);
-    const count = activities.length;
-    const milestones = [
-        { km: 10, label: 'First 10 km', icon: '⚡', color: '#60a5fa' },
-        { km: 50, label: '50 km Club', icon: '⚡', color: '#34d399' },
-        { km: 100, label: '100 km Club', icon: '⚡', color: '#a78bfa' },
-        { km: 500, label: '500 km Legend', icon: '⚡', color: '#f59e0b' },
-        { km: 1000, label: '1000 km Elite', icon: '⚡', color: '#ef4444' },
-    ];
-    const actMilestones = [
-        { n: 5, label: '5 Activities', color: '#60a5fa' },
-        { n: 20, label: '20 Activities', color: '#34d399' },
-        { n: 50, label: '50 Activities', color: '#a78bfa' },
-        { n: 100, label: '100 Activities', color: '#f59e0b' },
-    ];
-    const buildGem = (unlocked, color, label, countStr) => `
-    <div class="pv-trophy ${unlocked ? 'pv-trophy--unlocked' : ''}">
-      <div class="pv-trophy__gem" style="${unlocked ? `filter:drop-shadow(0 0 8px ${color}88)` : ''}">
-        <svg viewBox="0 0 80 90" width="64" height="72">
-          <polygon points="40,2 78,22 78,68 40,88 2,68 2,22"
-            fill="${unlocked ? color : '#1f2937'}"
-            stroke="${unlocked ? color : '#374151'}" stroke-width="2"/>
-          ${unlocked
-        ? `<polygon points="40,12 68,28 68,62 40,78 12,62 12,28" fill="${color}cc"/>
-               <text x="40" y="50" text-anchor="middle" font-size="22" font-weight="900"
-                 font-family="Manrope,sans-serif" fill="white">${countStr}</text>`
-        : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`}
-        </svg>
-      </div>
-      <span class="pv-trophy__label">${label}</span>
-    </div>`;
-    const kmTrophies = milestones.map(m => buildGem(totalKm >= m.km, m.color, m.label, `${m.km}`));
-    const actTrophies2 = actMilestones.map(m => buildGem(count >= m.n, m.color, m.label, `${m.n}`));
-    const total = [...milestones.filter(m => totalKm >= m.km), ...actMilestones.filter(m => count >= m.n)].length;
+function _renderTrophiesTab(el, activities, weeklyWins, bestStreak) {
+    const actTrophies = _activityTrophies(activities.length);
+    const wkTrophies = _weeklyTrophies(weeklyWins);
+    const streakTrophies = _streakTrophies(bestStreak);
+    const totalUnlocked = [...actTrophies, ...wkTrophies, ...streakTrophies].filter(t => t.unlocked).length;
     el.innerHTML = `
     <div class="pv-trophy-summary">
-      <span class="pv-trophy-summary__count">${total}</span>
+      <span class="pv-trophy-summary__count">${totalUnlocked}</span>
       <span class="pv-trophy-summary__label">trophies unlocked</span>
     </div>
-    <div class="pv-section-title">⚡ Distance Milestones</div>
-    <div class="pv-trophy-grid">${kmTrophies.join('')}</div>
-    <div class="pv-section-title" style="margin-top:24px">🏅 Activity Milestones</div>
-    <div class="pv-trophy-grid">${actTrophies2.join('')}</div>`;
+
+    ${weeklyWins > 0 ? `
+    <div class="pv-goal-cup">
+      <span class="pv-goal-cup__icon">🏆</span>
+      <div class="pv-goal-cup__info">
+        <span class="pv-goal-cup__title">Weekly goal achieved <strong>${weeklyWins}×</strong></span>
+        <span class="pv-goal-cup__sub">Keep crushing your goals!</span>
+      </div>
+    </div>` : ''}
+
+    <div class="pv-section-title">⚡ Activity Milestones</div>
+    <div class="pv-trophy-grid">${actTrophies.map(_buildTrophySVG).join('')}</div>
+
+    <div class="pv-section-title" style="margin-top:24px">🏆 Weekly Goal Cups</div>
+    <div class="pv-trophy-grid">${wkTrophies.map(_buildTrophySVG).join('')}</div>
+
+    <div class="pv-section-title" style="margin-top:24px">🔥 Streak Records${bestStreak >= 7 ? ` <span style="color:#f97316;font-size:1.1rem">(Best: ${bestStreak} days)</span>` : ''}</div>
+    <div class="pv-trophy-grid pv-trophy-grid--scroll">${streakTrophies.map(_buildTrophySVG).join('')}</div>`;
 }
 function _renderActivitiesTab(el, activities) {
     if (!activities.length) {

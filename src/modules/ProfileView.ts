@@ -21,6 +21,18 @@ const LS_GOAL_WEEK   = 'mapyou_last_goal_week'; // ISO week string — last week
 
 // ── Weekly goal win tracking (called from StatsView when goal reached) ─────────
 
+function _syncStatsToAtlas(): void {
+  const userId     = localStorage.getItem('mapyou_userId_profile');
+  const weeklyWins = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);
+  const bestStreak = parseInt(localStorage.getItem('mapyou_best_streak') ?? '0', 10);
+  if (!userId) return;
+  void fetch(`${BACKEND_URL}/users`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ userId, weeklyWins, bestStreak }),
+  }).catch(() => {});
+}
+
 export function recordWeeklyGoalWin(): void {
   const now      = new Date();
   const weekKey  = `${now.getFullYear()}-W${_isoWeek(now)}`;
