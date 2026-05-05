@@ -1096,6 +1096,20 @@ export class HomeView {
             else {
                 card = this._buildFriendFeedCard(item.kind, item.data, userId);
             }
+            // Set like/comment counts from feed response
+            const itemId = (item.data.activityId ?? item.data.postId ?? item.data.id);
+            const lc = (item.data._likeCount ?? 0);
+            const cc = (item.data._commentCount ?? 0);
+            if (lc > 0) {
+                const likeEl = card.querySelector(`[data-like-count="${itemId}"], [data-like-count="p_${itemId}"]`);
+                if (likeEl)
+                    likeEl.textContent = String(lc);
+            }
+            if (cc > 0) {
+                const commentEl = card.querySelector(`[data-comment-count="${itemId}"]`);
+                if (commentEl)
+                    commentEl.textContent = String(cc);
+            }
             card.style.animationDelay = `${idx * 60}ms`;
             scroll.appendChild(card);
             if (isOwn && item.kind === 'activity') {
@@ -1114,6 +1128,26 @@ export class HomeView {
         const friendsFeedEl = document.getElementById('friendsFeed');
         if (friendsFeedEl)
             friendsFeedEl.innerHTML = '';
+        // Batch load liked state
+        if (userId && feed.length > 0) {
+            const itemIds = feed.map(f => (f.data.activityId ?? f.data.postId ?? f.data.id)).filter(Boolean);
+            void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemIds.join(','))}`, { cache: 'no-store' })
+                .then(r => r.json())
+                .then((resp) => {
+                if (resp.status !== 'ok')
+                    return;
+                for (const [id, info] of Object.entries(resp.data)) {
+                    if (!info.liked)
+                        continue;
+                    const btn = scroll.querySelector(`[data-like-count="${id}"]`)?.closest('.home-card__action');
+                    if (btn)
+                        btn.classList.add('home-card__action--liked');
+                    const btnP = scroll.querySelector(`[data-like-count="p_${id}"]`)?.closest('.home-card__action');
+                    if (btnP)
+                        btnP.classList.add('home-card__action--liked');
+                }
+            }).catch(() => { });
+        }
         // Infinite scroll
         this._setupInfiniteScroll(scroll, activities, posts, userId);
     }
