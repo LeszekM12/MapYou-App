@@ -702,6 +702,11 @@ function buildCard(act) {
                 el.textContent = String(d.data.length);
         }
     }).catch(() => { });
+    // Click avatar → open own profile
+    card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
+        e.stopPropagation();
+        void profileView.open();
+    });
     return card;
 }
 // ── HomeView class ────────────────────────────────────────────────────────────
@@ -825,8 +830,9 @@ export class HomeView {
                 }
             }, false);
             // Also block touchend which Leaflet uses to synthesise map clicks
+            // but only when the target IS the tabEl itself, not its children
             tabEl.addEventListener('touchend', (e) => {
-                if (tabEl.classList.contains('tab-panel--active')) {
+                if (tabEl.classList.contains('tab-panel--active') && e.target === tabEl) {
                     e.stopPropagation();
                 }
             }, { passive: true });

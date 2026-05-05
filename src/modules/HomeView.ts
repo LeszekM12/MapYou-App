@@ -745,6 +745,12 @@ function buildCard(act: EnrichedActivity): HTMLElement {
       }
     }).catch(() => {});
 
+  // Click avatar → open own profile
+  card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
+    e.stopPropagation();
+    void profileView.open();
+  });
+
   return card;
 }
 
@@ -855,8 +861,9 @@ export class HomeView {
         }
       }, false);
       // Also block touchend which Leaflet uses to synthesise map clicks
+      // but only when the target IS the tabEl itself, not its children
       tabEl.addEventListener('touchend', (e: Event) => {
-        if (tabEl.classList.contains('tab-panel--active')) {
+        if (tabEl.classList.contains('tab-panel--active') && e.target === tabEl) {
           e.stopPropagation();
         }
       }, { passive: true });
