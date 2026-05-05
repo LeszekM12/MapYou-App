@@ -118,76 +118,96 @@ const LS_HYDRATED_KEY = 'mapyou_hydrated_at';
 const HYDRATE_MAX_AGE = 24 * 60 * 60 * 1000; // re-hydrate max raz na dobę
 // ── Push lokalnych danych których brakuje w Atlas ────────────────────────────
 // Odpala się przy każdym starcie — naprawia braki bez ręcznego sync
-// ── Generate minimap and upload to Cloudinary ────────────────────────────────
-// Renders Leaflet map on hidden canvas, exports PNG, uploads to Cloudinary
+// ── Generate minimap PNG on canvas and upload to Cloudinary ──────────────────
+// Draws GPS route on canvas (no external libs, no CORS issues)
+// Returns Cloudinary URL or null
 async function generateAndUploadMinimap(activity, userId) {
-    if (!activity.coords || activity.coords.length === 0)
+    const coords = activity.coords;
+    if (!coords || coords.length === 0)
         return null;
     if (!isOnline())
         return null;
-    return new Promise((resolve) => {
-        // Create hidden container
-        const container = document.createElement('div');
-        container.style.cssText = 'width:400px;height:200px;position:fixed;left:-9999px;top:-9999px;z-index:-1';
-        document.body.appendChild(container);
-        const coords = activity.coords;
-        const color = activity.sport === 'cycling' ? '#ffb545' : activity.sport === 'walking' ? '#5badea' : '#00c46a';
-        const map = L.map(container, {
-            zoomControl: false, dragging: false, touchZoom: false,
-            scrollWheelZoom: false, doubleClickZoom: false,
-            boxZoom: false, keyboard: false, attributionControl: false,
-        });
-        // Use Mapbox tiles (no CORS issues)
-        L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibGVzemVrLW1pa3J1dCIsImEiOiJjbW8ybm5jZ3IwYmZjMnFxd3VycjBtaHZ4In0.mpY8zJ-aEW8n5iZhf2GrWA`, { tileSize: 512, zoomOffset: -1 }).addTo(map);
+    try {
+        const W = 400, H = 200;
+        const canvas = document.createElement('canvas');
+        canvas.width = W;
+        canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        // Background — dark map style
+        ctx.fillStyle = '#e8e0d8';
+        ctx.fillRect(0, 0, W, H);
+        // Calculate bounds
+        const lats = coords.map(p => p[0]);
+        const lons = coords.map(p => p[1]);
+        const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+        const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+        const pad = 24;
+        const latSpan = (maxLat - minLat) || 0.001;
+        const lonSpan = (maxLon - minLon) || 0.001;
+        // Keep aspect ratio
+        const scaleX = (W - pad * 2) / lonSpan;
+        const scaleY = (H - pad * 2) / latSpan;
+        const scale = Math.min(scaleX, scaleY);
+        const offX = (W - lonSpan * scale) / 2;
+        const offY = (H - latSpan * scale) / 2;
+        const toX = (lon) => offX + (lon - minLon) * scale;
+        const toY = (lat) => offY + (maxLat - lat) * scale;
+        const color = activity.sport === 'cycling' ? '#ffb545'
+            : activity.sport === 'walking' ? '#5badea'
+                : '#00c46a';
         if (coords.length === 1) {
-            const [lat, lng] = coords[0];
-            map.setView([lat, lng], 15);
-            L.circleMarker([lat, lng], { radius: 8, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
+            // Single point — draw pin
+            const x = toX(coords[0][1]);
+            const y = toY(coords[0][0]);
+            ctx.beginPath();
+            ctx.arc(x, y, 10, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
         else {
-            const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), { color, weight: 4, opacity: 0.95 }).addTo(map);
-            map.fitBounds(line.getBounds(), { padding: [16, 16] });
-            const first = coords[0];
-            const last = coords[coords.length - 1];
-            L.circleMarker([first[0], first[1]], { radius: 6, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
-            L.circleMarker([last[0], last[1]], { radius: 6, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
+            // Draw route line
+            ctx.beginPath();
+            ctx.moveTo(toX(coords[0][1]), toY(coords[0][0]));
+            for (let i = 1; i < coords.length; i++) {
+                ctx.lineTo(toX(coords[i][1]), toY(coords[i][0]));
+            }
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+            // Start dot (green/blue/yellow filled)
+            const sx = toX(coords[0][1]), sy = toY(coords[0][0]);
+            ctx.beginPath();
+            ctx.arc(sx, sy, 6, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // End dot (red)
+            const ex = toX(coords[coords.length - 1][1]), ey = toY(coords[coords.length - 1][0]);
+            ctx.beginPath();
+            ctx.arc(ex, ey, 6, 0, Math.PI * 2);
+            ctx.fillStyle = '#e74c3c';
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
         }
-        // Wait for tiles to load then screenshot
-        const timeout = setTimeout(() => {
-            cleanup();
-            resolve(null);
-        }, 8000);
-        map.once('idle', async () => {
-            clearTimeout(timeout);
-            try {
-                // Use html2canvas to capture the map
-                const canvas = await window.html2canvas?.(container, {
-                    useCORS: true, allowTaint: false, scale: 1,
-                    width: 400, height: 200, logging: false,
-                });
-                if (!canvas) {
-                    cleanup();
-                    resolve(null);
-                    return;
-                }
-                const base64 = canvas.toDataURL('image/jpeg', 0.85);
-                const uploaded = await uploadIfBase64(base64, userId, 'activities', `minimaps/${userId}/${activity.id}`);
-                cleanup();
-                resolve(uploaded?.url ?? null);
-            }
-            catch {
-                cleanup();
-                resolve(null);
-            }
-        });
-        function cleanup() {
-            try {
-                map.remove();
-            }
-            catch { }
-            container.remove();
-        }
-    });
+        // Export as JPEG base64
+        const base64 = canvas.toDataURL('image/jpeg', 0.85);
+        // Upload to Cloudinary
+        const uploaded = await uploadIfBase64(base64, userId, 'activities', `minimaps/${userId}/${activity.id}`);
+        return uploaded?.url ?? null;
+    }
+    catch (err) {
+        console.warn('[CloudSync] generateAndUploadMinimap error:', err);
+        return null;
+    }
 }
 async function _pushMissingToAtlas(userId, enriched, unified, posts) {
     if (!isOnline() || !userId)
@@ -285,17 +305,17 @@ async function _pushMissingToAtlas(userId, enriched, unified, posts) {
             }
             catch { }
         }
-        // Napraw brakujące minimapUrl — generuj miniaturę i uploaduj do Cloudinary
+        // Generuj minimapUrl dla aktywności które go nie mają lub mają stary URL
         const enrichedMissingMinimap = enriched.filter(a => atlasEnrichedIds.has(a.id) &&
             a.coords && a.coords.length > 0 &&
-            (!a.minimapUrl || a.minimapUrl.includes('api.mapbox.com')));
+            (!a.minimapUrl || a.minimapUrl.includes('staticmap.openstreetmap') || a.minimapUrl.includes('api.mapbox.com')));
         for (const activity of enrichedMissingMinimap) {
             try {
                 const minimapUrl = await generateAndUploadMinimap(activity, userId);
                 if (minimapUrl) {
-                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, { userId, minimapUrl });
                     await saveEnrichedActivity({ ...activity, minimapUrl });
-                    console.log(`[CloudSync] 🗺️ Uploaded minimap for: ${activity.name} → ${minimapUrl}`);
+                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, { userId, minimapUrl });
+                    console.log(`[CloudSync] 🗺️ Minimap: ${activity.name} → ${minimapUrl.substring(0, 60)}`);
                 }
             }
             catch { }
@@ -455,16 +475,19 @@ export const CS = {
     },
     // ── EnrichedActivities (Home feed) ───────────────────────────────────────────
     async saveEnrichedActivity(activity) {
-        // Generate minimap and upload to Cloudinary
-        if ((!activity.minimapUrl || activity.minimapUrl.includes('api.mapbox.com')) && activity.coords && activity.coords.length > 0) {
+        const id = await saveEnrichedActivity(activity);
+        // Generate minimap async — don't block save
+        if (!activity.minimapUrl && activity.coords && activity.coords.length > 0) {
             void generateAndUploadMinimap(activity, getUserId()).then(async (minimapUrl) => {
                 if (minimapUrl) {
                     await saveEnrichedActivity({ ...activity, minimapUrl });
-                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, { userId: getUserId(), minimapUrl });
+                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
+                        userId: getUserId(), minimapUrl,
+                    });
+                    console.log(`[CloudSync] 🗺️ Minimap uploaded: ${minimapUrl.substring(0, 60)}`);
                 }
             });
         }
-        const id = await saveEnrichedActivity(activity);
         const userId = getUserId();
         // Upload zdjęcia do Cloudinary — zamień base64 na URL w IndexedDB
         const uploaded = await uploadIfBase64(activity.photoUrl, userId, 'activities');

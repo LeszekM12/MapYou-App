@@ -16,33 +16,6 @@ import { statsView } from './StatsView.js';
 import { loadPosts } from './db.js';
 import { CS } from './cloudSync.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
-// ── Static Map URL (Mapbox) ───────────────────────────────────────────────────
-function generateStaticMapUrl(coords) {
-    if (!coords || coords.length === 0)
-        return null;
-    const token = 'pk.eyJ1IjoibGVzemVrLW1pa3J1dCIsImEiOiJjbW8ybm5jZ3IwYmZjMnFxd3VycjBtaHZ4In0.mpY8zJ-aEW8n5iZhf2GrWA';
-    if (coords.length === 1) {
-        // Single point — just a pin marker
-        const [lat, lon] = coords[0];
-        return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/pin-l+1a73e8(${lon},${lat})/${lon},${lat},15,0/400x200?access_token=${token}`;
-    }
-    // Route — polyline + start pin
-    const lats = coords.map(p => p[0]);
-    const lons = coords.map(p => p[1]);
-    const clat = (Math.min(...lats) + Math.max(...lats)) / 2;
-    const clon = (Math.min(...lons) + Math.max(...lons)) / 2;
-    const step = Math.max(1, Math.floor(coords.length / 100));
-    const pts = coords.filter((_, i) => i % step === 0);
-    const geo = JSON.stringify({
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates: pts.map(p => [p[1], p[0]]) },
-        properties: { stroke: '#00c46a', 'stroke-width': 3 },
-    });
-    const startLon = coords[0][1];
-    const startLat = coords[0][0];
-    const marker = `pin-l+1a73e8(${startLon},${startLat})`;
-    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/${marker},geojson(${encodeURIComponent(geo)})/${clon},${clat},13,0/400x200?access_token=${token}`;
-}
 function relativeDate(timestamp) {
     const diff = Date.now() - timestamp;
     const mins = Math.floor(diff / 60000);
