@@ -158,14 +158,17 @@ async function _pushMissingToAtlas(
   try {
     // Pobierz co już jest w Atlas
     const [atlasEnriched, atlasUnified, atlasPosts] = await Promise.all([
-      apiGet<{ activityId: string }>(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
+      apiGet<{ activityId: string; photoUrl: string | null }>(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
       apiGet<{ workoutId: string }>(`/unified-workouts?userId=${encodeURIComponent(userId)}`),
-      apiGet<{ postId: string }>(`/posts?userId=${encodeURIComponent(userId)}`),
+      apiGet<{ postId: string; photoUrl: string | null }>(`/posts?userId=${encodeURIComponent(userId)}`),
     ]);
 
-    const atlasEnrichedIds = new Set((atlasEnriched ?? []).map(a => a.activityId));
-    const atlasUnifiedIds  = new Set((atlasUnified ?? []).map(w => w.workoutId));
-    const atlasPostIds     = new Set((atlasPosts ?? []).map(p => p.postId));
+    const atlasEnrichedIds  = new Set((atlasEnriched ?? []).map(a => a.activityId));
+    const atlasUnifiedIds   = new Set((atlasUnified ?? []).map(w => w.workoutId));
+    const atlasPostIds      = new Set((atlasPosts ?? []).map(p => p.postId));
+    // Mapa aktywności w Atlas z null photoUrl
+    const atlasNullPhotoIds = new Set((atlasEnriched ?? []).filter(a => !a.photoUrl).map(a => a.activityId));
+    const atlasNullPostIds  = new Set((atlasPosts ?? []).filter(p => !p.photoUrl).map(p => p.postId));
 
     // Push brakujących enriched activities
     const missingEnriched = enriched.filter(a => !atlasEnrichedIds.has(a.id));
@@ -180,35 +183,50 @@ async function _pushMissingToAtlas(
       } catch {}
     }
 
-    // Napraw istniejące rekordy w Atlas z photoUrl: null — uploaduj z lokalnego IndexedDB
-    const existingEnriched = enriched.filter(a => atlasEnrichedIds.has(a.id) && a.photoUrl && a.photoUrl.startsWith('data:'));
-    for (const activity of existingEnriched) {
+    // Napraw istniejące rekordy w Atlas z photoUrl: null
+    // Obsługuje zarówno base64 jak i URL Cloudinary w IndexedDB
+    const enrichedToFix = enriched.filter(a =>
+      atlasNullPhotoIds.has(a.id) && a.photoUrl && a.photoUrl.length > 0
+    );
+    for (const activity of enrichedToFix) {
       try {
-        const uploaded = await uploadIfBase64(activity.photoUrl, userId, 'activities', `activities/${userId}/${activity.id}`);
-        if (uploaded) {
-          // Zaktualizuj IndexedDB
-          await saveEnrichedActivity({ ...activity, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
-          // Zaktualizuj Atlas
-          await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
-            userId, photoUrl: uploaded.url, photoPublicId: uploaded.publicId,
-          });
-          console.log(`[CloudSync] 🖼️ Fixed photo for activity: ${activity.id}`);
+        let finalUrl = activity.photoUrl!;
+        let publicId = activity.photoPublicId ?? null;
+        // Jeśli base64 — uploaduj do Cloudinary
+        if (finalUrl.startsWith('data:')) {
+          const uploaded = await uploadIfBase64(finalUrl, userId, 'activities', `activities/${userId}/${activity.id}`);
+          if (!uploaded) continue;
+          finalUrl = uploaded.url;
+          publicId = uploaded.publicId;
+          await saveEnrichedActivity({ ...activity, photoUrl: finalUrl, photoPublicId: publicId });
         }
+        // Zaktualizuj Atlas
+        await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
+          userId, photoUrl: finalUrl, photoPublicId: publicId,
+        });
+        console.log(`[CloudSync] 🖼️ Fixed photo for activity: ${activity.id} → ${finalUrl.substring(0, 50)}`);
       } catch {}
     }
 
     // Napraw posty z photoUrl: null w Atlas
-    const existingPosts = posts.filter(p => atlasPostIds.has(p.id) && p.photoUrl && p.photoUrl.startsWith('data:'));
-    for (const post of existingPosts) {
+    const postsToFix = posts.filter(p =>
+      atlasNullPostIds.has(p.id) && p.photoUrl && p.photoUrl.length > 0
+    );
+    for (const post of postsToFix) {
       try {
-        const uploaded = await uploadIfBase64(post.photoUrl, userId, 'posts', `posts/${userId}/${post.id}`);
-        if (uploaded) {
-          await savePost({ ...post, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
-          await apiPost(`/posts/${encodeURIComponent(post.id)}/photo`, {
-            userId, photoUrl: uploaded.url, photoPublicId: uploaded.publicId,
-          });
-          console.log(`[CloudSync] 🖼️ Fixed photo for post: ${post.id}`);
+        let finalUrl = post.photoUrl!;
+        let publicId = post.photoPublicId ?? null;
+        if (finalUrl.startsWith('data:')) {
+          const uploaded = await uploadIfBase64(finalUrl, userId, 'posts', `posts/${userId}/${post.id}`);
+          if (!uploaded) continue;
+          finalUrl = uploaded.url;
+          publicId = uploaded.publicId;
+          await savePost({ ...post, photoUrl: finalUrl, photoPublicId: publicId });
         }
+        await apiPost(`/posts/${encodeURIComponent(post.id)}/photo`, {
+          userId, photoUrl: finalUrl, photoPublicId: publicId,
+        });
+        console.log(`[CloudSync] 🖼️ Fixed photo for post: ${post.id} → ${finalUrl.substring(0, 50)}`);
       } catch {}
     }
 
