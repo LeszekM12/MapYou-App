@@ -1,3 +1,16 @@
+// ── Static Map URL ────────────────────────────────────────────────────────────
+function generateStaticMapUrl(coords) {
+    if (!coords || coords.length < 2)
+        return null;
+    const lats = coords.map(p => p[0]);
+    const lons = coords.map(p => p[1]);
+    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2;
+    const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2;
+    const step = Math.max(1, Math.floor(coords.length / 80));
+    const sampled = coords.filter((_, i) => i % step === 0);
+    const path = sampled.map(p => `${p[0]},${p[1]}`).join('|');
+    return `https://staticmap.openstreetmap.de/staticmap.php?center=${centerLat},${centerLon}&zoom=14&size=400x200&maptype=mapnik&path=color:0x00c46aFF|weight:3|${path}`;
+}
 // ─── CLOUD SYNC ──────────────────────────────────────────────────────────────
 // src/modules/cloudSync.ts
 //
@@ -213,6 +226,24 @@ async function _pushMissingToAtlas(userId, enriched, unified, posts) {
             }
             catch { }
         }
+        // Napraw brakujące minimapUrl w Atlas
+        const enrichedWithCoords = enriched.filter(a => atlasEnrichedIds.has(a.id) &&
+            !a.minimapUrl &&
+            a.coords && a.coords.length > 1);
+        for (const activity of enrichedWithCoords) {
+            try {
+                const minimapUrl = generateStaticMapUrl(activity.coords);
+                if (minimapUrl) {
+                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
+                        userId, minimapUrl,
+                    });
+                    activity.minimapUrl = minimapUrl;
+                    await saveEnrichedActivity({ ...activity });
+                    console.log(`[CloudSync] 🗺️ Generated minimapUrl for: ${activity.name}`);
+                }
+            }
+            catch { }
+        }
         // Push stats (weeklyWins, bestStreak) — zawsze aktualizuj
         const weeklyWins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
         const bestStreak = parseInt(localStorage.getItem('mapyou_best_streak') ?? '0', 10);
@@ -368,6 +399,10 @@ export const CS = {
     },
     // ── EnrichedActivities (Home feed) ───────────────────────────────────────────
     async saveEnrichedActivity(activity) {
+        // Generuj minimapUrl z coords jeśli nie ma
+        if (!activity.minimapUrl && activity.coords && activity.coords.length > 1) {
+            activity.minimapUrl = generateStaticMapUrl(activity.coords);
+        }
         const id = await saveEnrichedActivity(activity);
         const userId = getUserId();
         // Upload zdjęcia do Cloudinary — zamień base64 na URL w IndexedDB

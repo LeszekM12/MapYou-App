@@ -585,7 +585,7 @@ function buildCard(act: EnrichedActivity): HTMLElement {
     ${act.description && act.name && act.description !== act.name
       ? `<p class="home-card__desc">${act.description}</p>` : ''}
 
-    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : ''}
+    ${(act as unknown as Record<string,unknown>).minimapUrl ? `<div class="home-card__map-wrap"><img src="${(act as unknown as Record<string,unknown>).minimapUrl as string}" class="home-card__minimap-img" alt="route"/></div>` : act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : ''}
 
     ${photoHtml}
 
@@ -1301,6 +1301,7 @@ export class HomeView {
         name:        (data.name ?? data.description ?? '') as string,
         description: (data.description ?? '') as string,
         photoUrl:    (data.photoUrl ?? null) as string | null,
+        minimapUrl:  (data.minimapUrl ?? null) as string | null,
         distanceKm:  +(data.distanceKm ?? 0),
         durationSec: +(data.durationSec ?? 0),
         paceMinKm:   +(data.paceMinKm ?? 0),

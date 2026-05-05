@@ -536,7 +536,7 @@ function buildCard(act) {
     ${act.description && act.name && act.description !== act.name
         ? `<p class="home-card__desc">${act.description}</p>` : ''}
 
-    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : ''}
+    ${act.minimapUrl ? `<div class="home-card__map-wrap"><img src="${act.minimapUrl}" class="home-card__minimap-img" alt="route"/></div>` : act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : ''}
 
     ${photoHtml}
 
@@ -1265,6 +1265,7 @@ export class HomeView {
                 name: (data.name ?? data.description ?? ''),
                 description: (data.description ?? ''),
                 photoUrl: (data.photoUrl ?? null),
+                minimapUrl: (data.minimapUrl ?? null),
                 distanceKm: +(data.distanceKm ?? 0),
                 durationSec: +(data.durationSec ?? 0),
                 paceMinKm: +(data.paceMinKm ?? 0),

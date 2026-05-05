@@ -32,6 +32,7 @@ export interface EnrichedActivity {
   name:        string;
   description: string;
   photoUrl:    string | null;   // data:image/… or Cloudinary URL
+  minimapUrl?: string | null;   // Static map image URL
   photoPublicId?: string | null; // Cloudinary public_id (for deletion)
   distanceKm:  number;
   durationSec: number;
