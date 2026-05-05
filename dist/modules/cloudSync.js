@@ -118,6 +118,77 @@ const LS_HYDRATED_KEY = 'mapyou_hydrated_at';
 const HYDRATE_MAX_AGE = 24 * 60 * 60 * 1000; // re-hydrate max raz na dobę
 // ── Push lokalnych danych których brakuje w Atlas ────────────────────────────
 // Odpala się przy każdym starcie — naprawia braki bez ręcznego sync
+// ── Generate minimap and upload to Cloudinary ────────────────────────────────
+// Renders Leaflet map on hidden canvas, exports PNG, uploads to Cloudinary
+async function generateAndUploadMinimap(activity, userId) {
+    if (!activity.coords || activity.coords.length === 0)
+        return null;
+    if (!isOnline())
+        return null;
+    return new Promise((resolve) => {
+        // Create hidden container
+        const container = document.createElement('div');
+        container.style.cssText = 'width:400px;height:200px;position:fixed;left:-9999px;top:-9999px;z-index:-1';
+        document.body.appendChild(container);
+        const coords = activity.coords;
+        const color = activity.sport === 'cycling' ? '#ffb545' : activity.sport === 'walking' ? '#5badea' : '#00c46a';
+        const map = L.map(container, {
+            zoomControl: false, dragging: false, touchZoom: false,
+            scrollWheelZoom: false, doubleClickZoom: false,
+            boxZoom: false, keyboard: false, attributionControl: false,
+        });
+        // Use Mapbox tiles (no CORS issues)
+        L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/streets-v12/tiles/{z}/{x}/{y}?access_token=pk.eyJ1IjoibGVzemVrLW1pa3J1dCIsImEiOiJjbW8ybm5jZ3IwYmZjMnFxd3VycjBtaHZ4In0.mpY8zJ-aEW8n5iZhf2GrWA`, { tileSize: 512, zoomOffset: -1 }).addTo(map);
+        if (coords.length === 1) {
+            const [lat, lng] = coords[0];
+            map.setView([lat, lng], 15);
+            L.circleMarker([lat, lng], { radius: 8, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
+        }
+        else {
+            const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), { color, weight: 4, opacity: 0.95 }).addTo(map);
+            map.fitBounds(line.getBounds(), { padding: [16, 16] });
+            const first = coords[0];
+            const last = coords[coords.length - 1];
+            L.circleMarker([first[0], first[1]], { radius: 6, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2 }).addTo(map);
+            L.circleMarker([last[0], last[1]], { radius: 6, color: '#fff', fillColor: '#e74c3c', fillOpacity: 1, weight: 2 }).addTo(map);
+        }
+        // Wait for tiles to load then screenshot
+        const timeout = setTimeout(() => {
+            cleanup();
+            resolve(null);
+        }, 8000);
+        map.once('idle', async () => {
+            clearTimeout(timeout);
+            try {
+                // Use html2canvas to capture the map
+                const canvas = await window.html2canvas?.(container, {
+                    useCORS: true, allowTaint: false, scale: 1,
+                    width: 400, height: 200, logging: false,
+                });
+                if (!canvas) {
+                    cleanup();
+                    resolve(null);
+                    return;
+                }
+                const base64 = canvas.toDataURL('image/jpeg', 0.85);
+                const uploaded = await uploadIfBase64(base64, userId, 'activities', `minimaps/${userId}/${activity.id}`);
+                cleanup();
+                resolve(uploaded?.url ?? null);
+            }
+            catch {
+                cleanup();
+                resolve(null);
+            }
+        });
+        function cleanup() {
+            try {
+                map.remove();
+            }
+            catch { }
+            container.remove();
+        }
+    });
+}
 async function _pushMissingToAtlas(userId, enriched, unified, posts) {
     if (!isOnline() || !userId)
         return;
@@ -214,15 +285,17 @@ async function _pushMissingToAtlas(userId, enriched, unified, posts) {
             }
             catch { }
         }
-        // Napraw brakujące minimapUrl
-        const enrichedMissingMinimap = enriched.filter(a => atlasEnrichedIds.has(a.id) && !a.minimapUrl && a.coords && a.coords.length > 1);
+        // Napraw brakujące minimapUrl — generuj miniaturę i uploaduj do Cloudinary
+        const enrichedMissingMinimap = enriched.filter(a => atlasEnrichedIds.has(a.id) &&
+            a.coords && a.coords.length > 0 &&
+            (!a.minimapUrl || a.minimapUrl.includes('api.mapbox.com')));
         for (const activity of enrichedMissingMinimap) {
             try {
-                const minimapUrl = generateStaticMapUrl(activity.coords);
+                const minimapUrl = await generateAndUploadMinimap(activity, userId);
                 if (minimapUrl) {
                     await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, { userId, minimapUrl });
                     await saveEnrichedActivity({ ...activity, minimapUrl });
-                    console.log(`[CloudSync] 🗺️ Generated minimapUrl for: ${activity.name}`);
+                    console.log(`[CloudSync] 🗺️ Uploaded minimap for: ${activity.name} → ${minimapUrl}`);
                 }
             }
             catch { }
@@ -240,19 +313,6 @@ async function _pushMissingToAtlas(userId, enriched, unified, posts) {
     catch (err) {
         console.warn('[CloudSync] _pushMissingToAtlas error:', err);
     }
-}
-// ── Static Map URL (Mapbox) ───────────────────────────────────────────────────
-function generateStaticMapUrl(coords) {
-    if (!coords || coords.length < 2)
-        return null;
-    const lats = coords.map(p => p[0]);
-    const lons = coords.map(p => p[1]);
-    const clat = (Math.min(...lats) + Math.max(...lats)) / 2;
-    const clon = (Math.min(...lons) + Math.max(...lons)) / 2;
-    const step = Math.max(1, Math.floor(coords.length / 100));
-    const pts = coords.filter((_, i) => i % step === 0);
-    const geo = JSON.stringify({ type: 'Feature', geometry: { type: 'LineString', coordinates: pts.map(p => [p[1], p[0]]) }, properties: { stroke: '#00c46a', 'stroke-width': 3 } });
-    return `https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/geojson(${encodeURIComponent(geo)})/${clon},${clat},13,0/400x200?access_token=pk.eyJ1IjoibGVzemVrLW1pa3J1dCIsImEiOiJjbW8ybm5jZ3IwYmZjMnFxd3VycjBtaHZ4In0.mpY8zJ-aEW8n5iZhf2GrWA`;
 }
 export async function hydrate() {
     if (!isOnline())
@@ -395,8 +455,14 @@ export const CS = {
     },
     // ── EnrichedActivities (Home feed) ───────────────────────────────────────────
     async saveEnrichedActivity(activity) {
-        if (!activity.minimapUrl && activity.coords && activity.coords.length > 1) {
-            activity.minimapUrl = generateStaticMapUrl(activity.coords);
+        // Generate minimap and upload to Cloudinary
+        if ((!activity.minimapUrl || activity.minimapUrl.includes('api.mapbox.com')) && activity.coords && activity.coords.length > 0) {
+            void generateAndUploadMinimap(activity, getUserId()).then(async (minimapUrl) => {
+                if (minimapUrl) {
+                    await saveEnrichedActivity({ ...activity, minimapUrl });
+                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, { userId: getUserId(), minimapUrl });
+                }
+            });
         }
         const id = await saveEnrichedActivity(activity);
         const userId = getUserId();
