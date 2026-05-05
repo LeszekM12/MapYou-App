@@ -126,6 +126,9 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
     </div>
     <div class="pv-subtabs">
       <button class="pv-subtab pv-subtab--active" data-pp="activities">Activities</button>
+      <button class="pv-subtab" data-pp="stats">Stats</button>
+      <button class="pv-subtab" data-pp="efforts">Best Efforts</button>
+      <button class="pv-subtab" data-pp="trophies">Trophies</button>
       <button class="pv-subtab" data-pp="posts">Posts</button>
     </div>
     <div class="pv-content" id="ppContent"></div>`;
@@ -160,12 +163,144 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
         btn.addEventListener('click', () => {
             sheet.querySelectorAll('.pv-subtab').forEach(b => b.classList.remove('pv-subtab--active'));
             btn.classList.add('pv-subtab--active');
-            if (btn.dataset.pp === 'activities')
+            const tab = btn.dataset.pp;
+            if (tab === 'activities')
                 _renderActivitiesTab(content, activities);
+            else if (tab === 'stats')
+                _renderStatsTab(content, activities);
+            else if (tab === 'efforts')
+                _renderEffortsTab(content, activities);
+            else if (tab === 'trophies')
+                _renderTrophiesTab(content, activities);
             else
                 _renderPostsTab(content, posts);
         });
     });
+}
+// ── Helpers ───────────────────────────────────────────────────────────────────
+function _heatmap(activities) {
+    const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
+    activities.forEach(a => {
+        const d = new Date(a.date);
+        grid[d.getDay()][d.getHours()]++;
+    });
+    return grid;
+}
+function _renderStatsTab(el, activities) {
+    const heatmap = _heatmap(activities);
+    const maxHeat = Math.max(...heatmap.flat(), 1);
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}`);
+    const typeCounts = {};
+    activities.forEach(a => {
+        const t = (a.data.sport ?? 'running');
+        typeCounts[t] = (typeCounts[t] ?? 0) + 1;
+    });
+    el.innerHTML = `
+    <div class="pv-section-title">Activity Heatmap</div>
+    <div class="pv-heatmap-wrap">
+      <div class="pv-heatmap">
+        <div class="pv-heatmap__hour-labels">
+          <span></span>
+          ${hours.map(h => `<span>${h}</span>`).join('')}
+        </div>
+        ${heatmap.map((row, di) => `
+          <div class="pv-heatmap__row">
+            <span class="pv-heatmap__day">${days[di]}</span>
+            ${row.map(v => `<div class="pv-heatmap__cell" style="background:rgba(0,196,106,${v > 0 ? 0.15 + (v / maxHeat) * 0.85 : 0})"></div>`).join('')}
+          </div>`).join('')}
+      </div>
+    </div>
+    <div class="pv-section-title" style="margin-top:16px">Sport breakdown</div>
+    <div style="padding:0 16px">
+      ${Object.entries(typeCounts).map(([type, count]) => `
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+          <span style="color:#fff;font-size:1.3rem">${SPORT_ICONS[type] ?? '🏅'} ${type}</span>
+          <span style="color:${SPORT_COLORS[type] ?? '#00c46a'};font-weight:700">${count}</span>
+        </div>`).join('')}
+    </div>`;
+}
+function _renderEffortsTab(el, activities) {
+    const runActs = activities.filter(a => a.data.sport === 'running');
+    const dists = [1, 5, 10, 21.1, 42.2];
+    const labels = ['1 km', '5 km', '10 km', 'Half Marathon', 'Marathon'];
+    const efforts = dists.map((dist, i) => {
+        const candidates = runActs.filter(a => +(a.data.distanceKm ?? 0) >= dist);
+        if (!candidates.length)
+            return { label: labels[i], timeStr: '', date: '' };
+        const best = candidates.reduce((b, a) => {
+            const pace = +(a.data.paceMinKm ?? 0);
+            return pace > 0 && pace < (+(b.data.paceMinKm ?? 999)) ? a : b;
+        });
+        const sec = Math.round(+(best.data.paceMinKm ?? 0) * 60 * dist);
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        const timeStr = h > 0
+            ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+            : `${m}:${String(s).padStart(2, '0')}`;
+        return { label: labels[i], timeStr, date: _relDate(best.date) };
+    });
+    el.innerHTML = `
+    <div class="pv-section-title">Personal Bests (Running)</div>
+    <div class="pv-efforts">
+      ${efforts.map(e => `
+        <div class="pv-effort">
+          <span class="pv-effort__dist">${e.label}</span>
+          <div class="pv-effort__right">
+            ${e.timeStr
+        ? `<span class="pv-effort__time">${e.timeStr}</span>
+                 <span class="pv-effort__date">${e.date}</span>`
+        : `<span class="pv-effort__empty">—</span>`}
+          </div>
+        </div>`).join('')}
+    </div>
+    <p class="pv-efforts__note">Calculated from GPS-tracked running activities only.</p>`;
+}
+function _renderTrophiesTab(el, activities) {
+    const totalKm = activities.reduce((s, a) => s + +(a.data.distanceKm ?? 0), 0);
+    const count = activities.length;
+    const milestones = [
+        { km: 10, label: 'First 10 km', icon: '⚡', color: '#60a5fa' },
+        { km: 50, label: '50 km Club', icon: '⚡', color: '#34d399' },
+        { km: 100, label: '100 km Club', icon: '⚡', color: '#a78bfa' },
+        { km: 500, label: '500 km Legend', icon: '⚡', color: '#f59e0b' },
+        { km: 1000, label: '1000 km Elite', icon: '⚡', color: '#ef4444' },
+    ];
+    const actMilestones = [
+        { n: 5, label: '5 Activities', color: '#60a5fa' },
+        { n: 20, label: '20 Activities', color: '#34d399' },
+        { n: 50, label: '50 Activities', color: '#a78bfa' },
+        { n: 100, label: '100 Activities', color: '#f59e0b' },
+    ];
+    const buildGem = (unlocked, color, label, countStr) => `
+    <div class="pv-trophy ${unlocked ? 'pv-trophy--unlocked' : ''}">
+      <div class="pv-trophy__gem" style="${unlocked ? `filter:drop-shadow(0 0 8px ${color}88)` : ''}">
+        <svg viewBox="0 0 80 90" width="64" height="72">
+          <polygon points="40,2 78,22 78,68 40,88 2,68 2,22"
+            fill="${unlocked ? color : '#1f2937'}"
+            stroke="${unlocked ? color : '#374151'}" stroke-width="2"/>
+          ${unlocked
+        ? `<polygon points="40,12 68,28 68,62 40,78 12,62 12,28" fill="${color}cc"/>
+               <text x="40" y="50" text-anchor="middle" font-size="22" font-weight="900"
+                 font-family="Manrope,sans-serif" fill="white">${countStr}</text>`
+        : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`}
+        </svg>
+      </div>
+      <span class="pv-trophy__label">${label}</span>
+    </div>`;
+    const kmTrophies = milestones.map(m => buildGem(totalKm >= m.km, m.color, m.label, `${m.km}`));
+    const actTrophies2 = actMilestones.map(m => buildGem(count >= m.n, m.color, m.label, `${m.n}`));
+    const total = [...milestones.filter(m => totalKm >= m.km), ...actMilestones.filter(m => count >= m.n)].length;
+    el.innerHTML = `
+    <div class="pv-trophy-summary">
+      <span class="pv-trophy-summary__count">${total}</span>
+      <span class="pv-trophy-summary__label">trophies unlocked</span>
+    </div>
+    <div class="pv-section-title">⚡ Distance Milestones</div>
+    <div class="pv-trophy-grid">${kmTrophies.join('')}</div>
+    <div class="pv-section-title" style="margin-top:24px">🏅 Activity Milestones</div>
+    <div class="pv-trophy-grid">${actTrophies2.join('')}</div>`;
 }
 function _renderActivitiesTab(el, activities) {
     if (!activities.length) {
