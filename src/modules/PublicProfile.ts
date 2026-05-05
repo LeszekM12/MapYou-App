@@ -82,23 +82,30 @@ function _renderProfile(modal: HTMLElement, profile: PublicProfileData, myUserId
 
   const avatarHtml = profile.avatarB64
     ? `<img src="${profile.avatarB64}" class="pv-avatar__img" alt="avatar"/>`
-    : `<div class="pv-avatar">${profile.name.charAt(0).toUpperCase()}</div>`;
+    : `<div style="width:100%;height:100%;background:rgba(74,222,128,0.15);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:700;color:#4ade80">${profile.name.charAt(0).toUpperCase()}</div>`;
 
-  sheet.innerHTML = `
+  const tmp = document.createElement('div');
+  tmp.innerHTML = `
     <div class="pv-handle"></div>
-
     <div class="pv-header">
-      <button class="pv-back" id="ppClose">✕</button>
+      <button class="pv-back" id="ppClose">‹</button>
+      <div class="pv-header__actions">
+        <button class="pv-header__btn ${profile.isFollowing ? 'pv-header__btn--active' : 'pv-header__btn--follow'}" id="ppFollowBtn">
+          ${profile.isFollowing ? 'Following ✓' : 'Follow'}
+        </button>
+      </div>
     </div>
-
     <div class="pv-content">
-      <div class="pv-avatar">${avatarHtml}</div>
-      <h2 class="pv-name">${profile.name}</h2>
-      ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
-
+      <div class="pv-hero">
+        <div class="pv-avatar">${avatarHtml}</div>
+        <div class="pv-hero__info">
+          <h2 class="pv-name">${profile.name}</h2>
+          ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
+        </div>
+      </div>
       <div class="pv-stats-row">
         <div class="pv-stats-row__item">
-          <span class="pv-stats-row__val">${profile.followersCount}</span>
+          <span class="pv-stats-row__val" id="ppFollowersCount">${profile.followersCount}</span>
           <span class="pv-stats-row__lbl">Followers</span>
         </div>
         <div class="pv-stats-row__item">
@@ -106,16 +113,14 @@ function _renderProfile(modal: HTMLElement, profile: PublicProfileData, myUserId
           <span class="pv-stats-row__lbl">Following</span>
         </div>
       </div>
-
-      <button class="pp-follow-btn ${profile.isFollowing ? 'pv-header__btn pv-header__btn--following' : ''}" id="ppFollowBtn">
-        ${profile.isFollowing ? 'Following ✓' : 'Follow'}
-      </button>
     </div>`;
 
-  // Close
+  // Zachowaj pv-sheet--open — podmień tylko dzieci
+  sheet.innerHTML = '';
+  while (tmp.firstChild) sheet.appendChild(tmp.firstChild);
+
   sheet.querySelector('#ppClose')?.addEventListener('click', closePublicProfile);
 
-  // Follow / Unfollow
   const followBtn = sheet.querySelector<HTMLButtonElement>('#ppFollowBtn')!;
   let isFollowing = profile.isFollowing;
 
@@ -130,10 +135,9 @@ function _renderProfile(modal: HTMLElement, profile: PublicProfileData, myUserId
       if (res.ok) {
         isFollowing = !isFollowing;
         followBtn.textContent = isFollowing ? 'Following ✓' : 'Follow';
-        followBtn.classList.toggle('pv-header__btn pv-header__btn--following', isFollowing);
-
-        // Update followers count
-        const followerEl = sheet.querySelector<HTMLElement>('.pp-stat__val');
+        followBtn.classList.toggle('pv-header__btn--active', isFollowing);
+        followBtn.classList.toggle('pv-header__btn--follow', !isFollowing);
+        const followerEl = sheet.querySelector<HTMLElement>('#ppFollowersCount');
         if (followerEl) {
           const current = parseInt(followerEl.textContent ?? '0', 10);
           followerEl.textContent = String(isFollowing ? current + 1 : Math.max(0, current - 1));
@@ -143,8 +147,7 @@ function _renderProfile(modal: HTMLElement, profile: PublicProfileData, myUserId
     followBtn.disabled = false;
   });
 
-  // Swipe to close
-  const handle = sheet.querySelector<HTMLElement>('.pp-handle')!;
+  const handle = sheet.querySelector<HTMLElement>('.pv-handle')!;
   let startY = 0;
   handle.addEventListener('touchstart', e => { startY = e.touches[0].clientY; }, { passive: true });
   handle.addEventListener('touchmove', e => {
@@ -157,6 +160,7 @@ function _renderProfile(modal: HTMLElement, profile: PublicProfileData, myUserId
     else sheet.style.transform = '';
   });
 }
+
 
 export function closePublicProfile(): void {
   const modal = document.getElementById('publicProfileModal');
