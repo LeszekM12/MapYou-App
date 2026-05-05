@@ -338,7 +338,8 @@ function buildPostCard(post, onRefresh) {
                 moreBtn.textContent = expanded ? 'mniej' : '…więcej';
         });
     }
-    // Click avatar → open own profile
+    // Mark as own card
+    card.querySelector('.home-card__avatar--user')?.setAttribute('data-own-profile', 'true');
     card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
         e.stopPropagation();
         import('./ProfileView.js').then(m => m.profileView.open()).catch(() => { });
@@ -1200,13 +1201,18 @@ export class HomeView {
             const nameEl = card.querySelector('.home-card__name');
             if (nameEl && authorName)
                 nameEl.textContent = act.name || authorName;
-            // Click avatar → open public profile
+            // Replace avatar element to remove own-profile handler from buildCard
             const friendUserId = (data.userId ?? '');
-            avatarEl?.addEventListener('click', e => {
-                e.stopPropagation();
-                if (friendUserId)
-                    void openPublicProfile(friendUserId);
-            });
+            if (avatarEl) {
+                const newAvatarEl = avatarEl.cloneNode(true);
+                avatarEl.replaceWith(newAvatarEl);
+                newAvatarEl.removeAttribute('data-own-profile');
+                newAvatarEl.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (friendUserId)
+                        void openPublicProfile(friendUserId);
+                });
+            }
             // Override like button to use Atlas
             const likeBtn = card.querySelector('.home-card__action--like');
             const newLike = likeBtn?.cloneNode(true);
@@ -1242,13 +1248,18 @@ export class HomeView {
             };
             const card = buildPostCard(post, () => { });
             card.querySelector('.home-card__post-menu-btn')?.remove();
-            // Click avatar → open public profile
+            // Replace avatar element to remove own-profile handler
             const postFriendId = (data.userId ?? '');
-            card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
-                e.stopPropagation();
-                if (postFriendId)
-                    void openPublicProfile(postFriendId);
-            });
+            const postAvatarEl = card.querySelector('.home-card__avatar--user');
+            if (postAvatarEl) {
+                const newPostAvatar = postAvatarEl.cloneNode(true);
+                postAvatarEl.replaceWith(newPostAvatar);
+                newPostAvatar.addEventListener('click', e => {
+                    e.stopPropagation();
+                    if (postFriendId)
+                        void openPublicProfile(postFriendId);
+                });
+            }
             const likeBtn = card.querySelector('.home-card__action--like');
             const newLike = likeBtn?.cloneNode(true);
             if (likeBtn && newLike) {
