@@ -342,7 +342,7 @@ function buildPostCard(post, onRefresh) {
     card.querySelector('.home-card__avatar--user')?.setAttribute('data-own-profile', 'true');
     card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
         e.stopPropagation();
-        import('./ProfileView.js').then(m => m.profileView.open()).catch(() => { });
+        void profileView.open();
     });
     // ⋯ menu — edit / delete
     card.querySelector(`#pmenu-${post.id}`)?.addEventListener('click', e => {
@@ -453,6 +453,11 @@ function buildPostCard(post, onRefresh) {
         }
     })();
     card.addEventListener('click', e => { e.stopPropagation(); });
+    // Click avatar → open own profile
+    card.querySelector('.home-card__avatar--user')?.addEventListener('click', e => {
+        e.stopPropagation();
+        void profileView.open();
+    });
     return card;
 }
 // ── Edit post modal ───────────────────────────────────────────────────────────
