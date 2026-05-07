@@ -1087,13 +1087,8 @@ export class HomeView {
             if (isOwn && item.kind === 'activity') {
                 const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
                 if (localAct) {
-                    // Save coordsEnc BEFORE mutating coords
-                    const enc = item.data.coordsEnc ??
-                        (localAct.coords && localAct.coords.length > 0
-                            ? encodePolyline(localAct.coords)
-                            : null);
-                    item.data._coordsEncResolved = enc;
-                    localAct.coordsEnc = enc;
+                    // Inject coordsEnc into localAct for buildCard
+                    localAct.coordsEnc = item.data.coordsEnc ?? encodePolyline(localAct.coords);
                     localAct.coords = [];
                 }
                 card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
@@ -1127,9 +1122,10 @@ export class HomeView {
             if (item.kind === 'activity') {
                 requestAnimationFrame(() => {
                     setTimeout(() => {
-                        const coordsEnc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? null);
+                        // Always use canvas for feed — consistent look for everyone
+                        const coordsEnc = (item.data.coordsEnc ?? item.coordsEnc ?? null);
                         const localAct = activities.find(a => a.id === actId);
-                        const enc = coordsEnc ?? null;
+                        const enc = coordsEnc ?? (localAct ? encodePolyline(localAct.coords) : null);
                         if (enc) {
                             const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
                             if (mapEl) {
@@ -1207,15 +1203,8 @@ export class HomeView {
                     newItems.forEach((item, idx) => {
                         const isOwn = item.data.userId === userId;
                         let card;
-                        let resolvedEnc = null;
                         if (isOwn && item.kind === 'activity') {
                             const local = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
-                            if (local) {
-                                resolvedEnc = item.data.coordsEnc ??
-                                    (local.coords && local.coords.length > 0 ? encodePolyline(local.coords) : null);
-                                local.coordsEnc = resolvedEnc;
-                                local.coords = [];
-                            }
                             card = local ? buildCard(local) : this._buildFriendFeedCard(item.kind, item.data, userId);
                         }
                         else if (isOwn && item.kind === 'post') {
@@ -1224,7 +1213,6 @@ export class HomeView {
                         }
                         else {
                             card = this._buildFriendFeedCard(item.kind, item.data, userId);
-                            resolvedEnc = item.data.coordsEnc ?? null;
                         }
                         const lc = (item.data._likeCount ?? 0);
                         if (lc > 0) {
@@ -1235,19 +1223,6 @@ export class HomeView {
                         }
                         card.style.animationDelay = String(idx * 60) + 'ms';
                         scroll.appendChild(card);
-                        // Render canvas minimap
-                        if (item.kind === 'activity' && resolvedEnc) {
-                            requestAnimationFrame(() => {
-                                setTimeout(() => {
-                                    const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
-                                    if (mapEl) {
-                                        mapEl.style.height = mapEl.style.height || '200px';
-                                        mapEl.style.display = 'block';
-                                        renderMinimapCanvas(mapEl, decodePolyline(resolvedEnc), (item.data.sport ?? 'running'));
-                                    }
-                                }, 80 + idx * 30);
-                            });
-                        }
                     });
                     if (this._feedHasMore)
                         this._setupInfiniteScroll(scroll, activities, posts, userId);

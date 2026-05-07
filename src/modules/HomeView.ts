@@ -588,7 +588,7 @@ function buildCard(act: EnrichedActivity): HTMLElement {
     </div>
 
     ${act.description && act.name && act.description !== act.name
-      ? `<p class="home-card__desc">${act.description}</p>` : ''}
+    ? `<p class="home-card__desc">${act.description}</p>` : ''}
 
     ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : (act as unknown as Record<string,unknown>).coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
 
@@ -744,8 +744,8 @@ function _openNotifPanel(): void {
       </div>
       <div class="hn-list" id="hnList">
         ${notifs.length === 0
-          ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
-          : notifs.map(n => `
+    ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
+    : notifs.map(n => `
             <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
               <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
               <div class="hn-item__body">
@@ -1113,9 +1113,9 @@ export class HomeView {
     const feed: FeedItem[] = serverFeed.length > 0
       ? serverFeed
       : [
-          ...activities.map(a => ({ kind: 'activity', date: a.date, data: a as unknown as Record<string, unknown>, isLocal: true })),
-          ...posts.map(p => ({ kind: 'post', date: p.date, data: p as unknown as Record<string, unknown>, isLocal: true })),
-        ].sort((a, b) => b.date - a.date);
+        ...activities.map(a => ({ kind: 'activity', date: a.date, data: a as unknown as Record<string, unknown>, isLocal: true })),
+        ...posts.map(p => ({ kind: 'post', date: p.date, data: p as unknown as Record<string, unknown>, isLocal: true })),
+      ].sort((a, b) => b.date - a.date);
 
     if (feed.length === 0) {
       const empty = document.createElement('div');
@@ -1135,13 +1135,8 @@ export class HomeView {
       if (isOwn && item.kind === 'activity') {
         const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
         if (localAct) {
-          // Save coordsEnc BEFORE mutating coords
-          const enc = (item.data.coordsEnc as string | null) ??
-            (localAct.coords && localAct.coords.length > 0
-              ? encodePolyline(localAct.coords as Array<[number,number]>)
-              : null);
-          (item.data as Record<string,unknown>)._coordsEncResolved = enc;
-          (localAct as unknown as Record<string,unknown>).coordsEnc = enc;
+          // Inject coordsEnc into localAct for buildCard
+          (localAct as unknown as Record<string,unknown>).coordsEnc = item.data.coordsEnc ?? encodePolyline(localAct.coords as Array<[number,number]>);
           (localAct as unknown as Record<string,unknown>).coords = [];
         }
         card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
@@ -1174,9 +1169,10 @@ export class HomeView {
       if (item.kind === 'activity') {
         requestAnimationFrame(() => {
           setTimeout(() => {
-            const coordsEnc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? null) as string | null;
+            // Always use canvas for feed — consistent look for everyone
+            const coordsEnc = (item.data.coordsEnc ?? (item as unknown as Record<string,unknown>).coordsEnc ?? null) as string | null;
             const localAct = activities.find(a => a.id === actId);
-            const enc = coordsEnc ?? null;
+            const enc = coordsEnc ?? (localAct ? encodePolyline(localAct.coords as Array<[number,number]>) : null);
             if (enc) {
               const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
               if (mapEl) {
@@ -1252,40 +1248,19 @@ export class HomeView {
           newItems.forEach((item, idx) => {
             const isOwn = item.data.userId === userId;
             let card: HTMLElement;
-            let resolvedEnc: string | null = null;
             if (isOwn && item.kind === 'activity') {
               const local = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
-              if (local) {
-                resolvedEnc = (item.data.coordsEnc as string | null) ??
-                  (local.coords && local.coords.length > 0 ? encodePolyline(local.coords as Array<[number,number]>) : null);
-                (local as unknown as Record<string,unknown>).coordsEnc = resolvedEnc;
-                (local as unknown as Record<string,unknown>).coords = [];
-              }
               card = local ? buildCard(local) : this._buildFriendFeedCard(item.kind, item.data, userId);
             } else if (isOwn && item.kind === 'post') {
               const local = posts.find(p => p.id === (item.data.postId ?? item.data.id));
               card = local ? buildPostCard(local, () => void this.render()) : this._buildFriendFeedCard(item.kind, item.data, userId);
             } else {
               card = this._buildFriendFeedCard(item.kind, item.data, userId);
-              resolvedEnc = (item.data.coordsEnc as string | null) ?? null;
             }
             const lc = (item.data._likeCount ?? 0) as number;
             if (lc > 0) { const id = (item.data.activityId ?? item.data.postId ?? item.data.id) as string; const el = card.querySelector<HTMLElement>('[data-like-count="' + id + '"], [data-like-count="p_' + id + '"]'); if (el) el.textContent = String(lc); }
             card.style.animationDelay = String(idx * 60) + 'ms';
             scroll.appendChild(card);
-            // Render canvas minimap
-            if (item.kind === 'activity' && resolvedEnc) {
-              requestAnimationFrame(() => {
-                setTimeout(() => {
-                  const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
-                  if (mapEl) {
-                    mapEl.style.height = mapEl.style.height || '200px';
-                    mapEl.style.display = 'block';
-                    renderMinimapCanvas(mapEl, decodePolyline(resolvedEnc!), (item.data.sport ?? 'running') as string);
-                  }
-                }, 80 + idx * 30);
-              });
-            }
           });
           if (this._feedHasMore) this._setupInfiniteScroll(scroll, activities, posts, userId);
         } else {
