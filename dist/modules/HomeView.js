@@ -1118,12 +1118,23 @@ export class HomeView {
                 requestAnimationFrame(() => {
                     setTimeout(() => {
                         if (isOwn) {
-                            // Own activity — use local coords from IndexedDB via Leaflet
+                            // Own activity — try local coords from IndexedDB via Leaflet
                             const localAct = activities.find(a => a.id === actId);
-                            if (localAct) {
+                            if (localAct && localAct.coords && localAct.coords.length > 0) {
                                 const mapEl = document.getElementById(`hcmap-${localAct.id}`);
                                 if (mapEl)
                                     renderMiniMap(mapEl, localAct.coords, localAct.sport);
+                            }
+                            else {
+                                // Fallback — use coordsEnc from Atlas
+                                const coordsEnc = (item.data.coordsEnc ?? null);
+                                if (coordsEnc) {
+                                    const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
+                                    if (mapEl) {
+                                        const coords = decodePolyline(coordsEnc);
+                                        renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running'));
+                                    }
+                                }
                             }
                         }
                         else {
