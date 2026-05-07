@@ -590,7 +590,7 @@ function buildCard(act: EnrichedActivity): HTMLElement {
     ${act.description && act.name && act.description !== act.name
       ? `<p class="home-card__desc">${act.description}</p>` : ''}
 
-    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : (act as unknown as Record<string,unknown>).coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
+    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : (act as unknown as Record<string,unknown>).coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
 
     ${photoHtml}
 
@@ -1135,9 +1135,9 @@ export class HomeView {
       if (isOwn && item.kind === 'activity') {
         const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
         if (localAct) {
-          // Inject coordsEnc into localAct for buildCard
-          (localAct as unknown as Record<string,unknown>).coordsEnc = item.data.coordsEnc ?? encodePolyline(localAct.coords as Array<[number,number]>);
-          (localAct as unknown as Record<string,unknown>).coords = [];
+          // Store coordsEnc from feed or encode from local coords — but don't mutate coords
+          const enc = (item.data.coordsEnc as string | null) ?? (localAct.coords?.length > 0 ? encodePolyline(localAct.coords as Array<[number,number]>) : null);
+          (item.data as Record<string,unknown>)._coordsEncResolved = enc;
         }
         card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
       } else if (isOwn && item.kind === 'post') {
@@ -1169,10 +1169,8 @@ export class HomeView {
       if (item.kind === 'activity') {
         requestAnimationFrame(() => {
           setTimeout(() => {
-            // Always use canvas for feed — consistent look for everyone
-            const coordsEnc = (item.data.coordsEnc ?? (item as unknown as Record<string,unknown>).coordsEnc ?? null) as string | null;
             const localAct = activities.find(a => a.id === actId);
-            const enc = coordsEnc ?? (localAct ? encodePolyline(localAct.coords as Array<[number,number]>) : null);
+            const enc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? (localAct && localAct.coords && localAct.coords.length > 0 ? encodePolyline(localAct.coords as Array<[number,number]>) : null)) as string | null;
             if (enc) {
               const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
               if (mapEl) {

@@ -537,7 +537,7 @@ function buildCard(act) {
     ${act.description && act.name && act.description !== act.name
         ? `<p class="home-card__desc">${act.description}</p>` : ''}
 
-    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : act.coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
+    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : act.coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
 
     ${photoHtml}
 
@@ -1087,9 +1087,9 @@ export class HomeView {
             if (isOwn && item.kind === 'activity') {
                 const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
                 if (localAct) {
-                    // Inject coordsEnc into localAct for buildCard
-                    localAct.coordsEnc = item.data.coordsEnc ?? encodePolyline(localAct.coords);
-                    localAct.coords = [];
+                    // Store coordsEnc from feed or encode from local coords — but don't mutate coords
+                    const enc = item.data.coordsEnc ?? (localAct.coords?.length > 0 ? encodePolyline(localAct.coords) : null);
+                    item.data._coordsEncResolved = enc;
                 }
                 card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
             }
@@ -1122,10 +1122,8 @@ export class HomeView {
             if (item.kind === 'activity') {
                 requestAnimationFrame(() => {
                     setTimeout(() => {
-                        // Always use canvas for feed — consistent look for everyone
-                        const coordsEnc = (item.data.coordsEnc ?? item.coordsEnc ?? null);
                         const localAct = activities.find(a => a.id === actId);
-                        const enc = coordsEnc ?? (localAct ? encodePolyline(localAct.coords) : null);
+                        const enc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? (localAct && localAct.coords && localAct.coords.length > 0 ? encodePolyline(localAct.coords) : null));
                         if (enc) {
                             const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
                             if (mapEl) {
