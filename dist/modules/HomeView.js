@@ -3,6 +3,7 @@
 import { loadEnrichedActivities } from './db.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
+import { renderMinimapCanvas, decodePolyline } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
@@ -1112,17 +1113,32 @@ export class HomeView {
             }
             card.style.animationDelay = `${idx * 60}ms`;
             scroll.appendChild(card);
-            if (isOwn && item.kind === 'activity') {
-                const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
-                if (localAct) {
-                    requestAnimationFrame(() => {
-                        setTimeout(() => {
-                            const mapEl = document.getElementById(`hcmap-${localAct.id}`);
-                            if (mapEl)
-                                renderMiniMap(mapEl, localAct.coords, localAct.sport);
-                        }, 80 + idx * 30);
-                    });
-                }
+            const actId = (item.data.activityId ?? item.data.id);
+            if (item.kind === 'activity') {
+                requestAnimationFrame(() => {
+                    setTimeout(() => {
+                        if (isOwn) {
+                            // Own activity — use local coords from IndexedDB via Leaflet
+                            const localAct = activities.find(a => a.id === actId);
+                            if (localAct) {
+                                const mapEl = document.getElementById(`hcmap-${localAct.id}`);
+                                if (mapEl)
+                                    renderMiniMap(mapEl, localAct.coords, localAct.sport);
+                            }
+                        }
+                        else {
+                            // Friend activity — render canvas from coordsEnc
+                            const coordsEnc = (item.data.coordsEnc ?? null);
+                            if (coordsEnc) {
+                                const mapEl = card.querySelector('.home-card__map-wrap');
+                                if (mapEl) {
+                                    const coords = decodePolyline(coordsEnc);
+                                    renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running'));
+                                }
+                            }
+                        }
+                    }, 80 + idx * 30);
+                });
             }
         });
         const friendsFeedEl = document.getElementById('friendsFeed');
@@ -1266,6 +1282,7 @@ export class HomeView {
                 description: (data.description ?? ''),
                 photoUrl: (data.photoUrl ?? null),
                 minimapUrl: (data.minimapUrl ?? null),
+                coordsEnc: (data.coordsEnc ?? null),
                 distanceKm: +(data.distanceKm ?? 0),
                 durationSec: +(data.durationSec ?? 0),
                 paceMinKm: +(data.paceMinKm ?? 0),

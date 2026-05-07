@@ -329,6 +329,163 @@ async function generateAndUploadMinimap(
 }
 
 
+
+// ── Encoded Polyline (Google format) ─────────────────────────────────────────
+
+function encodePolyline(coords: Array<[number, number]>): string {
+  let result = '';
+  let prevLat = 0, prevLon = 0;
+  // Sample max 200 points
+  const step = Math.max(1, Math.floor(coords.length / 200));
+  const pts = coords.filter((_, i) => i % step === 0);
+  for (const [lat, lon] of pts) {
+    const encodeVal = (val: number) => {
+      let v = Math.round(val * 1e5);
+      v = v < 0 ? ~(v << 1) : v << 1;
+      let str = '';
+      while (v >= 0x20) { str += String.fromCharCode((0x20 | (v & 0x1f)) + 63); v >>= 5; }
+      str += String.fromCharCode(v + 63);
+      return str;
+    };
+    result += encodeVal(lat - prevLat) + encodeVal(lon - prevLon);
+    prevLat = lat; prevLon = lon;
+  }
+  return result;
+}
+
+function decodePolyline(encoded: string): Array<[number, number]> {
+  const coords: Array<[number, number]> = [];
+  let lat = 0, lon = 0, i = 0;
+  while (i < encoded.length) {
+    const decode = () => {
+      let b, shift = 0, result = 0;
+      do { b = encoded.charCodeAt(i++) - 63; result |= (b & 0x1f) << shift; shift += 5; } while (b >= 0x20);
+      return result & 1 ? ~(result >> 1) : result >> 1;
+    };
+    lat += decode(); lon += decode();
+    coords.push([lat / 1e5, lon / 1e5]);
+  }
+  return coords;
+}
+
+// ── Canvas minimap renderer ───────────────────────────────────────────────────
+
+function renderMinimapCanvas(
+  container: HTMLElement,
+  coords:    Array<[number, number]>,
+  sport:     string,
+): void {
+  if (!coords || coords.length === 0) return;
+
+  const W = container.clientWidth  || 400;
+  const H = container.clientHeight || 200;
+
+  const canvas  = document.createElement('canvas');
+  canvas.width  = W;
+  canvas.height = H;
+  canvas.style.cssText = 'width:100%;height:100%;border-radius:12px;display:block';
+  container.innerHTML = '';
+  container.appendChild(canvas);
+  const ctx = canvas.getContext('2d')!;
+
+  const lats   = coords.map(p => p[0]);
+  const lons   = coords.map(p => p[1]);
+  const minLat = Math.min(...lats), maxLat = Math.max(...lats);
+  const minLon = Math.min(...lons), maxLon = Math.max(...lons);
+  const cLat   = (minLat + maxLat) / 2;
+  const cLon   = (minLon + maxLon) / 2;
+
+  // Choose zoom
+  const latSpan = maxLat - minLat || 0.001;
+  const lonSpan = maxLon - minLon || 0.001;
+  let zoom = 15;
+  for (let z = 16; z >= 10; z--) {
+    const n = Math.pow(2, z);
+    if (lonSpan / 360 * n * 256 < W * 0.7 && latSpan / 360 * n * 256 < H * 0.7) {
+      zoom = z; break;
+    }
+  }
+
+  const n        = Math.pow(2, zoom);
+  const centerTx = Math.floor((cLon + 180) / 360 * n);
+  const centerTy = Math.floor((1 - Math.log(Math.tan(cLat * Math.PI / 180) + 1 / Math.cos(cLat * Math.PI / 180)) / Math.PI) / 2 * n);
+  const tilesX   = Math.ceil(W / 256) + 2;
+  const tilesY   = Math.ceil(H / 256) + 2;
+  const originTx = centerTx - Math.floor(tilesX / 2);
+  const originTy = centerTy - Math.floor(tilesY / 2);
+
+  const toXY = (lat: number, lon: number) => {
+    const px = ((lon + 180) / 360 * n - originTx) * 256;
+    const sinLat = Math.sin(lat * Math.PI / 180);
+    const py = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * n * 256 - originTy * 256;
+    const cx = (centerTx - originTx) * 256 + 128;
+    const cy = (centerTy - originTy) * 256 + 128;
+    return { x: px - cx + W / 2, y: py - cy + H / 2 };
+  };
+
+  // Load and draw tiles
+  const tilePromises: Promise<void>[] = [];
+  for (let dx = 0; dx < tilesX; dx++) {
+    for (let dy = 0; dy < tilesY; dy++) {
+      const tx = originTx + dx;
+      const ty = originTy + dy;
+      const cx = (centerTx - originTx) * 256 + 128;
+      const cy = (centerTy - originTy) * 256 + 128;
+      const px = dx * 256 - cx + W / 2;
+      const py = dy * 256 - cy + H / 2;
+      const url = `${BACKEND_URL}/upload/tile?z=${zoom}&x=${tx}&y=${ty}`;
+      tilePromises.push(new Promise(resolve => {
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.onload  = () => { ctx.drawImage(img, Math.round(px), Math.round(py), 256, 256); resolve(); };
+        img.onerror = () => resolve();
+        img.src     = url;
+        setTimeout(resolve, 5000);
+      }));
+    }
+  }
+
+  Promise.all(tilePromises).then(() => {
+    const color = sport === 'cycling' ? '#ffb545' : sport === 'walking' ? '#5badea' : '#00c46a';
+
+    if (coords.length === 1) {
+      const { x, y } = toXY(coords[0][0], coords[0][1]);
+      ctx.beginPath(); ctx.arc(x, y - 8, 10, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(x - 6, y - 4); ctx.lineTo(x, y + 4); ctx.lineTo(x + 6, y - 4);
+      ctx.fillStyle = color; ctx.fill();
+    } else {
+      // Route line
+      ctx.beginPath();
+      const p0 = toXY(coords[0][0], coords[0][1]);
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < coords.length; i++) {
+        const p = toXY(coords[i][0], coords[i][1]);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.strokeStyle = color; ctx.lineWidth = 3;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+
+      // Start pin
+      const ps = toXY(coords[0][0], coords[0][1]);
+      ctx.beginPath(); ctx.arc(ps.x, ps.y - 6, 7, 0, Math.PI * 2);
+      ctx.fillStyle = color; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(ps.x - 4, ps.y - 1); ctx.lineTo(ps.x, ps.y + 5); ctx.lineTo(ps.x + 4, ps.y - 1);
+      ctx.fillStyle = color; ctx.fill();
+
+      // End dot
+      const pe = toXY(coords[coords.length-1][0], coords[coords.length-1][1]);
+      ctx.beginPath(); ctx.arc(pe.x, pe.y, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#e74c3c'; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+    }
+  });
+}
+
+export { renderMinimapCanvas, encodePolyline, decodePolyline };
+
 async function _pushMissingToAtlas(
   userId:     string,
   enriched:   EnrichedActivity[],
@@ -360,7 +517,10 @@ async function _pushMissingToAtlas(
         const toSave = uploaded
           ? { ...activity, photoUrl: uploaded.url, photoPublicId: uploaded.publicId }
           : activity;
-        await apiPost('/enriched-activities', { ...toSave, userId, activityId: toSave.id });
+        const coordsEnc = toSave.coords && (toSave.coords as unknown[]).length > 0
+          ? encodePolyline(toSave.coords as Array<[number, number]>)
+          : null;
+        await apiPost('/enriched-activities', { ...toSave, userId, activityId: toSave.id, coordsEnc, coords: [] });
         console.log(`[CloudSync] 📤 Pushed missing activity: ${activity.id}`);
       } catch {}
     }
@@ -546,7 +706,10 @@ export async function hydrate(): Promise<void> {
           const raw = e as unknown as Record<string, unknown>;
           const id = (raw.activityId ?? raw.id) as string | undefined;
           if (!id) continue;
-          await saveEnrichedActivity({ ...e, id } as EnrichedActivity);
+          // Decode coordsEnc back to coords array
+          const coordsEnc = raw.coordsEnc as string | null | undefined;
+          const coords = coordsEnc ? decodePolyline(coordsEnc) : (raw.coords as Array<[number,number]> ?? []);
+          await saveEnrichedActivity({ ...e, id, coords } as EnrichedActivity);
           count++;
         } catch { /* skip */ }
       }
@@ -649,10 +812,16 @@ export const CS = {
       // Zamień base64 na URL w IndexedDB (lżejsze dane lokalnie)
       await saveEnrichedActivity({ ...activity, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
     }
+    // Encode coords as Encoded Polyline before sending to Atlas
+    const coordsEnc = activity.coords && activity.coords.length > 0
+      ? encodePolyline(activity.coords as Array<[number, number]>)
+      : null;
     void apiPost('/enriched-activities', {
       ...activity,
       activityId: activity.id,
       userId,
+      coordsEnc,
+      coords:        [],   // never store raw coords in Atlas
       photoUrl:      uploaded?.url      ?? activity.photoUrl,
       photoPublicId: uploaded?.publicId ?? null,
     });

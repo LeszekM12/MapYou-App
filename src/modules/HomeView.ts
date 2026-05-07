@@ -4,6 +4,7 @@
 import { loadEnrichedActivities, type EnrichedActivity } from './db.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
+import { renderMinimapCanvas, decodePolyline } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import type { SportType } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
@@ -1159,16 +1160,30 @@ export class HomeView {
       card.style.animationDelay = `${idx * 60}ms`;
       scroll.appendChild(card);
 
-      if (isOwn && item.kind === 'activity') {
-        const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
-        if (localAct) {
-          requestAnimationFrame(() => {
-            setTimeout(() => {
-              const mapEl = document.getElementById(`hcmap-${localAct.id}`);
-              if (mapEl) renderMiniMap(mapEl, localAct.coords, localAct.sport as SportType);
-            }, 80 + idx * 30);
-          });
-        }
+      const actId = (item.data.activityId ?? item.data.id) as string;
+      if (item.kind === 'activity') {
+        requestAnimationFrame(() => {
+          setTimeout(() => {
+            if (isOwn) {
+              // Own activity — use local coords from IndexedDB via Leaflet
+              const localAct = activities.find(a => a.id === actId);
+              if (localAct) {
+                const mapEl = document.getElementById(`hcmap-${localAct.id}`);
+                if (mapEl) renderMiniMap(mapEl, localAct.coords, localAct.sport as SportType);
+              }
+            } else {
+              // Friend activity — render canvas from coordsEnc
+              const coordsEnc = (item.data.coordsEnc ?? null) as string | null;
+              if (coordsEnc) {
+                const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap');
+                if (mapEl) {
+                  const coords = decodePolyline(coordsEnc);
+                  renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running') as string);
+                }
+              }
+            }
+          }, 80 + idx * 30);
+        });
       }
     });
 
@@ -1306,6 +1321,7 @@ export class HomeView {
         description: (data.description ?? '') as string,
         photoUrl:    (data.photoUrl ?? null) as string | null,
         minimapUrl:  (data.minimapUrl ?? null) as string | null,
+        coordsEnc:   (data.coordsEnc ?? null) as string | null,
         distanceKm:  +(data.distanceKm ?? 0),
         durationSec: +(data.durationSec ?? 0),
         paceMinKm:   +(data.paceMinKm ?? 0),
