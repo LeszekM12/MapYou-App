@@ -590,7 +590,7 @@ function buildCard(act: EnrichedActivity): HTMLElement {
     ${act.description && act.name && act.description !== act.name
       ? `<p class="home-card__desc">${act.description}</p>` : ''}
 
-    ${(act as unknown as Record<string,unknown>).minimapUrl ? `<div class="home-card__map-wrap"><img src="${(act as unknown as Record<string,unknown>).minimapUrl as string}" class="home-card__minimap-img" alt="route"/></div>` : act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : ''}
+    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : (act as unknown as Record<string,unknown>).coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
 
     ${photoHtml}
 
@@ -1175,7 +1175,7 @@ export class HomeView {
               // Friend activity — render canvas from coordsEnc
               const coordsEnc = (item.data.coordsEnc ?? null) as string | null;
               if (coordsEnc) {
-                const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap');
+                const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
                 if (mapEl) {
                   const coords = decodePolyline(coordsEnc);
                   renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running') as string);

@@ -537,7 +537,7 @@ function buildCard(act) {
     ${act.description && act.name && act.description !== act.name
         ? `<p class="home-card__desc">${act.description}</p>` : ''}
 
-    ${act.minimapUrl ? `<div class="home-card__map-wrap"><img src="${act.minimapUrl}" class="home-card__minimap-img" alt="route"/></div>` : act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : ''}
+    ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : act.coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
 
     ${photoHtml}
 
@@ -1130,7 +1130,7 @@ export class HomeView {
                             // Friend activity — render canvas from coordsEnc
                             const coordsEnc = (item.data.coordsEnc ?? null);
                             if (coordsEnc) {
-                                const mapEl = card.querySelector('.home-card__map-wrap');
+                                const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
                                 if (mapEl) {
                                     const coords = decodePolyline(coordsEnc);
                                     renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running'));
