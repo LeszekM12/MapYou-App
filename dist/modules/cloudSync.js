@@ -145,143 +145,6 @@ async function _loadImage(url) {
         setTimeout(() => resolve(null), 5000);
     });
 }
-async function generateAndUploadMinimap(activity, userId) {
-    const coords = activity.coords;
-    if (!coords || coords.length === 0)
-        return null;
-    if (!isOnline())
-        return null;
-    try {
-        const W = 400, H = 200;
-        const canvas = document.createElement('canvas');
-        canvas.width = W;
-        canvas.height = H;
-        const ctx = canvas.getContext('2d');
-        // Calculate bounds
-        const lats = coords.map(p => p[0]);
-        const lons = coords.map(p => p[1]);
-        const minLat = Math.min(...lats), maxLat = Math.max(...lats);
-        const minLon = Math.min(...lons), maxLon = Math.max(...lons);
-        const cLat = (minLat + maxLat) / 2;
-        const cLon = (minLon + maxLon) / 2;
-        // Choose zoom level
-        const latSpan = maxLat - minLat || 0.001;
-        const lonSpan = maxLon - minLon || 0.001;
-        let zoom = 15;
-        for (let z = 16; z >= 10; z--) {
-            const n = Math.pow(2, z);
-            const pxSpanLon = lonSpan / 360 * n * 256;
-            const pxSpanLat = latSpan / 360 * n * 256;
-            if (pxSpanLon < W * 0.7 && pxSpanLat < H * 0.7) {
-                zoom = z;
-                break;
-            }
-        }
-        // Get origin tile
-        const centerTile = _latLonToTile(cLat, cLon, zoom);
-        const tilesX = Math.ceil(W / 256) + 1;
-        const tilesY = Math.ceil(H / 256) + 1;
-        const originTx = centerTile.tx - Math.floor(tilesX / 2);
-        const originTy = centerTile.ty - Math.floor(tilesY / 2);
-        // Draw tiles
-        const tilePromises = [];
-        for (let dx = 0; dx < tilesX + 1; dx++) {
-            for (let dy = 0; dy < tilesY + 1; dy++) {
-                const tx = originTx + dx;
-                const ty = originTy + dy;
-                const px = dx * 256 - (centerTile.tx - originTx) * 256 + W / 2 - 128;
-                const py = dy * 256 - (centerTile.ty - originTy) * 256 + H / 2 - 128;
-                const url = `${BACKEND_URL}/upload/tile?z=${zoom}&x=${tx}&y=${ty}`;
-                tilePromises.push(_loadImage(url).then(img => {
-                    if (img)
-                        ctx.drawImage(img, Math.round(px), Math.round(py), 256, 256);
-                }));
-            }
-        }
-        await Promise.all(tilePromises);
-        // Fallback background if tiles failed
-        const imgData = ctx.getImageData(0, 0, 1, 1);
-        if (imgData.data[3] === 0) {
-            ctx.fillStyle = '#e8e0d8';
-            ctx.fillRect(0, 0, W, H);
-        }
-        // Convert coords to pixels
-        const toP = (lat, lon) => {
-            const p = _latLonToPixel(lat, lon, zoom, originTx, originTy);
-            // Offset to center
-            const offX = W / 2 - (centerTile.tx - originTx + 0.5) * 256;
-            const offY = H / 2 - (centerTile.ty - originTy + 0.5) * 256;
-            return { x: p.px + offX + 128, y: p.py + offY + 128 };
-        };
-        const color = activity.sport === 'cycling' ? '#ffb545'
-            : activity.sport === 'walking' ? '#5badea'
-                : '#00c46a';
-        if (coords.length === 1) {
-            const { x, y } = toP(coords[0][0], coords[0][1]);
-            // Draw pin SVG-style
-            ctx.beginPath();
-            ctx.arc(x, y - 8, 10, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 2;
-            ctx.stroke();
-            // Pin tip
-            ctx.beginPath();
-            ctx.moveTo(x - 6, y - 4);
-            ctx.lineTo(x, y + 4);
-            ctx.lineTo(x + 6, y - 4);
-            ctx.fillStyle = color;
-            ctx.fill();
-        }
-        else {
-            // Draw route
-            ctx.beginPath();
-            const p0 = toP(coords[0][0], coords[0][1]);
-            ctx.moveTo(p0.x, p0.y);
-            for (let i = 1; i < coords.length; i++) {
-                const p = toP(coords[i][0], coords[i][1]);
-                ctx.lineTo(p.x, p.y);
-            }
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 3;
-            ctx.lineJoin = 'round';
-            ctx.lineCap = 'round';
-            ctx.stroke();
-            // Start pin
-            const ps = toP(coords[0][0], coords[0][1]);
-            ctx.beginPath();
-            ctx.arc(ps.x, ps.y - 6, 7, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-            ctx.beginPath();
-            ctx.moveTo(ps.x - 4, ps.y - 1);
-            ctx.lineTo(ps.x, ps.y + 5);
-            ctx.lineTo(ps.x + 4, ps.y - 1);
-            ctx.fillStyle = color;
-            ctx.fill();
-            // End dot
-            const pe = toP(coords[coords.length - 1][0], coords[coords.length - 1][1]);
-            ctx.beginPath();
-            ctx.arc(pe.x, pe.y, 5, 0, Math.PI * 2);
-            ctx.fillStyle = '#e74c3c';
-            ctx.fill();
-            ctx.strokeStyle = '#fff';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
-        }
-        const base64 = canvas.toDataURL('image/jpeg', 0.85);
-        const uploaded = await uploadIfBase64(base64, userId, 'activities', `minimaps/${userId}/${activity.id}`);
-        return uploaded?.url ?? null;
-    }
-    catch (err) {
-        console.warn('[CloudSync] generateAndUploadMinimap error:', err);
-        return null;
-    }
-}
 // ── Encoded Polyline (Google format) ─────────────────────────────────────────
 function encodePolyline(coords) {
     let result = '';
@@ -551,21 +414,6 @@ async function _pushMissingToAtlas(userId, enriched, unified, posts) {
             }
             catch { }
         }
-        // Generuj minimapUrl dla aktywności które go nie mają lub mają stary URL
-        const enrichedMissingMinimap = enriched.filter(a => atlasEnrichedIds.has(a.id) &&
-            a.coords && a.coords.length > 0 &&
-            (!a.minimapUrl || a.minimapUrl.includes('staticmap.openstreetmap') || a.minimapUrl.includes('api.mapbox.com')));
-        for (const activity of enrichedMissingMinimap) {
-            try {
-                const minimapUrl = await generateAndUploadMinimap(activity, userId);
-                if (minimapUrl) {
-                    await saveEnrichedActivity({ ...activity, minimapUrl });
-                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, { userId, minimapUrl });
-                    console.log(`[CloudSync] 🗺️ Minimap: ${activity.name} → ${minimapUrl.substring(0, 60)}`);
-                }
-            }
-            catch { }
-        }
         // Push stats (weeklyWins, bestStreak) — zawsze aktualizuj
         const weeklyWins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
         const bestStreak = parseInt(localStorage.getItem('mapyou_best_streak') ?? '0', 10);
@@ -725,18 +573,6 @@ export const CS = {
     // ── EnrichedActivities (Home feed) ───────────────────────────────────────────
     async saveEnrichedActivity(activity) {
         const id = await saveEnrichedActivity(activity);
-        // Generate minimap async — don't block save
-        if (!activity.minimapUrl && activity.coords && activity.coords.length > 0) {
-            void generateAndUploadMinimap(activity, getUserId()).then(async (minimapUrl) => {
-                if (minimapUrl) {
-                    await saveEnrichedActivity({ ...activity, minimapUrl });
-                    await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
-                        userId: getUserId(), minimapUrl,
-                    });
-                    console.log(`[CloudSync] 🗺️ Minimap uploaded: ${minimapUrl.substring(0, 60)}`);
-                }
-            });
-        }
         const userId = getUserId();
         // Upload zdjęcia do Cloudinary — zamień base64 na URL w IndexedDB
         const uploaded = await uploadIfBase64(activity.photoUrl, userId, 'activities');
