@@ -193,12 +193,13 @@ function decodePolyline(encoded) {
 function renderMinimapCanvas(container, coords, sport) {
     if (!coords || coords.length === 0)
         return;
-    const W = container.clientWidth || 400;
-    const H = container.clientHeight || 200;
+    const W = 400, H = 200;
     const canvas = document.createElement('canvas');
     canvas.width = W;
     canvas.height = H;
-    canvas.style.cssText = 'width:100%;height:100%;border-radius:12px;display:block';
+    canvas.style.cssText = 'width:100%;height:100%;border-radius:12px;display:block;position:absolute;top:0;left:0';
+    container.style.position = 'relative';
+    container.style.overflow = 'hidden';
     container.innerHTML = '';
     container.appendChild(canvas);
     const ctx = canvas.getContext('2d');
@@ -411,6 +412,20 @@ async function _pushMissingToAtlas(userId, enriched, unified, posts) {
                     : post;
                 await apiPost('/posts', { ...toSave, userId, postId: toSave.id });
                 console.log(`[CloudSync] 📤 Pushed missing post: ${post.id}`);
+            }
+            catch { }
+        }
+        // Napraw brakujące coordsEnc w Atlas dla starych aktywności
+        const atlasMissingCoordsEnc = (atlasEnriched ?? []).filter(a => !a.coordsEnc);
+        const atlasMissingIds = new Set(atlasMissingCoordsEnc.map(a => a.activityId));
+        const enrichedToEncode = enriched.filter(a => atlasMissingIds.has(a.id) && a.coords && a.coords.length > 0);
+        for (const activity of enrichedToEncode) {
+            try {
+                const coordsEnc = encodePolyline(activity.coords);
+                await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
+                    userId, coordsEnc,
+                });
+                console.log(`[CloudSync] 📍 Fixed coordsEnc for: ${activity.name}`);
             }
             catch { }
         }

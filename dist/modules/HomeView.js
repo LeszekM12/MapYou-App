@@ -1131,6 +1131,9 @@ export class HomeView {
                                 if (coordsEnc) {
                                     const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
                                     if (mapEl) {
+                                        mapEl.style.width = mapEl.style.width || '100%';
+                                        mapEl.style.height = mapEl.style.height || '200px';
+                                        mapEl.style.display = 'block';
                                         const coords = decodePolyline(coordsEnc);
                                         renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running'));
                                     }
@@ -1143,6 +1146,9 @@ export class HomeView {
                             if (coordsEnc) {
                                 const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
                                 if (mapEl) {
+                                    mapEl.style.width = mapEl.style.width || '100%';
+                                    mapEl.style.height = mapEl.style.height || '200px';
+                                    mapEl.style.display = 'block';
                                     const coords = decodePolyline(coordsEnc);
                                     renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running'));
                                 }

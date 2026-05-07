@@ -231,13 +231,13 @@ function renderMinimapCanvas(
 ): void {
   if (!coords || coords.length === 0) return;
 
-  const W = container.clientWidth  || 400;
-  const H = container.clientHeight || 200;
-
+  const W = 400, H = 200;
   const canvas  = document.createElement('canvas');
   canvas.width  = W;
   canvas.height = H;
-  canvas.style.cssText = 'width:100%;height:100%;border-radius:12px;display:block';
+  canvas.style.cssText = 'width:100%;height:100%;border-radius:12px;display:block;position:absolute;top:0;left:0';
+  container.style.position = 'relative';
+  container.style.overflow = 'hidden';
   container.innerHTML = '';
   container.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
@@ -351,7 +351,7 @@ async function _pushMissingToAtlas(
   try {
     // Pobierz co już jest w Atlas
     const [atlasEnriched, atlasUnified, atlasPosts] = await Promise.all([
-      apiGet<{ activityId: string; photoUrl: string | null }>(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
+      apiGet<{ activityId: string; photoUrl: string | null; coordsEnc: string | null }>(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
       apiGet<{ workoutId: string }>(`/unified-workouts?userId=${encodeURIComponent(userId)}`),
       apiGet<{ postId: string; photoUrl: string | null }>(`/posts?userId=${encodeURIComponent(userId)}`),
     ]);
@@ -448,7 +448,23 @@ async function _pushMissingToAtlas(
       } catch {}
     }
 
-// Push stats (weeklyWins, bestStreak) — zawsze aktualizuj
+// Napraw brakujące coordsEnc w Atlas dla starych aktywności
+    const atlasMissingCoordsEnc = (atlasEnriched ?? []).filter(a => !a.coordsEnc);
+    const atlasMissingIds = new Set(atlasMissingCoordsEnc.map(a => a.activityId));
+    const enrichedToEncode = enriched.filter(a =>
+      atlasMissingIds.has(a.id) && a.coords && a.coords.length > 0
+    );
+    for (const activity of enrichedToEncode) {
+      try {
+        const coordsEnc = encodePolyline(activity.coords as Array<[number, number]>);
+        await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
+          userId, coordsEnc,
+        });
+        console.log(`[CloudSync] 📍 Fixed coordsEnc for: ${activity.name}`);
+      } catch {}
+    }
+
+    // Push stats (weeklyWins, bestStreak) — zawsze aktualizuj
     const weeklyWins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
     const bestStreak = parseInt(localStorage.getItem('mapyou_best_streak') ?? '0', 10);
     if (weeklyWins > 0 || bestStreak > 0) {
