@@ -4,7 +4,7 @@
 import { loadEnrichedActivities, type EnrichedActivity } from './db.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
-import { renderMinimapCanvas, decodePolyline } from './cloudSync.js';
+import { renderMinimapCanvas, decodePolyline, encodePolyline } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import type { SportType } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
@@ -1134,6 +1134,11 @@ export class HomeView {
 
       if (isOwn && item.kind === 'activity') {
         const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
+        if (localAct) {
+          // Inject coordsEnc into localAct for buildCard
+          (localAct as unknown as Record<string,unknown>).coordsEnc = item.data.coordsEnc ?? encodePolyline(localAct.coords as Array<[number,number]>);
+          (localAct as unknown as Record<string,unknown>).coords = [];
+        }
         card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
       } else if (isOwn && item.kind === 'post') {
         const localPost = posts.find(p => p.id === (item.data.postId ?? item.data.id));
@@ -1164,38 +1169,17 @@ export class HomeView {
       if (item.kind === 'activity') {
         requestAnimationFrame(() => {
           setTimeout(() => {
-            if (isOwn) {
-              // Own activity — try local coords from IndexedDB via Leaflet
-              const localAct = activities.find(a => a.id === actId);
-              if (localAct && localAct.coords && localAct.coords.length > 0) {
-                const mapEl = document.getElementById(`hcmap-${localAct.id}`);
-                if (mapEl) renderMiniMap(mapEl, localAct.coords, localAct.sport as SportType);
-              } else {
-                // Fallback — use coordsEnc from Atlas
-                const coordsEnc = (item.data.coordsEnc ?? null) as string | null;
-                if (coordsEnc) {
-                  const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
-                  if (mapEl) {
-                    mapEl.style.width  = mapEl.style.width  || '100%';
-                    mapEl.style.height = mapEl.style.height || '200px';
-                    mapEl.style.display = 'block';
-                    const coords = decodePolyline(coordsEnc);
-                    renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running') as string);
-                  }
-                }
-              }
-            } else {
-              // Friend activity — render canvas from coordsEnc
-              const coordsEnc = (item.data.coordsEnc ?? null) as string | null;
-              if (coordsEnc) {
-                const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
-                if (mapEl) {
-                  mapEl.style.width  = mapEl.style.width  || '100%';
-                  mapEl.style.height = mapEl.style.height || '200px';
-                  mapEl.style.display = 'block';
-                  const coords = decodePolyline(coordsEnc);
-                  renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running') as string);
-                }
+            // Always use canvas for feed — consistent look for everyone
+            const coordsEnc = (item.data.coordsEnc ?? (item as unknown as Record<string,unknown>).coordsEnc ?? null) as string | null;
+            const localAct = activities.find(a => a.id === actId);
+            const enc = coordsEnc ?? (localAct ? encodePolyline(localAct.coords as Array<[number,number]>) : null);
+            if (enc) {
+              const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
+              if (mapEl) {
+                mapEl.style.height  = mapEl.style.height || '200px';
+                mapEl.style.display = 'block';
+                const coords = decodePolyline(enc);
+                renderMinimapCanvas(mapEl, coords, (item.data.sport ?? localAct?.sport ?? 'running') as string);
               }
             }
           }, 80 + idx * 30);
