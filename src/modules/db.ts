@@ -32,6 +32,7 @@ export interface EnrichedActivity {
   name:        string;
   description: string;
   photoUrl:    string | null;   // data:image/… or Cloudinary URL
+  mediaType?:  'image' | 'video' | null; // type of media attached
   coordsEnc?:  string | null;   // Encoded Polyline (compressed, for Atlas backup)
   minimapUrl?: string | null;   // Static map image URL
   photoPublicId?: string | null; // Cloudinary public_id (for deletion)
@@ -81,6 +82,7 @@ export interface PostRecord {
   body:       string;
   photoUrl:   string | null;
   photoPublicId?: string | null; // Cloudinary public_id (for deletion)
+  mediaType?:  'image' | 'video' | null; // type of media attached
   authorName: string;
   avatarB64:  string | null;
 }

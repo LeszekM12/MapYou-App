@@ -210,6 +210,24 @@
   opacity: 0.85;
 }
 
+/* Video in feed card — same container as photo */
+.home-card__photo video {
+  width:       100%;
+  height:      100%;
+  object-fit:  cover;
+  display:     block;
+  border-radius: 14px;
+}
+
+/* Media size hint shown below upload zone */
+.sam-media-hint {
+  display:     block;
+  font-size:   1.1rem;
+  color:       var(--color-light--2, #6c7175);
+  margin-top:  6px;
+  text-align:  center;
+}
+
 /* Stats row */
 .home-card__stats {
   display: flex;

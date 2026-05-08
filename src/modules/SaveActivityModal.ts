@@ -8,7 +8,7 @@
 import type { ActivityRecord, SportType } from './Tracker.js';
 import { SPORT_COLORS, SPORT_ICONS } from './Tracker.js';
 import { saveEnrichedActivity, type EnrichedActivity } from './db.js';
-import { CS } from './cloudSync.js';
+import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs, addToClubFeed } from './SearchView.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -97,17 +97,19 @@ function buildModalHtml(activity: ActivityRecord, isManual: boolean): string {
           <textarea class="sam-textarea" id="samDesc" placeholder="How did it go? Share your story..." rows="3" maxlength="300"></textarea>
         </div>
 
-        <!-- Photo upload -->
+        <!-- Photo / video upload -->
         <div class="sam-field">
-          <label class="sam-label">Photo</label>
+          <label class="sam-label">Photo / Video</label>
           <div class="sam-photo-zone" id="samPhotoZone">
-            <input type="file" accept="image/*" id="samPhotoInput" class="sam-photo-input"/>
+            <input type="file" accept="image/*,video/*" id="samPhotoInput" class="sam-photo-input"/>
             <div class="sam-photo-placeholder" id="samPhotoPlaceholder">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
-              <span>Tap to add photo</span>
+              <span>Tap to add photo or video</span>
             </div>
             <img class="sam-photo-preview hidden" id="samPhotoPreview" alt="Preview"/>
+            <video class="sam-photo-preview hidden" id="samVideoPreview" playsinline muted controls preload="metadata"></video>
           </div>
+          <span class="sam-media-hint">Max 10 MB for photos · 850 MB for videos</span>
         </div>
 
         <!-- Activity Stats — only for manual (no GPS data) -->
@@ -213,7 +215,8 @@ export class SaveActivityModal {
   private _el: HTMLElement | null = null;
   private _touchStartY = 0;
   private _selectedSport: SportType;
-  private _photoBlob: Blob | null = null;
+  private _photoBlob:    Blob | null = null;
+  private _photoIsVideo: boolean    = false;
   private _photoUrl: string | null = null;
   private _pickedCoords: [number, number] | null = null;
 
@@ -390,14 +393,34 @@ export class SaveActivityModal {
     const preview    = el.querySelector<HTMLImageElement>('#samPhotoPreview');
     const placeholder= el.querySelector<HTMLElement>('#samPhotoPlaceholder');
 
+    const videoPreview = el.querySelector<HTMLVideoElement>('#samVideoPreview');
+
     photoZone?.addEventListener('click', () => photoInput?.click());
     photoInput?.addEventListener('change', () => {
       const file = photoInput.files?.[0];
       if (!file) return;
-      this._photoBlob = file;
-      const url = URL.createObjectURL(file);
-      this._photoUrl = url;
-      if (preview)     { preview.src = url; preview.classList.remove('hidden'); }
+      const isVid = file.type.startsWith('video/');
+      const MAX_IMAGE = 10 * 1024 * 1024;   // 10 MB
+      const MAX_VIDEO = 850 * 1024 * 1024;  // 850 MB
+      if (!isVid && file.size > MAX_IMAGE) {
+        alert(`Photo too large. Max 10 MB (your file: ${(file.size/1024/1024).toFixed(1)} MB)`);
+        photoInput.value = ''; return;
+      }
+      if (isVid && file.size > MAX_VIDEO) {
+        alert(`Video too large. Max 850 MB (your file: ${(file.size/1024/1024).toFixed(0)} MB)`);
+        photoInput.value = ''; return;
+      }
+      this._photoBlob    = file;
+      this._photoIsVideo = isVid;
+      const url          = URL.createObjectURL(file);
+      this._photoUrl     = url;
+      if (isVid) {
+        preview?.classList.add('hidden');
+        if (videoPreview) { videoPreview.src = url; videoPreview.classList.remove('hidden'); }
+      } else {
+        videoPreview?.classList.add('hidden');
+        if (preview) { preview.src = url; preview.classList.remove('hidden'); }
+      }
       if (placeholder) placeholder.classList.add('hidden');
       photoZone?.classList.add('sam-photo-zone--filled');
     });
@@ -486,9 +509,15 @@ export class SaveActivityModal {
       manualPaceMinKm = dist > 0 && manualDurSec > 0 ? (manualDurSec / 60) / dist : 0;
     }
 
-    let photoDataUrl: string | null = null;
+    let photoUrl:  string | null              = null;
+    let mediaType: 'image' | 'video' | null   = null;
     if (this._photoBlob) {
-      try { photoDataUrl = await blobToDataUrl(this._photoBlob); } catch {}
+      const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+      try {
+        const up = await uploadMediaFile(this._photoBlob as File, userId, 'activities');
+        if (up) { photoUrl = up.url; mediaType = up.mediaType; }
+        else    { photoUrl = await blobToDataUrl(this._photoBlob); } // offline fallback
+      } catch   { photoUrl = await blobToDataUrl(this._photoBlob); }
     }
 
     const enriched: EnrichedActivity = {
@@ -497,7 +526,8 @@ export class SaveActivityModal {
       date:        new Date(manualDate).getTime(),
       name,
       description,
-      photoUrl:    photoDataUrl,
+      photoUrl,
+      mediaType:   mediaType ?? undefined,
       distanceKm:  manualDistKm,
       durationSec: manualDurSec,
       paceMinKm:   manualPaceMinKm,

@@ -5,7 +5,7 @@
 // User fills in name, description, photo, intensity, notes.
 // On save → writes EnrichedActivity to IndexedDB → triggers Home refresh.
 import { SPORT_COLORS, SPORT_ICONS } from './Tracker.js';
-import { CS } from './cloudSync.js';
+import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs, addToClubFeed } from './SearchView.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function blobToDataUrl(blob) {
@@ -85,17 +85,19 @@ function buildModalHtml(activity, isManual) {
           <textarea class="sam-textarea" id="samDesc" placeholder="How did it go? Share your story..." rows="3" maxlength="300"></textarea>
         </div>
 
-        <!-- Photo upload -->
+        <!-- Photo / video upload -->
         <div class="sam-field">
-          <label class="sam-label">Photo</label>
+          <label class="sam-label">Photo / Video</label>
           <div class="sam-photo-zone" id="samPhotoZone">
-            <input type="file" accept="image/*" id="samPhotoInput" class="sam-photo-input"/>
+            <input type="file" accept="image/*,video/*" id="samPhotoInput" class="sam-photo-input"/>
             <div class="sam-photo-placeholder" id="samPhotoPlaceholder">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
-              <span>Tap to add photo</span>
+              <span>Tap to add photo or video</span>
             </div>
             <img class="sam-photo-preview hidden" id="samPhotoPreview" alt="Preview"/>
+            <video class="sam-photo-preview hidden" id="samVideoPreview" playsinline muted controls preload="metadata"></video>
           </div>
+          <span class="sam-media-hint">Max 10 MB for photos · 850 MB for videos</span>
         </div>
 
         <!-- Activity Stats — only for manual (no GPS data) -->
@@ -238,6 +240,12 @@ export class SaveActivityModal {
             configurable: true,
             writable: true,
             value: null
+        });
+        Object.defineProperty(this, "_photoIsVideo", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
         });
         Object.defineProperty(this, "_photoUrl", {
             enumerable: true,
@@ -416,17 +424,42 @@ export class SaveActivityModal {
         const photoZone = el.querySelector('#samPhotoZone');
         const preview = el.querySelector('#samPhotoPreview');
         const placeholder = el.querySelector('#samPhotoPlaceholder');
+        const videoPreview = el.querySelector('#samVideoPreview');
         photoZone?.addEventListener('click', () => photoInput?.click());
         photoInput?.addEventListener('change', () => {
             const file = photoInput.files?.[0];
             if (!file)
                 return;
+            const isVid = file.type.startsWith('video/');
+            const MAX_IMAGE = 10 * 1024 * 1024; // 10 MB
+            const MAX_VIDEO = 850 * 1024 * 1024; // 850 MB
+            if (!isVid && file.size > MAX_IMAGE) {
+                alert(`Photo too large. Max 10 MB (your file: ${(file.size / 1024 / 1024).toFixed(1)} MB)`);
+                photoInput.value = '';
+                return;
+            }
+            if (isVid && file.size > MAX_VIDEO) {
+                alert(`Video too large. Max 850 MB (your file: ${(file.size / 1024 / 1024).toFixed(0)} MB)`);
+                photoInput.value = '';
+                return;
+            }
             this._photoBlob = file;
+            this._photoIsVideo = isVid;
             const url = URL.createObjectURL(file);
             this._photoUrl = url;
-            if (preview) {
-                preview.src = url;
-                preview.classList.remove('hidden');
+            if (isVid) {
+                preview?.classList.add('hidden');
+                if (videoPreview) {
+                    videoPreview.src = url;
+                    videoPreview.classList.remove('hidden');
+                }
+            }
+            else {
+                videoPreview?.classList.add('hidden');
+                if (preview) {
+                    preview.src = url;
+                    preview.classList.remove('hidden');
+                }
             }
             if (placeholder)
                 placeholder.classList.add('hidden');
@@ -517,12 +550,23 @@ export class SaveActivityModal {
             manualDurSec = Math.round((durH * 60 + durM) * 60);
             manualPaceMinKm = dist > 0 && manualDurSec > 0 ? (manualDurSec / 60) / dist : 0;
         }
-        let photoDataUrl = null;
+        let photoUrl = null;
+        let mediaType = null;
         if (this._photoBlob) {
+            const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
             try {
-                photoDataUrl = await blobToDataUrl(this._photoBlob);
+                const up = await uploadMediaFile(this._photoBlob, userId, 'activities');
+                if (up) {
+                    photoUrl = up.url;
+                    mediaType = up.mediaType;
+                }
+                else {
+                    photoUrl = await blobToDataUrl(this._photoBlob);
+                } // offline fallback
             }
-            catch { }
+            catch {
+                photoUrl = await blobToDataUrl(this._photoBlob);
+            }
         }
         const enriched = {
             id: this._activity.id,
@@ -530,7 +574,8 @@ export class SaveActivityModal {
             date: new Date(manualDate).getTime(),
             name,
             description,
-            photoUrl: photoDataUrl,
+            photoUrl,
+            mediaType: mediaType ?? undefined,
             distanceKm: manualDistKm,
             durationSec: manualDurSec,
             paceMinKm: manualPaceMinKm,

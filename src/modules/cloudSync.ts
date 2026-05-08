@@ -102,27 +102,69 @@ async function apiGet<T>(path: string): Promise<T[] | null> {
 }
 
 
-// ── Upload zdjęcia do Cloudinary jeśli base64 ─────────────────────────────────
+// ── Upload media (image or video) to Cloudinary via multipart ────────────────
 
-interface UploadResult { url: string; publicId: string }
+interface UploadResult { url: string; publicId: string; mediaType: 'image' | 'video' }
 
+/**
+ * Upload a File/Blob to /upload/media using multipart/form-data.
+ * Works for both images and videos.
+ */
+export async function uploadMediaFile(
+  file:           File | Blob,
+  userId:         string,
+  folder:         'activities' | 'posts' | 'avatars',
+  fixedPublicId?: string,
+): Promise<UploadResult | null> {
+  if (!file || !userId) return null;
+  try {
+    const form = new FormData();
+    form.append('file',   file, (file as File).name ?? 'upload');
+    form.append('userId', userId);
+    form.append('folder', folder);
+    if (fixedPublicId) form.append('publicId', fixedPublicId);
+
+    const res = await fetch(`${BACKEND_URL}/upload/media`, {
+      method: 'POST',
+      body:   form,
+      signal: AbortSignal.timeout(300_000), // 5 min — large video uploads
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as {
+      status: string; url: string; publicId: string; mediaType: 'image' | 'video';
+    };
+    return data.status === 'ok'
+      ? { url: data.url, publicId: data.publicId, mediaType: data.mediaType }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Backward-compat: upload base64 image (used for avatars and minimaps only).
+ * New code should use uploadMediaFile instead.
+ */
 async function uploadIfBase64(
   base64:    string | null | undefined,
   userId:    string,
   folder:    'activities' | 'posts' | 'avatars',
   fixedPublicId?: string,
 ): Promise<UploadResult | null> {
-  if (!base64 || !base64.startsWith('data:image/')) return null;
+  if (!base64) return null;
+  // If it's already a Cloudinary URL — nothing to upload
+  if (base64.startsWith('http')) return null;
+  if (!base64.startsWith('data:image/') && !base64.startsWith('data:video/')) return null;
+
+  // Convert base64 to Blob then use multipart upload
   try {
-    const res = await fetch(`${BACKEND_URL}/upload/image`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ image: base64, userId, folder, publicId: fixedPublicId }),
-      signal:  AbortSignal.timeout(30_000),
-    });
-    if (!res.ok) return null;
-    const data = await res.json() as { status: string; url: string; publicId: string };
-    return data.status === 'ok' ? { url: data.url, publicId: data.publicId } : null;
+    const [meta, b64] = base64.split(',');
+    const mime        = meta.split(':')[1].split(';')[0];
+    const binary      = atob(b64);
+    const bytes       = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    const blob = new Blob([bytes], { type: mime });
+    return await uploadMediaFile(blob, userId, folder, fixedPublicId);
   } catch {
     return null;
   }
@@ -131,7 +173,7 @@ async function uploadIfBase64(
 async function deleteFromCloudinary(publicId: string): Promise<void> {
   if (!isOnline()) return;
   try {
-    await fetch(`${BACKEND_URL}/upload/image`, {
+    await fetch(`${BACKEND_URL}/upload/media`, {
       method:  'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body:    JSON.stringify({ publicId }),

@@ -5,7 +5,7 @@
 // Stored locally in IndexedDB (postsFeed table) + localStorage fallback.
 
 import { savePost, type PostRecord } from './db.js';
-import { CS } from './cloudSync.js';
+import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs, addToClubFeed } from './SearchView.js';
 
 // ── Build HTML ────────────────────────────────────────────────────────────────
@@ -39,20 +39,22 @@ function buildHTML(): string {
         </div>
 
         <div class="pm-field">
-          <label class="pm-label">Photo <span class="pm-optional">(optional)</span></label>
+          <label class="pm-label">Photo / Video <span class="pm-optional">(optional)</span></label>
           <div class="pm-photo-zone" id="pmPhotoZone">
-            <input type="file" accept="image/*" id="pmPhotoInput" class="pm-photo-input"/>
+            <input type="file" accept="image/*,video/*" id="pmPhotoInput" class="pm-photo-input"/>
             <div class="pm-photo-placeholder" id="pmPhotoPlaceholder">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
                 <rect x="3" y="3" width="18" height="18" rx="3"/>
                 <circle cx="8.5" cy="8.5" r="1.5"/>
                 <polyline points="21,15 16,10 5,21"/>
               </svg>
-              <span>Add photo</span>
+              <span>Add photo or video</span>
             </div>
             <img class="pm-photo-preview hidden" id="pmPhotoPreview" alt="Preview"/>
-            <button class="pm-photo-remove hidden" id="pmPhotoRemove" aria-label="Remove photo">✕</button>
+            <video class="pm-photo-preview hidden" id="pmVideoPreview" playsinline muted controls preload="metadata"></video>
+            <button class="pm-photo-remove hidden" id="pmPhotoRemove" aria-label="Remove media">✕</button>
           </div>
+          <span class="sam-media-hint">Max 10 MB for photos · 850 MB for videos</span>
         </div>
 
       </div>
@@ -76,7 +78,9 @@ function buildHTML(): string {
 
 export class PostModal {
   private _el: HTMLElement | null = null;
-  private _photoB64: string | null = null;
+  private _photoB64:    string | null = null;
+  private _mediaFile:   File | null   = null;
+  private _mediaIsVideo: boolean       = false;
   private _touchStartY = 0;
 
   constructor(private _onSave: (post: PostRecord) => void) {}
@@ -122,6 +126,8 @@ export class PostModal {
     const placeholder = el.querySelector<HTMLElement>('#pmPhotoPlaceholder')!;
     const removeBtn = el.querySelector<HTMLButtonElement>('#pmPhotoRemove')!;
 
+    const videoPreview = el.querySelector<HTMLVideoElement>('#pmVideoPreview')!;
+
     zone.addEventListener('click', e => {
       if ((e.target as HTMLElement).closest('#pmPhotoRemove')) return;
       input.click();
@@ -129,21 +135,44 @@ export class PostModal {
     input.addEventListener('change', () => {
       const file = input.files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        this._photoB64 = reader.result as string;
-        preview.src = this._photoB64;
-        preview.classList.remove('hidden');
-        placeholder.classList.add('hidden');
-        removeBtn.classList.remove('hidden');
-        zone.classList.add('pm-photo-zone--filled');
-      };
-      reader.readAsDataURL(file);
+      const isVid     = file.type.startsWith('video/');
+      const MAX_IMAGE = 10 * 1024 * 1024;
+      const MAX_VIDEO = 850 * 1024 * 1024;
+      if (!isVid && file.size > MAX_IMAGE) {
+        alert(`Photo too large. Max 10 MB (your file: ${(file.size/1024/1024).toFixed(1)} MB)`);
+        input.value = ''; return;
+      }
+      if (isVid && file.size > MAX_VIDEO) {
+        alert(`Video too large. Max 850 MB (your file: ${(file.size/1024/1024).toFixed(0)} MB)`);
+        input.value = ''; return;
+      }
+      this._mediaFile    = file;
+      this._mediaIsVideo = isVid;
+      const url          = URL.createObjectURL(file);
+      if (isVid) {
+        preview.classList.add('hidden'); preview.src = '';
+        videoPreview.src = url; videoPreview.classList.remove('hidden');
+        this._photoB64 = null;
+      } else {
+        videoPreview.classList.add('hidden'); videoPreview.src = '';
+        const reader = new FileReader();
+        reader.onload = () => {
+          this._photoB64 = reader.result as string;
+          preview.src    = this._photoB64;
+          preview.classList.remove('hidden');
+        };
+        reader.readAsDataURL(file);
+      }
+      placeholder.classList.add('hidden');
+      removeBtn.classList.remove('hidden');
+      zone.classList.add('pm-photo-zone--filled');
     });
     removeBtn.addEventListener('click', () => {
-      this._photoB64 = null;
-      preview.src = '';
-      preview.classList.add('hidden');
+      this._photoB64     = null;
+      this._mediaFile    = null;
+      this._mediaIsVideo = false;
+      preview.src        = ''; preview.classList.add('hidden');
+      videoPreview.src   = ''; videoPreview.classList.add('hidden');
       placeholder.classList.remove('hidden');
       removeBtn.classList.add('hidden');
       zone.classList.remove('pm-photo-zone--filled');
@@ -200,13 +229,25 @@ export class PostModal {
     btn.disabled = true;
     btn.textContent = 'Posting…';
 
+    // Upload media via multipart if file selected
+    let finalPhotoUrl: string | null = this._photoB64; // fallback: base64 if no upload
+    let finalMediaType: 'image' | 'video' | null = null;
+    if (this._mediaFile) {
+      const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+      try {
+        const up = await uploadMediaFile(this._mediaFile, userId, 'posts');
+        if (up) { finalPhotoUrl = up.url; finalMediaType = up.mediaType; }
+      } catch {}
+    }
+
     const post: PostRecord = {
       id:        String(Date.now()),
       type:      'post',
       date:      Date.now(),
       title:     title || desc.slice(0, 60),
       body:      desc,
-      photoUrl:  this._photoB64,
+      photoUrl:  finalPhotoUrl,
+      mediaType: finalMediaType ?? undefined,
       authorName: localStorage.getItem('mapyou_userName') ?? 'Athlete',
       avatarB64:  localStorage.getItem('mapyou_avatar') ?? null,
     };
