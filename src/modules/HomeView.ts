@@ -4,7 +4,7 @@
 import { loadEnrichedActivities, type EnrichedActivity } from './db.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
-import { renderMinimapCanvas, decodePolyline, encodePolyline } from './cloudSync.js';
+import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import type { SportType } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
@@ -834,6 +834,11 @@ export class HomeView {
       e.stopPropagation();
       toggleMenu(false);
       openPostModal(async () => {
+        // Push to Atlas first, then refresh feed so new post is visible immediately
+        const { loadEnrichedActivities, loadUnifiedWorkouts, loadPosts } = await import('./db.js');
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        const [enriched, unified, posts] = await Promise.all([loadEnrichedActivities(), loadUnifiedWorkouts(), loadPosts()]);
+        await pushNow(userId, enriched, unified, posts);
         await this.render();
       });
     });
@@ -876,6 +881,11 @@ export class HomeView {
             intensity:   enriched.intensity,
             photoUrl:    enriched.photoUrl,
           } as UnifiedWorkout);
+          // Push to Atlas first so the new activity is visible in feed immediately
+          const { loadEnrichedActivities: _lea, loadUnifiedWorkouts: _luw, loadPosts: _lp } = await import('./db.js');
+          const _userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+          const [_enriched, _unified, _posts] = await Promise.all([_lea(), _luw(), _lp()]);
+          await pushNow(_userId, _enriched, _unified, _posts);
           // Refresh Home feed
           await this.render();
           // Refresh Stats (Progress + History)
@@ -1046,7 +1056,7 @@ export class HomeView {
     let serverRes: { hasMore?: boolean } = {};
     if (userId) {
       try {
-        const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`);
+        const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
         if (res.ok) {
           const d = await res.json() as { status: string; hasMore: boolean; data: typeof serverFeed };
           serverFeed = d.data ?? [];

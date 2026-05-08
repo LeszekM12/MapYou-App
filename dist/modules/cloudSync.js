@@ -277,22 +277,26 @@ function renderMinimapCanvas(container, coords, sport) {
         // Sport colors — identical to StatsView
         const color = sport === 'cycling' ? '#ffb545' : sport === 'walking' ? '#5badea' : '#00c46a';
         if (coords.length === 1) {
-            // Single point — teardrop pin, matching StatsView SVG marker style
+            // Single point — teardrop pin matching StatsView SVG (iconAnchor bottom = tip of pin)
             const { x, y } = toXY(coords[0][0], coords[0][1]);
-            const R = 12; // pin circle radius
-            // Draw teardrop body
+            const R = 12; // circle radius
+            const TH = R * 1.6; // tail height below circle centre
+            // Pin total height = R (top of circle) + R (centre→bottom of circle) + TH (tail)
+            // Anchor = tip of tail = y coordinate. So circle centre = y - TH - R
+            const cy = y - TH - R;
+            // Draw teardrop body — circle top half, curve to tip, back up
             ctx.beginPath();
-            ctx.arc(x, y - R, R, Math.PI, 0); // top half circle
-            ctx.quadraticCurveTo(x + R, y, x, y + R * 1.6); // right side to tip
-            ctx.quadraticCurveTo(x - R, y, x - R, y - R); // left side from tip
+            ctx.arc(x, cy, R, Math.PI, 0); // top semicircle
+            ctx.quadraticCurveTo(x + R, cy + R, x, cy + R + TH); // right → tip
+            ctx.quadraticCurveTo(x - R, cy + R, x - R, cy); // tip → left
             ctx.fillStyle = color;
             ctx.fill();
             ctx.strokeStyle = '#fff';
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            // Inner white circle
+            // Inner white dot (matches StatsView <circle cx=12 cy=12 r=5 fill=white/>)
             ctx.beginPath();
-            ctx.arc(x, y - R, R * 0.42, 0, Math.PI * 2);
+            ctx.arc(x, cy, R * 0.42, 0, Math.PI * 2);
             ctx.fillStyle = '#fff';
             ctx.fill();
         }
@@ -334,7 +338,7 @@ function renderMinimapCanvas(container, coords, sport) {
     });
 }
 export { renderMinimapCanvas, encodePolyline, decodePolyline };
-async function _pushMissingToAtlas(userId, enriched, unified, posts) {
+export async function pushNow(userId, enriched, unified, posts) {
     if (!isOnline() || !userId)
         return;
     try {
@@ -478,7 +482,7 @@ export async function hydrate() {
     if (hasLocalData && Date.now() - lastHydrated < HYDRATE_MAX_AGE) {
         console.log('[CloudSync] ✅ IndexedDB has data, skipping hydration');
         // Ale zawsze sprawdź czy lokalne dane są w Atlas — push brakujących
-        void _pushMissingToAtlas(userId, enriched, unified, posts);
+        void pushNow(userId, enriched, unified, posts);
         return;
     }
     console.log('[CloudSync] 🔄 Hydrating from Atlas...');
