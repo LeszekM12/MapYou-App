@@ -252,7 +252,7 @@ function openLightbox(src: string): void {
 
 // ── Post card builder ─────────────────────────────────────────────────────────
 
-function buildPostCard(post: PostRecord, onRefresh: () => void): HTMLElement {
+function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> | void): HTMLElement {
   const card = document.createElement('article');
   card.className = 'home-card home-card--post';
   card.dataset.id = post.id;
@@ -353,7 +353,7 @@ function buildPostCard(post: PostRecord, onRefresh: () => void): HTMLElement {
       menu.remove();
       if (!confirm('Delete this post?')) return;
       await CS.deletePost(post.id);
-      onRefresh();
+      await onRefresh();
     });
 
     // Close on outside click
@@ -1106,7 +1106,7 @@ export class HomeView {
       } else if (isOwn && item.kind === 'post') {
         const localPost = posts.find(p => p.id === (item.data.postId ?? item.data.id));
         card = localPost
-          ? buildPostCard(localPost, () => void this.render())
+          ? buildPostCard(localPost, () => this.render())
           : this._buildFriendFeedCard(item.kind, item.data, userId);
       } else {
         card = this._buildFriendFeedCard(item.kind, item.data, userId);
@@ -1221,7 +1221,7 @@ export class HomeView {
               card = local ? buildCard(local) : this._buildFriendFeedCard(item.kind, item.data, userId);
             } else if (isOwn && item.kind === 'post') {
               const local = posts.find(p => p.id === (item.data.postId ?? item.data.id));
-              card = local ? buildPostCard(local, () => void this.render()) : this._buildFriendFeedCard(item.kind, item.data, userId);
+              card = local ? buildPostCard(local, () => this.render()) : this._buildFriendFeedCard(item.kind, item.data, userId);
             } else {
               card = this._buildFriendFeedCard(item.kind, item.data, userId);
               resolvedEnc = (item.data.coordsEnc as string | null) ?? null;

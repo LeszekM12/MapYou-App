@@ -320,7 +320,7 @@ function buildPostCard(post, onRefresh) {
             if (!confirm('Delete this post?'))
                 return;
             await CS.deletePost(post.id);
-            onRefresh();
+            await onRefresh();
         });
         // Close on outside click
         setTimeout(() => {
@@ -1061,7 +1061,7 @@ export class HomeView {
             else if (isOwn && item.kind === 'post') {
                 const localPost = posts.find(p => p.id === (item.data.postId ?? item.data.id));
                 card = localPost
-                    ? buildPostCard(localPost, () => void this.render())
+                    ? buildPostCard(localPost, () => this.render())
                     : this._buildFriendFeedCard(item.kind, item.data, userId);
             }
             else {
@@ -1179,7 +1179,7 @@ export class HomeView {
                         }
                         else if (isOwn && item.kind === 'post') {
                             const local = posts.find(p => p.id === (item.data.postId ?? item.data.id));
-                            card = local ? buildPostCard(local, () => void this.render()) : this._buildFriendFeedCard(item.kind, item.data, userId);
+                            card = local ? buildPostCard(local, () => this.render()) : this._buildFriendFeedCard(item.kind, item.data, userId);
                         }
                         else {
                             card = this._buildFriendFeedCard(item.kind, item.data, userId);

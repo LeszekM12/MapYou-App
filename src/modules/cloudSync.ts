@@ -772,7 +772,7 @@ const userId = getUserId();
     const publicId = (post as unknown as Record<string, unknown>)?.photoPublicId as string | null;
     await deletePost(id);
     const userId = getUserId();
-    void apiDelete(`/posts/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`);
+    await apiDelete(`/posts/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`);
     // Usuń zdjęcie z Cloudinary
     if (publicId) void deleteFromCloudinary(publicId);
   },
