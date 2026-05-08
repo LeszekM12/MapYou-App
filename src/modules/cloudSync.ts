@@ -277,7 +277,13 @@ function renderMinimapCanvas(
     return { x: px - cx + W / 2, y: py - cy + H / 2 };
   };
 
-  // Load and draw tiles
+  // Fallback background — visible while tiles load or if they fail
+  ctx.fillStyle = '#f2efe9';
+  ctx.fillRect(0, 0, W, H);
+
+  // Load HOT OSM tiles — same provider as StatsView detail map
+  // https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png
+  const SUBS = ['a', 'b', 'c'];
   const tilePromises: Promise<void>[] = [];
   for (let dx = 0; dx < tilesX; dx++) {
     for (let dy = 0; dy < tilesY; dy++) {
@@ -287,7 +293,8 @@ function renderMinimapCanvas(
       const cy = (centerTy - originTy) * 256 + 128;
       const px = dx * 256 - cx + W / 2;
       const py = dy * 256 - cy + H / 2;
-      const url = `${BACKEND_URL}/upload/tile?z=${zoom}&x=${tx}&y=${ty}`;
+      const sub = SUBS[(tx + ty) % 3];
+      const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
       tilePromises.push(new Promise(resolve => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -300,17 +307,31 @@ function renderMinimapCanvas(
   }
 
   Promise.all(tilePromises).then(() => {
+    // Sport colors — identical to StatsView
     const color = sport === 'cycling' ? '#ffb545' : sport === 'walking' ? '#5badea' : '#00c46a';
 
     if (coords.length === 1) {
+      // Single point — teardrop pin, matching StatsView SVG marker style
       const { x, y } = toXY(coords[0][0], coords[0][1]);
-      ctx.beginPath(); ctx.arc(x, y - 8, 10, 0, Math.PI * 2);
-      ctx.fillStyle = color; ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(x - 6, y - 4); ctx.lineTo(x, y + 4); ctx.lineTo(x + 6, y - 4);
-      ctx.fillStyle = color; ctx.fill();
+      const R = 12; // pin circle radius
+      // Draw teardrop body
+      ctx.beginPath();
+      ctx.arc(x, y - R, R, Math.PI, 0); // top half circle
+      ctx.quadraticCurveTo(x + R, y, x, y + R * 1.6); // right side to tip
+      ctx.quadraticCurveTo(x - R, y, x - R, y - R);   // left side from tip
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      // Inner white circle
+      ctx.beginPath();
+      ctx.arc(x, y - R, R * 0.42, 0, Math.PI * 2);
+      ctx.fillStyle = '#fff';
+      ctx.fill();
     } else {
-      // Route line
+      // Route polyline — weight: 4, opacity: 0.95 (matches StatsView)
+      ctx.globalAlpha = 0.95;
       ctx.beginPath();
       const p0 = toXY(coords[0][0], coords[0][1]);
       ctx.moveTo(p0.x, p0.y);
@@ -318,22 +339,32 @@ function renderMinimapCanvas(
         const p = toXY(coords[i][0], coords[i][1]);
         ctx.lineTo(p.x, p.y);
       }
-      ctx.strokeStyle = color; ctx.lineWidth = 3;
-      ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+      ctx.strokeStyle = color;
+      ctx.lineWidth   = 4;
+      ctx.lineJoin    = 'round';
+      ctx.lineCap     = 'round';
+      ctx.stroke();
+      ctx.globalAlpha = 1;
 
-      // Start pin
+      // Start circleMarker — radius 6, fillColor=color, white border weight 2
       const ps = toXY(coords[0][0], coords[0][1]);
-      ctx.beginPath(); ctx.arc(ps.x, ps.y - 6, 7, 0, Math.PI * 2);
-      ctx.fillStyle = color; ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(ps.x - 4, ps.y - 1); ctx.lineTo(ps.x, ps.y + 5); ctx.lineTo(ps.x + 4, ps.y - 1);
-      ctx.fillStyle = color; ctx.fill();
+      ctx.beginPath();
+      ctx.arc(ps.x, ps.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle   = color;
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth   = 2;
+      ctx.stroke();
 
-      // End dot
-      const pe = toXY(coords[coords.length-1][0], coords[coords.length-1][1]);
-      ctx.beginPath(); ctx.arc(pe.x, pe.y, 5, 0, Math.PI * 2);
-      ctx.fillStyle = '#e74c3c'; ctx.fill();
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+      // End circleMarker — radius 6, fillColor=#e74c3c, white border weight 2
+      const pe = toXY(coords[coords.length - 1][0], coords[coords.length - 1][1]);
+      ctx.beginPath();
+      ctx.arc(pe.x, pe.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle   = '#e74c3c';
+      ctx.fill();
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth   = 2;
+      ctx.stroke();
     }
   });
 }
