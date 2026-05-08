@@ -193,16 +193,24 @@ function decodePolyline(encoded) {
 function renderMinimapCanvas(container, coords, sport) {
     if (!coords || coords.length === 0)
         return;
-    const W = 400, H = 200;
+    // Read actual container dimensions — container must already be in DOM with CSS applied
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    // CSS sets height:180px; width = card width minus margin 16px*2 = 32px
+    // Fall back to offsetWidth/offsetHeight if getBoundingClientRect returns 0 (element hidden)
+    const W = Math.round(rect.width || container.offsetWidth || 328);
+    const H = Math.round(rect.height || container.offsetHeight || 180);
     const canvas = document.createElement('canvas');
-    canvas.width = W;
-    canvas.height = H;
-    canvas.style.cssText = 'width:100%;height:100%;border-radius:12px;display:block;position:absolute;top:0;left:0';
+    // Render at physical pixel resolution (crisp on Retina/HiDPI)
+    canvas.width = Math.round(W * dpr);
+    canvas.height = Math.round(H * dpr);
+    canvas.style.cssText = 'width:100%;height:100%;border-radius:14px;display:block;position:absolute;top:0;left:0';
     container.style.position = 'relative';
     container.style.overflow = 'hidden';
     container.innerHTML = '';
     container.appendChild(canvas);
     const ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr); // all drawing in CSS pixels; canvas handles HiDPI internally
     const lats = coords.map(p => p[0]);
     const lons = coords.map(p => p[1]);
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
