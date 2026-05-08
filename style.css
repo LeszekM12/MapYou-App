@@ -2953,3 +2953,17 @@ body {
   border-radius: 12px;
   display:       block;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   iOS AUTO-ZOOM FIX
+   Safari/WKWebView zooms in when input font-size < 16px.
+   This targets iOS only via -webkit-touch-callout support query.
+   No effect on Android, desktop, or other browsers.
+   ═══════════════════════════════════════════════════════════════════════════ */
+@supports (-webkit-touch-callout: none) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
