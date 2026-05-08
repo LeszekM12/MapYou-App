@@ -210,6 +210,12 @@
   opacity: 0.85;
 }
 
+/* Video preview inside label — must not capture clicks (label handles them) */
+.sam-photo-zone video,
+.pm-photo-zone video {
+  pointer-events: none;
+}
+
 /* Video in feed card — same container as photo */
 .home-card__photo video {
   width:       100%;

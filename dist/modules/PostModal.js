@@ -36,7 +36,7 @@ function buildHTML() {
 
         <div class="pm-field">
           <label class="pm-label">Photo / Video <span class="pm-optional">(optional)</span></label>
-          <div class="pm-photo-zone" id="pmPhotoZone">
+          <label class="pm-photo-zone" id="pmPhotoZone" for="pmPhotoInput">
             <input type="file" accept="image/*,video/*" id="pmPhotoInput" class="pm-photo-input"/>
             <div class="pm-photo-placeholder" id="pmPhotoPlaceholder">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="28" height="28">
@@ -49,7 +49,7 @@ function buildHTML() {
             <img class="pm-photo-preview hidden" id="pmPhotoPreview" alt="Preview"/>
             <video class="pm-photo-preview hidden" id="pmVideoPreview" playsinline muted controls preload="metadata"></video>
             <button class="pm-photo-remove hidden" id="pmPhotoRemove" aria-label="Remove media">✕</button>
-          </div>
+          </label>
           <span class="sam-media-hint">Max 10 MB for photos · 500 MB for videos</span>
         </div>
 
@@ -148,9 +148,9 @@ export class PostModal {
         const removeBtn = el.querySelector('#pmPhotoRemove');
         const videoPreview = el.querySelector('#pmVideoPreview');
         zone.addEventListener('click', e => {
+            // Prevent label from reopening file picker when clicking remove button
             if (e.target.closest('#pmPhotoRemove'))
-                return;
-            input.click();
+                e.preventDefault();
         });
         input.addEventListener('change', () => {
             const file = input.files?.[0];

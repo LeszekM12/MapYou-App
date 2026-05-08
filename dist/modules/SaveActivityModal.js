@@ -88,7 +88,7 @@ function buildModalHtml(activity, isManual) {
         <!-- Photo / video upload -->
         <div class="sam-field">
           <label class="sam-label">Photo / Video</label>
-          <div class="sam-photo-zone" id="samPhotoZone">
+          <label class="sam-photo-zone" id="samPhotoZone" for="samPhotoInput">
             <input type="file" accept="image/*,video/*" id="samPhotoInput" class="sam-photo-input"/>
             <div class="sam-photo-placeholder" id="samPhotoPlaceholder">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21,15 16,10 5,21"/></svg>
@@ -96,7 +96,7 @@ function buildModalHtml(activity, isManual) {
             </div>
             <img class="sam-photo-preview hidden" id="samPhotoPreview" alt="Preview"/>
             <video class="sam-photo-preview hidden" id="samVideoPreview" playsinline muted controls preload="metadata"></video>
-          </div>
+          </label>
           <span class="sam-media-hint">Max 10 MB for photos · 500 MB for videos</span>
         </div>
 
@@ -425,7 +425,6 @@ export class SaveActivityModal {
         const preview = el.querySelector('#samPhotoPreview');
         const placeholder = el.querySelector('#samPhotoPlaceholder');
         const videoPreview = el.querySelector('#samVideoPreview');
-        photoZone?.addEventListener('click', () => photoInput?.click());
         photoInput?.addEventListener('change', () => {
             const file = photoInput.files?.[0];
             if (!file)
