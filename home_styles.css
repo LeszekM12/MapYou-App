@@ -196,16 +196,12 @@
   overflow: hidden;
   background: rgba(0,0,0,0.3);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  max-height: 320px;
+  height: 260px;
 }
 .home-card__photo img {
   width: 100%;
-  height: auto;
-  max-height: 320px;
-  object-fit: contain;
+  height: 100%;
+  object-fit: cover;
   object-position: center;
   display: block;
   transition: opacity 0.2s;
