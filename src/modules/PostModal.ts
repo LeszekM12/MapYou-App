@@ -54,7 +54,7 @@ function buildHTML(): string {
             <video class="pm-photo-preview hidden" id="pmVideoPreview" playsinline muted controls preload="metadata"></video>
             <button class="pm-photo-remove hidden" id="pmPhotoRemove" aria-label="Remove media">✕</button>
           </div>
-          <span class="sam-media-hint">Max 10 MB for photos · 850 MB for videos</span>
+          <span class="sam-media-hint">Max 10 MB for photos · 500 MB for videos</span>
         </div>
 
       </div>
@@ -143,7 +143,7 @@ export class PostModal {
         input.value = ''; return;
       }
       if (isVid && file.size > MAX_VIDEO) {
-        alert(`Video too large. Max 850 MB (your file: ${(file.size/1024/1024).toFixed(0)} MB)`);
+        alert(`Video too large. Max 500 MB (your file: ${(file.size/1024/1024).toFixed(0)} MB)`);
         input.value = ''; return;
       }
       this._mediaFile    = file;

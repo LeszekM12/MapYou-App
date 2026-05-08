@@ -97,7 +97,7 @@ function buildModalHtml(activity, isManual) {
             <img class="sam-photo-preview hidden" id="samPhotoPreview" alt="Preview"/>
             <video class="sam-photo-preview hidden" id="samVideoPreview" playsinline muted controls preload="metadata"></video>
           </div>
-          <span class="sam-media-hint">Max 10 MB for photos · 850 MB for videos</span>
+          <span class="sam-media-hint">Max 10 MB for photos · 500 MB for videos</span>
         </div>
 
         <!-- Activity Stats — only for manual (no GPS data) -->
@@ -432,14 +432,14 @@ export class SaveActivityModal {
                 return;
             const isVid = file.type.startsWith('video/');
             const MAX_IMAGE = 10 * 1024 * 1024; // 10 MB
-            const MAX_VIDEO = 850 * 1024 * 1024; // 850 MB
+            const MAX_VIDEO = 500 * 1024 * 1024; // 500 MB
             if (!isVid && file.size > MAX_IMAGE) {
                 alert(`Photo too large. Max 10 MB (your file: ${(file.size / 1024 / 1024).toFixed(1)} MB)`);
                 photoInput.value = '';
                 return;
             }
             if (isVid && file.size > MAX_VIDEO) {
-                alert(`Video too large. Max 850 MB (your file: ${(file.size / 1024 / 1024).toFixed(0)} MB)`);
+                alert(`Video too large. Max 500 MB (your file: ${(file.size / 1024 / 1024).toFixed(0)} MB)`);
                 photoInput.value = '';
                 return;
             }
