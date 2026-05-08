@@ -249,33 +249,37 @@ function renderMinimapCanvas(
   const cLat   = (minLat + maxLat) / 2;
   const cLon   = (minLon + maxLon) / 2;
 
-  // Choose zoom
-  const latSpan = maxLat - minLat || 0.001;
-  const lonSpan = maxLon - minLon || 0.001;
+  // Standard Web Mercator helpers - fractional tile coords
+  const latToTileY = (lat: number, z: number) => {
+    const sin = Math.sin(lat * Math.PI / 180);
+    return (0.5 - Math.log((1 + sin) / (1 - sin)) / (4 * Math.PI)) * Math.pow(2, z);
+  };
+  const lonToTileX = (lon: number, z: number) => (lon + 180) / 360 * Math.pow(2, z);
+
+  // Pick zoom so route fits with 24px padding (mirrors fitBounds padding:[24,24])
+  const PAD = 24;
   let zoom = 15;
-  for (let z = 16; z >= 10; z--) {
-    const n = Math.pow(2, z);
-    if (lonSpan / 360 * n * 256 < W * 0.7 && latSpan / 360 * n * 256 < H * 0.7) {
-      zoom = z; break;
-    }
+  for (let z = 17; z >= 10; z--) {
+    const spanX = (lonToTileX(maxLon, z) - lonToTileX(minLon, z)) * 256;
+    const spanY = (latToTileY(minLat, z) - latToTileY(maxLat, z)) * 256;
+    if (spanX <= W - PAD * 2 && spanY <= H - PAD * 2) { zoom = z; break; }
   }
 
-  const n        = Math.pow(2, zoom);
-  const centerTx = Math.floor((cLon + 180) / 360 * n);
-  const centerTy = Math.floor((1 - Math.log(Math.tan(cLat * Math.PI / 180) + 1 / Math.cos(cLat * Math.PI / 180)) / Math.PI) / 2 * n);
+  // Fractional tile position of map centre
+  const cTx = lonToTileX(cLon, zoom);
+  const cTy = latToTileY(cLat, zoom);
+
+  // Convert lat/lon to canvas pixel, perfectly centred on (W/2, H/2)
+  const toXY = (lat: number, lon: number) => ({
+    x: (lonToTileX(lon, zoom) - cTx) * 256 + W / 2,
+    y: (latToTileY(lat, zoom) - cTy) * 256 + H / 2,
+  });
+
+  // Tile grid covering canvas
   const tilesX   = Math.ceil(W / 256) + 2;
   const tilesY   = Math.ceil(H / 256) + 2;
-  const originTx = centerTx - Math.floor(tilesX / 2);
-  const originTy = centerTy - Math.floor(tilesY / 2);
-
-  const toXY = (lat: number, lon: number) => {
-    const px = ((lon + 180) / 360 * n - originTx) * 256;
-    const sinLat = Math.sin(lat * Math.PI / 180);
-    const py = (0.5 - Math.log((1 + sinLat) / (1 - sinLat)) / (4 * Math.PI)) * n * 256 - originTy * 256;
-    const cx = (centerTx - originTx) * 256 + 128;
-    const cy = (centerTy - originTy) * 256 + 128;
-    return { x: px - cx + W / 2, y: py - cy + H / 2 };
-  };
+  const originTx = Math.floor(cTx) - Math.floor(tilesX / 2);
+  const originTy = Math.floor(cTy) - Math.floor(tilesY / 2);
 
   // Fallback background — visible while tiles load or if they fail
   ctx.fillStyle = '#f2efe9';
@@ -289,10 +293,9 @@ function renderMinimapCanvas(
     for (let dy = 0; dy < tilesY; dy++) {
       const tx = originTx + dx;
       const ty = originTy + dy;
-      const cx = (centerTx - originTx) * 256 + 128;
-      const cy = (centerTy - originTy) * 256 + 128;
-      const px = dx * 256 - cx + W / 2;
-      const py = dy * 256 - cy + H / 2;
+      // Pixel position of this tile on canvas, anchored to fractional centre cTx/cTy
+      const px = (tx - cTx) * 256 + W / 2;
+      const py = (ty - cTy) * 256 + H / 2;
       const sub = SUBS[(tx + ty) % 3];
       const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
       tilePromises.push(new Promise(resolve => {
