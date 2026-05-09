@@ -768,8 +768,13 @@ export class FriendsView {
                 const res = await fetch(`${BACKEND_URL}/live/active/${ep}`);
                 const data = await res.json();
                 if (data.active && data.token) {
-                    await updateFriendLiveToken(f.subscriptionId, data.token);
-                    changed = true;
+                    // Verify token belongs to THIS friend by checking session owner
+                    const ownerUserId = data.userId;
+                    if (!ownerUserId || ownerUserId === f.friendUserId) {
+                        await updateFriendLiveToken(f.subscriptionId, data.token);
+                        changed = true;
+                    }
+                    // If ownerUserId doesn't match this friend — skip, another friend's session
                 }
             }
             catch { /* ignoruj */ }

@@ -786,8 +786,13 @@ export class FriendsView {
         const data = await res.json() as { active: boolean; token: string | null };
 
         if (data.active && data.token) {
-          await updateFriendLiveToken(f.subscriptionId, data.token);
-          changed = true;
+          // Verify token belongs to THIS friend by checking session owner
+          const ownerUserId = (data as Record<string,unknown>).userId as string | undefined;
+          if (!ownerUserId || ownerUserId === f.friendUserId) {
+            await updateFriendLiveToken(f.subscriptionId, data.token);
+            changed = true;
+          }
+          // If ownerUserId doesn't match this friend — skip, another friend's session
         }
       } catch { /* ignoruj */ }
     }
