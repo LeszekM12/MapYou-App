@@ -188,13 +188,13 @@ async function uploadIfBase64(
   }
 }
 
-async function deleteFromCloudinary(publicId: string): Promise<void> {
+async function deleteFromCloudinary(publicId: string, isVideo = false): Promise<void> {
   if (!isOnline()) return;
   try {
     await fetch(`${BACKEND_URL}/upload/media`, {
       method:  'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ publicId }),
+      body:    JSON.stringify({ publicId, isVideo }),
       signal:  AbortSignal.timeout(10_000),
     });
   } catch { /* ignoruj błąd sieciowy */ }
@@ -826,15 +826,16 @@ const userId = getUserId();
   },
 
   async deletePost(id: string): Promise<void> {
-    // Pobierz publicId przed usunięciem
-    const posts = await loadPosts();
-    const post = posts.find(p => p.id === id);
-    const publicId = (post as unknown as Record<string, unknown>)?.photoPublicId as string | null;
+    // Pobierz publicId i mediaType przed usunięciem
+    const posts    = await loadPosts();
+    const post     = posts.find(p => p.id === id);
+    const publicId = post?.photoPublicId ?? null;
+    const isVideo  = post?.mediaType === 'video';
     await deletePost(id);
     const userId = getUserId();
     await apiDelete(`/posts/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`);
-    // Usuń zdjęcie z Cloudinary
-    if (publicId) void deleteFromCloudinary(publicId);
+    // Usuń media z Cloudinary (image lub video)
+    if (publicId) void deleteFromCloudinary(publicId, isVideo);
   },
 
   // ── Profile ──────────────────────────────────────────────────────────────────

@@ -521,8 +521,9 @@ export class SaveActivityModal {
       manualPaceMinKm = dist > 0 && manualDurSec > 0 ? (manualDurSec / 60) / dist : 0;
     }
 
-    let photoUrl:  string | null              = null;
-    let mediaType: 'image' | 'video' | null   = null;
+    let photoUrl:     string | null              = null;
+    let mediaType:    'image' | 'video' | null   = null;
+    let photoPublicId: string | null             = null;
     if (this._photoBlob) {
       const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
       const isVid  = this._photoIsVideo;
@@ -551,7 +552,7 @@ export class SaveActivityModal {
             }
           }
         );
-        if (up) { photoUrl = up.url; mediaType = up.mediaType; }
+        if (up) { photoUrl = up.url; mediaType = up.mediaType; photoPublicId = up.publicId; }
         else    { photoUrl = await blobToDataUrl(this._photoBlob); }
       } catch   { photoUrl = await blobToDataUrl(this._photoBlob); }
     }
@@ -563,7 +564,8 @@ export class SaveActivityModal {
       name,
       description,
       photoUrl,
-      mediaType:   mediaType ?? undefined,
+      photoPublicId: photoPublicId ?? undefined,
+      mediaType:     mediaType ?? undefined,
       distanceKm:  manualDistKm,
       durationSec: manualDurSec,
       paceMinKm:   manualPaceMinKm,

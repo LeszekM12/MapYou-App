@@ -245,6 +245,7 @@ export class PostModal {
     // Upload media via multipart with progress feedback
     let finalPhotoUrl: string | null = this._photoB64;
     let finalMediaType: 'image' | 'video' | null = null;
+    let _publicId: string | null = null;
     if (this._mediaFile) {
       const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
       const isVid  = this._mediaFile.type.startsWith('video/');
@@ -273,7 +274,7 @@ export class PostModal {
             }
           }
         );
-        if (up) { finalPhotoUrl = up.url; finalMediaType = up.mediaType; }
+        if (up) { finalPhotoUrl = up.url; finalMediaType = up.mediaType; _publicId = up.publicId; }
       } catch {}
     }
 
@@ -283,9 +284,10 @@ export class PostModal {
       date:      Date.now(),
       title:     title || desc.slice(0, 60),
       body:      desc,
-      photoUrl:  finalPhotoUrl,
-      mediaType: finalMediaType ?? undefined,
-      authorName: localStorage.getItem('mapyou_userName') ?? 'Athlete',
+      photoUrl:      finalPhotoUrl,
+      photoPublicId: _publicId ?? undefined,
+      mediaType:     finalMediaType ?? undefined,
+      authorName:    localStorage.getItem('mapyou_userName') ?? 'Athlete',
       avatarB64:  localStorage.getItem('mapyou_avatar') ?? null,
     };
 

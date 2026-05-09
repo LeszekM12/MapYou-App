@@ -564,6 +564,7 @@ export class SaveActivityModal {
         }
         let photoUrl = null;
         let mediaType = null;
+        let photoPublicId = null;
         if (this._photoBlob) {
             const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
             const isVid = this._photoIsVideo;
@@ -593,6 +594,7 @@ export class SaveActivityModal {
                 if (up) {
                     photoUrl = up.url;
                     mediaType = up.mediaType;
+                    photoPublicId = up.publicId;
                 }
                 else {
                     photoUrl = await blobToDataUrl(this._photoBlob);
@@ -609,6 +611,7 @@ export class SaveActivityModal {
             name,
             description,
             photoUrl,
+            photoPublicId: photoPublicId ?? undefined,
             mediaType: mediaType ?? undefined,
             distanceKm: manualDistKm,
             durationSec: manualDurSec,
