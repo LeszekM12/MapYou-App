@@ -233,10 +233,10 @@ function buildPostCard(post, onRefresh) {
     const avatarHtml = post.avatarB64
         ? `<img src="${post.avatarB64}" class="home-card__avatar-img" alt="avatar"/>`
         : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
-    const _postIsVideo = post.mediaType === 'video';
+    const _postIsVideo = post.mediaType === 'video' || (post.photoUrl?.includes('/video/upload/') ?? false);
     const photoHtml = post.photoUrl
         ? _postIsVideo
-            ? `<div class="home-card__photo"><video src="${post.photoUrl}" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
+            ? `<div class="home-card__photo"><video src="${post.photoUrl}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
             : `<div class="home-card__photo" data-photosrc="${post.photoUrl}"><img src="${post.photoUrl}" alt="" loading="lazy"/></div>`
         : '';
     // Truncate body at 250 chars
@@ -462,10 +462,10 @@ function buildCard(act) {
     const intenHtml = act.intensity
         ? `<span class="home-card__badge" style="background:${intensityColor(act.intensity)}22;color:${intensityColor(act.intensity)};border:1px solid ${intensityColor(act.intensity)}44">${intensityLabel(act.intensity)}</span>`
         : '';
-    const _actIsVideo = act.mediaType === 'video';
+    const _actIsVideo = act.mediaType === 'video' || (act.photoUrl?.includes('/video/upload/') ?? false);
     const photoHtml = act.photoUrl
         ? _actIsVideo
-            ? `<div class="home-card__photo"><video src="${act.photoUrl}" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
+            ? `<div class="home-card__photo"><video src="${act.photoUrl}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
             : `<div class="home-card__photo" data-photosrc="${act.photoUrl}"><img src="${act.photoUrl}" alt="Activity photo" loading="lazy"/></div>`
         : '';
     const notesHtml = act.notes
