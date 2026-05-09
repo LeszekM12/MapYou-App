@@ -127,7 +127,7 @@ export class FriendsView {
         const myUserId = getUserId();
         for (const f of friends) {
             let friendUserId = f.friendUserId;
-            // Znajdź friendUserId jeśli brakuje
+            // Znajdź friendUserId jeśli brakuje (tylko dla prawdziwych push endpoints)
             if (!friendUserId && f.subscriptionId && !f.subscriptionId.startsWith('local:')) {
                 try {
                     const res = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
@@ -147,6 +147,7 @@ export class FriendsView {
                 catch { }
             }
             // Zarejestruj znajomego w Atlas jeśli mamy jego userId
+            // Uwaga: nie pomijamy local: endpointów — friendUserId może być znany z linku
             if (friendUserId) {
                 void fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(friendUserId)}`, {
                     method: 'POST',
@@ -425,17 +426,19 @@ export class FriendsView {
         // 3. Backend niedostępny lub brak push sub
         const base = window.location.href.split('#')[0];
         if (sub) {
-            // Mamy push sub — base64 z pełnymi danymi (działa bez backendu)
+            // Mamy push sub — base64 z pełnymi danymi + userId (działa bez backendu)
             this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
                 name,
                 pushSub: sub.toJSON(),
+                friendUserId: getUserId(),
             }))}`;
         }
         else {
-            // Brak push sub — link tylko z imieniem (znajomy może dodać ale bez push)
+            // Brak push sub — link z imieniem i userId (znajomy może dodać ale bez push)
             this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
                 name,
                 pushSub: null,
+                friendUserId: getUserId(),
             }))}`;
         }
         this._cachingLink = false;
