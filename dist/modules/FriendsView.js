@@ -741,7 +741,10 @@ export class FriendsView {
     }
     // ── Poll friends status ───────────────────────────────────────────────────
     async _pollFriendsStatus() {
-        const friends = await getAllFriends();
+        const allFriends = await getAllFriends();
+        const myUserId = getUserId();
+        // Skip self — own endpoint should never be polled
+        const friends = allFriends.filter(f => f.friendUserId !== myUserId);
         let changed = false;
         for (const f of friends) {
             try {
