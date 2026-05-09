@@ -227,7 +227,20 @@ export class PostModal {
 
     const btn = el.querySelector<HTMLButtonElement>('#pmPost')!;
     btn.disabled = true;
-    btn.textContent = 'Posting…';
+    btn.innerHTML = `
+      <span style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation:pm-spin 0.8s linear infinite">
+          <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,0.3)" stroke-width="2.5"/>
+          <path d="M8 2a6 6 0 0 1 6 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+        </svg>
+        <span>${this._mediaFile?.type.startsWith('video/') ? 'Compressing…' : 'Posting…'}</span>
+      </span>`;
+    if (!document.querySelector('#pm-spin-style')) {
+      const s = document.createElement('style');
+      s.id = 'pm-spin-style';
+      s.textContent = '@keyframes pm-spin{to{transform:rotate(360deg)}}';
+      document.head.appendChild(s);
+    }
 
     // Upload media via multipart if file selected
     let finalPhotoUrl: string | null = this._photoB64; // fallback: base64 if no upload
