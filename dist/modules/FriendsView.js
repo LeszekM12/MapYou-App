@@ -793,11 +793,27 @@ export class FriendsView {
         const friends = await getAllFriends();
         let friend = friends.find(f => f.liveToken === token);
         if (!friend) {
-            friend = friends[0];
-            if (friend) {
-                await updateFriendLiveToken(friend.subscriptionId, token);
-                void this.render();
+            // Ask backend who owns this token — match by friendUserId
+            try {
+                const res = await fetch(`${BACKEND_URL}/live/status/${token}`);
+                const data = await res.json();
+                if (data.session && data.session !== 'finished') {
+                    // Find friend by userId from session
+                    const ownerUserId = data.userId;
+                    if (ownerUserId) {
+                        friend = friends.find(f => f.friendUserId === ownerUserId);
+                    }
+                    // Fallback: match by userName
+                    if (!friend && data.userName) {
+                        friend = friends.find(f => f.name === data.userName);
+                    }
+                    if (friend) {
+                        await updateFriendLiveToken(friend.subscriptionId, token);
+                        void this.render();
+                    }
+                }
             }
+            catch { /* ignoruj */ }
         }
     }
     async _handleLivePushUrl(url) {
