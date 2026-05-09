@@ -167,7 +167,29 @@ export class FriendsView {
         btn.addEventListener('click', async () => {
           const id = Number(btn.dataset.delete);
           if (confirm('Remove this friend?')) {
+            // Get friend data before deleting locally
+            const friends    = await getAllFriends();
+            const friend     = friends.find(f => f.id === id);
+            const friendId   = friend?.friendUserId;
+            const myUserId   = getUserId();
+
+            // 1. Remove from local IndexedDB
             await deleteFriend(id);
+
+            // 2. Remove from Atlas — both sides simultaneously
+            if (friendId && myUserId) {
+              await Promise.allSettled([
+                // My feed won't see their activities
+                fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(friendId)}`, {
+                  method: 'DELETE',
+                }),
+                // Their feed won't see my activities
+                fetch(`${BACKEND_URL}/users/${encodeURIComponent(friendId)}/friends/${encodeURIComponent(myUserId)}`, {
+                  method: 'DELETE',
+                }),
+              ]);
+            }
+
             void this.render();
           }
         });
