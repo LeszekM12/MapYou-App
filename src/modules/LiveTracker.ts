@@ -79,7 +79,7 @@ export class LiveTracker {
       await fetch(`${BACKEND_URL}/live/start`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ token: this._token, userName, liveUrl, friendSubs }),
+        body:    JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, myUserId: getUserId() }),
       });
     } catch (err) {
       console.warn('[LiveTracker] start failed:', err);

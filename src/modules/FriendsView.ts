@@ -774,7 +774,11 @@ export class FriendsView {
         }
 
         // Brak tokenu — sprawdź czy znajomy właśnie zaczął trening przez /live/active/:endpoint
-        const ep   = encodeURIComponent(f.subscriptionId);
+        // Dla iPhone bez push sub (local: prefix) używamy friendUserId jako lookup key
+        const lookupKey = f.subscriptionId.startsWith('local:') && f.friendUserId
+          ? f.friendUserId
+          : f.subscriptionId;
+        const ep   = encodeURIComponent(lookupKey);
         const res  = await fetch(`${BACKEND_URL}/live/active/${ep}`);
         const data = await res.json() as { active: boolean; token: string | null };
 

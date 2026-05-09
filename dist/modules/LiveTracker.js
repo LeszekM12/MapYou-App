@@ -8,6 +8,7 @@
 //   - integruje z push notifications do znajomych
 import { BACKEND_URL } from '../config.js';
 import { getAllFriends, updateFriendLiveToken } from './FriendsDB.js';
+import { getUserId } from './PushNotifications.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const INTERVAL_MS = 5000; // wysyłaj pozycję co 5 sekund
 const LS_TOKEN_KEY = 'mapyou_live_token';
@@ -95,7 +96,7 @@ export class LiveTracker {
             await fetch(`${BACKEND_URL}/live/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs }),
+                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, myUserId: getUserId() }),
             });
         }
         catch (err) {
