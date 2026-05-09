@@ -102,6 +102,8 @@ export class FriendsView {
         document.getElementById('btnCloseLiveView')?.addEventListener('click', () => this._closeLiveView());
         // Napraw znajomych bez friendUserId
         void this._fixMissingFriendUserIds();
+        // Auto-dodaj znajomych którzy nas dodali gdy byliśmy offline
+        void this._checkPendingFriends();
         // Renderuj listę
         void this.render();
         // Od razu zweryfikuj statusy — nie czekaj 30s
@@ -153,6 +155,53 @@ export class FriendsView {
                     method: 'POST',
                 }).catch(() => { });
             }
+        }
+    }
+    async _checkPendingFriends() {
+        const myUserId = getUserId();
+        if (!myUserId)
+            return;
+        try {
+            const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/pending-friends`);
+            if (!res.ok)
+                return;
+            const data = await res.json();
+            if (!data.data?.length)
+                return;
+            for (const pending of data.data) {
+                if (!pending.userId)
+                    continue;
+                // Add to local IndexedDB (use userId as subscriptionId fallback for local: friends)
+                const existing = await (await import('./FriendsDB.js')).getAllFriends();
+                const alreadyLocal = existing.some(f => f.friendUserId === pending.userId);
+                if (!alreadyLocal) {
+                    await (await import('./FriendsDB.js')).addFriend({
+                        name: pending.name,
+                        friendUserId: pending.userId,
+                        subscriptionId: `local:${pending.userId}`,
+                        pushSub: { endpoint: `local:${pending.userId}`, expirationTime: null, keys: { p256dh: '', auth: '' } },
+                        liveToken: null,
+                        lastSeen: null,
+                        addedAt: Date.now(),
+                    });
+                    console.log(`[Friends] Auto-added pending friend: ${pending.name} (${pending.userId})`);
+                }
+                // Register mutual friendship in Atlas
+                void fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(pending.userId)}`, {
+                    method: 'POST',
+                });
+            }
+            // Refresh UI if any were added
+            void this.render();
+            if (data.data.length === 1) {
+                this._showToast(`${data.data[0].name} added you as a friend! 🎉`);
+            }
+            else {
+                this._showToast(`${data.data.length} new friends added you! 🎉`);
+            }
+        }
+        catch (e) {
+            console.warn('[Friends] checkPendingFriends error:', e);
         }
     }
     destroy() {
