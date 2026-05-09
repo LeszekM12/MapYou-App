@@ -86,10 +86,11 @@ export class LiveTracker {
         localStorage.setItem(LS_TOKEN_KEY, this._token);
         const userName = getUserName();
         const liveUrl = getLiveUrl(this._token);
-        // Zbierz push subskrypcje znajomych
+        // Zbierz push subskrypcje znajomych — wyklucz siebie
+        const myId = getUserId();
         const friends = await getAllFriends();
         const friendSubs = friends
-            .filter(f => f.pushSub?.endpoint)
+            .filter(f => f.pushSub?.endpoint && f.friendUserId !== myId)
             .map(f => f.pushSub);
         // Zarejestruj sesję na backendzie + wyślij push do znajomych
         try {
