@@ -115,30 +115,48 @@ export async function uploadMediaFile(
   userId:         string,
   folder:         'activities' | 'posts' | 'avatars',
   fixedPublicId?: string,
+  onProgress?:    (pct: number, phase: 'uploading' | 'compressing') => void,
 ): Promise<UploadResult | null> {
   if (!file || !userId) return null;
-  try {
-    const form = new FormData();
-    form.append('file',   file, (file as File).name ?? 'upload');
-    form.append('userId', userId);
-    form.append('folder', folder);
-    if (fixedPublicId) form.append('publicId', fixedPublicId);
 
-    const res = await fetch(`${BACKEND_URL}/upload/media`, {
-      method: 'POST',
-      body:   form,
-      signal: AbortSignal.timeout(300_000), // 5 min — large video uploads
+  const form = new FormData();
+  form.append('file',   file, (file as File).name ?? 'upload');
+  form.append('userId', userId);
+  form.append('folder', folder);
+  if (fixedPublicId) form.append('publicId', fixedPublicId);
+
+  return new Promise(resolve => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${BACKEND_URL}/upload/media`);
+    xhr.timeout = 300_000; // 5 min
+
+    // Upload progress (0–100% = sending bytes to server)
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable && onProgress) {
+        onProgress(Math.round(e.loaded / e.total * 100), 'uploading');
+      }
     });
-    if (!res.ok) return null;
-    const data = await res.json() as {
-      status: string; url: string; publicId: string; mediaType: 'image' | 'video';
-    };
-    return data.status === 'ok'
-      ? { url: data.url, publicId: data.publicId, mediaType: data.mediaType }
-      : null;
-  } catch {
-    return null;
-  }
+
+    // Upload done — now server is compressing
+    xhr.upload.addEventListener('load', () => {
+      if (onProgress) onProgress(100, 'compressing');
+    });
+
+    xhr.addEventListener('load', () => {
+      try {
+        const data = JSON.parse(xhr.responseText) as {
+          status: string; url: string; publicId: string; mediaType: 'image' | 'video';
+        };
+        resolve(data.status === 'ok'
+          ? { url: data.url, publicId: data.publicId, mediaType: data.mediaType }
+          : null);
+      } catch { resolve(null); }
+    });
+
+    xhr.addEventListener('error',   () => resolve(null));
+    xhr.addEventListener('timeout', () => resolve(null));
+    xhr.send(form);
+  });
 }
 
 /**

@@ -85,31 +85,45 @@ async function apiGet(path) {
  * Upload a File/Blob to /upload/media using multipart/form-data.
  * Works for both images and videos.
  */
-export async function uploadMediaFile(file, userId, folder, fixedPublicId) {
+export async function uploadMediaFile(file, userId, folder, fixedPublicId, onProgress) {
     if (!file || !userId)
         return null;
-    try {
-        const form = new FormData();
-        form.append('file', file, file.name ?? 'upload');
-        form.append('userId', userId);
-        form.append('folder', folder);
-        if (fixedPublicId)
-            form.append('publicId', fixedPublicId);
-        const res = await fetch(`${BACKEND_URL}/upload/media`, {
-            method: 'POST',
-            body: form,
-            signal: AbortSignal.timeout(300000), // 5 min — large video uploads
+    const form = new FormData();
+    form.append('file', file, file.name ?? 'upload');
+    form.append('userId', userId);
+    form.append('folder', folder);
+    if (fixedPublicId)
+        form.append('publicId', fixedPublicId);
+    return new Promise(resolve => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', `${BACKEND_URL}/upload/media`);
+        xhr.timeout = 300000; // 5 min
+        // Upload progress (0–100% = sending bytes to server)
+        xhr.upload.addEventListener('progress', e => {
+            if (e.lengthComputable && onProgress) {
+                onProgress(Math.round(e.loaded / e.total * 100), 'uploading');
+            }
         });
-        if (!res.ok)
-            return null;
-        const data = await res.json();
-        return data.status === 'ok'
-            ? { url: data.url, publicId: data.publicId, mediaType: data.mediaType }
-            : null;
-    }
-    catch {
-        return null;
-    }
+        // Upload done — now server is compressing
+        xhr.upload.addEventListener('load', () => {
+            if (onProgress)
+                onProgress(100, 'compressing');
+        });
+        xhr.addEventListener('load', () => {
+            try {
+                const data = JSON.parse(xhr.responseText);
+                resolve(data.status === 'ok'
+                    ? { url: data.url, publicId: data.publicId, mediaType: data.mediaType }
+                    : null);
+            }
+            catch {
+                resolve(null);
+            }
+        });
+        xhr.addEventListener('error', () => resolve(null));
+        xhr.addEventListener('timeout', () => resolve(null));
+        xhr.send(form);
+    });
 }
 /**
  * Backward-compat: upload base64 image (used for avatars and minimaps only).

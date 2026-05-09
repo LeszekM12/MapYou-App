@@ -525,10 +525,34 @@ export class SaveActivityModal {
     let mediaType: 'image' | 'video' | null   = null;
     if (this._photoBlob) {
       const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+      const isVid  = this._photoIsVideo;
       try {
-        const up = await uploadMediaFile(this._photoBlob as File, userId, 'activities');
+        const up = await uploadMediaFile(
+          this._photoBlob as File, userId, 'activities', undefined,
+          (pct, phase) => {
+            if (phase === 'uploading') {
+              btn.innerHTML = `
+                <span style="display:flex;align-items:center;justify-content:center;gap:8px">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation:pm-spin 0.8s linear infinite">
+                    <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,0.3)" stroke-width="2.5"/>
+                    <path d="M8 2a6 6 0 0 1 6 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                  <span>Uploading ${pct}%</span>
+                </span>`;
+            } else {
+              btn.innerHTML = `
+                <span style="display:flex;align-items:center;justify-content:center;gap:8px">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation:pm-spin 0.8s linear infinite">
+                    <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,0.3)" stroke-width="2.5"/>
+                    <path d="M8 2a6 6 0 0 1 6 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                  <span>${isVid ? 'Compressing…' : 'Processing…'}</span>
+                </span>`;
+            }
+          }
+        );
         if (up) { photoUrl = up.url; mediaType = up.mediaType; }
-        else    { photoUrl = await blobToDataUrl(this._photoBlob); } // offline fallback
+        else    { photoUrl = await blobToDataUrl(this._photoBlob); }
       } catch   { photoUrl = await blobToDataUrl(this._photoBlob); }
     }
 

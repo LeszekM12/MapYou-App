@@ -269,13 +269,35 @@ export class PostModal {
             s.textContent = '@keyframes pm-spin{to{transform:rotate(360deg)}}';
             document.head.appendChild(s);
         }
-        // Upload media via multipart if file selected
-        let finalPhotoUrl = this._photoB64; // fallback: base64 if no upload
+        // Upload media via multipart with progress feedback
+        let finalPhotoUrl = this._photoB64;
         let finalMediaType = null;
         if (this._mediaFile) {
             const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+            const isVid = this._mediaFile.type.startsWith('video/');
             try {
-                const up = await uploadMediaFile(this._mediaFile, userId, 'posts');
+                const up = await uploadMediaFile(this._mediaFile, userId, 'posts', undefined, (pct, phase) => {
+                    if (phase === 'uploading') {
+                        btn.innerHTML = `
+                <span style="display:flex;align-items:center;justify-content:center;gap:8px">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation:pm-spin 0.8s linear infinite">
+                    <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,0.3)" stroke-width="2.5"/>
+                    <path d="M8 2a6 6 0 0 1 6 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                  <span>Uploading ${pct}%</span>
+                </span>`;
+                    }
+                    else {
+                        btn.innerHTML = `
+                <span style="display:flex;align-items:center;justify-content:center;gap:8px">
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style="animation:pm-spin 0.8s linear infinite">
+                    <circle cx="8" cy="8" r="6" stroke="rgba(255,255,255,0.3)" stroke-width="2.5"/>
+                    <path d="M8 2a6 6 0 0 1 6 6" stroke="#fff" stroke-width="2.5" stroke-linecap="round"/>
+                  </svg>
+                  <span>${isVid ? 'Compressing…' : 'Processing…'}</span>
+                </span>`;
+                    }
+                });
                 if (up) {
                     finalPhotoUrl = up.url;
                     finalMediaType = up.mediaType;
