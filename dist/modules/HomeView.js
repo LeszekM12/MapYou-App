@@ -3,7 +3,7 @@
 import { loadEnrichedActivities } from './db.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
-import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow } from './cloudSync.js';
+import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
@@ -234,6 +234,7 @@ function buildPostCard(post, onRefresh) {
         ? `<img src="${post.avatarB64}" class="home-card__avatar-img" alt="avatar"/>`
         : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
     const _postIsVideo = post.mediaType === 'video' || (post.photoUrl?.includes('/video/upload/') ?? false);
+    const _postHasReel = post._authorHasReel;
     const photoHtml = post.photoUrl
         ? _postIsVideo
             ? `<div class="home-card__photo"><video src="${post.photoUrl}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
@@ -734,6 +735,26 @@ export class HomeView {
             writable: true,
             value: null
         });
+        // ── Reels bar ──────────────────────────────────────────────────────────────
+        Object.defineProperty(this, "_reelsFeed", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: []
+        });
+        // ── Reels Viewer ───────────────────────────────────────────────────────────
+        Object.defineProperty(this, "_viewerTimer", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
+        Object.defineProperty(this, "_viewerInterval", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
     }
     init() {
         this.container = document.querySelector('#tabHome .home-scroll');
@@ -998,6 +1019,334 @@ export class HomeView {
       </div>`;
         return wrap;
     }
+    async _buildReelsBar() {
+        const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        this._reelsFeed = await CS.fetchFeedReels();
+        const myReels = this._reelsFeed.find(u => u.userId === myUserId);
+        const others = this._reelsFeed.filter(u => u.userId !== myUserId);
+        // If no reels at all and I have none — return null (hide bar)
+        if (!myReels && others.length === 0)
+            return null;
+        const bar = document.createElement('div');
+        bar.className = 'home-reels-bar';
+        // My avatar with + button
+        // Load profile from localStorage directly
+        const _profileRaw = localStorage.getItem('mapyou_profile');
+        const profile = _profileRaw ? JSON.parse(_profileRaw) : { avatarB64: null, name: 'Me' };
+        const myAvatarHtml = profile.avatarB64
+            ? `<img src="${profile.avatarB64}" class="home-reel-avatar__img" alt="avatar"/>`
+            : `<div class="home-reel-avatar__placeholder"></div>`;
+        const myHasReel = !!myReels;
+        const myHasUnseen = myReels?.hasUnseen ?? false;
+        const myItem = document.createElement('div');
+        myItem.className = 'home-reel-item';
+        myItem.innerHTML = `
+      <div class="home-reel-avatar ${myHasReel ? (myHasUnseen ? 'home-reel-avatar--active' : 'home-reel-avatar--seen') : ''}">
+        ${myAvatarHtml}
+        <div class="home-reel-add-btn" id="reelAddBtn" title="Add reel">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="10" height="10"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </div>
+      </div>
+      <span class="home-reel-name">Your reel</span>`;
+        myItem.querySelector('#reelAddBtn')?.addEventListener('click', e => {
+            e.stopPropagation();
+            void this._openReelCreator();
+        });
+        if (myHasReel) {
+            myItem.querySelector('.home-reel-avatar')?.addEventListener('click', () => {
+                void this._openReelsViewer(myUserId, 0);
+            });
+        }
+        bar.appendChild(myItem);
+        // Friends reels
+        for (const u of others) {
+            const item = document.createElement('div');
+            item.className = 'home-reel-item';
+            const avatarContent = u.avatarB64
+                ? `<img src="${u.avatarB64}" class="home-reel-avatar__img" alt="${u.authorName}"/>`
+                : `<div class="home-reel-avatar__placeholder">${u.authorName[0] ?? '?'}</div>`;
+            item.innerHTML = `
+        <div class="home-reel-avatar ${u.hasUnseen ? 'home-reel-avatar--active' : 'home-reel-avatar--seen'}">
+          ${avatarContent}
+        </div>
+        <span class="home-reel-name">${u.authorName.split(' ')[0]}</span>`;
+            item.querySelector('.home-reel-avatar')?.addEventListener('click', () => {
+                void this._openReelsViewer(u.userId, 0);
+            });
+            bar.appendChild(item);
+        }
+        return bar;
+    }
+    // ── Reel Creator ───────────────────────────────────────────────────────────
+    async _openReelCreator() {
+        const overlay = document.createElement('div');
+        overlay.className = 'home-reel-creator';
+        overlay.innerHTML = `
+      <div class="home-reel-creator__header">
+        <button class="home-reel-creator__close" id="reelCreatorClose">✕</button>
+        <span class="home-reel-creator__title">New Reel</span>
+        <button class="home-reel-creator__share" id="reelCreatorShare" disabled>Share</button>
+      </div>
+      <div class="home-reel-creator__canvas" id="reelCreatorCanvas">
+        <label class="home-reel-creator__pick" for="reelFileInput">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
+            <rect x="3" y="3" width="18" height="18" rx="3"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21,15 16,10 5,21"/>
+          </svg>
+          <span>Tap to add photo or video</span>
+          <input type="file" accept="image/*,video/*" id="reelFileInput" style="display:none"/>
+        </label>
+      </div>
+      <div class="home-reel-creator__tools" id="reelCreatorTools" style="display:none">
+        <div class="home-reel-creator__text-tools">
+          <input type="text" class="home-reel-creator__caption" id="reelCaption" placeholder="Add text…" maxlength="80"/>
+          <div class="home-reel-creator__colors" id="reelColors">
+            ${['#ffffff', '#000000', '#ff3b30', '#00c46a', '#ffcc00', '#007aff'].map(c => `<button class="home-reel-creator__color-btn" data-color="${c}" style="background:${c}"></button>`).join('')}
+          </div>
+          <div class="home-reel-creator__sizes">
+            <button data-size="14">S</button>
+            <button data-size="20" class="active">M</button>
+            <button data-size="28">L</button>
+            <button data-size="38">XL</button>
+          </div>
+        </div>
+      </div>
+      <span class="sam-media-hint">Max 10 MB photos · 500 MB videos</span>`;
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('home-reel-creator--visible'));
+        let selectedFile = null;
+        let captionColor = '#ffffff';
+        let captionSize = 20;
+        let isDragging = false;
+        let dragStartX = 0, dragStartY = 0;
+        let captionPct = { x: 50, y: 80 };
+        const canvas = overlay.querySelector('#reelCreatorCanvas');
+        const tools = overlay.querySelector('#reelCreatorTools');
+        const shareBtn = overlay.querySelector('#reelCreatorShare');
+        const captionEl = overlay.querySelector('#reelCaption');
+        overlay.querySelector('#reelCreatorClose')?.addEventListener('click', () => {
+            overlay.classList.remove('home-reel-creator--visible');
+            setTimeout(() => overlay.remove(), 350);
+        });
+        // File input
+        overlay.querySelector('#reelFileInput')?.addEventListener('change', (e) => {
+            const file = e.target.files?.[0];
+            if (!file)
+                return;
+            const isVid = file.type.startsWith('video/');
+            if (!isVid && file.size > 10 * 1024 * 1024) {
+                alert('Max 10 MB for photos');
+                return;
+            }
+            if (isVid && file.size > 500 * 1024 * 1024) {
+                alert('Max 500 MB for videos');
+                return;
+            }
+            selectedFile = file;
+            const url = URL.createObjectURL(file);
+            canvas.innerHTML = isVid
+                ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div>`
+                : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div>`;
+            tools.style.display = 'block';
+            shareBtn.disabled = false;
+        });
+        // Caption drag
+        const updateCaptionOverlay = () => {
+            const ov = overlay.querySelector('#captionOverlay');
+            if (!ov)
+                return;
+            const text = captionEl.value;
+            ov.innerHTML = text ? `<span class="home-reel-creator__caption-text" style="font-size:${captionSize}px;color:${captionColor};left:${captionPct.x}%;top:${captionPct.y}%;transform:translate(-50%,-50%)">${text}</span>` : '';
+        };
+        captionEl.addEventListener('input', updateCaptionOverlay);
+        canvas.addEventListener('mousedown', e => { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; });
+        canvas.addEventListener('touchstart', e => { isDragging = true; dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY; }, { passive: true });
+        const onMove = (x, y) => {
+            if (!isDragging)
+                return;
+            const rect = canvas.getBoundingClientRect();
+            captionPct = { x: ((x - rect.left) / rect.width) * 100, y: ((y - rect.top) / rect.height) * 100 };
+            updateCaptionOverlay();
+        };
+        canvas.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+        canvas.addEventListener('touchmove', e => onMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
+        window.addEventListener('mouseup', () => { isDragging = false; });
+        window.addEventListener('touchend', () => { isDragging = false; });
+        // Colors
+        overlay.querySelectorAll('.home-reel-creator__color-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                captionColor = btn.dataset.color ?? '#ffffff';
+                updateCaptionOverlay();
+            });
+        });
+        // Sizes
+        overlay.querySelectorAll('.home-reel-creator__sizes button').forEach(btn => {
+            btn.addEventListener('click', () => {
+                overlay.querySelectorAll('.home-reel-creator__sizes button').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                captionSize = Number(btn.dataset.size ?? 20);
+                updateCaptionOverlay();
+            });
+        });
+        // Share
+        shareBtn.addEventListener('click', async () => {
+            if (!selectedFile)
+                return;
+            shareBtn.disabled = true;
+            shareBtn.textContent = 'Uploading…';
+            const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
+            const reel = await uploadReel(selectedFile, myUserId, {
+                caption: captionEl.value || null,
+                captionX: captionPct.x,
+                captionY: captionPct.y,
+                captionSize,
+                captionColor,
+            });
+            if (reel) {
+                overlay.classList.remove('home-reel-creator--visible');
+                setTimeout(() => overlay.remove(), 350);
+                await this.render();
+            }
+            else {
+                shareBtn.disabled = false;
+                shareBtn.textContent = 'Share';
+                alert('Upload failed, please try again');
+            }
+        });
+    }
+    async _openReelsViewer(startUserId, startIndex) {
+        const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        const allGroups = this._reelsFeed;
+        let groupIdx = allGroups.findIndex(u => u.userId === startUserId);
+        if (groupIdx < 0)
+            groupIdx = 0;
+        let reelIdx = startIndex;
+        const overlay = document.createElement('div');
+        overlay.className = 'home-reel-viewer';
+        document.body.appendChild(overlay);
+        requestAnimationFrame(() => overlay.classList.add('home-reel-viewer--visible'));
+        const renderViewer = () => {
+            if (groupIdx >= allGroups.length) {
+                closeViewer();
+                return;
+            }
+            const group = allGroups[groupIdx];
+            if (reelIdx >= group.reels.length) {
+                groupIdx++;
+                reelIdx = 0;
+                renderViewer();
+                return;
+            }
+            const reel = group.reels[reelIdx];
+            const totalReels = group.reels.length;
+            // Mark as viewed
+            void CS.markReelViewed(reel.id);
+            const isLiked = reel.likes.includes(myUserId);
+            const isVideo = reel.mediaType === 'video';
+            const dur = isVideo ? reel.duration : (reel.duration || 5);
+            overlay.innerHTML = `
+        <div class="home-reel-viewer__bg">
+          ${isVideo
+                ? `<video class="home-reel-viewer__media" src="${reel.mediaUrl}" autoplay muted playsinline id="reelViewerVideo"></video>`
+                : `<img class="home-reel-viewer__media" src="${reel.mediaUrl}" alt="reel"/>`}
+          ${reel.caption ? `<span class="home-reel-viewer__caption" style="left:${reel.captionX}%;top:${reel.captionY}%;font-size:${reel.captionSize}px;color:${reel.captionColor}">${reel.caption}</span>` : ''}
+        </div>
+        <div class="home-reel-viewer__top">
+          <div class="home-reel-viewer__bars">
+            ${group.reels.map((_, i) => `<div class="home-reel-viewer__bar ${i < reelIdx ? 'done' : i === reelIdx ? 'active' : ''}" id="reelBar${i}"></div>`).join('')}
+          </div>
+          <div class="home-reel-viewer__author">
+            <div class="home-reel-avatar home-reel-avatar--active home-reel-avatar--sm">
+              ${group.avatarB64 ? `<img src="${group.avatarB64}" class="home-reel-avatar__img"/>` : `<div class="home-reel-avatar__placeholder">${group.authorName[0]}</div>`}
+            </div>
+            <span class="home-reel-viewer__name">${group.authorName}</span>
+            <span class="home-reel-viewer__time">${(() => { const s = Math.floor((Date.now() - reel.createdAt) / 1000); return s < 60 ? 'just now' : s < 3600 ? Math.floor(s / 60) + 'm ago' : Math.floor(s / 3600) + 'h ago'; })()}</span>
+          </div>
+          <button class="home-reel-viewer__close" id="reelViewerClose">✕</button>
+        </div>
+        <div class="home-reel-viewer__actions">
+          <button class="home-reel-viewer__like ${isLiked ? 'liked' : ''}" id="reelViewerLike">
+            <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+            <span id="reelLikeCount">${reel.likes.length}</span>
+          </button>
+          ${group.userId === myUserId ? `<button class="home-reel-viewer__delete" id="reelViewerDelete">🗑</button>` : ''}
+        </div>
+        <div class="home-reel-viewer__tap-left" id="reelTapLeft"></div>
+        <div class="home-reel-viewer__tap-right" id="reelTapRight"></div>`;
+            // Progress bar animation
+            if (this._viewerTimer)
+                clearTimeout(this._viewerTimer);
+            if (this._viewerInterval)
+                clearInterval(this._viewerInterval);
+            const bar = overlay.querySelector(`#reelBar${reelIdx}`);
+            let elapsed = 0;
+            const step = 50;
+            const videEl = overlay.querySelector('#reelViewerVideo');
+            const getDur = () => isVideo && videEl ? (videEl.duration || dur) : dur;
+            let paused = false;
+            overlay.querySelector('.home-reel-viewer__bg')?.addEventListener('touchstart', () => { paused = true; videEl?.pause(); }, { passive: true });
+            overlay.querySelector('.home-reel-viewer__bg')?.addEventListener('touchend', () => { paused = false; videEl?.play().catch(() => { }); });
+            this._viewerInterval = setInterval(() => {
+                if (paused)
+                    return;
+                elapsed += step;
+                const pct = Math.min((elapsed / (getDur() * 1000)) * 100, 100);
+                if (bar)
+                    bar.style.setProperty('--p', `${pct}%`);
+                if (pct >= 100) {
+                    clearInterval(this._viewerInterval);
+                    reelIdx++;
+                    renderViewer();
+                }
+            }, step);
+            // Close
+            overlay.querySelector('#reelViewerClose')?.addEventListener('click', closeViewer);
+            // Like
+            overlay.querySelector('#reelViewerLike')?.addEventListener('click', async () => {
+                const result = await CS.likeReel(reel.id);
+                if (result) {
+                    const btn = overlay.querySelector('#reelViewerLike');
+                    btn?.classList.toggle('liked', result.liked);
+                    const countEl = overlay.querySelector('#reelLikeCount');
+                    if (countEl)
+                        countEl.textContent = String(result.count);
+                }
+            });
+            // Delete (own reel)
+            overlay.querySelector('#reelViewerDelete')?.addEventListener('click', async () => {
+                if (!confirm('Delete this reel?'))
+                    return;
+                await CS.deleteReel(reel.id);
+                closeViewer();
+                await this.render();
+            });
+            // Tap navigation
+            overlay.querySelector('#reelTapLeft')?.addEventListener('click', () => {
+                if (reelIdx > 0) {
+                    reelIdx--;
+                }
+                else if (groupIdx > 0) {
+                    groupIdx--;
+                    reelIdx = allGroups[groupIdx].reels.length - 1;
+                }
+                renderViewer();
+            });
+            overlay.querySelector('#reelTapRight')?.addEventListener('click', () => {
+                reelIdx++;
+                renderViewer();
+            });
+        };
+        const closeViewer = () => {
+            if (this._viewerTimer)
+                clearTimeout(this._viewerTimer);
+            if (this._viewerInterval)
+                clearInterval(this._viewerInterval);
+            overlay.classList.remove('home-reel-viewer--visible');
+            setTimeout(() => overlay.remove(), 300);
+        };
+        renderViewer();
+    }
     async render() {
         this.container = document.querySelector('#tabHome .home-scroll');
         if (!this.container)
@@ -1014,6 +1363,10 @@ export class HomeView {
         scroll.innerHTML = '';
         scroll.appendChild(this._buildGreeting(activities.length + posts.length));
         scroll.appendChild(this._buildStreakWidget());
+        // Reels bar
+        const reelsBar = await this._buildReelsBar();
+        if (reelsBar)
+            scroll.appendChild(reelsBar);
         // Pobierz unified feed z Atlas (własne + znajomych)
         const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
         let serverFeed = [];

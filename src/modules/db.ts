@@ -73,6 +73,27 @@ export interface ProfileRecord {
   avatarB64: string | null;
 }
 
+/** Reel — ephemeral 24h story */
+export interface ReelRecord {
+  id:           string;
+  userId:       string;
+  authorName:   string;
+  avatarB64:    string | null;
+  mediaUrl:     string;
+  mediaType:    'image' | 'video';
+  publicId:     string;
+  caption:      string | null;
+  captionX:     number;
+  captionY:     number;
+  captionSize:  number;
+  captionColor: string;
+  duration:     number;
+  views:        string[];
+  likes:        string[];
+  createdAt:    number;  // timestamp ms
+  expiresAt:    number;  // timestamp ms
+}
+
 /** Post in the Home feed (text + optional photo) */
 export interface PostRecord {
   id:         string;
@@ -136,6 +157,17 @@ db.version(6).stores({
   profile:            'userId',
   postsFeed:          'id, date',
   unifiedWorkouts:    'id, type, source, date, distanceKm',
+});
+
+// version(7) — reels (ephemeral 24h stories)
+db.version(7).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
 });
 
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
@@ -341,6 +373,40 @@ export async function loadPosts(): Promise<PostRecord[]> {
 
 export async function deletePost(id: string): Promise<void> {
   await db.postsFeed.delete(id);
+}
+
+// ── CRUD — reels ─────────────────────────────────────────────────────────────
+
+export async function saveReel(reel: ReelRecord): Promise<void> {
+  try { await db.reels.put(reel); } catch (err) { console.error('[DB] saveReel error:', err); throw err; }
+}
+
+export async function loadReels(): Promise<ReelRecord[]> {
+  try {
+    const all = await db.reels.toArray();
+    const now = Date.now();
+    return all.filter((r: ReelRecord) => r.expiresAt > now);
+  } catch { return []; }
+}
+
+export async function loadReelsByUser(userId: string): Promise<ReelRecord[]> {
+  try {
+    const now = Date.now();
+    return await db.reels.where('userId').equals(userId).filter((r: ReelRecord) => r.expiresAt > now).toArray();
+  } catch { return []; }
+}
+
+export async function deleteReel(id: string): Promise<void> {
+  await db.reels.delete(id);
+}
+
+export async function cleanupExpiredReelsLocal(): Promise<void> {
+  try {
+    const now = Date.now();
+    const all = await db.reels.toArray();
+    const expired = all.filter((r: ReelRecord) => r.expiresAt <= now);
+    for (const r of expired) await db.reels.delete(r.id);
+  } catch { /* ignoruj */ }
 }
 
 // ── CRUD — unifiedWorkouts ────────────────────────────────────────────────────

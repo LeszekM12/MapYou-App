@@ -38,6 +38,10 @@ import {
   savePost,
   loadPosts,
   deletePost,
+  saveReel,
+  loadReels,
+  deleteReel,
+  cleanupExpiredReelsLocal,
   saveProfileToDB,
   loadProfileFromDB,
   type WorkoutRecord,
@@ -45,6 +49,7 @@ import {
   type UnifiedWorkout,
   type PostRecord,
   type ProfileRecord,
+  type ReelRecord,
 } from './db.js';
 import type { ActivityRecord } from './Tracker.js';
 import { getUserId } from './UserProfile.js';
@@ -709,6 +714,74 @@ export async function hydrate(): Promise<void> {
 
 // ── CS — główny obiekt syncu ──────────────────────────────────────────────────
 
+// ── Upload reelsa do Cloudinary i zapis w Atlas ──────────────────────────────
+
+export async function uploadReel(
+  file: File | Blob,
+  userId: string,
+  meta: {
+    caption?:      string | null;
+    captionX?:     number;
+    captionY?:     number;
+    captionSize?:  number;
+    captionColor?: string;
+    duration?:     number;
+  } = {},
+): Promise<ReelRecord | null> {
+  if (!file || !userId) return null;
+  try {
+    const up = await uploadMediaFile(file as File, userId, 'activities');
+    if (!up) return null;
+
+    const reelId    = `reel_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const now       = Date.now();
+    const expiresAt = now + 24 * 60 * 60 * 1000;
+
+    const reel: ReelRecord = {
+      id:           reelId,
+      userId,
+      authorName:   localStorage.getItem('mapyou_userName') ?? 'Athlete',
+      avatarB64:    localStorage.getItem('mapyou_avatar') ?? null,
+      mediaUrl:     up.url,
+      mediaType:    up.mediaType,
+      publicId:     up.publicId,
+      caption:      meta.caption ?? null,
+      captionX:     meta.captionX ?? 50,
+      captionY:     meta.captionY ?? 80,
+      captionSize:  meta.captionSize ?? 20,
+      captionColor: meta.captionColor ?? '#ffffff',
+      duration:     meta.duration ?? 5,
+      views:        [],
+      likes:        [],
+      createdAt:    now,
+      expiresAt,
+    };
+
+    await saveReel(reel);
+
+    if (isOnline()) {
+      await fetch(`${BACKEND_URL}/reels`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({
+          reelId: reel.id, userId: reel.userId,
+          authorName: reel.authorName, avatarB64: null,
+          mediaUrl: reel.mediaUrl, mediaType: reel.mediaType,
+          publicId: reel.publicId, caption: reel.caption,
+          captionX: reel.captionX, captionY: reel.captionY,
+          captionSize: reel.captionSize, captionColor: reel.captionColor,
+          duration: reel.duration,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    }
+    return reel;
+  } catch (err) {
+    console.error('[CS] uploadReel error:', err);
+    return null;
+  }
+}
+
 export const CS = {
 
   // ── Workouty ────────────────────────────────────────────────────────────────
@@ -823,6 +896,72 @@ const userId = getUserId();
       photoUrl:      uploaded?.url      ?? post.photoUrl,
       photoPublicId: uploaded?.publicId ?? null,
     });
+  },
+
+  async deleteReel(id: string): Promise<void> {
+    const reels = await loadReels();
+    const reel  = reels.find(r => r.id === id);
+    await deleteReel(id);
+    if (reel && isOnline()) {
+      const userId = getUserId();
+      fetch(`${BACKEND_URL}/reels/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`, {
+        method: 'DELETE' }).catch(() => {});
+    }
+  },
+
+  async markReelViewed(reelId: string): Promise<void> {
+    const userId = getUserId();
+    if (!userId || !isOnline()) return;
+    fetch(`${BACKEND_URL}/reels/${encodeURIComponent(reelId)}/view`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
+    }).catch(() => {});
+  },
+
+  async likeReel(reelId: string): Promise<{ liked: boolean; count: number } | null> {
+    const userId = getUserId();
+    if (!userId || !isOnline()) return null;
+    try {
+      const res = await fetch(`${BACKEND_URL}/reels/${encodeURIComponent(reelId)}/like`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+      return await res.json() as { liked: boolean; count: number };
+    } catch { return null; }
+  },
+
+  async fetchFeedReels(): Promise<{ userId: string; authorName: string; avatarB64: string | null; reels: ReelRecord[]; hasUnseen: boolean }[]> {
+    const userId = getUserId();
+    if (!userId || !isOnline()) return [];
+    try {
+      const res  = await fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(userId)}`, {
+        cache: 'no-store', signal: AbortSignal.timeout(10_000),
+      });
+      const data = await res.json() as { status: string; data: { userId: string; authorName: string; avatarB64: string | null; reels: Record<string,unknown>[]; hasUnseen: boolean }[] };
+      if (data.status !== 'ok') return [];
+      return data.data.map(u => ({
+        ...u,
+        reels: u.reels.map((r) => ({
+          id:           r['reelId'] as string,
+          userId:       u.userId,
+          authorName:   u.authorName,
+          avatarB64:    u.avatarB64,
+          mediaUrl:     r['mediaUrl'] as string,
+          mediaType:    r['mediaType'] as 'image' | 'video',
+          publicId:     '',
+          caption:      r['caption'] as string | null,
+          captionX:     r['captionX'] as number,
+          captionY:     r['captionY'] as number,
+          captionSize:  r['captionSize'] as number,
+          captionColor: r['captionColor'] as string,
+          duration:     r['duration'] as number,
+          views:        r['views'] as string[],
+          likes:        r['likes'] as string[],
+          createdAt:    new Date(r['createdAt'] as string).getTime(),
+          expiresAt:    new Date(r['expiresAt'] as string).getTime(),
+        })),
+      }));
+    } catch { return []; }
   },
 
   async deletePost(id: string): Promise<void> {

@@ -21,7 +21,7 @@
 //   await CS.deletePost(id);                 // zamiast deletePost()
 //   await CS.hydrate();                      // przy starcie — pobierz z Atlas jeśli IndexedDB puste
 import { BACKEND_URL } from '../config.js';
-import { saveWorkoutToDB, deleteWorkoutFromDB, loadWorkoutsFromDB, saveActivity, loadActivities, deleteActivity, saveEnrichedActivity, loadEnrichedActivities, deleteEnrichedActivity, saveUnifiedWorkout, loadUnifiedWorkouts, deleteUnifiedWorkout, savePost, loadPosts, deletePost, saveProfileToDB, } from './db.js';
+import { saveWorkoutToDB, deleteWorkoutFromDB, loadWorkoutsFromDB, saveActivity, loadActivities, deleteActivity, saveEnrichedActivity, loadEnrichedActivities, deleteEnrichedActivity, saveUnifiedWorkout, loadUnifiedWorkouts, deleteUnifiedWorkout, savePost, loadPosts, deletePost, saveReel, loadReels, deleteReel, saveProfileToDB, } from './db.js';
 import { getUserId } from './UserProfile.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isOnline() {
@@ -626,6 +626,60 @@ export async function hydrate() {
     }
 }
 // ── CS — główny obiekt syncu ──────────────────────────────────────────────────
+// ── Upload reelsa do Cloudinary i zapis w Atlas ──────────────────────────────
+export async function uploadReel(file, userId, meta = {}) {
+    if (!file || !userId)
+        return null;
+    try {
+        const up = await uploadMediaFile(file, userId, 'activities');
+        if (!up)
+            return null;
+        const reelId = `reel_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+        const now = Date.now();
+        const expiresAt = now + 24 * 60 * 60 * 1000;
+        const reel = {
+            id: reelId,
+            userId,
+            authorName: localStorage.getItem('mapyou_userName') ?? 'Athlete',
+            avatarB64: localStorage.getItem('mapyou_avatar') ?? null,
+            mediaUrl: up.url,
+            mediaType: up.mediaType,
+            publicId: up.publicId,
+            caption: meta.caption ?? null,
+            captionX: meta.captionX ?? 50,
+            captionY: meta.captionY ?? 80,
+            captionSize: meta.captionSize ?? 20,
+            captionColor: meta.captionColor ?? '#ffffff',
+            duration: meta.duration ?? 5,
+            views: [],
+            likes: [],
+            createdAt: now,
+            expiresAt,
+        };
+        await saveReel(reel);
+        if (isOnline()) {
+            await fetch(`${BACKEND_URL}/reels`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reelId: reel.id, userId: reel.userId,
+                    authorName: reel.authorName, avatarB64: null,
+                    mediaUrl: reel.mediaUrl, mediaType: reel.mediaType,
+                    publicId: reel.publicId, caption: reel.caption,
+                    captionX: reel.captionX, captionY: reel.captionY,
+                    captionSize: reel.captionSize, captionColor: reel.captionColor,
+                    duration: reel.duration,
+                }),
+                signal: AbortSignal.timeout(10000),
+            });
+        }
+        return reel;
+    }
+    catch (err) {
+        console.error('[CS] uploadReel error:', err);
+        return null;
+    }
+}
 export const CS = {
     // ── Workouty ────────────────────────────────────────────────────────────────
     async saveWorkout(workout) {
@@ -727,6 +781,79 @@ export const CS = {
             photoUrl: uploaded?.url ?? post.photoUrl,
             photoPublicId: uploaded?.publicId ?? null,
         });
+    },
+    async deleteReel(id) {
+        const reels = await loadReels();
+        const reel = reels.find(r => r.id === id);
+        await deleteReel(id);
+        if (reel && isOnline()) {
+            const userId = getUserId();
+            fetch(`${BACKEND_URL}/reels/${encodeURIComponent(id)}?userId=${encodeURIComponent(userId)}`, {
+                method: 'DELETE'
+            }).catch(() => { });
+        }
+    },
+    async markReelViewed(reelId) {
+        const userId = getUserId();
+        if (!userId || !isOnline())
+            return;
+        fetch(`${BACKEND_URL}/reels/${encodeURIComponent(reelId)}/view`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId }),
+        }).catch(() => { });
+    },
+    async likeReel(reelId) {
+        const userId = getUserId();
+        if (!userId || !isOnline())
+            return null;
+        try {
+            const res = await fetch(`${BACKEND_URL}/reels/${encodeURIComponent(reelId)}/like`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId }),
+            });
+            return await res.json();
+        }
+        catch {
+            return null;
+        }
+    },
+    async fetchFeedReels() {
+        const userId = getUserId();
+        if (!userId || !isOnline())
+            return [];
+        try {
+            const res = await fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(userId)}`, {
+                cache: 'no-store', signal: AbortSignal.timeout(10000),
+            });
+            const data = await res.json();
+            if (data.status !== 'ok')
+                return [];
+            return data.data.map(u => ({
+                ...u,
+                reels: u.reels.map((r) => ({
+                    id: r['reelId'],
+                    userId: u.userId,
+                    authorName: u.authorName,
+                    avatarB64: u.avatarB64,
+                    mediaUrl: r['mediaUrl'],
+                    mediaType: r['mediaType'],
+                    publicId: '',
+                    caption: r['caption'],
+                    captionX: r['captionX'],
+                    captionY: r['captionY'],
+                    captionSize: r['captionSize'],
+                    captionColor: r['captionColor'],
+                    duration: r['duration'],
+                    views: r['views'],
+                    likes: r['likes'],
+                    createdAt: new Date(r['createdAt']).getTime(),
+                    expiresAt: new Date(r['expiresAt']).getTime(),
+                })),
+            }));
+        }
+        catch {
+            return [];
+        }
     },
     async deletePost(id) {
         // Pobierz publicId i mediaType przed usunięciem

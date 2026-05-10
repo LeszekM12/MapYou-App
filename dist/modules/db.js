@@ -40,6 +40,16 @@ db.version(6).stores({
     postsFeed: 'id, date',
     unifiedWorkouts: 'id, type, source, date, distanceKm',
 });
+// version(7) — reels (ephemeral 24h stories)
+db.version(7).stores({
+    workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+    activities: 'id, sport, date, distanceKm, durationSec',
+    enrichedActivities: 'id, sport, date, name',
+    profile: 'userId',
+    postsFeed: 'id, date',
+    unifiedWorkouts: 'id, type, source, date, distanceKm',
+    reels: 'id, userId, expiresAt',
+});
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
 function _generateDescription(type, isoDate) {
     const months = [
@@ -228,6 +238,48 @@ export async function loadPosts() {
 }
 export async function deletePost(id) {
     await db.postsFeed.delete(id);
+}
+// ── CRUD — reels ─────────────────────────────────────────────────────────────
+export async function saveReel(reel) {
+    try {
+        await db.reels.put(reel);
+    }
+    catch (err) {
+        console.error('[DB] saveReel error:', err);
+        throw err;
+    }
+}
+export async function loadReels() {
+    try {
+        const all = await db.reels.toArray();
+        const now = Date.now();
+        return all.filter((r) => r.expiresAt > now);
+    }
+    catch {
+        return [];
+    }
+}
+export async function loadReelsByUser(userId) {
+    try {
+        const now = Date.now();
+        return await db.reels.where('userId').equals(userId).filter((r) => r.expiresAt > now).toArray();
+    }
+    catch {
+        return [];
+    }
+}
+export async function deleteReel(id) {
+    await db.reels.delete(id);
+}
+export async function cleanupExpiredReelsLocal() {
+    try {
+        const now = Date.now();
+        const all = await db.reels.toArray();
+        const expired = all.filter((r) => r.expiresAt <= now);
+        for (const r of expired)
+            await db.reels.delete(r.id);
+    }
+    catch { /* ignoruj */ }
 }
 // ── CRUD — unifiedWorkouts ────────────────────────────────────────────────────
 export async function saveUnifiedWorkout(workout) {
