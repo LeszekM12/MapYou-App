@@ -1344,6 +1344,7 @@ export class HomeView {
 
     const overlay = document.createElement('div');
     overlay.className = 'home-reel-viewer';
+    overlay.addEventListener('contextmenu', e => e.preventDefault());
     document.body.appendChild(overlay);
     requestAnimationFrame(() => overlay.classList.add('home-reel-viewer--visible'));
 
@@ -1369,8 +1370,8 @@ export class HomeView {
       overlay.innerHTML = `
         <div class="home-reel-viewer__bg">
           ${isVideo
-            ? `<video class="home-reel-viewer__media" src="${reel.mediaUrl}" autoplay muted playsinline id="reelViewerVideo"></video>`
-            : `<img class="home-reel-viewer__media" src="${reel.mediaUrl}" alt="reel"/>`}
+            ? `<video class="home-reel-viewer__media" src="${reel.mediaUrl}" autoplay muted playsinline id="reelViewerVideo" oncontextmenu="return false"></video>`
+            : `<img class="home-reel-viewer__media" src="${reel.mediaUrl}" alt="reel" oncontextmenu="return false" draggable="false"/>`}
           ${reel.caption ? `<span class="home-reel-viewer__caption" style="left:${reel.captionX}%;top:${reel.captionY}%;font-size:${reel.captionSize}px;color:${reel.captionColor}">${reel.caption}</span>` : ''}
         </div>
         <div class="home-reel-viewer__top">

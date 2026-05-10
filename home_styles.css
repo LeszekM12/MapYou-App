@@ -2474,6 +2474,9 @@
 }
 .home-reel-viewer__media {
   width: 100%; height: 100%; object-fit: cover;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .home-reel-viewer__caption {
   position: absolute;
