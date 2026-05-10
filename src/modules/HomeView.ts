@@ -1434,6 +1434,9 @@ export class HomeView {
         const vid = overlay.querySelector<HTMLVideoElement>('#reelViewerVideo');
         vid?.pause();
 
+        // Lower viewer z-index so profile appears on top
+        overlay.style.zIndex = '4999';
+
         // Open profile
         if (group.userId === myUserId) {
           void profileView.open();
@@ -1446,6 +1449,7 @@ export class HomeView {
           const profileOpen = document.querySelector('.pv-overlay--visible');
           if (!profileOpen) {
             clearInterval(resumeWatcher);
+            overlay.style.zIndex = '9100'; // restore viewer on top
             vid?.play().catch(() => {});
             // Restart interval from current position
             let elapsed = 0;
