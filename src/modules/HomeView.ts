@@ -1378,8 +1378,8 @@ export class HomeView {
           <div class="home-reel-viewer__bars">
             ${group.reels.map((_, i) => `<div class="home-reel-viewer__bar ${i < reelIdx ? 'done' : i === reelIdx ? 'active' : ''}" id="reelBar${i}"></div>`).join('')}
           </div>
-          <div class="home-reel-viewer__author">
-            <div class="home-reel-avatar home-reel-avatar--active home-reel-avatar--sm">
+          <div class="home-reel-viewer__author" id="reelViewerAuthor" style="cursor:pointer">
+            <div class="home-reel-avatar ${reel.views.includes(myUserId) ? 'home-reel-avatar--seen' : 'home-reel-avatar--active'} home-reel-avatar--sm">
               ${group.avatarB64 ? `<img src="${group.avatarB64}" class="home-reel-avatar__img"/>` : `<div class="home-reel-avatar__placeholder">${group.authorName[0]}</div>`}
             </div>
             <span class="home-reel-viewer__name">${group.authorName}</span>
@@ -1426,6 +1426,41 @@ export class HomeView {
 
       // Close
       overlay.querySelector('#reelViewerClose')?.addEventListener('click', closeViewer);
+
+      // Author click — pause reel and open profile
+      overlay.querySelector('#reelViewerAuthor')?.addEventListener('click', () => {
+        // Pause timer
+        if (this._viewerInterval) { clearInterval(this._viewerInterval); this._viewerInterval = null; }
+        const vid = overlay.querySelector<HTMLVideoElement>('#reelViewerVideo');
+        vid?.pause();
+
+        // Open profile
+        if (group.userId === myUserId) {
+          void profileView.open();
+        } else {
+          openPublicProfile(group.userId);
+        }
+
+        // Resume when profile closes — poll for overlay removal
+        const resumeWatcher = setInterval(() => {
+          const profileOpen = document.querySelector('.pv-overlay--visible');
+          if (!profileOpen) {
+            clearInterval(resumeWatcher);
+            vid?.play().catch(() => {});
+            // Restart interval from current position
+            let elapsed = 0;
+            const step = 50;
+            const barEl = overlay.querySelector<HTMLElement>(`#reelBar${reelIdx}`);
+            const getDur = () => reel.mediaType === 'video' && vid ? (vid.duration || reel.duration) : (reel.duration || 5);
+            this._viewerInterval = setInterval(() => {
+              elapsed += step;
+              const pct = Math.min((elapsed / (getDur() * 1000)) * 100, 100);
+              if (barEl) barEl.style.setProperty('--p', `${pct}%`);
+              if (pct >= 100) { clearInterval(this._viewerInterval!); reelIdx++; renderViewer(); }
+            }, step);
+          }
+        }, 300);
+      });
 
       // Like
       overlay.querySelector('#reelViewerLike')?.addEventListener('click', async () => {
