@@ -1024,18 +1024,14 @@ export class HomeView {
         this._reelsFeed = await CS.fetchFeedReels();
         const myReels = this._reelsFeed.find(u => u.userId === myUserId);
         const others = this._reelsFeed.filter(u => u.userId !== myUserId);
-        // If no reels at all and I have none — return null (hide bar)
-        if (!myReels && others.length === 0)
-            return null;
+        // Always show bar — user needs + button to add their first reel
         const bar = document.createElement('div');
-        bar.className = 'home-reels-bar';
+        bar.className = 'home-reels-bar home-reels-bar--in-header';
         // My avatar with + button
-        // Load profile from localStorage directly
-        const _profileRaw = localStorage.getItem('mapyou_profile');
-        const profile = _profileRaw ? JSON.parse(_profileRaw) : { avatarB64: null, name: 'Me' };
+        const profile = loadProfileFromLocal();
         const myAvatarHtml = profile.avatarB64
-            ? `<img src="${profile.avatarB64}" class="home-reel-avatar__img" alt="avatar"/>`
-            : `<div class="home-reel-avatar__placeholder"></div>`;
+            ? `<img src="${profile.avatarB64}" class="home-reel-avatar__img" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;border:2px solid #141417;"/>`
+            : `<div class="home-reel-avatar__placeholder">${profile.name?.[0] ?? '?'}</div>`;
         const myHasReel = !!myReels;
         const myHasUnseen = myReels?.hasUnseen ?? false;
         const myItem = document.createElement('div');
@@ -1085,7 +1081,7 @@ export class HomeView {
       <div class="home-reel-creator__header">
         <button class="home-reel-creator__close" id="reelCreatorClose">✕</button>
         <span class="home-reel-creator__title">New Reel</span>
-        <button class="home-reel-creator__share" id="reelCreatorShare" disabled>Share</button>
+        <div style="width:28px;"></div>
       </div>
       <div class="home-reel-creator__canvas" id="reelCreatorCanvas">
         <label class="home-reel-creator__pick" for="reelFileInput">
@@ -1098,21 +1094,28 @@ export class HomeView {
           <input type="file" accept="image/*,video/*" id="reelFileInput" style="display:none"/>
         </label>
       </div>
-      <div class="home-reel-creator__tools" id="reelCreatorTools" style="display:none">
-        <div class="home-reel-creator__text-tools">
-          <input type="text" class="home-reel-creator__caption" id="reelCaption" placeholder="Add text…" maxlength="80"/>
-          <div class="home-reel-creator__colors" id="reelColors">
-            ${['#ffffff', '#000000', '#ff3b30', '#00c46a', '#ffcc00', '#007aff'].map(c => `<button class="home-reel-creator__color-btn" data-color="${c}" style="background:${c}"></button>`).join('')}
-          </div>
-          <div class="home-reel-creator__sizes">
-            <button data-size="14">S</button>
-            <button data-size="20" class="active">M</button>
-            <button data-size="28">L</button>
-            <button data-size="38">XL</button>
-          </div>
+      <!-- Right side tools — Instagram style, visible after file selected -->
+      <div class="home-reel-creator__right-tools" id="reelCreatorTools" style="display:none">
+        <button class="home-reel-creator__tool-btn" id="reelTextToggle" title="Add text">
+          <span style="font-size:16px;font-weight:700;color:#fff;">Aa</span>
+          <span class="home-reel-creator__tool-lbl">Text</span>
+        </button>
+        <div class="home-reel-creator__tool-btn" id="reelColorPicker" title="Color">
+          <div class="home-reel-creator__color-wheel"></div>
+          <span class="home-reel-creator__tool-lbl">Color</span>
         </div>
+        <button class="home-reel-creator__tool-btn" id="reelSizePicker" title="Size">
+          <span style="font-size:14px;font-weight:700;color:#fff;" id="reelSizeLabel">M</span>
+          <span class="home-reel-creator__tool-lbl">Size</span>
+        </button>
       </div>
-      <span class="sam-media-hint">Max 10 MB photos · 500 MB videos</span>`;
+      <!-- Text input — shown when text tool active -->
+      <input type="text" class="home-reel-creator__caption" id="reelCaption" placeholder="Type text…" maxlength="80" style="display:none"/>
+      <!-- Bottom bar — share button + hint -->
+      <div class="home-reel-creator__bottom">
+        <span class="home-reel-creator__hint">Max 10 MB photos · 500 MB videos</span>
+        <button class="home-reel-creator__share" id="reelCreatorShare" disabled>Share ➤</button>
+      </div>`;
         document.body.appendChild(overlay);
         requestAnimationFrame(() => overlay.classList.add('home-reel-creator--visible'));
         let selectedFile = null;
@@ -1148,7 +1151,10 @@ export class HomeView {
             canvas.innerHTML = isVid
                 ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div>`
                 : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div>`;
-            tools.style.display = 'block';
+            // Reset tool overlays so ensureTools() re-creates them inside new canvas
+            _palette = null;
+            _sizeWrap = null;
+            tools.style.display = 'flex';
             shareBtn.disabled = false;
         });
         // Caption drag
@@ -1190,6 +1196,66 @@ export class HomeView {
             });
         });
         // Share
+        // Show caption input when text tool clicked
+        overlay.querySelector('#reelTextToggle')?.addEventListener('click', () => {
+            const cap = overlay.querySelector('#reelCaption');
+            cap.style.display = cap.style.display === 'none' ? 'block' : 'none';
+            if (cap.style.display === 'block')
+                cap.focus();
+        });
+        // Color & size tools — lazy init after file pick to survive canvas.innerHTML reset
+        const COLORS = ['#ffffff', '#000000', '#ff3b30', '#ff9500', '#ffcc00', '#00c46a', '#007aff', '#af52de', '#ff2d55', '#5ac8fa'];
+        let _palette = null;
+        let _sizeWrap = null;
+        const ensureTools = () => {
+            if (_palette)
+                return;
+            _palette = document.createElement('div');
+            _palette.className = 'home-reel-creator__palette';
+            _palette.style.display = 'none';
+            _palette.innerHTML = COLORS.map(c => `<button class="home-reel-creator__color-swatch" data-color="${c}" style="background:${c}"></button>`).join('');
+            canvas.appendChild(_palette);
+            _palette.addEventListener('click', e => {
+                const btn = e.target.closest('[data-color]');
+                if (!btn)
+                    return;
+                captionColor = btn.dataset.color ?? '#ffffff';
+                const wheel = overlay.querySelector('.home-reel-creator__color-wheel');
+                if (wheel)
+                    wheel.style.background = captionColor;
+                updateCaptionOverlay();
+                _palette.style.display = 'none';
+            });
+            _sizeWrap = document.createElement('div');
+            _sizeWrap.className = 'home-reel-creator__size-slider-wrap';
+            _sizeWrap.style.display = 'none';
+            _sizeWrap.innerHTML = `
+        <input type="range" min="12" max="48" value="${captionSize}" step="1" class="home-reel-creator__size-slider"/>
+        <span class="home-reel-creator__size-val">${captionSize}px</span>`;
+            canvas.appendChild(_sizeWrap);
+            _sizeWrap.querySelector('input')?.addEventListener('input', e => {
+                captionSize = Number(e.target.value);
+                const val = _sizeWrap.querySelector('.home-reel-creator__size-val');
+                if (val)
+                    val.textContent = `${captionSize}px`;
+                const lbl = overlay.querySelector('#reelSizeLabel');
+                if (lbl)
+                    lbl.textContent = String(captionSize);
+                updateCaptionOverlay();
+            });
+        };
+        overlay.querySelector('#reelColorPicker')?.addEventListener('click', () => {
+            ensureTools();
+            const isOpen = _palette.style.display !== 'none';
+            _palette.style.display = isOpen ? 'none' : 'flex';
+            _sizeWrap.style.display = 'none';
+        });
+        overlay.querySelector('#reelSizePicker')?.addEventListener('click', () => {
+            ensureTools();
+            const isOpen = _sizeWrap.style.display !== 'none';
+            _sizeWrap.style.display = isOpen ? 'none' : 'flex';
+            _palette.style.display = 'none';
+        });
         shareBtn.addEventListener('click', async () => {
             if (!selectedFile)
                 return;
@@ -1362,11 +1428,11 @@ export class HomeView {
         this._workouts = workouts;
         scroll.innerHTML = '';
         scroll.appendChild(this._buildGreeting(activities.length + posts.length));
-        scroll.appendChild(this._buildStreakWidget());
-        // Reels bar
+        // Reels bar — directly under header, BEFORE streak (Instagram style)
         const reelsBar = await this._buildReelsBar();
         if (reelsBar)
             scroll.appendChild(reelsBar);
+        scroll.appendChild(this._buildStreakWidget());
         // Pobierz unified feed z Atlas (własne + znajomych)
         const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
         let serverFeed = [];
