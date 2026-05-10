@@ -1166,8 +1166,29 @@ export class HomeView {
             ov.innerHTML = text ? `<span class="home-reel-creator__caption-text" style="font-size:${captionSize}px;color:${captionColor};left:${captionPct.x}%;top:${captionPct.y}%;transform:translate(-50%,-50%)">${text}</span>` : '';
         };
         captionEl.addEventListener('input', updateCaptionOverlay);
-        canvas.addEventListener('mousedown', e => { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; });
-        canvas.addEventListener('touchstart', e => { isDragging = true; dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY; }, { passive: true });
+        const isToolEl = (t) => {
+            if (!t)
+                return false;
+            const el = t;
+            return !!(el.closest('.home-reel-creator__size-slider-wrap') ||
+                el.closest('.home-reel-creator__palette') ||
+                el.closest('.home-reel-creator__right-tools') ||
+                el.closest('.home-reel-creator__caption'));
+        };
+        canvas.addEventListener('mousedown', e => {
+            if (isToolEl(e.target))
+                return;
+            isDragging = true;
+            dragStartX = e.clientX;
+            dragStartY = e.clientY;
+        });
+        canvas.addEventListener('touchstart', e => {
+            if (isToolEl(e.target))
+                return;
+            isDragging = true;
+            dragStartX = e.touches[0].clientX;
+            dragStartY = e.touches[0].clientY;
+        }, { passive: true });
         const onMove = (x, y) => {
             if (!isDragging)
                 return;

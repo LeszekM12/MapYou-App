@@ -1198,8 +1198,22 @@ export class HomeView {
     };
     captionEl.addEventListener('input', updateCaptionOverlay);
 
-    canvas.addEventListener('mousedown', e => { isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY; });
-    canvas.addEventListener('touchstart', e => { isDragging = true; dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY; }, { passive: true });
+    const isToolEl = (t: EventTarget | null) => {
+      if (!t) return false;
+      const el = t as HTMLElement;
+      return !!(el.closest('.home-reel-creator__size-slider-wrap') ||
+                el.closest('.home-reel-creator__palette') ||
+                el.closest('.home-reel-creator__right-tools') ||
+                el.closest('.home-reel-creator__caption'));
+    };
+    canvas.addEventListener('mousedown', e => {
+      if (isToolEl(e.target)) return;
+      isDragging = true; dragStartX = e.clientX; dragStartY = e.clientY;
+    });
+    canvas.addEventListener('touchstart', e => {
+      if (isToolEl(e.target)) return;
+      isDragging = true; dragStartX = e.touches[0].clientX; dragStartY = e.touches[0].clientY;
+    }, { passive: true });
     const onMove = (x: number, y: number) => {
       if (!isDragging) return;
       const rect = canvas.getBoundingClientRect();
