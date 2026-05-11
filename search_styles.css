@@ -431,3 +431,40 @@
   font-size: 1.4rem !important;
   min-width: 44px;
 }
+
+/* ── Club detail action row (Strava-style) ───────────────────────────────── */
+.sv2-club-detail__action-row {
+  display: flex;
+  gap: 0;
+  border-top: 1px solid rgba(255,255,255,0.07);
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+  margin-bottom: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sv2-club-detail__action-row::-webkit-scrollbar { display: none; }
+.sv2-club-detail__action-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 8px;
+  background: none;
+  border: none;
+  border-right: 1px solid rgba(255,255,255,0.06);
+  color: rgba(255,255,255,0.5);
+  font-size: 1.1rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  white-space: nowrap;
+  min-width: 60px;
+}
+.sv2-club-detail__action-btn:last-child { border-right: none; }
+.sv2-club-detail__action-btn > span:first-child { font-size: 1.6rem; }
+.sv2-club-detail__action-btn:active { background: rgba(255,255,255,0.05); }
+.sv2-club-detail__action-btn--active {
+  color: var(--color-brand--2, #00c46a);
+  border-bottom: 2px solid var(--color-brand--2, #00c46a);
+}

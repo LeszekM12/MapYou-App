@@ -566,267 +566,314 @@ export class SearchView {
 
   private _openClubDetail(club: LocalClub): void {
     document.getElementById('clubDetailModal')?.remove();
-    const sportIcons: Record<string, string> = {
-      running: '🏃', walking: '🚶', cycling: '🚴', fitness: '💪', hiking: '🥾', other: '🏅',
-    };
+    const sportIcons: Record<string,string> = { running:'🏃',walking:'🚶',cycling:'🚴',fitness:'💪',hiking:'🥾',other:'🏅' };
     const icon  = sportIcons[club.sport] ?? '🏅';
-    const colors: Record<string, string> = {
-      running: '#00c46a', cycling: '#ffb545', walking: '#5badea', fitness: '#f97316', hiking: '#a78bfa', other: '#6b7280',
-    };
-    const color = colors[club.sport] ?? '#00c46a';
+    const color = club.sport === 'cycling' ? '#ffb545' : club.sport === 'running' ? '#00c46a' : '#5badea';
+    const myUserId = getUserId();
 
     const modal = document.createElement('div');
     modal.id = 'clubDetailModal';
     modal.className = 'sv2-club-detail-overlay';
 
-    // Load feed from backend
-    let feedHtml = '<div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>';
-    fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/feed`, { cache: 'no-store' })
-      .then(r => r.json())
-      .then((data: { status: string; data: {kind:string;date:number;data:Record<string,unknown>}[] }) => {
-        const feedEl = document.querySelector<HTMLElement>('.sv2-club-detail__feed');
-        if (!feedEl) return;
-        if (!data.data?.length) {
-          feedEl.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📢</span><p>No posts yet.</p><p class="sv2-club-detail__feed-sub">Share activities or posts to see them here.</p></div>';
-          return;
-        }
-        feedEl.innerHTML = data.data.map(f => {
-          const d = f.data;
-          const isAct = f.kind === 'activity';
-          return `<div class="sv2-club-feed-item">
-            <div class="sv2-club-feed-item__top">
-              <span class="sv2-club-feed-item__author">${d.authorName ?? ''}</span>
-              <span class="sv2-club-feed-item__date">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>
-            </div>
-            <div class="sv2-club-feed-item__title">${d.name ?? d.title ?? d.description ?? ''}</div>
-            ${isAct && d.distanceKm ? `<div class="sv2-club-feed-item__stats"><span>${(d.distanceKm as number).toFixed(2)} km</span>${d.durationSec ? `<span>${Math.floor((d.durationSec as number)/60)}m</span>` : ''}</div>` : ''}
-          </div>`;
-        }).join('');
-      }).catch(() => {});
-
-    modal.innerHTML = `
-      <div class="sv2-club-detail">
-        <!-- Banner -->
-        <div class="sv2-club-detail__banner" style="${club.bannerB64
-          ? `background:url('${club.bannerB64}') center/cover`
-          : `background:linear-gradient(135deg,${color}33,${color}11)`}">
+    const renderModal = (tab: 'feed'|'members' = 'feed') => {
+      const isMember = club.joined || club.isOwner;
+      modal.innerHTML = `
+        <div class="sv2-club-detail__banner" style="${club.bannerB64 ? `background:url('${club.bannerB64}') center/cover` : `background:linear-gradient(135deg,${color}33,${color}11)`}">
           <button class="sv2-club-detail__back" id="cdbBack">←</button>
-          ${club.isOwner ? `
-          <label class="sv2-club-detail__edit-banner" title="Change banner">
-            📷
-            <input type="file" accept="image/*" id="cdbBannerInput" style="display:none"/>
-          </label>` : ''}
-          <div class="sv2-club-detail__logo" style="${club.logoB64
-            ? `background:url('${club.logoB64}') center/cover;border:2px solid ${color}44`
-            : `background:${color}22;border:2px solid ${color}44`}">
+          ${club.isOwner ? `<label class="sv2-club-detail__edit-banner" for="cdbBannerInput">📷 Edit</label><input type="file" accept="image/*" id="cdbBannerInput" style="display:none"/>` : ''}
+          <div class="sv2-club-detail__logo" style="${club.logoB64 ? `background:url('${club.logoB64}') center/cover no-repeat;border:2px solid ${color}44` : `background:rgba(255,255,255,0.08)`}">
             ${club.logoB64 ? '' : `<span style="font-size:2.8rem">${icon}</span>`}
-            ${club.isOwner ? `
-            <label class="sv2-club-detail__edit-logo" title="Change logo">
-              ✏️
-              <input type="file" accept="image/*" id="cdbLogoInput" style="display:none"/>
-            </label>` : ''}
+            ${club.isOwner ? `<label class="sv2-club-detail__edit-logo" for="cdbLogoInput">✏️</label><input type="file" accept="image/*" id="cdbLogoInput" style="display:none"/>` : ''}
           </div>
         </div>
 
-        <!-- Info -->
         <div class="sv2-club-detail__info">
           <h2 class="sv2-club-detail__name">${club.name}</h2>
           <div class="sv2-club-detail__meta">
-            <span>${icon} ${club.sport.charAt(0).toUpperCase() + club.sport.slice(1)}</span>
-            <span>👥 ${club.memberCount} member${club.memberCount !== 1 ? 's' : ''}</span>
-            <span>🌐 Public</span>
-            ${club.location ? `<span>📍 ${club.location}</span>` : ''}
+            <span>${icon} ${club.sport}</span>
+            <span>👥 ${club.memberCount} members</span>
+            <span>${(club as unknown as Record<string,unknown>).isPrivate ? '🔒 Private' : '🌐 Public'}</span>
+            <span>📍 ${club.location}</span>
           </div>
-          ${club.description ? `<p class="sv2-club-detail__desc">${club.description}</p>` : ''}
-          <div class="sv2-club-detail__actions" style="display:flex;flex-direction:column;gap:8px">
-            ${club.isOwner ? `
-              <div style="display:flex;gap:8px">
-                <button class="sv2-club-action sv2-club-action--join" id="cdbPrivacy" style="flex:1;font-size:1.25rem">
-                  ${(club as unknown as Record<string,unknown>).isPrivate ? '🌐 Make Public' : '🔒 Make Private'}
-                </button>
-                <button class="sv2-club-action sv2-club-action--join" id="cdbShare" style="flex:0 0 auto;padding:14px 16px" title="Share invite link">
-                  🔗
-                </button>
-                <button class="sv2-club-action sv2-club-action--leave" id="cdbDelete" style="flex:0 0 auto;padding:14px 16px">
-                  🗑
-                </button>
-              </div>` : `
-              <button class="sv2-club-action ${club.joined ? 'sv2-club-action--leave' : 'sv2-club-action--join'}"
-                id="cdbJoin">${club.joined ? 'Leave club' : 'Join club'}</button>`}
-            ${club.joined || club.isOwner ? `
-              <button class="sv2-club-action sv2-club-action--join" id="cdbAddPost" style="background:rgba(0,196,106,0.12);color:#00c46a;border:1.5px solid rgba(0,196,106,0.3)">
-                ✏️ Add Post to Club
-              </button>` : ''}
+          <p class="sv2-club-detail__desc">${club.description || ''}</p>
+        </div>
+
+        <!-- Action buttons row — Strava style -->
+        <div class="sv2-club-detail__action-row">
+          ${club.isOwner ? `
+            <button class="sv2-club-detail__action-btn" id="cdbPrivacy">
+              <span>${(club as unknown as Record<string,unknown>).isPrivate ? '🌐' : '🔒'}</span>
+              <span>${(club as unknown as Record<string,unknown>).isPrivate ? 'Public' : 'Private'}</span>
+            </button>
+            <button class="sv2-club-detail__action-btn" id="cdbShare">
+              <span>🔗</span><span>Share</span>
+            </button>
+            <button class="sv2-club-detail__action-btn" id="cdbDelete" style="color:#f87171">
+              <span>🗑</span><span>Delete</span>
+            </button>` : `
+            <button class="sv2-club-detail__action-btn ${isMember ? 'sv2-club-detail__action-btn--active' : ''}" id="cdbJoin">
+              <span>${isMember ? '✓' : '+'}</span>
+              <span>${isMember ? 'Joined' : ((club as unknown as Record<string,unknown>).isPrivate ? 'Request' : 'Join')}</span>
+            </button>
+            <button class="sv2-club-detail__action-btn" id="cdbShare">
+              <span>🔗</span><span>Share</span>
+            </button>`}
+          <button class="sv2-club-detail__action-btn ${tab === 'feed' ? 'sv2-club-detail__action-btn--active' : ''}" id="cdbTabFeed">
+            <span>📢</span><span>Feed</span>
+          </button>
+          <button class="sv2-club-detail__action-btn ${tab === 'members' ? 'sv2-club-detail__action-btn--active' : ''}" id="cdbTabMembers">
+            <span>👥</span><span>Members</span>
+          </button>
+        </div>
+
+        ${isMember ? `
+        <div class="sv2-club-detail__actions" style="padding:0 16px 12px">
+          <button class="sv2-club-action sv2-club-action--join" id="cdbAddPost">✏️ Add Post to Club</button>
+        </div>` : ''}
+
+        <!-- Feed tab -->
+        <div id="cdbFeedSection" style="${tab === 'feed' ? '' : 'display:none'}">
+          <div class="sv2-club-detail__section-title">CLUB FEED</div>
+          <div class="sv2-club-detail__feed" id="cdbFeed">
+            <div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>
           </div>
         </div>
 
-        <!-- Feed -->
-        <div class="sv2-club-detail__section-title">Club Feed</div>
-        <div class="sv2-club-detail__feed"><div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div></div>
-
-        <!-- Members -->
-        <div class="sv2-club-detail__section-title">Members (${club.memberCount})</div>
-        <div class="sv2-club-detail__members">
-          <div class="sv2-item" style="margin:0 16px">
-            <div class="sv2-item__avatar">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
-                <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-              </svg>
-            </div>
-            <div class="sv2-item__info">
-              <span class="sv2-item__name">${localStorage.getItem('mapyou_userName') ?? 'You'}</span>
-              <span class="sv2-item__sub">${club.isOwner ? '👑 Owner' : '👤 Member'}</span>
-            </div>
+        <!-- Members + Stats tab -->
+        <div id="cdbMembersSection" style="${tab === 'members' ? '' : 'display:none'}">
+          <div class="sv2-club-detail__section-title">STATISTICS</div>
+          <div id="cdbStats" style="padding:0 16px 8px;color:rgba(255,255,255,0.5);font-size:1.2rem">Loading…</div>
+          <div class="sv2-club-detail__section-title">MEMBERS</div>
+          <div class="sv2-club-detail__members" id="cdbMembers">
+            <div style="padding:16px;color:rgba(255,255,255,0.3)">Loading…</div>
           </div>
-        </div>
-      </div>`;
+          ${club.isOwner ? `
+          <div class="sv2-club-detail__section-title" id="cdbPendingTitle" style="display:none">JOIN REQUESTS</div>
+          <div id="cdbPending"></div>` : ''}
+        </div>`;
 
-    document.body.appendChild(modal);
-    requestAnimationFrame(() => modal.classList.add('sv2-club-detail-overlay--visible'));
+      // Back
+      modal.querySelector('#cdbBack')?.addEventListener('click', close);
+
+      // Tab switching
+      modal.querySelector('#cdbTabFeed')?.addEventListener('click', () => renderModal('feed'));
+      modal.querySelector('#cdbTabMembers')?.addEventListener('click', () => {
+        renderModal('members');
+        loadMembersAndStats();
+      });
+
+      // Load feed if on feed tab
+      if (tab === 'feed') loadFeed();
+      if (tab === 'members') loadMembersAndStats();
+
+      // Banner/logo upload
+      const uploadToCloud = async (file: File): Promise<string | null> => {
+        const { uploadMediaFile } = await import('./cloudSync.js');
+        return (await uploadMediaFile(file, myUserId, 'activities' as 'activities'))?.url ?? null;
+      };
+      modal.querySelector('#cdbBannerInput')?.addEventListener('change', async e => {
+        const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
+        const url = await uploadToCloud(file); if (!url) return;
+        const clubs = loadClubs(); const c = clubs.find(x => x.id === club.id);
+        if (c) { c.bannerB64 = url; saveClubs(clubs); club.bannerB64 = url; }
+        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ bannerUrl: url }) });
+        renderModal(tab);
+      });
+      modal.querySelector('#cdbLogoInput')?.addEventListener('change', async e => {
+        const file = (e.target as HTMLInputElement).files?.[0]; if (!file) return;
+        const url = await uploadToCloud(file); if (!url) return;
+        const clubs = loadClubs(); const c = clubs.find(x => x.id === club.id);
+        if (c) { c.logoB64 = url; saveClubs(clubs); club.logoB64 = url; }
+        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ avatarB64: url }) });
+        renderModal(tab);
+      });
+
+      // Join / Request
+      modal.querySelector('#cdbJoin')?.addEventListener('click', async () => {
+        const isPrivate = !!(club as unknown as Record<string,unknown>).isPrivate;
+        if (club.joined) {
+          await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/leave`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId: myUserId }) });
+          club.joined = false; club.memberCount = Math.max(0, club.memberCount - 1);
+          const lc = loadClubs().find(c => c.id === club.id); if (lc) { lc.joined = false; saveClubs(loadClubs().map(c => c.id === club.id ? lc : c)); }
+        } else if (isPrivate) {
+          await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/request`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId: myUserId }) });
+          const btn = modal.querySelector<HTMLButtonElement>('#cdbJoin'); if (btn) { btn.querySelector('span')!.textContent = '⏳'; btn.querySelectorAll('span')[1].textContent = 'Pending'; }
+          return;
+        } else {
+          await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/join`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId: myUserId }) });
+          club.joined = true; club.memberCount++;
+          const lcs = loadClubs(); const lc = lcs.find(c => c.id === club.id);
+          if (lc) { lc.joined = true; lc.memberCount++; saveClubs(lcs); }
+          else { loadClubs(); saveClubs([...loadClubs(), { ...club }]); }
+        }
+        renderModal(tab);
+      });
+
+      // Privacy toggle
+      modal.querySelector('#cdbPrivacy')?.addEventListener('click', async () => {
+        const nowPrivate = !(club as unknown as Record<string,unknown>).isPrivate;
+        (club as unknown as Record<string,unknown>).isPrivate = nowPrivate;
+        const lcs = loadClubs(); const lc = lcs.find(c => c.id === club.id);
+        if (lc) { (lc as unknown as Record<string,unknown>).isPrivate = nowPrivate; saveClubs(lcs); }
+        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ isPrivate: nowPrivate }) });
+        renderModal(tab);
+      });
+
+      // Share
+      modal.querySelector('#cdbShare')?.addEventListener('click', async () => {
+        try {
+          const res  = await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/invite`, { method:'POST' });
+          const data = await res.json() as { status: string; code: string };
+          if (data.status !== 'ok') throw new Error('Failed');
+          const link = `${window.location.href.split('#')[0]}#club=${data.code}`;
+          if (navigator.share) {
+            await navigator.share({ title: `Join ${club.name} on MapYou`, url: link });
+          } else {
+            await navigator.clipboard.writeText(link);
+            const btn = modal.querySelector<HTMLButtonElement>('#cdbShare');
+            if (btn) { btn.querySelectorAll('span')[0].textContent = '✓'; setTimeout(() => btn.querySelectorAll('span')[0].textContent = '🔗', 2000); }
+          }
+        } catch { /* ignore */ }
+      });
+
+      // Delete
+      modal.querySelector('#cdbDelete')?.addEventListener('click', async () => {
+        if (!confirm(`Delete "${club.name}"?`)) return;
+        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { method:'DELETE' });
+        saveClubs(loadClubs().filter(c => c.id !== club.id));
+        close();
+      });
+
+      // Add Post — lower z-index so PostModal appears on top
+      modal.querySelector('#cdbAddPost')?.addEventListener('click', () => {
+        modal.style.zIndex = '4999';
+        import('./PostModal.js').then(m => {
+          m.openPostModal(post => {
+            post.clubIds = [club.id];
+            import('./cloudSync.js').then(cs => {
+              void cs.CS.savePost(post).then(() => { loadFeed(); });
+            });
+          });
+          // Restore z-index when PostModal closes
+          const watcher = setInterval(() => {
+            if (!document.querySelector('.pm-overlay--visible, .pm-overlay') || document.querySelector('.pm-overlay')?.classList.contains('pm-overlay--hidden')) {
+              clearInterval(watcher);
+              setTimeout(() => { modal.style.zIndex = ''; }, 400);
+            }
+          }, 300);
+        });
+      });
+    }; // end renderModal
+
+    const loadFeed = () => {
+      const feedEl = modal.querySelector<HTMLElement>('#cdbFeed'); if (!feedEl) return;
+      fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/feed`, { cache:'no-store' })
+        .then(r => r.json())
+        .then((data: { status: string; data: {kind:string;date:number;data:Record<string,unknown>}[] }) => {
+          if (!feedEl) return;
+          if (!data.data?.length) { feedEl.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📢</span><p>No posts yet.</p><p class="sv2-club-detail__feed-sub">Share activities or posts to see them here.</p></div>'; return; }
+          feedEl.innerHTML = data.data.map(f => {
+            const d = f.data;
+            return `<div class="sv2-club-feed-item">
+              <div class="sv2-club-feed-item__top">
+                <span class="sv2-club-feed-item__author">${d.authorName ?? ''}</span>
+                <span class="sv2-club-feed-item__date">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>
+              </div>
+              <div class="sv2-club-feed-item__title">${d.name ?? d.title ?? ''}</div>
+              ${d.distanceKm ? `<div class="sv2-club-feed-item__stats"><span>${(d.distanceKm as number).toFixed(2)} km</span>${d.durationSec ? `<span>${Math.floor((d.durationSec as number)/60)}m</span>` : ''}</div>` : ''}
+              ${d.photoUrl ? `<img src="${d.photoUrl}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px"/>` : ''}
+            </div>`;
+          }).join('');
+        }).catch(() => { const feedEl2 = modal.querySelector<HTMLElement>('#cdbFeed'); if (feedEl2) feedEl2.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📡</span><p>Offline</p></div>'; });
+    };
+
+    const loadMembersAndStats = () => {
+      // Stats
+      fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/stats`, { cache:'no-store' })
+        .then(r => r.json())
+        .then((data: { status: string; totalKm: number; activities: number; ranking: {userId:string;name:string;avatarB64:string|null;km:number;count:number}[] }) => {
+          const statsEl = modal.querySelector<HTMLElement>('#cdbStats'); if (!statsEl) return;
+          statsEl.innerHTML = `
+            <div style="display:flex;gap:16px;flex-wrap:wrap;padding:4px 0 12px">
+              <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:10px 16px;flex:1;min-width:120px">
+                <div style="font-size:2rem;font-weight:800;color:#fff">${data.totalKm.toFixed(1)}</div>
+                <div style="font-size:1.1rem;color:rgba(255,255,255,0.4)">Total km</div>
+              </div>
+              <div style="background:rgba(255,255,255,0.05);border-radius:12px;padding:10px 16px;flex:1;min-width:120px">
+                <div style="font-size:2rem;font-weight:800;color:#fff">${data.activities}</div>
+                <div style="font-size:1.1rem;color:rgba(255,255,255,0.4)">Activities</div>
+              </div>
+            </div>
+            <div style="padding:4px 0 8px">
+              ${data.ranking.slice(0,10).map((r,i) => `
+                <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
+                  <span style="font-size:1.3rem;font-weight:700;color:rgba(255,255,255,0.4);width:20px">${i+1}</span>
+                  <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
+                    ${r.avatarB64 ? `<img src="${r.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff">${r.name[0]}</div>`}
+                  </div>
+                  <span style="flex:1;font-size:1.3rem;color:#fff">${r.name}</span>
+                  <span style="font-size:1.3rem;font-weight:700;color:#00c46a">${r.km.toFixed(1)} km</span>
+                </div>`).join('')}
+            </div>`;
+        }).catch(() => {});
+
+      // Members
+      fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/members`, { cache:'no-store' })
+        .then(r => r.json())
+        .then((data: { status: string; ownerId: string; pendingMembers: string[]; data: {userId:string;name:string;avatarB64:string|null}[] }) => {
+          const membersEl = modal.querySelector<HTMLElement>('#cdbMembers'); if (!membersEl) return;
+          membersEl.innerHTML = data.data.map(u => `
+            <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05)">
+              <div style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
+                ${u.avatarB64 ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${u.name[0]}</div>`}
+              </div>
+              <div style="flex:1">
+                <div style="font-size:1.35rem;font-weight:700;color:#fff">${u.name}</div>
+                ${u.userId === data.ownerId ? '<div style="font-size:1.1rem;color:#00c46a">👑 Owner</div>' : '<div style="font-size:1.1rem;color:rgba(255,255,255,0.4)">Member</div>'}
+              </div>
+            </div>`).join('');
+
+          // Pending requests (owner only)
+          if (club.isOwner && data.pendingMembers?.length) {
+            const pendingTitle = modal.querySelector<HTMLElement>('#cdbPendingTitle');
+            const pendingEl    = modal.querySelector<HTMLElement>('#cdbPending');
+            if (pendingTitle) pendingTitle.style.display = '';
+            if (pendingEl) {
+              pendingEl.innerHTML = data.pendingMembers.map(uid => `
+                <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05)">
+                  <div style="width:36px;height:36px;border-radius:50%;background:#444;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff">?</div>
+                  <span style="flex:1;font-size:1.25rem;color:#fff">${uid.slice(0,12)}…</span>
+                  <button style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:1.1rem;cursor:pointer;font-family:inherit;margin-right:6px" data-approve="${uid}">✓</button>
+                  <button style="background:rgba(248,113,113,0.2);border:1px solid #f87171;color:#f87171;border-radius:8px;padding:6px 12px;font-size:1.1rem;cursor:pointer;font-family:inherit" data-reject="${uid}">✕</button>
+                </div>`).join('');
+              pendingEl.querySelectorAll<HTMLButtonElement>('[data-approve]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                  await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/approve/${encodeURIComponent(btn.dataset.approve!)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ownerId: myUserId }) });
+                  club.memberCount++;
+                  loadMembersAndStats();
+                });
+              });
+              pendingEl.querySelectorAll<HTMLButtonElement>('[data-reject]').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                  await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/reject/${encodeURIComponent(btn.dataset.reject!)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ownerId: myUserId }) });
+                  loadMembersAndStats();
+                });
+              });
+            }
+          }
+        }).catch(() => {});
+    };
 
     const close = () => {
       modal.classList.remove('sv2-club-detail-overlay--visible');
-      setTimeout(() => modal.remove(), 320);
+      setTimeout(() => modal.remove(), 300);
     };
 
-    modal.querySelector('#cdbBack')?.addEventListener('click', close);
-
-    // Banner upload
-    const uploadToCloudinary = async (file: File, folder: 'clubs'): Promise<string | null> => {
-      const { uploadMediaFile } = await import('./cloudSync.js');
-      const result = await uploadMediaFile(file, getUserId(), 'activities' as 'activities');
-      return result?.url ?? null;
-    };
-
-    modal.querySelector('#cdbBannerInput')?.addEventListener('change', async e => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const bannerEl = modal.querySelector<HTMLElement>('.sv2-club-detail__banner');
-      if (bannerEl) bannerEl.style.opacity = '0.5';
-      try {
-        const url = await uploadToCloudinary(file, 'clubs');
-        if (!url) return;
-        const clubs = loadClubs();
-        const c = clubs.find(x => x.id === club.id);
-        if (c) { c.bannerB64 = url; saveClubs(clubs); }
-        if (bannerEl) { bannerEl.style.background = `url('${url}') center/cover`; bannerEl.style.opacity = '1'; }
-        // Sync to Atlas
-        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bannerUrl: url }),
-        });
-      } catch { if (bannerEl) bannerEl.style.opacity = '1'; }
-    });
-
-    // Logo upload → Cloudinary
-    modal.querySelector('#cdbLogoInput')?.addEventListener('change', async e => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const logoEl = modal.querySelector<HTMLElement>('.sv2-club-detail__logo');
-      if (logoEl) logoEl.style.opacity = '0.5';
-      try {
-        const url = await uploadToCloudinary(file, 'clubs');
-        if (!url) return;
-        const clubs = loadClubs();
-        const c = clubs.find(x => x.id === club.id);
-        if (c) { c.logoB64 = url; saveClubs(clubs); }
-        if (logoEl) { logoEl.style.background = `url('${url}') center/cover no-repeat`; logoEl.style.opacity = '1'; logoEl.innerHTML = ''; }
-        // Sync to Atlas
-        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, {
-          method: 'PUT', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ avatarB64: url }),
-        });
-      } catch { if (logoEl) logoEl.style.opacity = '1'; }
-    });
-
-    modal.querySelector('#cdbJoin')?.addEventListener('click', async () => {
-      const myUserId = getUserId();
-      const action   = club.joined ? 'leave' : 'join';
-      await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/${action}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: myUserId }),
-      });
-      const clubs = loadClubs();
-      const c = clubs.find(x => x.id === club.id);
-      if (c) { c.joined = !c.joined; c.memberCount = Math.max(0, c.memberCount + (c.joined ? 1 : -1)); saveClubs(clubs); }
-      close();
-    });
-
-    // Share club invite link (owner only)
-    modal.querySelector('#cdbShare')?.addEventListener('click', async () => {
-      try {
-        const res  = await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/invite`, { method: 'POST' });
-        const data = await res.json() as { status: string; code: string };
-        if (data.status !== 'ok') throw new Error('Failed');
-        const base = window.location.href.split('#')[0];
-        const link = `${base}#club=${data.code}`;
-        if (navigator.share) {
-          await navigator.share({ title: `Join ${club.name} on MapYou`, url: link });
-        } else {
-          await navigator.clipboard.writeText(link);
-          const btn = modal.querySelector<HTMLButtonElement>('#cdbShare')!;
-          btn.textContent = '✓';
-          setTimeout(() => { btn.textContent = '🔗'; }, 2000);
-        }
-      } catch { alert('Could not generate invite link'); }
-    });
-
-    // Privacy toggle (owner only)
-    modal.querySelector('#cdbPrivacy')?.addEventListener('click', async () => {
-      const clubs  = loadClubs();
-      const c      = clubs.find(x => x.id === club.id);
-      const nowPrivate = !((club as unknown as Record<string,unknown>).isPrivate);
-      if (c) { (c as unknown as Record<string,unknown>).isPrivate = nowPrivate; saveClubs(clubs); }
-      await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isPrivate: nowPrivate }),
-      });
-      const btn = modal.querySelector<HTMLButtonElement>('#cdbPrivacy');
-      if (btn) btn.textContent = nowPrivate ? '🌐 Make Public' : '🔒 Make Private';
-    });
-
-    // Delete club (owner only)
-    modal.querySelector('#cdbDelete')?.addEventListener('click', async () => {
-      if (!confirm(`Delete "${club.name}"? This cannot be undone.`)) return;
-      await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { method: 'DELETE' });
-      const clubs = loadClubs().filter(c => c.id !== club.id);
-      saveClubs(clubs);
-      close();
-    });
-
-    // Add post directly to club
-    modal.querySelector('#cdbAddPost')?.addEventListener('click', () => {
-      import('./PostModal.js').then(m => {
-        m.openPostModal(post => {
-          // Force clubId on this post
-          post.clubIds = [club.id];
-          import('./cloudSync.js').then(cs => {
-            void cs.CS.savePost(post).then(() => {
-              // Reload club feed
-              const feedEl = modal.querySelector<HTMLElement>('.sv2-club-detail__feed');
-              if (!feedEl) return;
-              feedEl.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>';
-              fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/feed`, { cache: 'no-store' })
-                .then(r => r.json())
-                .then((data: { status: string; data: {kind:string;date:number;data:Record<string,unknown>}[] }) => {
-                  if (!data.data?.length) { feedEl.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📢</span><p>No posts yet.</p></div>'; return; }
-                  feedEl.innerHTML = data.data.map(f => {
-                    const d = f.data;
-                    return `<div class="sv2-club-feed-item">
-                      <div class="sv2-club-feed-item__top">
-                        <span class="sv2-club-feed-item__author">${d.authorName ?? ''}</span>
-                        <span class="sv2-club-feed-item__date">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>
-                      </div>
-                      <div class="sv2-club-feed-item__title">${d.name ?? d.title ?? ''}</div>
-                    </div>`;
-                  }).join('');
-                }).catch(() => {});
-            });
-          });
-        });
-      });
-    });
+    renderModal('feed');
+    document.body.appendChild(modal);
+    requestAnimationFrame(() => modal.classList.add('sv2-club-detail-overlay--visible'));
   }
+
 
   private _openCreateClubModal(parentEl: HTMLElement): void {
     document.getElementById('createClubModal')?.remove();
