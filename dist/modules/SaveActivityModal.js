@@ -624,14 +624,12 @@ export class SaveActivityModal {
                 ? [this._pickedCoords]
                 : this._activity.coords,
         };
-        await CS.saveEnrichedActivity(enriched);
-        // Share to selected clubs — store clubIds on activity (no duplication)
+        // Share to selected clubs — set clubIds BEFORE saving
         const checkedClubs = this._el?.querySelectorAll('.sam-club-check:checked') ?? [];
         if (checkedClubs.length > 0) {
             enriched.clubIds = [...checkedClubs].map(cb => cb.dataset.clubId);
-            // Re-save with clubIds
-            await CS.saveEnrichedActivity(enriched);
         }
+        await CS.saveEnrichedActivity(enriched);
         this._onSave(enriched); // render first, then close
         this.close(true); // saved=true → skip onCancel
     }

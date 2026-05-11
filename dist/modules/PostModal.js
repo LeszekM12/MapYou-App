@@ -319,12 +319,12 @@ export class PostModal {
             authorName: localStorage.getItem('mapyou_userName') ?? 'Athlete',
             avatarB64: localStorage.getItem('mapyou_avatar') ?? null,
         };
-        await CS.savePost(post);
-        // Share to selected clubs — store clubIds on post (no duplication)
+        // Share to selected clubs — set clubIds BEFORE saving
         const checkedClubs = el.querySelectorAll('.pm-club-check:checked');
         if (checkedClubs.length > 0) {
             post.clubIds = [...checkedClubs].map(cb => cb.dataset.clubId);
         }
+        await CS.savePost(post);
         this.close();
         this._onSave(post);
     }
