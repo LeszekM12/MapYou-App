@@ -361,17 +361,29 @@ export class SearchView {
             });
         };
         const userRegion = localStorage.getItem('mapyou_region') ?? '';
+        const searchOverride = localStorage.getItem('mapyou_search_city'); // null=not set, ''=cleared by user
         const loadNearby = async () => {
             resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>';
             try {
-                // Search by region (province) so all cities in the region appear
-                const label = userRegion || userLoc || '';
-                const url = userRegion
-                    ? `${BACKEND_URL}/clubs?region=${encodeURIComponent(userRegion)}`
-                    : userLoc
-                        ? `${BACKEND_URL}/clubs?city=${encodeURIComponent(userLoc)}`
-                        : `${BACKEND_URL}/clubs`;
-                const res = await fetch(url);
+                let label = '';
+                let url = `${BACKEND_URL}/clubs`;
+                if (searchOverride !== null) {
+                    // User explicitly set or cleared location
+                    if (searchOverride.trim()) {
+                        label = searchOverride;
+                        url = `${BACKEND_URL}/clubs?city=${encodeURIComponent(searchOverride)}`;
+                    }
+                    // else '' = show all
+                }
+                else if (userRegion) {
+                    label = userRegion;
+                    url = `${BACKEND_URL}/clubs?region=${encodeURIComponent(userRegion)}`;
+                }
+                else if (userLoc) {
+                    label = userLoc;
+                    url = `${BACKEND_URL}/clubs?city=${encodeURIComponent(userLoc)}`;
+                }
+                const res = await fetch(url, { cache: 'no-store' });
                 const data = await res.json();
                 renderClubs(data.data ?? [], label ? `Near ${label}` : 'All clubs');
             }
@@ -386,7 +398,7 @@ export class SearchView {
             }
             resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Searching…</div>';
             try {
-                const res = await fetch(`${BACKEND_URL}/clubs?q=${encodeURIComponent(q)}`);
+                const res = await fetch(`${BACKEND_URL}/clubs?q=${encodeURIComponent(q)}`, { cache: 'no-store' });
                 const data = await res.json();
                 renderClubs(data.data ?? [], `Results for "${q}"`);
             }
@@ -394,19 +406,19 @@ export class SearchView {
                 resultsEl.innerHTML = '<div class="sv2-empty"><p class="sv2-empty__title">Error</p></div>';
             }
         };
-        // Location picker
+        // Location picker — uses separate search key, doesn't touch profile city
         el.querySelector('#sv2LocationBtn')?.addEventListener('click', () => {
-            const current = localStorage.getItem('mapyou_city') ?? '';
-            const city = prompt('Enter city or region to search near:', current);
+            const current = localStorage.getItem('mapyou_search_city') ?? localStorage.getItem('mapyou_city') ?? '';
+            const city = prompt('Enter city or region (empty = show all):', current);
             if (city === null)
-                return; // cancelled
+                return;
             if (city.trim()) {
-                localStorage.setItem('mapyou_city', city.trim());
+                localStorage.setItem('mapyou_search_city', city.trim());
             }
             else {
-                localStorage.removeItem('mapyou_city');
+                localStorage.removeItem('mapyou_search_city');
             }
-            this._renderClubs(el); // re-render with new location
+            this._renderClubs(el);
         });
         // Load my clubs from local storage + backend
         const myClubs = loadClubs();
