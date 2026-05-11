@@ -312,7 +312,12 @@ export class SearchView {
           <button class="sv2-create-btn" id="sv2CreateClub">+ Create</button>
         </div>
         <div class="sv2-location-pill" id="sv2LocationBtn" style="cursor:pointer;user-select:none">
-          📍 ${userLoc ? `Near ${userLoc}` : 'Set location'} <span style="opacity:.5">▾</span>
+          ${(() => {
+            const ov = localStorage.getItem('mapyou_search_city');
+            if (ov !== null)
+                return ov ? `📍 Near ${ov} ▾` : '🌍 All locations ▾';
+            return userLoc ? `📍 Near ${userLoc} ▾` : '📍 Set location ▾';
+        })()}
         </div>
       </div>
       <div id="sv2ClubResults" style="padding-bottom:32px"></div>`;
@@ -361,19 +366,19 @@ export class SearchView {
             });
         };
         const userRegion = localStorage.getItem('mapyou_region') ?? '';
-        const searchOverride = localStorage.getItem('mapyou_search_city'); // null=not set, ''=cleared by user
         const loadNearby = async () => {
             resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>';
             try {
+                // Read fresh every time so location changes take effect
+                const override = localStorage.getItem('mapyou_search_city');
                 let label = '';
                 let url = `${BACKEND_URL}/clubs`;
-                if (searchOverride !== null) {
-                    // User explicitly set or cleared location
-                    if (searchOverride.trim()) {
-                        label = searchOverride;
-                        url = `${BACKEND_URL}/clubs?city=${encodeURIComponent(searchOverride)}`;
+                if (override !== null) {
+                    if (override.trim()) {
+                        label = override.trim();
+                        url = `${BACKEND_URL}/clubs?city=${encodeURIComponent(override.trim())}`;
                     }
-                    // else '' = show all
+                    // override === '' means show all
                 }
                 else if (userRegion) {
                     label = userRegion;
