@@ -692,35 +692,51 @@ export class SearchView {
     modal.querySelector('#cdbBack')?.addEventListener('click', close);
 
     // Banner upload
-    modal.querySelector('#cdbBannerInput')?.addEventListener('change', e => {
+    const uploadToCloudinary = async (file: File, folder: 'clubs'): Promise<string | null> => {
+      const { uploadMediaFile } = await import('./cloudSync.js');
+      const result = await uploadMediaFile(file, getUserId(), 'activities' as 'activities');
+      return result?.url ?? null;
+    };
+
+    modal.querySelector('#cdbBannerInput')?.addEventListener('change', async e => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const b64 = reader.result as string;
+      const bannerEl = modal.querySelector<HTMLElement>('.sv2-club-detail__banner');
+      if (bannerEl) bannerEl.style.opacity = '0.5';
+      try {
+        const url = await uploadToCloudinary(file, 'clubs');
+        if (!url) return;
         const clubs = loadClubs();
         const c = clubs.find(x => x.id === club.id);
-        if (c) { c.bannerB64 = b64; saveClubs(clubs); }
-        const bannerEl = modal.querySelector<HTMLElement>('.sv2-club-detail__banner');
-        if (bannerEl) bannerEl.style.background = `url('${b64}') center/cover`;
-      };
-      reader.readAsDataURL(file);
+        if (c) { c.bannerB64 = url; saveClubs(clubs); }
+        if (bannerEl) { bannerEl.style.background = `url('${url}') center/cover`; bannerEl.style.opacity = '1'; }
+        // Sync to Atlas
+        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bannerUrl: url }),
+        });
+      } catch { if (bannerEl) bannerEl.style.opacity = '1'; }
     });
 
-    // Logo upload
-    modal.querySelector('#cdbLogoInput')?.addEventListener('change', e => {
+    // Logo upload → Cloudinary
+    modal.querySelector('#cdbLogoInput')?.addEventListener('change', async e => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const b64 = reader.result as string;
+      const logoEl = modal.querySelector<HTMLElement>('.sv2-club-detail__logo');
+      if (logoEl) logoEl.style.opacity = '0.5';
+      try {
+        const url = await uploadToCloudinary(file, 'clubs');
+        if (!url) return;
         const clubs = loadClubs();
         const c = clubs.find(x => x.id === club.id);
-        if (c) { c.logoB64 = b64; saveClubs(clubs); }
-        const logoEl = modal.querySelector<HTMLElement>('.sv2-club-detail__logo');
-        if (logoEl) { logoEl.style.background = `url('${b64}') center/cover`; logoEl.innerHTML = ''; }
-      };
-      reader.readAsDataURL(file);
+        if (c) { c.logoB64 = url; saveClubs(clubs); }
+        if (logoEl) { logoEl.style.background = `url('${url}') center/cover no-repeat`; logoEl.style.opacity = '1'; logoEl.innerHTML = ''; }
+        // Sync to Atlas
+        await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ avatarB64: url }),
+        });
+      } catch { if (logoEl) logoEl.style.opacity = '1'; }
     });
 
     modal.querySelector('#cdbJoin')?.addEventListener('click', async () => {

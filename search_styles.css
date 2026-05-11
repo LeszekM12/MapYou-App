@@ -416,3 +416,18 @@
   font-size: 1.1rem; color: var(--color-brand--2, #00c46a);
   font-weight: 600;
 }
+
+/* ── Club detail actions fix ─────────────────────────────────────────────── */
+.sv2-club-detail__actions {
+  padding: 0 20px 16px;
+}
+.sv2-club-action {
+  font-size: 1.3rem !important;
+  padding: 11px 14px !important;
+}
+/* Share/Delete icon buttons — smaller */
+#cdbShare, #cdbDelete {
+  padding: 11px 14px !important;
+  font-size: 1.4rem !important;
+  min-width: 44px;
+}
