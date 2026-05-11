@@ -5,6 +5,8 @@
 // Friends: search, invite, list (backend-ready placeholders)
 // Clubs: create locally, search by name/location (backend-ready)
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { BACKEND_URL } from '../config.js';
+import { getUserId } from './UserProfile.js';
 const LS_CLUBS = 'mapyou_local_clubs';
 const LS_FRIENDS = 'mapyou_local_friends';
 // ── Storage helpers ───────────────────────────────────────────────────────────
@@ -61,6 +63,12 @@ export class SearchView {
             writable: true,
             value: ''
         });
+        Object.defineProperty(this, "_followingSet", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: new Set()
+        }); // userIds I already follow
     }
     open() {
         document.getElementById('searchViewOverlay')?.remove();
@@ -161,7 +169,6 @@ export class SearchView {
     // FRIENDS TAB
     // ══════════════════════════════════════════════════════════════════════════
     _renderFriends(el) {
-        const friends = loadFriends();
         el.innerHTML = `
       <div class="sv2-search-wrap">
         <div class="sv2-search-row">
@@ -170,64 +177,113 @@ export class SearchView {
               <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
             </svg>
             <input class="sv2-search-input" id="sv2FriendSearch" type="text"
-              placeholder="Search friends…" value="${this._friendQuery}" autocomplete="off"/>
+              placeholder="Search athletes…" value="${this._friendQuery}" autocomplete="off"/>
           </div>
         </div>
       </div>
-
-      ${friends.length === 0 ? `
-        <div class="sv2-empty">
-          <div class="sv2-empty__icon">👥</div>
-          <p class="sv2-empty__title">No friends yet</p>
-          <p class="sv2-empty__sub">Invite friends using your link from the Friends tab</p>
-        </div>` : `
-        <div class="sv2-section-title">Your Friends</div>
-        <div class="sv2-list" id="sv2FriendList">
-          ${friends.map(f => `
-            <div class="sv2-item">
-              <div class="sv2-item__avatar">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22">
-                  <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
-                </svg>
-              </div>
+      <div id="sv2FriendResults" style="padding-bottom:32px"></div>`;
+        const resultsEl = el.querySelector('#sv2FriendResults');
+        const myUserId = getUserId();
+        const renderUserList = (users, title) => {
+            if (!users.length) {
+                resultsEl.innerHTML = `<div class="sv2-empty"><div class="sv2-empty__icon">👥</div><p class="sv2-empty__title">No results</p></div>`;
+                return;
+            }
+            resultsEl.innerHTML = `
+        <div class="sv2-section-title">${title}</div>
+        <div class="sv2-list">${users.map(u => {
+                const isFollowing = this._followingSet.has(u.userId);
+                const loc = [u.city, u.region].filter(Boolean).join(', ');
+                const avatar = u.avatarB64
+                    ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+                    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
+                return `
+            <div class="sv2-item" data-userid="${u.userId}" style="cursor:pointer">
+              <div class="sv2-item__avatar">${avatar}</div>
               <div class="sv2-item__info">
-                <span class="sv2-item__name">${f.name}</span>
-                <span class="sv2-item__sub">📍 ${f.location || 'Unknown location'}</span>
+                <span class="sv2-item__name">${u.name}</span>
+                ${loc ? `<span class="sv2-item__sub">📍 ${loc}</span>` : ''}
+                ${u.followersCount ? `<span class="sv2-item__desc">${u.followersCount} followers</span>` : ''}
               </div>
-              <span class="sv2-badge sv2-badge--green">Following</span>
-            </div>`).join('')}
-        </div>`}
-
-      <div class="sv2-section-title" style="margin-top:20px">Suggestions</div>
-      <div class="sv2-backend-note">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        Friend suggestions will appear here when the backend is ready.
-      </div>
-
-      <button class="sv2-invite-btn" id="sv2InviteBtn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
-          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
-          <polyline points="22,6 12,13 2,6"/>
-        </svg>
-        Invite Friends
-      </button>`;
-        // Search input
+              <button class="sv2-badge ${isFollowing ? 'sv2-badge--gray' : 'sv2-badge--green'}"
+                data-follow="${u.userId}">${isFollowing ? 'Following' : 'Follow'}</button>
+            </div>`;
+            }).join('')}
+        </div>`;
+            // Follow buttons
+            resultsEl.querySelectorAll('[data-follow]').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const targetId = btn.dataset.follow;
+                    const isNow = this._followingSet.has(targetId);
+                    if (isNow) {
+                        await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
+                        this._followingSet.delete(targetId);
+                        btn.textContent = 'Follow';
+                        btn.className = 'sv2-badge sv2-badge--green';
+                    }
+                    else {
+                        await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(targetId)}`, { method: 'POST' });
+                        this._followingSet.add(targetId);
+                        btn.textContent = 'Following';
+                        btn.className = 'sv2-badge sv2-badge--gray';
+                    }
+                });
+            });
+            // Item click → open public profile
+            resultsEl.querySelectorAll('.sv2-item').forEach(item => {
+                item.addEventListener('click', e => {
+                    if (e.target.closest('[data-follow]'))
+                        return;
+                    const uid = item.dataset.userid;
+                    if (uid) {
+                        import('./PublicProfile.js').then(m => m.openPublicProfile(uid));
+                    }
+                });
+            });
+        };
+        const loadSuggestions = async () => {
+            resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>';
+            try {
+                // Load my following list to know who I already follow
+                const meRes = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}`);
+                const meData = await meRes.json();
+                this._followingSet = new Set(meData.data?.following ?? []);
+                const res = await fetch(`${BACKEND_URL}/users/suggestions?userId=${encodeURIComponent(myUserId)}`);
+                const data = await res.json();
+                renderUserList(data.data ?? [], 'People you may know');
+            }
+            catch {
+                resultsEl.innerHTML = '<div class="sv2-empty"><p class="sv2-empty__title">Offline</p></div>';
+            }
+        };
+        const searchUsers = async (q) => {
+            if (!q.trim()) {
+                void loadSuggestions();
+                return;
+            }
+            resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Searching…</div>';
+            try {
+                const res = await fetch(`${BACKEND_URL}/users/search?q=${encodeURIComponent(q)}&exclude=${encodeURIComponent(myUserId)}`);
+                const data = await res.json();
+                renderUserList(data.data ?? [], `Results for "${q}"`);
+            }
+            catch {
+                resultsEl.innerHTML = '<div class="sv2-empty"><p class="sv2-empty__title">Error</p></div>';
+            }
+        };
+        void loadSuggestions();
+        let _debounce;
         el.querySelector('#sv2FriendSearch')?.addEventListener('input', e => {
             this._friendQuery = e.target.value;
-        });
-        // Invite btn — opens Friends tab
-        el.querySelector('#sv2InviteBtn')?.addEventListener('click', () => {
-            this.close();
-            document.querySelector('.bottom-nav__item[data-tab="tabFriends"]')?.click();
+            clearTimeout(_debounce);
+            _debounce = setTimeout(() => void searchUsers(this._friendQuery), 400);
         });
     }
     // ══════════════════════════════════════════════════════════════════════════
     // CLUBS TAB
     // ══════════════════════════════════════════════════════════════════════════
     _renderClubs(el) {
-        const clubs = loadClubs();
         const userLoc = this._getUserLocation();
         el.innerHTML = `
       <div class="sv2-search-wrap">
@@ -243,77 +299,96 @@ export class SearchView {
         </div>
         ${userLoc ? `<div class="sv2-location-pill">📍 Near ${userLoc}</div>` : ''}
       </div>
-
-      ${clubs.length === 0 ? `
-        <div class="sv2-empty">
-          <div class="sv2-empty__icon">🚴</div>
-          <p class="sv2-empty__title">No clubs yet</p>
-          <p class="sv2-empty__sub">Create your own club or wait for the backend to connect to local clubs</p>
-        </div>` : `
-        <div class="sv2-section-title">Your Clubs</div>
-        <div class="sv2-list" id="sv2ClubList">
-          ${clubs.map(c => this._buildClubItem(c)).join('')}
-        </div>`}
-
-      <div class="sv2-section-title" style="margin-top:20px">Discover Clubs</div>
-      <div class="sv2-backend-note">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18">
-          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        Local club discovery will be available when the backend launches.
-      </div>`;
-        // Search
-        el.querySelector('#sv2ClubSearch')?.addEventListener('input', e => {
-            this._clubQuery = e.target.value.toLowerCase();
-            const list = el.querySelector('#sv2ClubList');
-            if (!list)
+      <div id="sv2ClubResults" style="padding-bottom:32px"></div>`;
+        const resultsEl = el.querySelector('#sv2ClubResults');
+        const myUserId = getUserId();
+        const renderClubs = (clubs, title) => {
+            if (!clubs.length) {
+                resultsEl.innerHTML = '<div class="sv2-empty"><div class="sv2-empty__icon">🚴</div><p class="sv2-empty__title">No clubs found</p></div>';
                 return;
-            list.querySelectorAll('.sv2-item').forEach(item => {
-                const name = item.querySelector('.sv2-item__name')?.textContent?.toLowerCase() ?? '';
-                const loc = item.querySelector('.sv2-item__sub')?.textContent?.toLowerCase() ?? '';
-                item.style.display = name.includes(this._clubQuery) || loc.includes(this._clubQuery) ? '' : 'none';
+            }
+            const sportIcons = { running: '🏃', walking: '🚶', cycling: '🚴', fitness: '💪', hiking: '🥾', other: '🏅' };
+            resultsEl.innerHTML = `
+        <div class="sv2-section-title">${title}</div>
+        <div class="sv2-list">
+          ${clubs.map(c => {
+                const isMember = c.members.includes(myUserId);
+                const icon = sportIcons[c.sport] ?? '🏅';
+                const avatar = c.avatarB64
+                    ? `<img src="${c.avatarB64}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>`
+                    : `<span style="font-size:24px">${icon}</span>`;
+                return `
+              <div class="sv2-item" data-club-id="${c.clubId}" style="cursor:pointer">
+                <div class="sv2-item__avatar sv2-item__avatar--club">${avatar}</div>
+                <div class="sv2-item__info">
+                  <span class="sv2-item__name">${c.name}</span>
+                  <span class="sv2-item__sub">${c.members.length} members · ${[c.city, c.region].filter(Boolean).join(', ')}</span>
+                  ${c.description ? `<span class="sv2-item__desc">${c.description.slice(0, 60)}</span>` : ''}
+                </div>
+                <button class="sv2-badge ${isMember ? 'sv2-badge--gray' : 'sv2-badge--green'}"
+                  data-club-join="${c.clubId}">${isMember ? 'Joined' : 'Join'}</button>
+              </div>`;
+            }).join('')}
+        </div>`;
+            // Join/Leave
+            resultsEl.querySelectorAll('[data-club-join]').forEach(btn => {
+                btn.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    const cid = btn.dataset.clubJoin;
+                    const joined = btn.textContent === 'Joined';
+                    const url = `${BACKEND_URL}/clubs/${encodeURIComponent(cid)}/${joined ? 'leave' : 'join'}`;
+                    await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId: myUserId }) });
+                    btn.textContent = joined ? 'Join' : 'Joined';
+                    btn.className = joined ? 'sv2-badge sv2-badge--green' : 'sv2-badge sv2-badge--gray';
+                });
             });
-        });
+        };
+        const userRegion = localStorage.getItem('mapyou_region') ?? '';
+        const loadNearby = async () => {
+            resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>';
+            try {
+                // Search by region (province) so all cities in the region appear
+                const label = userRegion || userLoc || '';
+                const url = userRegion
+                    ? `${BACKEND_URL}/clubs?region=${encodeURIComponent(userRegion)}`
+                    : userLoc
+                        ? `${BACKEND_URL}/clubs?city=${encodeURIComponent(userLoc)}`
+                        : `${BACKEND_URL}/clubs`;
+                const res = await fetch(url);
+                const data = await res.json();
+                renderClubs(data.data ?? [], label ? `Near ${label}` : 'All clubs');
+            }
+            catch {
+                resultsEl.innerHTML = '<div class="sv2-empty"><p class="sv2-empty__title">Offline</p></div>';
+            }
+        };
+        const searchClubs = async (q) => {
+            if (!q.trim()) {
+                void loadNearby();
+                return;
+            }
+            resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Searching…</div>';
+            try {
+                const res = await fetch(`${BACKEND_URL}/clubs?q=${encodeURIComponent(q)}`);
+                const data = await res.json();
+                renderClubs(data.data ?? [], `Results for "${q}"`);
+            }
+            catch {
+                resultsEl.innerHTML = '<div class="sv2-empty"><p class="sv2-empty__title">Error</p></div>';
+            }
+        };
+        void loadNearby();
         // Create club
         el.querySelector('#sv2CreateClub')?.addEventListener('click', () => {
             this._openCreateClubModal(el);
         });
-        // Club actions
-        el.querySelectorAll('[data-club-join]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.clubJoin;
-                const clubs = loadClubs();
-                const club = clubs.find(c => c.id === id);
-                if (!club)
-                    return;
-                club.joined = !club.joined;
-                if (club.joined)
-                    club.memberCount++;
-                else
-                    club.memberCount = Math.max(0, club.memberCount - 1);
-                saveClubs(clubs);
-                this._renderClubs(el);
-            });
-        });
-        // Open club detail on item click
-        el.querySelectorAll('[data-club-open]').forEach(item => {
-            item.addEventListener('click', e => {
-                if (e.target.closest('[data-club-join],[data-club-del]'))
-                    return;
-                const id = item.dataset.clubOpen;
-                const club = loadClubs().find(c => c.id === id);
-                if (club)
-                    this._openClubDetail(club);
-            });
-        });
-        el.querySelectorAll('[data-club-del]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const id = btn.dataset.clubDel;
-                if (!confirm('Delete this club?'))
-                    return;
-                saveClubs(loadClubs().filter(c => c.id !== id));
-                this._renderClubs(el);
-            });
+        // Search with debounce
+        let _debounce;
+        el.querySelector('#sv2ClubSearch')?.addEventListener('input', e => {
+            this._clubQuery = e.target.value;
+            clearTimeout(_debounce);
+            _debounce = setTimeout(() => void searchClubs(this._clubQuery), 400);
         });
     }
     _buildClubItem(c) {
@@ -557,23 +632,63 @@ export class SearchView {
         modal.querySelector('#ccCancel')?.addEventListener('click', close);
         modal.addEventListener('click', e => { if (e.target === modal)
             close(); });
+        // Auto-fill region from city via Nominatim (OpenStreetMap, no API key needed)
+        let _nominatimTimer;
+        modal.querySelector('#ccLocation')?.addEventListener('input', e => {
+            const cityVal = e.target.value.trim();
+            const regionEl = modal.querySelector('#ccRegion');
+            clearTimeout(_nominatimTimer);
+            if (cityVal.length < 3) {
+                regionEl.value = '';
+                return;
+            }
+            _nominatimTimer = setTimeout(async () => {
+                try {
+                    const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityVal)}&format=json&limit=1&addressdetails=1`, { headers: { 'Accept-Language': 'en' } });
+                    const data = await res.json();
+                    const addr = data[0]?.address;
+                    if (addr)
+                        regionEl.value = addr.state ?? addr.county ?? '';
+                }
+                catch { /* offline */ }
+            }, 600);
+        });
         modal.querySelector('#ccSave')?.addEventListener('click', () => {
             const name = (modal.querySelector('#ccName')?.value ?? '').trim();
             if (!name) {
                 modal.querySelector('#ccName')?.focus();
                 return;
             }
+            const myUserId = getUserId();
+            const city = (modal.querySelector('#ccLocation')?.value ?? '').trim();
+            const region = (modal.querySelector('#ccRegion')?.value ?? '').trim();
+            if (!city) {
+                const inp = modal.querySelector('#ccLocation');
+                inp?.focus();
+                inp?.classList.add('sv2-modal__input--error');
+                return;
+            }
+            const clubId = `club_${Date.now()}`;
             const club = {
-                id: `club_${Date.now()}`,
+                id: clubId,
                 name,
                 sport: (modal.querySelector('#ccSport')?.value ?? 'other'),
                 description: (modal.querySelector('#ccDesc')?.value ?? '').trim(),
-                location: (modal.querySelector('#ccLocation')?.value ?? '').trim(),
+                location: region ? `${city}, ${region}` : city,
                 memberCount: 1,
                 isOwner: true,
                 joined: true,
                 createdAt: Date.now(),
             };
+            // Sync to backend
+            fetch(`${BACKEND_URL}/clubs`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    clubId, ownerId: myUserId, name: club.name,
+                    sport: club.sport, description: club.description,
+                    city, region, members: [myUserId],
+                }),
+            }).catch(() => { });
             saveClubs([...loadClubs(), club]);
             close();
             this._renderClubs(parentEl);
@@ -581,6 +696,11 @@ export class SearchView {
     }
     // ── Helpers ───────────────────────────────────────────────────────────────
     _getUserLocation() {
+        // First try profile city (most accurate)
+        const profileCity = localStorage.getItem('mapyou_city');
+        if (profileCity)
+            return profileCity;
+        // Fallback to IP location
         try {
             const raw = localStorage.getItem('mapty_ip_coords') ?? localStorage.getItem('mapyou_last_city');
             if (!raw)

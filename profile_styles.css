@@ -382,3 +382,27 @@
   color:       rgba(255,255,255,0.6);
   border-color:rgba(255,255,255,0.12);
 }
+
+/* ── Extended profile fields ─────────────────────────────────────────────── */
+.up-field--row {
+  display: flex;
+  gap: 10px;
+}
+.up-field__half {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.up-select {
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+.up-input[type="date"] {
+  color-scheme: dark;
+}
+.up-input--error {
+  border-color: #ef4444 !important;
+}

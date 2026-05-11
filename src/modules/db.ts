@@ -71,6 +71,11 @@ export interface ProfileRecord {
   name:      string;
   bio:       string;
   avatarB64: string | null;
+  city:      string;
+  region:    string;
+  birthDate: string | null;
+  gender:    'male' | 'female' | 'other' | null;
+  weightKg:  number | null;
 }
 
 /** Reel — ephemeral 24h story */

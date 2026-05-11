@@ -10,6 +10,7 @@
 import { loadUnifiedWorkouts, type UnifiedWorkout, SPORT_ICONS_U, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
 import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, type ProfileData } from './UserProfile.js';
+import type { ProfileRecord } from './db.js';
 import { loadPosts, type PostRecord } from './db.js';
 
 declare const Chart: any;
@@ -290,7 +291,7 @@ export class ProfileView {
     setTimeout(() => el.remove(), 360);
   }
 
-  private _buildShell(profile: ProfileData): HTMLElement {
+  private _buildShell(profile: ProfileData | ProfileRecord): HTMLElement {
     const wrapper = document.createElement('div');
     const totalKm = this._workouts.reduce((s, w) => s + w.distanceKm, 0);
     const weeklyWins = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);

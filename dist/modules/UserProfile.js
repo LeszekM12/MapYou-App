@@ -9,8 +9,12 @@ import { CS } from './cloudSync.js';
 const LS_USER_ID = 'mapyou_userId_profile';
 const LS_USERNAME = 'mapyou_userName';
 const LS_BIO = 'mapyou_bio';
-const LS_AVATAR = 'mapyou_avatar'; // base64
-const FRIEND_BASE = 'https://mapyou.app/add-friend';
+const LS_AVATAR = 'mapyou_avatar';
+const LS_CITY = 'mapyou_city';
+const LS_REGION = 'mapyou_region';
+const LS_BIRTHDATE = 'mapyou_birthDate';
+const LS_GENDER = 'mapyou_gender';
+const LS_WEIGHT = 'mapyou_weightKg';
 // ── userId ────────────────────────────────────────────────────────────────────
 export function generateUserId() {
     const existing = localStorage.getItem(LS_USER_ID);
@@ -35,6 +39,16 @@ export function saveProfileToLocal(data) {
     }
     if (data.bio !== undefined)
         localStorage.setItem(LS_BIO, data.bio);
+    if (data.city !== undefined)
+        localStorage.setItem(LS_CITY, data.city ?? '');
+    if (data.region !== undefined)
+        localStorage.setItem(LS_REGION, data.region ?? '');
+    if (data.birthDate !== undefined)
+        localStorage.setItem(LS_BIRTHDATE, data.birthDate ?? '');
+    if (data.gender !== undefined)
+        localStorage.setItem(LS_GENDER, data.gender ?? '');
+    if (data.weightKg !== undefined)
+        localStorage.setItem(LS_WEIGHT, String(data.weightKg ?? ''));
     if (data.avatarB64 !== undefined) {
         if (data.avatarB64)
             localStorage.setItem(LS_AVATAR, data.avatarB64);
@@ -50,6 +64,11 @@ export function loadProfileFromLocal() {
         name: localStorage.getItem(LS_USERNAME) ?? 'Athlete',
         bio: localStorage.getItem(LS_BIO) ?? '',
         avatarB64: localStorage.getItem(LS_AVATAR) ?? null,
+        city: localStorage.getItem(LS_CITY) ?? '',
+        region: localStorage.getItem(LS_REGION) ?? '',
+        birthDate: localStorage.getItem(LS_BIRTHDATE) ?? null,
+        gender: localStorage.getItem(LS_GENDER) ?? null,
+        weightKg: localStorage.getItem(LS_WEIGHT) ? Number(localStorage.getItem(LS_WEIGHT)) : null,
     };
 }
 // ── Image → base64 ────────────────────────────────────────────────────────────
@@ -63,7 +82,7 @@ export function convertImageToBase64(file) {
 }
 // ── Friend link ───────────────────────────────────────────────────────────────
 export function getFriendInviteLink() {
-    return `${FRIEND_BASE}?userId=${getUserId()}`;
+    return `https://mapyou.app/add-friend?userId=${getUserId()}`;
 }
 // ── Update profile avatar in UI wherever it appears ──────────────────────────
 export function updateProfileUI(data) {
@@ -132,26 +151,45 @@ function buildModalHTML(profile) {
             placeholder="A short bio…">${profile.bio}</textarea>
         </div>
 
-        <!-- Friend link -->
-        <div class="up-field">
-          <label class="up-label">Add-friend link</label>
-          <div class="up-link-box">
-            <span class="up-link-url" id="upLinkUrl">${getFriendInviteLink()}</span>
-            <button class="up-link-copy" id="upLinkCopy">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-                <rect x="9" y="9" width="13" height="13" rx="2"/>
-                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-            </button>
+        <!-- Location -->
+        <div class="up-field up-field--row">
+          <div class="up-field__half">
+            <label class="up-label" for="upCity">City</label>
+            <input class="up-input" id="upCity" type="text"
+              value="${profile.city ?? ''}" maxlength="64" placeholder="e.g. Warsaw"/>
           </div>
-          <button class="up-share-btn" id="upShareLink">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
-              <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-              <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
-              <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-            </svg>
-            Share invite link
-          </button>
+          <div class="up-field__half">
+            <label class="up-label" for="upRegion">Region
+              <span style="opacity:.4;font-size:0.9rem">(auto)</span>
+            </label>
+            <input class="up-input" id="upRegion" type="text"
+              value="${profile.region ?? ''}" maxlength="64" placeholder="auto-filled" readonly style="opacity:.6"/>
+          </div>
+        </div>
+
+        <!-- Personal -->
+        <div class="up-field up-field--row">
+          <div class="up-field__half">
+            <label class="up-label" for="upGender">Gender</label>
+            <select class="up-input up-select" id="upGender">
+              <option value="">—</option>
+              <option value="male"   ${profile.gender === 'male' ? 'selected' : ''}>Male</option>
+              <option value="female" ${profile.gender === 'female' ? 'selected' : ''}>Female</option>
+              <option value="other"  ${profile.gender === 'other' ? 'selected' : ''}>Other</option>
+            </select>
+          </div>
+          <div class="up-field__half">
+            <label class="up-label" for="upWeight">Weight (kg)</label>
+            <input class="up-input" id="upWeight" type="number"
+              value="${profile.weightKg ?? ''}" min="30" max="250" placeholder="70"/>
+          </div>
+        </div>
+
+        <!-- Birth date -->
+        <div class="up-field">
+          <label class="up-label" for="upBirthDate">Date of birth</label>
+          <input class="up-input" id="upBirthDate" type="date"
+            value="${profile.birthDate ?? ''}"/>
         </div>
 
       </div><!-- /up-body -->
@@ -233,51 +271,44 @@ function _bindModalEvents(el, _profile) {
     bioEl.addEventListener('input', () => {
         countEl.textContent = `${bioEl.value.length}/120`;
     });
-    // Copy link
-    el.querySelector('#upLinkCopy')?.addEventListener('click', async () => {
-        const btn = el.querySelector('#upLinkCopy');
-        try {
-            await navigator.clipboard.writeText(getFriendInviteLink());
-            btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg>`;
-            setTimeout(() => {
-                btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
-            }, 2000);
+    // Auto-fill region from city via Nominatim
+    let _nomTimer;
+    el.querySelector('#upCity')?.addEventListener('input', e => {
+        const cityVal = e.target.value.trim();
+        const regionEl = el.querySelector('#upRegion');
+        clearTimeout(_nomTimer);
+        if (cityVal.length < 3) {
+            regionEl.value = '';
+            return;
         }
-        catch { }
-    });
-    // Share link
-    el.querySelector('#upShareLink')?.addEventListener('click', async () => {
-        const link = getFriendInviteLink();
-        const name = el.querySelector('#upName')?.value.trim()
-            ?? loadProfileFromLocal().name;
-        if (navigator.share) {
+        _nomTimer = setTimeout(async () => {
             try {
-                await navigator.share({ title: `Add ${name} on MapYou`, url: link });
+                const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cityVal)}&format=json&limit=1&addressdetails=1`, { headers: { 'Accept-Language': 'en' } });
+                const data = await res.json();
+                const addr = data[0]?.address;
+                if (addr)
+                    regionEl.value = addr.state ?? addr.county ?? '';
             }
-            catch { }
-        }
-        else {
-            try {
-                await navigator.clipboard.writeText(link);
-                const btn = el.querySelector('#upShareLink');
-                const orig = btn.textContent;
-                btn.textContent = 'Copied! ✓';
-                setTimeout(() => { btn.textContent = orig; }, 2000);
-            }
-            catch { }
-        }
+            catch { /* offline */ }
+        }, 600);
     });
     // Save
     el.querySelector('#upSave')?.addEventListener('click', () => {
         const name = el.querySelector('#upName')?.value.trim() ?? '';
         const bio = el.querySelector('#upBio')?.value.trim() ?? '';
+        const city = el.querySelector('#upCity')?.value.trim() ?? '';
+        const region = el.querySelector('#upRegion')?.value.trim() ?? '';
+        const gender = (el.querySelector('#upGender')?.value || null);
+        const weightVal = el.querySelector('#upWeight')?.value;
+        const weightKg = weightVal ? Number(weightVal) : null;
+        const birthDate = el.querySelector('#upBirthDate')?.value || null;
         const avatarB64 = (avatarPreview.dataset.pending ?? null);
         if (!name) {
             el.querySelector('#upName')?.focus();
             el.querySelector('#upName')?.classList.add('up-input--error');
             return;
         }
-        saveProfileToLocal({ name, bio, avatarB64: avatarB64 ?? undefined });
+        saveProfileToLocal({ name, bio, city, region, gender, weightKg, birthDate, avatarB64: avatarB64 ?? undefined });
         updateProfileUI();
         // Visual feedback
         const btn = el.querySelector('#upSave');
