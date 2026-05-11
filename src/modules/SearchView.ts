@@ -327,7 +327,9 @@ export class SearchView {
           </div>
           <button class="sv2-create-btn" id="sv2CreateClub">+ Create</button>
         </div>
-        ${userLoc ? `<div class="sv2-location-pill">📍 Near ${userLoc}</div>` : ''}
+        <div class="sv2-location-pill" id="sv2LocationBtn" style="cursor:pointer;user-select:none">
+          📍 ${userLoc ? `Near ${userLoc}` : 'Set location'} <span style="opacity:.5">▾</span>
+        </div>
       </div>
       <div id="sv2ClubResults" style="padding-bottom:32px"></div>`;
 
@@ -409,6 +411,43 @@ export class SearchView {
         resultsEl.innerHTML = '<div class="sv2-empty"><p class="sv2-empty__title">Error</p></div>';
       }
     };
+
+    // Location picker
+    el.querySelector('#sv2LocationBtn')?.addEventListener('click', () => {
+      const current = localStorage.getItem('mapyou_city') ?? '';
+      const city = prompt('Enter city or region to search near:', current);
+      if (city === null) return; // cancelled
+      if (city.trim()) {
+        localStorage.setItem('mapyou_city', city.trim());
+      } else {
+        localStorage.removeItem('mapyou_city');
+      }
+      this._renderClubs(el); // re-render with new location
+    });
+
+    // Load my clubs from local storage + backend
+    const myClubs = loadClubs();
+    if (myClubs.length > 0) {
+      const mySection = document.createElement('div');
+      mySection.innerHTML = `
+        <div class="sv2-section-title">My Clubs</div>
+        <div class="sv2-list">
+          ${myClubs.map(c => {
+            const sportIcons: Record<string,string> = { running:'🏃',walking:'🚶',cycling:'🚴',fitness:'💪',hiking:'🥾',other:'🏅' };
+            return `<div class="sv2-item">
+              <div class="sv2-item__avatar sv2-item__avatar--club">
+                ${c.logoB64 ? `<img src="${c.logoB64}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>` : `<span style="font-size:24px">${sportIcons[c.sport]??'🏅'}</span>`}
+              </div>
+              <div class="sv2-item__info">
+                <span class="sv2-item__name">${c.name}</span>
+                <span class="sv2-item__sub">${c.memberCount} members · ${c.location}</span>
+              </div>
+              <span class="sv2-badge sv2-badge--gray">Owner</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+      resultsEl.insertAdjacentElement('beforebegin', mySection);
+    }
 
     void loadNearby();
 
@@ -673,7 +712,8 @@ export class SearchView {
     let _nominatimTimer: ReturnType<typeof setTimeout>;
     modal.querySelector('#ccLocation')?.addEventListener('input', e => {
       const cityVal  = (e.target as HTMLInputElement).value.trim();
-      const regionEl = modal.querySelector<HTMLInputElement>('#ccRegion')!;
+      const regionEl = modal.querySelector<HTMLInputElement>('#ccRegion');
+      if (!regionEl) return;
       clearTimeout(_nominatimTimer);
       if (cityVal.length < 3) { regionEl.value = ''; return; }
       _nominatimTimer = setTimeout(async () => {
