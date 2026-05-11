@@ -101,7 +101,7 @@ export class SearchView {
           <h2 class="sv2-title">Search</h2>
         </div>
         <div class="sv2-tabs">
-          <button class="sv2-tab sv2-tab--active" data-sv2="friends">
+          <button class="sv2-tab ${this._tab === 'friends' ? 'sv2-tab--active' : ''}" data-sv2="friends">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>
@@ -109,7 +109,7 @@ export class SearchView {
             </svg>
             Friends
           </button>
-          <button class="sv2-tab" data-sv2="clubs">
+          <button class="sv2-tab ${this._tab === 'clubs' ? 'sv2-tab--active' : ''}" data-sv2="clubs">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>
@@ -351,6 +351,33 @@ export class SearchView {
               </div>`;
             }).join('')}
         </div>`;
+            // Open club detail on click
+            resultsEl.querySelectorAll('.sv2-item[data-club-id]').forEach(item => {
+                item.addEventListener('click', e => {
+                    if (e.target.closest('[data-club-join]'))
+                        return;
+                    const cid = item.dataset.clubId;
+                    const clubData = clubs.find(c => c.clubId === cid);
+                    if (!clubData)
+                        return;
+                    const myUserId = getUserId();
+                    // Convert backend club to LocalClub for detail view
+                    const localClub = {
+                        id: clubData.clubId,
+                        name: clubData.name,
+                        sport: clubData.sport,
+                        description: clubData.description,
+                        location: [clubData.city, clubData.region].filter(Boolean).join(', '),
+                        memberCount: clubData.members.length,
+                        isOwner: clubData.members[0] === myUserId,
+                        joined: clubData.members.includes(myUserId),
+                        createdAt: Date.now(),
+                        feed: [],
+                        logoB64: clubData.avatarB64 ?? undefined,
+                    };
+                    this._openClubDetail(localClub);
+                });
+            });
             // Join/Leave
             resultsEl.querySelectorAll('[data-club-join]').forEach(btn => {
                 btn.addEventListener('click', async (e) => {
@@ -362,6 +389,24 @@ export class SearchView {
                         body: JSON.stringify({ userId: myUserId }) });
                     btn.textContent = joined ? 'Join' : 'Joined';
                     btn.className = joined ? 'sv2-badge sv2-badge--green' : 'sv2-badge sv2-badge--gray';
+                    // Sync local club list for PostModal/SaveActivityModal
+                    const localClubs = loadClubs();
+                    const existing = localClubs.find(lc => lc.id === cid);
+                    if (!existing && !joined) {
+                        const cd = clubs.find(c => c.clubId === cid);
+                        if (cd) {
+                            localClubs.push({ id: cid, name: cd.name, sport: cd.sport,
+                                description: cd.description,
+                                location: [cd.city, cd.region ?? ''].filter(Boolean).join(', '),
+                                memberCount: cd.members.length + 1, isOwner: false, joined: true,
+                                createdAt: Date.now(), feed: [] });
+                            saveClubs(localClubs);
+                        }
+                    }
+                    else if (existing && joined) {
+                        existing.joined = false;
+                        saveClubs(localClubs);
+                    }
                 });
             });
         };
@@ -505,27 +550,31 @@ export class SearchView {
         const modal = document.createElement('div');
         modal.id = 'clubDetailModal';
         modal.className = 'sv2-club-detail-overlay';
-        const feed = club.feed ?? [];
-        const feedHtml = feed.length === 0
-            ? `<div class="sv2-club-detail__feed-empty">
-           <span>📢</span>
-           <p>No posts yet in this club.</p>
-           <p class="sv2-club-detail__feed-sub">Share activities or posts to see them here.</p>
-         </div>`
-            : feed.map(f => `
-          <div class="sv2-club-feed-item">
+        // Load feed from backend
+        let feedHtml = '<div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>';
+        fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/feed`, { cache: 'no-store' })
+            .then(r => r.json())
+            .then((data) => {
+            const feedEl = document.querySelector('.sv2-club-detail__feed');
+            if (!feedEl)
+                return;
+            if (!data.data?.length) {
+                feedEl.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📢</span><p>No posts yet.</p><p class="sv2-club-detail__feed-sub">Share activities or posts to see them here.</p></div>';
+                return;
+            }
+            feedEl.innerHTML = data.data.map(f => {
+                const d = f.data;
+                const isAct = f.kind === 'activity';
+                return `<div class="sv2-club-feed-item">
             <div class="sv2-club-feed-item__top">
-              <span class="sv2-club-feed-item__author">${f.authorName}</span>
+              <span class="sv2-club-feed-item__author">${d.authorName ?? ''}</span>
               <span class="sv2-club-feed-item__date">${new Date(f.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>
             </div>
-            <div class="sv2-club-feed-item__title">${f.title}</div>
-            ${f.body ? `<div class="sv2-club-feed-item__body">${f.body}</div>` : ''}
-            ${f.type === 'activity' && f.distanceKm ? `
-              <div class="sv2-club-feed-item__stats">
-                <span>${f.distanceKm.toFixed(2)} km</span>
-                ${f.durationSec ? `<span>${Math.floor(f.durationSec / 60)}m</span>` : ''}
-              </div>` : ''}
-          </div>`).join('');
+            <div class="sv2-club-feed-item__title">${d.name ?? d.title ?? d.description ?? ''}</div>
+            ${isAct && d.distanceKm ? `<div class="sv2-club-feed-item__stats"><span>${d.distanceKm.toFixed(2)} km</span>${d.durationSec ? `<span>${Math.floor(d.durationSec / 60)}m</span>` : ''}</div>` : ''}
+          </div>`;
+            }).join('');
+        }).catch(() => { });
         modal.innerHTML = `
       <div class="sv2-club-detail">
         <!-- Banner -->
@@ -570,7 +619,7 @@ export class SearchView {
 
         <!-- Feed -->
         <div class="sv2-club-detail__section-title">Club Feed</div>
-        <div class="sv2-club-detail__feed">${feedHtml}</div>
+        <div class="sv2-club-detail__feed"><div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div></div>
 
         <!-- Members -->
         <div class="sv2-club-detail__section-title">Members (${club.memberCount})</div>

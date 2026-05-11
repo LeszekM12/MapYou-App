@@ -580,22 +580,13 @@ export class SaveActivityModal {
 
     await CS.saveEnrichedActivity(enriched);
 
-    // Share to selected clubs
+    // Share to selected clubs — store clubIds on activity (no duplication)
     const checkedClubs = this._el?.querySelectorAll<HTMLInputElement>('.sam-club-check:checked') ?? [];
-    const userName = localStorage.getItem('mapyou_userName') ?? 'Athlete';
-    checkedClubs.forEach(cb => {
-      addToClubFeed(cb.dataset.clubId!, {
-        id:          `cf_${Date.now()}_${Math.random().toString(36).slice(2,6)}`,
-        type:        'activity',
-        title:       enriched.name || enriched.description || enriched.sport,
-        body:        enriched.description,
-        date:        enriched.date,
-        authorName:  userName,
-        sport:       enriched.sport,
-        distanceKm:  enriched.distanceKm,
-        durationSec: enriched.durationSec,
-      });
-    });
+    if (checkedClubs.length > 0) {
+      enriched.clubIds = [...checkedClubs].map(cb => cb.dataset.clubId!);
+      // Re-save with clubIds
+      await CS.saveEnrichedActivity(enriched);
+    }
 
     this._onSave(enriched);  // render first, then close
     this.close(true);         // saved=true → skip onCancel

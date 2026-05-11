@@ -32,6 +32,7 @@ export interface EnrichedActivity {
   name:        string;
   description: string;
   photoUrl:    string | null;   // data:image/… or Cloudinary URL
+  clubIds?:    string[];        // clubs this activity is shared to
   mediaType?:  'image' | 'video' | null; // type of media attached
   coordsEnc?:  string | null;   // Encoded Polyline (compressed, for Atlas backup)
   minimapUrl?: string | null;   // Static map image URL
