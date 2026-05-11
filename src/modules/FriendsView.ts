@@ -52,6 +52,30 @@ export class FriendsView {
     }
 
     // Sprawdź czy URL zawiera #live= (oglądanie trasy)
+    // Check for club invite link #club=CODE
+    if (window.location.hash.startsWith('#club=')) {
+      const code     = window.location.hash.replace('#club=', '');
+      const myUserId = getUserId();
+      if (code && myUserId) {
+        void (async () => {
+          try {
+            const res  = await fetch(`${BACKEND_URL}/clubs/invite/${encodeURIComponent(code)}`);
+            const data = await res.json() as { status: string; clubId: string };
+            if (data.status === 'ok' && data.clubId) {
+              // Auto-join the club
+              await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(data.clubId)}/join`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: myUserId }),
+              });
+              this._showToast('You joined the club! 🎉');
+              // Clean hash
+              history.replaceState(null, '', window.location.pathname);
+            }
+          } catch { /* ignoruj */ }
+        })();
+      }
+    }
+
     const hash = window.location.hash;
     if (hash.startsWith('#live=')) {
       const token = hash.replace('#live=', '');

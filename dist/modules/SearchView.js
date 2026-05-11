@@ -343,7 +343,7 @@ export class SearchView {
                 <div class="sv2-item__avatar sv2-item__avatar--club">${avatar}</div>
                 <div class="sv2-item__info">
                   <span class="sv2-item__name">${c.name}</span>
-                  <span class="sv2-item__sub">${c.members.length} members · ${[c.city, c.region].filter(Boolean).join(', ')}</span>
+                  <span class="sv2-item__sub">${c.members.length} member${c.members.length !== 1 ? 's' : ''} · ${[c.city, c['region']].filter(Boolean).join(', ')}</span>
                   ${c.description ? `<span class="sv2-item__desc">${c.description.slice(0, 60)}</span>` : ''}
                 </div>
                 <button class="sv2-badge ${isMember ? 'sv2-badge--gray' : 'sv2-badge--green'}"
@@ -618,11 +618,25 @@ export class SearchView {
             ${club.location ? `<span>📍 ${club.location}</span>` : ''}
           </div>
           ${club.description ? `<p class="sv2-club-detail__desc">${club.description}</p>` : ''}
-          <div class="sv2-club-detail__actions">
-            ${club.isOwner
-            ? `<button class="sv2-club-action sv2-club-action--owner" disabled>👑 You own this club</button>`
-            : `<button class="sv2-club-action ${club.joined ? 'sv2-club-action--leave' : 'sv2-club-action--join'}"
-                  id="cdbJoin">${club.joined ? 'Leave club' : 'Join club'}</button>`}
+          <div class="sv2-club-detail__actions" style="display:flex;flex-direction:column;gap:8px">
+            ${club.isOwner ? `
+              <div style="display:flex;gap:8px">
+                <button class="sv2-club-action sv2-club-action--join" id="cdbPrivacy" style="flex:1;font-size:1.25rem">
+                  ${club.isPrivate ? '🌐 Make Public' : '🔒 Make Private'}
+                </button>
+                <button class="sv2-club-action sv2-club-action--join" id="cdbShare" style="flex:0 0 auto;padding:14px 16px" title="Share invite link">
+                  🔗
+                </button>
+                <button class="sv2-club-action sv2-club-action--leave" id="cdbDelete" style="flex:0 0 auto;padding:14px 16px">
+                  🗑
+                </button>
+              </div>` : `
+              <button class="sv2-club-action ${club.joined ? 'sv2-club-action--leave' : 'sv2-club-action--join'}"
+                id="cdbJoin">${club.joined ? 'Leave club' : 'Join club'}</button>`}
+            ${club.joined || club.isOwner ? `
+              <button class="sv2-club-action sv2-club-action--join" id="cdbAddPost" style="background:rgba(0,196,106,0.12);color:#00c46a;border:1.5px solid rgba(0,196,106,0.3)">
+                ✏️ Add Post to Club
+              </button>` : ''}
           </div>
         </div>
 
@@ -695,15 +709,106 @@ export class SearchView {
             };
             reader.readAsDataURL(file);
         });
-        modal.querySelector('#cdbJoin')?.addEventListener('click', () => {
+        modal.querySelector('#cdbJoin')?.addEventListener('click', async () => {
+            const myUserId = getUserId();
+            const action = club.joined ? 'leave' : 'join';
+            await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/${action}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: myUserId }),
+            });
             const clubs = loadClubs();
             const c = clubs.find(x => x.id === club.id);
-            if (!c)
+            if (c) {
+                c.joined = !c.joined;
+                c.memberCount = Math.max(0, c.memberCount + (c.joined ? 1 : -1));
+                saveClubs(clubs);
+            }
+            close();
+        });
+        // Share club invite link (owner only)
+        modal.querySelector('#cdbShare')?.addEventListener('click', async () => {
+            try {
+                const res = await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/invite`, { method: 'POST' });
+                const data = await res.json();
+                if (data.status !== 'ok')
+                    throw new Error('Failed');
+                const base = window.location.href.split('#')[0];
+                const link = `${base}#club=${data.code}`;
+                if (navigator.share) {
+                    await navigator.share({ title: `Join ${club.name} on MapYou`, url: link });
+                }
+                else {
+                    await navigator.clipboard.writeText(link);
+                    const btn = modal.querySelector('#cdbShare');
+                    btn.textContent = '✓';
+                    setTimeout(() => { btn.textContent = '🔗'; }, 2000);
+                }
+            }
+            catch {
+                alert('Could not generate invite link');
+            }
+        });
+        // Privacy toggle (owner only)
+        modal.querySelector('#cdbPrivacy')?.addEventListener('click', async () => {
+            const clubs = loadClubs();
+            const c = clubs.find(x => x.id === club.id);
+            const nowPrivate = !(club.isPrivate);
+            if (c) {
+                c.isPrivate = nowPrivate;
+                saveClubs(clubs);
+            }
+            await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ isPrivate: nowPrivate }),
+            });
+            const btn = modal.querySelector('#cdbPrivacy');
+            if (btn)
+                btn.textContent = nowPrivate ? '🌐 Make Public' : '🔒 Make Private';
+        });
+        // Delete club (owner only)
+        modal.querySelector('#cdbDelete')?.addEventListener('click', async () => {
+            if (!confirm(`Delete "${club.name}"? This cannot be undone.`))
                 return;
-            c.joined = !c.joined;
-            c.memberCount = Math.max(0, c.memberCount + (c.joined ? 1 : -1));
+            await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { method: 'DELETE' });
+            const clubs = loadClubs().filter(c => c.id !== club.id);
             saveClubs(clubs);
             close();
+        });
+        // Add post directly to club
+        modal.querySelector('#cdbAddPost')?.addEventListener('click', () => {
+            import('./PostModal.js').then(m => {
+                m.openPostModal(post => {
+                    // Force clubId on this post
+                    post.clubIds = [club.id];
+                    import('./cloudSync.js').then(cs => {
+                        void cs.CS.savePost(post).then(() => {
+                            // Reload club feed
+                            const feedEl = modal.querySelector('.sv2-club-detail__feed');
+                            if (!feedEl)
+                                return;
+                            feedEl.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>';
+                            fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/feed`, { cache: 'no-store' })
+                                .then(r => r.json())
+                                .then((data) => {
+                                if (!data.data?.length) {
+                                    feedEl.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📢</span><p>No posts yet.</p></div>';
+                                    return;
+                                }
+                                feedEl.innerHTML = data.data.map(f => {
+                                    const d = f.data;
+                                    return `<div class="sv2-club-feed-item">
+                      <div class="sv2-club-feed-item__top">
+                        <span class="sv2-club-feed-item__author">${d.authorName ?? ''}</span>
+                        <span class="sv2-club-feed-item__date">${new Date(f.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>
+                      </div>
+                      <div class="sv2-club-feed-item__title">${d.name ?? d.title ?? ''}</div>
+                    </div>`;
+                                }).join('');
+                            }).catch(() => { });
+                        });
+                    });
+                });
+            });
         });
     }
     _openCreateClubModal(parentEl) {
@@ -735,9 +840,16 @@ export class SearchView {
             </select>
           </div>
           <div class="sv2-modal__field">
-            <label class="sv2-modal__label">Location</label>
+            <label class="sv2-modal__label">City <span style="color:#ef4444">*</span></label>
             <input class="sv2-modal__input" id="ccLocation" type="text" maxlength="60"
-              placeholder="City or region" value="${userLoc}"/>
+              placeholder="e.g. Elbląg" value="${userLoc}"/>
+          </div>
+          <div class="sv2-modal__field">
+            <label class="sv2-modal__label">Region
+              <span style="opacity:.4;font-size:1rem">(auto-filled, editable)</span>
+            </label>
+            <input class="sv2-modal__input" id="ccRegion" type="text" maxlength="80"
+              placeholder="e.g. Warmian-Masurian"/>
           </div>
           <div class="sv2-modal__field">
             <label class="sv2-modal__label">Description <span style="opacity:.4">(optional)</span></label>
