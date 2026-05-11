@@ -108,8 +108,9 @@ export interface PostRecord {
   title:      string;
   body:       string;
   photoUrl:   string | null;
-  photoPublicId?: string | null; // Cloudinary public_id (for deletion)
-  mediaType?:  'image' | 'video' | null; // type of media attached
+  photoPublicId?: string | null;
+  mediaType?:  'image' | 'video' | null;
+  clubIds?:    string[];
   authorName: string;
   avatarB64:  string | null;
 }

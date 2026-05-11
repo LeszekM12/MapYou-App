@@ -4,7 +4,7 @@
 // Bottom-sheet for creating a text/photo post shown in the Home feed.
 // Stored locally in IndexedDB (postsFeed table) + localStorage fallback.
 import { CS, uploadMediaFile } from './cloudSync.js';
-import { getJoinedClubs, addToClubFeed } from './SearchView.js';
+import { getJoinedClubs } from './SearchView.js';
 // ── Build HTML ────────────────────────────────────────────────────────────────
 function buildHTML() {
     return `
@@ -320,19 +320,11 @@ export class PostModal {
             avatarB64: localStorage.getItem('mapyou_avatar') ?? null,
         };
         await CS.savePost(post);
-        // Share to selected clubs
+        // Share to selected clubs — store clubIds on post (no duplication)
         const checkedClubs = el.querySelectorAll('.pm-club-check:checked');
-        const userName = localStorage.getItem('mapyou_userName') ?? 'Athlete';
-        checkedClubs.forEach(cb => {
-            addToClubFeed(cb.dataset.clubId, {
-                id: `cf_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-                type: 'post',
-                title: post.title,
-                body: post.body ?? '',
-                date: post.date,
-                authorName: userName,
-            });
-        });
+        if (checkedClubs.length > 0) {
+            post.clubIds = [...checkedClubs].map(cb => cb.dataset.clubId);
+        }
         this.close();
         this._onSave(post);
     }

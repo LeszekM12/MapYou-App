@@ -479,7 +479,7 @@ export class SearchView {
         <div class="sv2-list">
           ${myClubs.map(c => {
                 const sportIcons = { running: '🏃', walking: '🚶', cycling: '🚴', fitness: '💪', hiking: '🥾', other: '🏅' };
-                return `<div class="sv2-item">
+                return `<div class="sv2-item" data-my-club-id="${c.id}" style="cursor:pointer">
               <div class="sv2-item__avatar sv2-item__avatar--club">
                 ${c.logoB64 ? `<img src="${c.logoB64}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>` : `<span style="font-size:24px">${sportIcons[c.sport] ?? '🏅'}</span>`}
               </div>
@@ -487,10 +487,19 @@ export class SearchView {
                 <span class="sv2-item__name">${c.name}</span>
                 <span class="sv2-item__sub">${c.memberCount} members · ${c.location}</span>
               </div>
-              <span class="sv2-badge sv2-badge--gray">Owner</span>
+              <span class="sv2-badge sv2-badge--gray">${c.isOwner ? 'Owner' : 'Joined'}</span>
             </div>`;
             }).join('')}
         </div>`;
+            // Click handler for my clubs
+            mySection.querySelectorAll('[data-my-club-id]').forEach(item => {
+                item.addEventListener('click', () => {
+                    const cid = item.dataset.myClubId;
+                    const club = myClubs.find(c => c.id === cid);
+                    if (club)
+                        this._openClubDetail(club);
+                });
+            });
             resultsEl.insertAdjacentElement('beforebegin', mySection);
         }
         void loadNearby();
