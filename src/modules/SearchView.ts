@@ -252,7 +252,20 @@ export class SearchView {
         item.addEventListener('click', e => {
           if ((e.target as HTMLElement).closest('[data-follow]')) return;
           const uid = item.dataset.userid;
-          if (uid) { import('./PublicProfile.js').then(m => m.openPublicProfile(uid)); }
+          if (!uid) return;
+          // Lower search overlay so profile appears on top
+          const searchOverlay = document.getElementById('searchViewOverlay');
+          if (searchOverlay) searchOverlay.style.zIndex = '4999';
+          import('./PublicProfile.js').then(m => {
+            m.openPublicProfile(uid);
+            // Restore z-index when profile closes
+            const watcher = setInterval(() => {
+              if (!document.querySelector('.pv-overlay--visible')) {
+                clearInterval(watcher);
+                if (searchOverlay) searchOverlay.style.zIndex = '';
+              }
+            }, 300);
+          });
         });
       });
     };
