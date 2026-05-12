@@ -815,6 +815,7 @@ export class SearchView {
       modal.querySelector('#cdbJoin')?.addEventListener('click', async () => {
         const isPrivate = !!(club as unknown as Record<string,unknown>).isPrivate;
         if (club.joined) {
+          if (!confirm(`Leave "${club.name}"?`)) return;
           await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/leave`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId: myUserId }) });
           club.joined = false; club.memberCount = Math.max(0, club.memberCount - 1);
           removePendingClub(club.id);
@@ -870,35 +871,28 @@ export class SearchView {
         close();
       });
 
-      // Add Post — lower ALL overlays so PostModal appears on top
+      // Add Post — force PostModal z-index above all overlays
       modal.querySelector('#cdbAddPost')?.addEventListener('click', () => {
-        modal.style.zIndex = '4999';
-        const searchOverlay = document.getElementById('searchViewOverlay');
-        if (searchOverlay) searchOverlay.style.zIndex = '4998';
-
         import('./PostModal.js').then(m => {
           m.openPostModal(post => {
-            post.clubIds = [club.id];
-            // Mark as club-only so it doesn't appear in home feed
+            post.clubIds   = [club.id];
             post.addToHome = false;
             import('./cloudSync.js').then(cs => {
-              void cs.CS.savePost(post).then(() => {
-                loadFeed();
-                modal.style.zIndex = '';
-                if (searchOverlay) searchOverlay.style.zIndex = '';
-              });
+              void cs.CS.savePost(post).then(() => loadFeed());
             });
           });
-          // Restore z-index when PostModal closes without saving
-          const watcher = setInterval(() => {
-            if (!document.querySelector('.pm-overlay--visible')) {
-              clearInterval(watcher);
-              setTimeout(() => {
-                modal.style.zIndex = '';
-                if (searchOverlay) searchOverlay.style.zIndex = '';
-              }, 400);
-            }
-          }, 300);
+          // Raise pm-overlay above club detail (7000) and search (5500)
+          setTimeout(() => {
+            const pmEl = document.getElementById('postModalOverlay');
+            if (pmEl) pmEl.style.zIndex = '9500';
+            const watcher = setInterval(() => {
+              const pm = document.getElementById('postModalOverlay');
+              if (!pm || !pm.classList.contains('pm-overlay--visible')) {
+                clearInterval(watcher);
+                if (pm) pm.style.zIndex = '';
+              }
+            }, 200);
+          }, 50);
         });
       });
     }; // end renderModal
@@ -928,12 +922,18 @@ export class SearchView {
                 </div>
               </div>`;
             }
-            return `<div class="sv2-club-feed-item">
-              <div class="sv2-club-feed-item__top">
-                <span class="sv2-club-feed-item__author">${d.authorName ?? ''}</span>
+            const canDelete = d.userId === myUserId || club.isOwner;
+            const postId = (d.postId ?? d.id ?? '') as string;
+            return `<div class="sv2-club-feed-item" data-feed-post-id="${postId}">
+              <div class="sv2-club-feed-item__top" style="display:flex;align-items:center;gap:8px">
+                <div data-feed-profile="${d.userId}" style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0;cursor:pointer">
+                  ${d.authorAvatarUrl ? `<img src="${d.authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">${((d.authorName as string)||'?')[0]}</div>`}
+                </div>
+                <span class="sv2-club-feed-item__author" data-feed-profile="${d.userId}" style="cursor:pointer;flex:1">${d.authorName ?? ''}</span>
                 <span class="sv2-club-feed-item__date">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>
+                ${canDelete ? `<button data-delete-post="${postId}" style="background:none;border:none;color:rgba(255,255,255,0.3);font-size:1.3rem;cursor:pointer;padding:0 4px">🗑</button>` : ''}
               </div>
-              <div class="sv2-club-feed-item__title">${d.name ?? d.title ?? ''}</div>
+              <div class="sv2-club-feed-item__title" style="margin-top:6px">${d.name ?? d.title ?? d.body ?? ''}</div>
               ${d.distanceKm ? `<div class="sv2-club-feed-item__stats"><span>${(d.distanceKm as number).toFixed(2)} km</span>${d.durationSec ? `<span>${Math.floor((d.durationSec as number)/60)}m</span>` : ''}</div>` : ''}
               ${d.photoUrl && d.mediaType !== 'video' ? `<img src="${d.photoUrl}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px" onerror="this.style.display='none'"/>` : ''}
             </div>`;
@@ -952,17 +952,36 @@ export class SearchView {
               loadFeed();
             });
           });
-          // Profile click on request cards
-          feedEl.querySelectorAll<HTMLElement>('[data-profile-uid]').forEach(el => {
+          // Profile click (request cards + feed items)
+          feedEl.querySelectorAll<HTMLElement>('[data-profile-uid],[data-feed-profile]').forEach(el => {
             el.addEventListener('click', () => {
-              const uid = el.dataset.profileUid!;
-              modal.style.zIndex = '4999';
+              const uid = (el.dataset.profileUid ?? el.dataset.feedProfile)!;
+              if (!uid || uid === myUserId) return;
               import('./PublicProfile.js').then(m => {
                 m.openPublicProfile(uid);
-                const w = setInterval(() => {
-                  if (!document.querySelector('.pv-overlay--visible')) { clearInterval(w); modal.style.zIndex = ''; }
-                }, 300);
+                setTimeout(() => {
+                  const pvEl = document.querySelector<HTMLElement>('.pv-overlay');
+                  if (pvEl) pvEl.style.zIndex = '9500';
+                  const w = setInterval(() => {
+                    if (!document.querySelector('.pv-overlay--visible')) {
+                      clearInterval(w); if (pvEl) pvEl.style.zIndex = '';
+                    }
+                  }, 300);
+                }, 50);
               });
+            });
+          });
+          // Delete post from feed
+          feedEl.querySelectorAll<HTMLButtonElement>('[data-delete-post]').forEach(btn => {
+            btn.addEventListener('click', async e => {
+              e.stopPropagation();
+              if (!confirm('Delete this post?')) return;
+              const pid = btn.dataset.deletePost!;
+              await fetch(`${BACKEND_URL}/posts/${encodeURIComponent(pid)}`, {
+                method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: myUserId }),
+              }).catch(() => {});
+              loadFeed();
             });
           });
         }).catch(() => { const feedEl2 = modal.querySelector<HTMLElement>('#cdbFeed'); if (feedEl2) feedEl2.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📡</span><p>Offline</p></div>'; });
