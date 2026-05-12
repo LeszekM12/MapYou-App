@@ -849,7 +849,7 @@ export class SearchView {
         }).catch(() => { const feedEl2 = modal.querySelector<HTMLElement>('#cdbFeed'); if (feedEl2) feedEl2.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📡</span><p>Offline</p></div>'; });
     };
 
-    const loadMembersAndStats = () => {
+    const loadMembersAndStats = async () => {
       // Stats
       fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/stats`, { cache:'no-store' })
         .then(r => r.json())
@@ -882,7 +882,7 @@ export class SearchView {
       // Members
       fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/members`, { cache:'no-store' })
         .then(r => r.json())
-        .then((data: { status: string; ownerId: string; pendingMembers: string[]; data: {userId:string;name:string;avatarB64:string|null}[] }) => {
+        .then(async (data: { status: string; ownerId: string; pendingMembers: string[]; data: {userId:string;name:string;avatarB64:string|null}[] }) => {
           const membersEl = modal.querySelector<HTMLElement>('#cdbMembers'); if (!membersEl) return;
           membersEl.innerHTML = data.data.map(u => `
             <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05)">
@@ -901,16 +901,49 @@ export class SearchView {
             const pendingEl    = modal.querySelector<HTMLElement>('#cdbPending');
             if (pendingTitle) pendingTitle.style.display = '';
             if (pendingEl) {
-              pendingEl.innerHTML = data.pendingMembers.map(uid => `
-                <div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05)">
-                  <div style="width:36px;height:36px;border-radius:50%;background:#444;display:flex;align-items:center;justify-content:center;font-size:14px;color:#fff">?</div>
-                  <span style="flex:1;font-size:1.25rem;color:#fff">${uid.slice(0,12)}…</span>
-                  <button style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 12px;font-size:1.1rem;cursor:pointer;font-family:inherit;margin-right:6px" data-approve="${uid}">✓</button>
-                  <button style="background:rgba(248,113,113,0.2);border:1px solid #f87171;color:#f87171;border-radius:8px;padding:6px 12px;font-size:1.1rem;cursor:pointer;font-family:inherit" data-reject="${uid}">✕</button>
+              // Fetch user details for pending members
+              const pendingUsers: {userId:string;name:string;avatarB64:string|null}[] = await Promise.all(
+                data.pendingMembers.map(uid =>
+                  fetch(`${BACKEND_URL}/users/${encodeURIComponent(uid)}`, { cache:'no-store' })
+                    .then(r => r.json())
+                    .then((d: {data?:{userId:string;name:string;avatarB64:string|null}}) =>
+                      d.data ?? { userId: uid, name: uid.slice(0,10)+'…', avatarB64: null })
+                    .catch(() => ({ userId: uid, name: uid.slice(0,10)+'…', avatarB64: null }))
+                )
+              );
+
+              pendingEl.innerHTML = pendingUsers.map(u => `
+                <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05)">
+                  <div data-open-profile="${u.userId}" style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0;cursor:pointer">
+                    ${u.avatarB64
+                      ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>`
+                      : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${u.name[0]}</div>`}
+                  </div>
+                  <span data-open-profile="${u.userId}" style="flex:1;font-size:1.3rem;font-weight:600;color:#fff;cursor:pointer">${u.name}</span>
+                  <button style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;margin-right:6px;font-weight:700" data-approve="${u.userId}">Accept</button>
+                  <button style="background:rgba(248,113,113,0.12);border:1.5px solid #f87171;color:#f87171;border-radius:8px;padding:7px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700" data-reject="${u.userId}">Decline</button>
                 </div>`).join('');
+
+              // Profile click
+              pendingEl.querySelectorAll<HTMLElement>('[data-open-profile]').forEach(el => {
+                el.addEventListener('click', () => {
+                  const uid = el.dataset.openProfile!;
+                  modal.style.zIndex = '4999';
+                  import('./PublicProfile.js').then(m => {
+                    m.openPublicProfile(uid);
+                    const w = setInterval(() => {
+                      if (!document.querySelector('.pv-overlay--visible')) {
+                        clearInterval(w); modal.style.zIndex = '';
+                      }
+                    }, 300);
+                  });
+                });
+              });
+
               pendingEl.querySelectorAll<HTMLButtonElement>('[data-approve]').forEach(btn => {
                 btn.addEventListener('click', async () => {
                   await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/approve/${encodeURIComponent(btn.dataset.approve!)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ownerId: myUserId }) });
+                  removePendingClub(club.id);
                   club.memberCount++;
                   loadMembersAndStats();
                 });
