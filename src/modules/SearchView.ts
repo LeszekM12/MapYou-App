@@ -407,6 +407,12 @@ export class SearchView {
             body: JSON.stringify({ userId: myUserId }) });
           btn.textContent = joined ? 'Join' : 'Joined';
           btn.className   = joined ? 'sv2-badge sv2-badge--green' : 'sv2-badge sv2-badge--gray';
+          // Update member count in card
+          const subEl = btn.closest('.sv2-item')?.querySelector('.sv2-item__sub');
+          if (subEl) {
+            const m = subEl.textContent?.match(/(\d+) member/);
+            if (m) { const n = joined ? Math.max(0, Number(m[1]) - 1) : Number(m[1]) + 1; subEl.textContent = subEl.textContent!.replace(m[0], n + ' member' + (n !== 1 ? 's' : '')); }
+          }
           // Sync local club list for PostModal/SaveActivityModal
           const localClubs = loadClubs();
           const existing   = localClubs.find(lc => lc.id === cid);
@@ -575,6 +581,22 @@ export class SearchView {
     modal.id = 'clubDetailModal';
     modal.className = 'sv2-club-detail-overlay';
 
+    // Fetch fresh club data from backend (to get isPrivate, memberCount, avatarB64)
+    void fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then((d: { status: string; data: Record<string,unknown> }) => {
+        if (d.status === 'ok' && d.data) {
+          const fresh = d.data;
+          if (fresh.isPrivate !== undefined) (club as unknown as Record<string,unknown>).isPrivate = fresh.isPrivate;
+          if (fresh.members)    club.memberCount = (fresh.members as string[]).length;
+          if (fresh.avatarB64)  club.logoB64     = fresh.avatarB64 as string;
+          if (fresh.bannerUrl)  club.bannerB64   = fresh.bannerUrl as string;
+          // Check if user is member
+          if (fresh.members) club.joined = (fresh.members as string[]).includes(myUserId);
+          renderModal('feed');
+        }
+      }).catch(() => {});
+
     const renderModal = (tab: 'feed'|'members' = 'feed') => {
       const isMember = club.joined || club.isOwner;
       modal.innerHTML = `
@@ -694,7 +716,8 @@ export class SearchView {
         if (club.joined) {
           await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/leave`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId: myUserId }) });
           club.joined = false; club.memberCount = Math.max(0, club.memberCount - 1);
-          const lc = loadClubs().find(c => c.id === club.id); if (lc) { lc.joined = false; saveClubs(loadClubs().map(c => c.id === club.id ? lc : c)); }
+          const lcs2 = loadClubs(); const lc2 = lcs2.find(c => c.id === club.id);
+          if (lc2) { lc2.joined = false; lc2.memberCount = club.memberCount; saveClubs(lcs2); }
         } else if (isPrivate) {
           await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/request`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId: myUserId }) });
           const btn = modal.querySelector<HTMLButtonElement>('#cdbJoin'); if (btn) { btn.querySelector('span')!.textContent = '⏳'; btn.querySelectorAll('span')[1].textContent = 'Pending'; }
@@ -869,9 +892,13 @@ export class SearchView {
       setTimeout(() => modal.remove(), 300);
     };
 
-    renderModal('feed');
+    // Show loading state first, then render after fresh data arrives
+    modal.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>';
     document.body.appendChild(modal);
     requestAnimationFrame(() => modal.classList.add('sv2-club-detail-overlay--visible'));
+    // renderModal is called by the fresh-fetch callback above
+    // Fallback: if fetch fails or takes too long, render anyway after 1s
+    setTimeout(() => { if (!modal.querySelector('.sv2-club-detail__action-row')) renderModal('feed'); }, 1000);
   }
 
 
