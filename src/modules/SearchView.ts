@@ -423,7 +423,17 @@ export class SearchView {
           const clubData = clubs.find(c => c.clubId === cid);
           const isPrivate = !!(clubData as Record<string,unknown>|undefined)?.isPrivate;
 
-          if (pending) return; // already requested — do nothing
+          if (pending) {
+            // Cancel request
+            await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(cid)}/cancel-request`, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ userId: myUserId }),
+            });
+            removePendingClub(cid);
+            btn.textContent = isPrivate ? 'Request' : 'Join';
+            btn.className   = 'sv2-badge sv2-badge--green';
+            return;
+          }
 
           if (joined) {
             // Leave
@@ -871,17 +881,16 @@ export class SearchView {
           feedEl.innerHTML = data.data.map(f => {
             const d = f.data;
             if (f.kind === 'request') {
-              // Join request card — owner only
               return `<div class="sv2-club-feed-item" style="border:1.5px solid rgba(0,196,106,0.3);background:rgba(0,196,106,0.06)">
                 <div class="sv2-club-feed-item__top">
                   <span class="sv2-club-feed-item__author">🔔 Join Request</span>
                   <span class="sv2-club-feed-item__date">now</span>
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
-                  <div style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0">
+                  <div data-profile-uid="${d.userId}" style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0;cursor:pointer">
                     ${d.avatarB64 ? `<img src="${d.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff">${(d.authorName as string)[0]}</div>`}
                   </div>
-                  <span style="flex:1;font-weight:700;color:#fff">${d.authorName}</span>
+                  <span data-profile-uid="${d.userId}" style="flex:1;font-weight:700;color:#fff;cursor:pointer">${d.authorName}</span>
                   <button data-feed-approve="${d.userId}" style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:1.1rem;cursor:pointer;font-family:inherit;font-weight:700">Accept</button>
                   <button data-feed-reject="${d.userId}" style="background:rgba(248,113,113,0.12);border:1.5px solid #f87171;color:#f87171;border-radius:8px;padding:6px 14px;font-size:1.1rem;cursor:pointer;font-family:inherit;font-weight:700;margin-left:6px">Decline</button>
                 </div>
@@ -909,6 +918,19 @@ export class SearchView {
             btn.addEventListener('click', async () => {
               await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/reject/${encodeURIComponent(btn.dataset.feedReject!)}`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ ownerId: myUserId }) });
               loadFeed();
+            });
+          });
+          // Profile click on request cards
+          feedEl.querySelectorAll<HTMLElement>('[data-profile-uid]').forEach(el => {
+            el.addEventListener('click', () => {
+              const uid = el.dataset.profileUid!;
+              modal.style.zIndex = '4999';
+              import('./PublicProfile.js').then(m => {
+                m.openPublicProfile(uid);
+                const w = setInterval(() => {
+                  if (!document.querySelector('.pv-overlay--visible')) { clearInterval(w); modal.style.zIndex = ''; }
+                }, 300);
+              });
             });
           });
         }).catch(() => { const feedEl2 = modal.querySelector<HTMLElement>('#cdbFeed'); if (feedEl2) feedEl2.innerHTML = '<div class="sv2-club-detail__feed-empty"><span>📡</span><p>Offline</p></div>'; });
