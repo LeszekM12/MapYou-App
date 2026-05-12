@@ -111,6 +111,7 @@ export interface PostRecord {
   photoPublicId?: string | null;
   mediaType?:  'image' | 'video' | null;
   clubIds?:    string[];
+  addToHome?:  boolean;
   authorName: string;
   avatarB64:  string | null;
 }

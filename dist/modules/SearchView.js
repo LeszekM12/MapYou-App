@@ -571,6 +571,26 @@ export class SearchView {
             </div>`;
             }).join('')}
         </div>`;
+            // Sync localStorage so getJoinedClubs() works for accepted members
+            const existingLocal = loadClubs();
+            const existingIds = new Set(existingLocal.map(c => c.id));
+            let changed = false;
+            for (const cd of mine) {
+                if (!existingIds.has(cd.clubId)) {
+                    existingLocal.push({
+                        id: cd.clubId, name: cd.name, sport: cd.sport, description: cd.description,
+                        location: [cd.city, cd.region ?? ''].filter(Boolean).join(', '),
+                        memberCount: cd.members.length, isOwner: cd.ownerId === myUserId,
+                        joined: true, createdAt: Date.now(), feed: [],
+                    });
+                    changed = true;
+                }
+            }
+            // Remove clubs user has left (not in mine anymore)
+            const mineIds = new Set(mine.map(c => c.clubId));
+            const pruned = existingLocal.filter(c => mineIds.has(c.id) || c.isOwner);
+            if (changed || pruned.length !== existingLocal.length)
+                saveClubs(pruned);
             mySection.querySelectorAll('[data-my-club-id]').forEach(item => {
                 item.addEventListener('click', () => {
                     const cid = item.dataset.myClubId;
@@ -884,21 +904,35 @@ export class SearchView {
                 saveClubs(loadClubs().filter(c => c.id !== club.id));
                 close();
             });
-            // Add Post — lower z-index so PostModal appears on top
+            // Add Post — lower ALL overlays so PostModal appears on top
             modal.querySelector('#cdbAddPost')?.addEventListener('click', () => {
                 modal.style.zIndex = '4999';
+                const searchOverlay = document.getElementById('searchViewOverlay');
+                if (searchOverlay)
+                    searchOverlay.style.zIndex = '4998';
                 import('./PostModal.js').then(m => {
                     m.openPostModal(post => {
                         post.clubIds = [club.id];
+                        // Mark as club-only so it doesn't appear in home feed
+                        post.addToHome = false;
                         import('./cloudSync.js').then(cs => {
-                            void cs.CS.savePost(post).then(() => { loadFeed(); });
+                            void cs.CS.savePost(post).then(() => {
+                                loadFeed();
+                                modal.style.zIndex = '';
+                                if (searchOverlay)
+                                    searchOverlay.style.zIndex = '';
+                            });
                         });
                     });
-                    // Restore z-index when PostModal closes
+                    // Restore z-index when PostModal closes without saving
                     const watcher = setInterval(() => {
-                        if (!document.querySelector('.pm-overlay--visible, .pm-overlay') || document.querySelector('.pm-overlay')?.classList.contains('pm-overlay--hidden')) {
+                        if (!document.querySelector('.pm-overlay--visible')) {
                             clearInterval(watcher);
-                            setTimeout(() => { modal.style.zIndex = ''; }, 400);
+                            setTimeout(() => {
+                                modal.style.zIndex = '';
+                                if (searchOverlay)
+                                    searchOverlay.style.zIndex = '';
+                            }, 400);
                         }
                     }, 300);
                 });
@@ -1066,9 +1100,12 @@ export class SearchView {
                         });
                         pendingEl.querySelectorAll('[data-approve]').forEach(btn => {
                             btn.addEventListener('click', async () => {
-                                await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/approve/${encodeURIComponent(btn.dataset.approve)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ownerId: myUserId }) });
+                                const approvedUid = btn.dataset.approve;
+                                await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/approve/${encodeURIComponent(approvedUid)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ownerId: myUserId }) });
                                 removePendingClub(club.id);
                                 club.memberCount++;
+                                // Sync local clubs so approved user sees club in getJoinedClubs()
+                                // (This runs on owner's device — the approved user's device syncs via backend on next open)
                                 loadMembersAndStats();
                             });
                         });

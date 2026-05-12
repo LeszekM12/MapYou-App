@@ -882,20 +882,36 @@ const userId = getUserId();
   // ── Posts ────────────────────────────────────────────────────────────────────
 
   async savePost(post: PostRecord): Promise<void> {
-    await savePost(post);
     const userId = getUserId();
     // Upload zdjęcia do Cloudinary — zamień base64 na URL w IndexedDB
     const uploaded = await uploadIfBase64(post.photoUrl, userId, 'posts');
-    if (uploaded) {
-      await savePost({ ...post, photoUrl: uploaded.url, photoPublicId: uploaded.publicId });
+    const finalPost = uploaded
+      ? { ...post, photoUrl: uploaded.url, photoPublicId: uploaded.publicId }
+      : post;
+    await savePost(finalPost);
+
+    // Club-only posts — skip home feed, send only club IDs
+    const isClubOnly = finalPost.clubIds && finalPost.clubIds.length > 0 && finalPost.addToHome === false;
+    if (!isClubOnly) {
+      // Normal post — goes to home feed
+      void apiPost('/posts', {
+        ...finalPost,
+        postId:        finalPost.id,
+        userId,
+        photoUrl:      finalPost.photoUrl,
+        photoPublicId: uploaded?.publicId ?? null,
+      });
+    } else {
+      // Club-only — still save to backend posts collection (for club feed queries) but skip home
+      void apiPost('/posts', {
+        ...finalPost,
+        postId:        finalPost.id,
+        userId,
+        photoUrl:      finalPost.photoUrl,
+        photoPublicId: uploaded?.publicId ?? null,
+        clubOnly:      true,
+      });
     }
-    void apiPost('/posts', {
-      ...post,
-      postId:        post.id,
-      userId,
-      photoUrl:      uploaded?.url      ?? post.photoUrl,
-      photoPublicId: uploaded?.publicId ?? null,
-    });
   },
 
   async deleteReel(id: string): Promise<void> {
