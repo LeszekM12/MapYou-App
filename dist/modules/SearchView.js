@@ -964,6 +964,12 @@ export class SearchView {
                 </div>
               </div>`;
                     }
+                    if (f.kind === 'post' && d.type === 'club_event') {
+                        return `<div class="sv2-club-feed-item" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);text-align:center;padding:10px">
+                <span style="font-size:1.2rem;color:rgba(255,255,255,0.4)">${d.title}</span>
+                <span style="font-size:1.1rem;color:rgba(255,255,255,0.25);margin-left:8px">${new Date(f.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>
+              </div>`;
+                    }
                     const canDelete = d.userId === myUserId || club.isOwner;
                     const postId = (d.postId ?? d.id ?? '');
                     return `<div class="sv2-club-feed-item" data-feed-post-id="${postId}">
