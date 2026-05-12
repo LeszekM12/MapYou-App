@@ -751,7 +751,16 @@ export class SearchView {
 
         ${isMember ? `
         <div class="sv2-club-detail__actions" style="padding:0 16px 12px">
-          <button class="sv2-club-action sv2-club-action--join" id="cdbAddPost">✏️ Add Post to Club</button>
+          <button id="cdbAddPost" style="
+            display:flex;align-items:center;justify-content:center;gap:8px;
+            width:100%;padding:13px;border-radius:14px;border:none;
+            background:linear-gradient(135deg,rgba(0,196,106,0.15),rgba(0,196,106,0.08));
+            border:1.5px solid rgba(0,196,106,0.35);color:#00c46a;
+            font-size:1.35rem;font-weight:700;font-family:inherit;cursor:pointer;
+            transition:background 0.2s;letter-spacing:0.01em">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
+            Add Post to Club
+          </button>
         </div>` : ''}
 
         <!-- Feed tab -->
@@ -880,7 +889,7 @@ export class SearchView {
             import('./cloudSync.js').then(cs => {
               void cs.CS.savePost(post).then(() => loadFeed());
             });
-          });
+          }, true); // clubOnly — hide club checkboxes
           // Raise pm-overlay above club detail (7000) and search (5500)
           setTimeout(() => {
             const pmEl = document.getElementById('postModalOverlay');
@@ -983,10 +992,13 @@ export class SearchView {
               e.stopPropagation();
               if (!confirm('Delete this post?')) return;
               const pid = btn.dataset.deletePost!;
-              await fetch(`${BACKEND_URL}/posts/${encodeURIComponent(pid)}`, {
-                method: 'DELETE', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: myUserId }),
-              }).catch(() => {});
+              // Try as author first, then as owner
+              const delUrl = `${BACKEND_URL}/posts/${encodeURIComponent(pid)}?userId=${encodeURIComponent(myUserId)}`;
+              const delRes = await fetch(delUrl, { method: 'DELETE' }).catch(() => null);
+              if (delRes && !delRes.ok && club.isOwner) {
+                // Owner force-delete — try with ownerId override
+                await fetch(`${delUrl}&ownerId=${encodeURIComponent(myUserId)}`, { method: 'DELETE' }).catch(() => {});
+              }
               loadFeed();
             });
           });

@@ -304,6 +304,14 @@ export class PostModal {
   }
 }
 
-export function openPostModal(onSave: (post: PostRecord) => void): void {
-  new PostModal(onSave).open();
+export function openPostModal(onSave: (post: PostRecord) => void, clubOnly = false): void {
+  const pm = new PostModal(onSave);
+  pm.open();
+  if (clubOnly) {
+    // Hide club checkboxes — post goes directly to club, no need to select
+    setTimeout(() => {
+      const clubs = document.getElementById('pmShareClubs');
+      if (clubs) clubs.style.display = 'none';
+    }, 50);
+  }
 }
