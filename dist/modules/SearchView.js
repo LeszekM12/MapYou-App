@@ -9,6 +9,7 @@ import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
 const LS_CLUBS = 'mapyou_local_clubs';
 const LS_FRIENDS = 'mapyou_local_friends';
+const LS_PENDING_CLUBS = 'mapyou_pending_clubs'; // clubIds user has requested to join
 // ── Storage helpers ───────────────────────────────────────────────────────────
 export function loadClubs() {
     try {
@@ -17,6 +18,24 @@ export function loadClubs() {
     catch {
         return [];
     }
+}
+export function getPendingClubs() {
+    try {
+        return JSON.parse(localStorage.getItem(LS_PENDING_CLUBS) ?? '[]');
+    }
+    catch {
+        return [];
+    }
+}
+export function addPendingClub(clubId) {
+    const p = getPendingClubs();
+    if (!p.includes(clubId)) {
+        p.push(clubId);
+        localStorage.setItem(LS_PENDING_CLUBS, JSON.stringify(p));
+    }
+}
+export function removePendingClub(clubId) {
+    localStorage.setItem(LS_PENDING_CLUBS, JSON.stringify(getPendingClubs().filter(id => id !== clubId)));
 }
 export function saveClubs(clubs) {
     localStorage.setItem(LS_CLUBS, JSON.stringify(clubs));
@@ -480,37 +499,65 @@ export class SearchView {
             this._renderClubs(el);
         });
         // Load my clubs from local storage + backend
-        const myClubs = loadClubs();
-        if (myClubs.length > 0) {
-            const mySection = document.createElement('div');
+        // My Clubs — fetch from backend for fresh data (logo, memberCount, etc.)
+        const mySection = document.createElement('div');
+        mySection.id = 'sv2MyClubsSection';
+        resultsEl.insertAdjacentElement('beforebegin', mySection);
+        const renderMyClubs = (backendClubs) => {
+            const sportIcons = { running: '🏃', walking: '🚶', cycling: '🚴', fitness: '💪', hiking: '🥾', other: '🏅' };
+            const myClubIds = new Set(loadClubs().filter(c => c.joined || c.isOwner).map(c => c.id));
+            const mine = backendClubs.filter(c => myClubIds.has(c.clubId) || c.ownerId === myUserId || c.members.includes(myUserId));
+            if (!mine.length) {
+                mySection.innerHTML = '';
+                return;
+            }
             mySection.innerHTML = `
         <div class="sv2-section-title">My Clubs</div>
         <div class="sv2-list">
-          ${myClubs.map(c => {
-                const sportIcons = { running: '🏃', walking: '🚶', cycling: '🚴', fitness: '💪', hiking: '🥾', other: '🏅' };
-                return `<div class="sv2-item" data-my-club-id="${c.id}" style="cursor:pointer">
+          ${mine.map(c => {
+                const icon = sportIcons[c.sport] ?? '🏅';
+                const isOwner = c.ownerId === myUserId;
+                return `<div class="sv2-item" data-my-club-id="${c.clubId}" style="cursor:pointer">
               <div class="sv2-item__avatar sv2-item__avatar--club">
-                ${c.logoB64 ? `<img src="${c.logoB64}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>` : `<span style="font-size:24px">${sportIcons[c.sport] ?? '🏅'}</span>`}
+                ${c.avatarB64 ? `<img src="${c.avatarB64}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>` : `<span style="font-size:24px">${icon}</span>`}
               </div>
               <div class="sv2-item__info">
                 <span class="sv2-item__name">${c.name}</span>
-                <span class="sv2-item__sub">${c.memberCount} members · ${c.location}</span>
+                <span class="sv2-item__sub">${c.members.length} members · ${[c.city, c.region].filter(Boolean).join(', ')}</span>
               </div>
-              <span class="sv2-badge sv2-badge--gray">${c.isOwner ? 'Owner' : 'Joined'}</span>
+              <span class="sv2-badge sv2-badge--gray">${isOwner ? 'Owner' : 'Joined'}</span>
             </div>`;
             }).join('')}
         </div>`;
-            // Click handler for my clubs
             mySection.querySelectorAll('[data-my-club-id]').forEach(item => {
                 item.addEventListener('click', () => {
                     const cid = item.dataset.myClubId;
-                    const club = myClubs.find(c => c.id === cid);
-                    if (club)
-                        this._openClubDetail(club);
+                    const cd = mine.find(c => c.clubId === cid);
+                    if (!cd)
+                        return;
+                    const localClub = {
+                        id: cd.clubId, name: cd.name, sport: cd.sport, description: cd.description,
+                        location: [cd.city, cd.region ?? ''].filter(Boolean).join(', '),
+                        memberCount: cd.members.length, isOwner: cd.ownerId === myUserId,
+                        joined: cd.members.includes(myUserId), createdAt: Date.now(),
+                        logoB64: cd.avatarB64 ?? undefined, feed: [],
+                    };
+                    localClub.isPrivate = cd.isPrivate ?? false;
+                    this._openClubDetail(localClub);
                 });
             });
-            resultsEl.insertAdjacentElement('beforebegin', mySection);
-        }
+        };
+        // Load backend clubs — used for both My Clubs and Nearby
+        void (async () => {
+            try {
+                const res = await fetch(`${BACKEND_URL}/clubs`, { cache: 'no-store' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    renderMyClubs(data.data);
+                }
+            }
+            catch { /* offline */ }
+        })();
         void loadNearby();
         // Create club
         el.querySelector('#sv2CreateClub')?.addEventListener('click', () => {
@@ -621,8 +668,8 @@ export class SearchView {
               <span>🗑</span><span>Delete</span>
             </button>` : `
             <button class="sv2-club-detail__action-btn ${isMember ? 'sv2-club-detail__action-btn--active' : ''}" id="cdbJoin">
-              <span>${isMember ? '✓' : '+'}</span>
-              <span>${isMember ? 'Joined' : (club.isPrivate ? 'Request' : 'Join')}</span>
+              <span>${isMember ? '✓' : getPendingClubs().includes(club.id) ? '⏳' : '+'}</span>
+              <span>${isMember ? 'Joined' : getPendingClubs().includes(club.id) ? 'Pending' : (club.isPrivate ? 'Request' : 'Join')}</span>
             </button>
             <button class="sv2-club-detail__action-btn" id="cdbShare">
               <span>🔗</span><span>Share</span>
@@ -719,6 +766,7 @@ export class SearchView {
                     await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/leave`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: myUserId }) });
                     club.joined = false;
                     club.memberCount = Math.max(0, club.memberCount - 1);
+                    removePendingClub(club.id);
                     const lcs2 = loadClubs();
                     const lc2 = lcs2.find(c => c.id === club.id);
                     if (lc2) {
@@ -729,11 +777,8 @@ export class SearchView {
                 }
                 else if (isPrivate) {
                     await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/request`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: myUserId }) });
-                    const btn = modal.querySelector('#cdbJoin');
-                    if (btn) {
-                        btn.querySelector('span').textContent = '⏳';
-                        btn.querySelectorAll('span')[1].textContent = 'Pending';
-                    }
+                    addPendingClub(club.id);
+                    renderModal(tab);
                     return;
                 }
                 else {
@@ -839,7 +884,7 @@ export class SearchView {
               </div>
               <div class="sv2-club-feed-item__title">${d.name ?? d.title ?? ''}</div>
               ${d.distanceKm ? `<div class="sv2-club-feed-item__stats"><span>${d.distanceKm.toFixed(2)} km</span>${d.durationSec ? `<span>${Math.floor(d.durationSec / 60)}m</span>` : ''}</div>` : ''}
-              ${d.photoUrl ? `<img src="${d.photoUrl}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px"/>` : ''}
+              ${d.photoUrl && d.mediaType !== 'video' ? `<img src="${d.photoUrl}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px" onerror="this.style.display='none'"/>` : ''}
             </div>`;
                 }).join('');
             }).catch(() => { const feedEl2 = modal.querySelector('#cdbFeed'); if (feedEl2)
