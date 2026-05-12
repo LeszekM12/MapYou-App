@@ -329,7 +329,16 @@ export class PostModal {
         this._onSave(post);
     }
 }
-export function openPostModal(onSave) {
-    new PostModal(onSave).open();
+export function openPostModal(onSave, clubOnly = false) {
+    const pm = new PostModal(onSave);
+    pm.open();
+    if (clubOnly) {
+        // Hide club checkboxes — post goes directly to club, no need to select
+        setTimeout(() => {
+            const clubs = document.getElementById('pmShareClubs');
+            if (clubs)
+                clubs.style.display = 'none';
+        }, 50);
+    }
 }
 //# sourceMappingURL=PostModal.js.map

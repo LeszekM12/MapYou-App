@@ -432,39 +432,82 @@
   min-width: 44px;
 }
 
-/* ── Club detail action row (Strava-style) ───────────────────────────────── */
+/* ── Club detail action row ─────────────────────────────────────────────── */
 .sv2-club-detail__action-row {
   display: flex;
-  gap: 0;
-  border-top: 1px solid rgba(255,255,255,0.07);
-  border-bottom: 1px solid rgba(255,255,255,0.07);
-  margin-bottom: 4px;
+  gap: 8px;
+  padding: 12px 16px 16px;
   overflow-x: auto;
   scrollbar-width: none;
+  background: rgba(255,255,255,0.02);
+  border-top: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
 }
 .sv2-club-detail__action-row::-webkit-scrollbar { display: none; }
+
 .sv2-club-detail__action-btn {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 12px 8px;
-  background: none;
-  border: none;
-  border-right: 1px solid rgba(255,255,255,0.06);
-  color: rgba(255,255,255,0.5);
-  font-size: 1.1rem;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 6px;
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.09);
+  border-radius: 14px;
+  color: rgba(255,255,255,0.55);
+  font-size: 1.05rem;
+  font-weight: 600;
   font-family: inherit;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
   white-space: nowrap;
-  min-width: 60px;
+  min-width: 56px;
 }
-.sv2-club-detail__action-btn:last-child { border-right: none; }
-.sv2-club-detail__action-btn > span:first-child { font-size: 1.6rem; }
-.sv2-club-detail__action-btn:active { background: rgba(255,255,255,0.05); }
+.sv2-club-detail__action-btn > span:first-child {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.sv2-club-detail__action-btn:active {
+  background: rgba(255,255,255,0.1);
+  transform: scale(0.97);
+}
 .sv2-club-detail__action-btn--active {
-  color: var(--color-brand--2, #00c46a);
-  border-bottom: 2px solid var(--color-brand--2, #00c46a);
+  color: #00c46a;
+  background: rgba(0,196,106,0.1);
+  border-color: rgba(0,196,106,0.3);
+}
+/* Delete button red tint */
+.sv2-club-detail__action-btn[id="cdbDelete"] {
+  color: rgba(248,113,113,0.7);
+  border-color: rgba(248,113,113,0.15);
+}
+.sv2-club-detail__action-btn[id="cdbDelete"]:active {
+  background: rgba(248,113,113,0.1);
+}
+
+/* ── Add Post button ─────────────────────────────────────────────────────── */
+#cdbAddPost {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: calc(100% - 32px) !important;
+  margin: 0 16px 4px !important;
+  padding: 14px !important;
+  border-radius: 16px !important;
+  background: rgba(0,196,106,0.1) !important;
+  border: 1.5px solid rgba(0,196,106,0.3) !important;
+  color: #00c46a !important;
+  font-size: 1.4rem !important;
+  font-weight: 700 !important;
+  font-family: inherit;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+  transition: background 0.15s, transform 0.1s;
+}
+#cdbAddPost:active {
+  background: rgba(0,196,106,0.18) !important;
+  transform: scale(0.98);
 }

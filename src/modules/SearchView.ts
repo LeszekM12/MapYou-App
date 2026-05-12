@@ -751,13 +751,7 @@ export class SearchView {
 
         ${isMember ? `
         <div class="sv2-club-detail__actions" style="padding:0 16px 12px">
-          <button id="cdbAddPost" style="
-            display:flex;align-items:center;justify-content:center;gap:8px;
-            width:100%;padding:13px;border-radius:14px;border:none;
-            background:linear-gradient(135deg,rgba(0,196,106,0.15),rgba(0,196,106,0.08));
-            border:1.5px solid rgba(0,196,106,0.35);color:#00c46a;
-            font-size:1.35rem;font-weight:700;font-family:inherit;cursor:pointer;
-            transition:background 0.2s;letter-spacing:0.01em">
+          <button id="cdbAddPost">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
             Add Post to Club
           </button>
@@ -938,7 +932,7 @@ export class SearchView {
               </div>`;
             }
             const canDelete = d.userId === myUserId || club.isOwner;
-            const postId = (d.postId ?? d.id ?? '') as string;
+            const postId = (d.postId ?? (d._id as Record<string,unknown>|undefined)?.toString?.() ?? '') as string;
             return `<div class="sv2-club-feed-item" data-feed-post-id="${postId}">
               <div class="sv2-club-feed-item__top" style="display:flex;align-items:center;gap:8px">
                 <div data-feed-profile="${d.userId}" style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0;cursor:pointer">
@@ -971,7 +965,7 @@ export class SearchView {
           feedEl.querySelectorAll<HTMLElement>('[data-profile-uid],[data-feed-profile]').forEach(el => {
             el.addEventListener('click', () => {
               const uid = (el.dataset.profileUid ?? el.dataset.feedProfile)!;
-              if (!uid || uid === myUserId) return;
+              if (!uid) return;
               import('./PublicProfile.js').then(m => {
                 m.openPublicProfile(uid);
                 setTimeout(() => {
