@@ -21,6 +21,9 @@ self.addEventListener('push', event => {
         if (data.url && data.url.includes('#live=')) {
           client.postMessage({ type: 'OPEN_LIVE', url: data.url, silent: true });
         }
+        if (data.url && data.url.includes('#club_open=')) {
+          client.postMessage({ type: 'OPEN_CLUB', url: data.url, silent: true });
+        }
       }
     });
 
@@ -56,7 +59,8 @@ self.addEventListener('notificationclick', event => {
 
       if (appClient) {
         await appClient.focus();
-        appClient.postMessage({ type: 'OPEN_LIVE', url: targetUrl });
+        const msgType = targetUrl.includes('#club_open=') ? 'OPEN_CLUB' : 'OPEN_LIVE';
+        appClient.postMessage({ type: msgType, url: targetUrl });
       } else {
         const fullUrl = targetUrl.startsWith('http')
           ? targetUrl

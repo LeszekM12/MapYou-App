@@ -96,16 +96,47 @@ export class SearchView {
   private _clubQuery   = '';
   private _followingSet = new Set<string>(); // userIds I already follow
 
-  open(): void {
+  open(tab: 'friends'|'clubs' = 'friends', openClubId?: string): void {
     document.getElementById('searchViewOverlay')?.remove();
+    if (tab) this._tab = tab;
     const el = this._build();
     document.body.appendChild(el);
     requestAnimationFrame(() => {
       el.classList.add('sv2-overlay--visible');
-      setTimeout(() => el.querySelector<HTMLElement>('.sv2-sheet')?.classList.add('sv2-sheet--open'), 10);
+      setTimeout(() => {
+        el.querySelector<HTMLElement>('.sv2-sheet')?.classList.add('sv2-sheet--open');
+        // Auto-open specific club after sheet animation
+        if (openClubId) {
+          setTimeout(() => this._openClubById(openClubId), 400);
+        }
+      }, 10);
     });
     this._bindEvents(el);
     this._renderTab(this._tab, el);
+  }
+
+  private _openClubById(clubId: string): void {
+    fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(clubId)}`, { cache: 'no-store' })
+      .then(r => r.json())
+      .then((d: { status: string; data: Record<string,unknown> }) => {
+        if (d.status !== 'ok') return;
+        const cd = d.data;
+        const myUserId = getUserId();
+        const localClub: LocalClub = {
+          id:          cd.clubId as string,
+          name:        cd.name as string,
+          sport:       (cd.sport as string) ?? 'other',
+          description: (cd.description as string) ?? '',
+          location:    [cd.city, cd.region].filter(Boolean).join(', '),
+          memberCount: (cd.members as string[]).length,
+          isOwner:     cd.ownerId === myUserId,
+          joined:      (cd.members as string[]).includes(myUserId),
+          createdAt:   Date.now(), feed: [],
+          logoB64:     (cd.avatarB64 as string) ?? undefined,
+        };
+        (localClub as unknown as Record<string,unknown>).isPrivate = cd.isPrivate ?? false;
+        this._openClubDetail(localClub);
+      }).catch(() => {});
   }
 
   close(): void {
@@ -687,6 +718,7 @@ export class SearchView {
       .then(r => r.json())
       .then((d: { status: string; data: Record<string,unknown> }) => {
         if (d.status === 'ok' && d.data) {
+          startFeedPolling();
           const fresh = d.data;
           if (fresh.isPrivate !== undefined) (club as unknown as Record<string,unknown>).isPrivate = fresh.isPrivate;
           if (fresh.members)    club.memberCount = (fresh.members as string[]).length;
@@ -877,12 +909,43 @@ export class SearchView {
       // Add Post — force PostModal z-index above all overlays
       modal.querySelector('#cdbAddPost')?.addEventListener('click', () => {
         import('./PostModal.js').then(m => {
-          m.openPostModal(post => {
+          m.openPostModal(async post => {
             post.clubIds   = [club.id];
             post.addToHome = false;
-            import('./cloudSync.js').then(cs => {
-              void cs.CS.savePost(post).then(() => loadFeed());
-            });
+
+            // Show optimistic post immediately
+            const feedEl = modal.querySelector<HTMLElement>('#cdbFeed');
+            if (feedEl) {
+              const myName   = localStorage.getItem('mapyou_userName') ?? 'You';
+              const myAvatar = localStorage.getItem('mapyou_avatar') ?? null;
+              const optEl    = document.createElement('div');
+              optEl.className = 'sv2-club-feed-item';
+              optEl.id = 'cdbOptimisticPost';
+              optEl.innerHTML = `
+                <div class="sv2-club-feed-item__top" style="display:flex;align-items:center;gap:8px">
+                  <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0">
+                    ${myAvatar ? `<img src="${myAvatar}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">${myName[0]}</div>`}
+                  </div>
+                  <span style="flex:1;font-weight:600;color:#fff">${myName}</span>
+                  <span style="font-size:1.1rem;color:rgba(255,255,255,0.3)">just now</span>
+                </div>
+                <div style="margin-top:6px;color:#fff">${post.title || post.body || ''}</div>
+                ${post.photoUrl && !post.photoUrl.startsWith('data:video') ? `<img src="${post.photoUrl}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px"/>` : ''}
+                <div style="margin-top:4px;font-size:1.1rem;color:rgba(255,255,255,0.3)">⏳ Syncing…</div>`;
+              feedEl.insertBefore(optEl, feedEl.firstChild);
+            }
+
+            const { CS } = await import('./cloudSync.js');
+            await CS.savePost(post);
+            // Wait for backend sync then reload feed
+            setTimeout(() => {
+              loadFeed();
+              const myName = localStorage.getItem('mapyou_userName') ?? 'Someone';
+              fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/notify-post`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: myUserId, authorName: myName, postTitle: post.title || post.body || '' }),
+              }).catch(() => {});
+            }, 1500);
           }, true); // clubOnly — hide club checkboxes
           // Raise pm-overlay above club detail (7000) and search (5500)
           setTimeout(() => {
@@ -899,6 +962,16 @@ export class SearchView {
         });
       });
     }; // end renderModal
+
+    // Auto-refresh feed every 30s
+    let _feedTimer: ReturnType<typeof setInterval> | null = null;
+    const startFeedPolling = () => {
+      if (_feedTimer) return;
+      _feedTimer = setInterval(() => {
+        if (modal.isConnected && modal.querySelector('#cdbFeedSection') && (modal.querySelector('#cdbFeedSection') as HTMLElement).style.display !== 'none') loadFeed();
+      }, 30000);
+    };
+    const stopFeedPolling = () => { if (_feedTimer) { clearInterval(_feedTimer); _feedTimer = null; } };
 
     const loadFeed = () => {
       const feedEl = modal.querySelector<HTMLElement>('#cdbFeed'); if (!feedEl) return;

@@ -138,12 +138,23 @@ export class FriendsView {
         navigator.serviceWorker.addEventListener('message', (e) => {
             if (e.data?.type === 'OPEN_LIVE') {
                 if (e.data.silent) {
-                    // Cicha aktualizacja — tylko zapisz token i odśwież listę (bez otwierania live)
                     void this._saveLiveTokenFromUrl(e.data.url);
                 }
                 else {
-                    // Kliknięcie powiadomienia — otwórz live panel
                     void this._handleLivePushUrl(e.data.url);
+                }
+            }
+            if (e.data?.type === 'OPEN_CLUB') {
+                // Kliknięcie powiadomienia o poście w klubie — otwórz klub
+                const url = e.data.url;
+                const match = url.match(/#club_open=([^&]+)/);
+                if (match) {
+                    const clubId = decodeURIComponent(match[1]);
+                    import('./SearchView.js').then(m => {
+                        // Otwórz SearchView na zakładce Clubs i kliknij w ten klub
+                        const sv = new m.SearchView();
+                        sv.open('clubs', clubId);
+                    });
                 }
             }
         });
