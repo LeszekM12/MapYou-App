@@ -8,7 +8,6 @@
 //   - integruje z push notifications do znajomych
 import { BACKEND_URL } from '../config.js';
 import { getAllFriends, updateFriendLiveToken } from './FriendsDB.js';
-import { getUserId } from './PushNotifications.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const INTERVAL_MS = 5000; // wysyłaj pozycję co 5 sekund
 const LS_TOKEN_KEY = 'mapyou_live_token';
@@ -40,6 +39,12 @@ export class LiveTracker {
             configurable: true,
             writable: true,
             value: null
+        });
+        Object.defineProperty(this, "_sport", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 'running'
         });
         Object.defineProperty(this, "_active", {
             enumerable: true,
@@ -73,6 +78,7 @@ export class LiveTracker {
         });
     }
     get token() { return this._token; }
+    setSport(sport) { this._sport = sport; }
     get isActive() { return this._active; }
     get liveUrl() { return this._token ? getLiveUrl(this._token) : null; }
     // ── Start ──────────────────────────────────────────────────────────────────
@@ -86,18 +92,17 @@ export class LiveTracker {
         localStorage.setItem(LS_TOKEN_KEY, this._token);
         const userName = getUserName();
         const liveUrl = getLiveUrl(this._token);
-        // Zbierz push subskrypcje znajomych — wyklucz siebie
-        const myId = getUserId();
+        // Zbierz push subskrypcje znajomych
         const friends = await getAllFriends();
         const friendSubs = friends
-            .filter(f => f.pushSub?.endpoint && f.friendUserId !== myId)
+            .filter(f => f.pushSub?.endpoint)
             .map(f => f.pushSub);
         // Zarejestruj sesję na backendzie + wyślij push do znajomych
         try {
             await fetch(`${BACKEND_URL}/live/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, myUserId: getUserId() }),
+                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running' }),
             });
         }
         catch (err) {

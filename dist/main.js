@@ -1254,6 +1254,7 @@ class App {
             document.querySelectorAll('.trk-sport-tab').forEach(b => b.classList.remove('trk-sport-tab--active'));
             btn.classList.add('trk-sport-tab--active');
             __classPrivateFieldGet(this, _App_tracker, "f")?.setSport(btn.dataset.sport);
+            liveTracker.setSport(btn.dataset.sport);
             const color = SPORT_COLORS[btn.dataset.sport];
             const sb = document.getElementById('trkBtnStart');
             if (sb) {

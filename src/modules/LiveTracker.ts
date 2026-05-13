@@ -44,6 +44,7 @@ export function getLiveUrl(token: string): string {
 
 export class LiveTracker {
   private _token:    string | null = null;
+  private _sport:    string = 'running';
   private _active:   boolean       = false;
   private _paused:   boolean       = false;
   private _watchId:  number | null = null;
@@ -51,6 +52,7 @@ export class LiveTracker {
   private _lastPos:  GeolocationPosition | null = null;
 
   get token():   string | null { return this._token; }
+  setSport(sport: string): void { this._sport = sport; }
   get isActive(): boolean       { return this._active; }
   get liveUrl():  string | null { return this._token ? getLiveUrl(this._token) : null; }
 
@@ -68,11 +70,10 @@ export class LiveTracker {
     const userName  = getUserName();
     const liveUrl   = getLiveUrl(this._token);
 
-    // Zbierz push subskrypcje znajomych — wyklucz siebie
-    const myId      = getUserId();
+    // Zbierz push subskrypcje znajomych
     const friends   = await getAllFriends();
     const friendSubs = friends
-      .filter(f => f.pushSub?.endpoint && f.friendUserId !== myId)
+      .filter(f => f.pushSub?.endpoint)
       .map(f => f.pushSub);
 
     // Zarejestruj sesję na backendzie + wyślij push do znajomych
@@ -80,7 +81,7 @@ export class LiveTracker {
       await fetch(`${BACKEND_URL}/live/start`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, myUserId: getUserId() }),
+        body:    JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running' }),
       });
     } catch (err) {
       console.warn('[LiveTracker] start failed:', err);

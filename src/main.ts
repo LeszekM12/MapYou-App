@@ -1209,6 +1209,7 @@ class App {
       document.querySelectorAll('.trk-sport-tab').forEach(b => b.classList.remove('trk-sport-tab--active'));
       btn.classList.add('trk-sport-tab--active');
       this.#tracker?.setSport(btn.dataset.sport as SportType);
+      liveTracker.setSport(btn.dataset.sport as string);
       const color = SPORT_COLORS[btn.dataset.sport as SportType];
       const sb = document.getElementById('trkBtnStart') as HTMLElement | null;
       if (sb) { sb.style.background = color; sb.style.boxShadow = `0 6px 28px ${color}80`; }

@@ -254,6 +254,12 @@ export async function sendActivityFinishedPush(
 }
 
 export async function sendWelcomeBackPush(): Promise<void> {
+  const KEY  = 'mapty_last_welcome_push';
+  const now  = Date.now();
+  const last = Number(localStorage.getItem(KEY) ?? 0);
+  // Max raz na 24h
+  if (last > 0 && (now - last) < 24 * 60 * 60 * 1000) return;
+  localStorage.setItem(KEY, String(now));
   await sendPushToSelf('Witaj ponownie! 👋', 'Gotowy na kolejny trening?');
 }
 
