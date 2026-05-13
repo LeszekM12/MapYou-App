@@ -223,11 +223,26 @@ export async function sendWelcomeBackPush() {
 }
 export async function sendLongBreakPush() {
     const KEY = 'mapty_last_open';
+    const KEY_SENT = 'mapty_last_break_push';
     const now = Date.now();
     const last = Number(localStorage.getItem(KEY) ?? 0);
+    const lastSent = Number(localStorage.getItem(KEY_SENT) ?? 0);
     localStorage.setItem(KEY, String(now));
-    if (last > 0 && (now - last) / (1000 * 60 * 60) > 24) {
+    if (last === 0)
+        return false;
+    const hoursAway = (now - last) / (1000 * 60 * 60);
+    const hoursSinceSent = (now - lastSent) / (1000 * 60 * 60);
+    // Nie wysyłaj częściej niż raz na 3h
+    if (hoursSinceSent < 3)
+        return false;
+    if (hoursAway >= 24) {
         await sendPushToSelf('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!');
+        localStorage.setItem(KEY_SENT, String(now));
+        return true;
+    }
+    if (hoursAway >= 3) {
+        await sendPushToSelf('Gotowy na kolejny trening? 💪', 'Dawno Cię nie było — czas na aktywność!');
+        localStorage.setItem(KEY_SENT, String(now));
         return true;
     }
     return false;
