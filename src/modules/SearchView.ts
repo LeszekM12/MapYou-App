@@ -75,6 +75,34 @@ export function getJoinedClubs(): LocalClub[] {
   return loadClubs().filter(c => c.joined || c.isOwner);
 }
 
+/** Sync joined clubs from backend — call once on app init */
+export async function syncJoinedClubsFromBackend(): Promise<void> {
+  try {
+    const myUserId = getUserId();
+    const res  = await fetch(`${BACKEND_URL}/clubs`, { cache: 'no-store' });
+    const data = await res.json() as { status: string; data: {clubId:string;name:string;sport:string;city:string;region?:string;description:string;members:string[];avatarB64:string|null;ownerId:string;isPrivate?:boolean}[] };
+    if (data.status !== 'ok') return;
+    const mine = data.data.filter(c => c.members.includes(myUserId) || c.ownerId === myUserId);
+    if (!mine.length) return;
+    const existing = loadClubs();
+    const existingIds = new Set(existing.map(c => c.id));
+    let changed = false;
+    for (const cd of mine) {
+      if (!existingIds.has(cd.clubId)) {
+        existing.push({
+          id: cd.clubId, name: cd.name, sport: cd.sport, description: cd.description,
+          location: [cd.city, cd.region ?? ''].filter(Boolean).join(', '),
+          memberCount: cd.members.length, isOwner: cd.ownerId === myUserId,
+          joined: true, createdAt: Date.now(), feed: [],
+          logoB64: cd.avatarB64 ?? undefined,
+        });
+        changed = true;
+      }
+    }
+    if (changed) saveClubs(existing);
+  } catch { /* offline */ }
+}
+
 export function addToClubFeed(clubId: string, item: ClubFeedItem): void {
   const clubs = loadClubs();
   const club  = clubs.find(c => c.id === clubId);

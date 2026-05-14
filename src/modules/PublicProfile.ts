@@ -33,6 +33,50 @@ function _fmtDur(sec: number): string {
   return m >= 60 ? `${Math.floor(m/60)}h ${m%60}m` : `${m}m`;
 }
 
+async function _showFollowList(title: string, userIds: string[], myUserId: string, parent: HTMLElement): Promise<void> {
+  document.getElementById('ppFollowListModal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'ppFollowListModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end';
+  modal.innerHTML = `
+    <div style="width:100%;max-height:75vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">
+        <span style="font-size:1.7rem;font-weight:700;color:#fff">${title}</span>
+        <button id="ppFlClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
+      </div>
+      <div id="ppFlBody" style="overflow-y:auto;padding:8px 0 32px">
+        <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>
+      </div>
+    </div>`;
+  parent.appendChild(modal);
+  modal.querySelector('#ppFlClose')?.addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  const body = modal.querySelector<HTMLElement>('#ppFlBody')!;
+  if (!userIds.length) { body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">No users yet</div>'; return; }
+  const users = await Promise.all(userIds.slice(0,50).map(uid =>
+    fetch(`${BACKEND_URL}/users/${encodeURIComponent(uid)}`)
+      .then(r => r.json())
+      .then((d: {status:string;data:{userId:string;name:string;avatarB64:string|null}}) =>
+        d.status === 'ok' ? d.data : { userId: uid, name: uid.slice(0,10)+'…', avatarB64: null })
+      .catch(() => ({ userId: uid, name: uid.slice(0,10)+'…', avatarB64: null }))
+  ));
+  body.innerHTML = users.map(u => `
+    <div data-uid="${u.userId}" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer">
+      <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
+        ${u.avatarB64 ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff">${u.name[0]}</div>`}
+      </div>
+      <span style="font-size:1.4rem;font-weight:600;color:#fff;flex:1">${u.name}</span>
+      ${u.userId === myUserId ? '<span style="font-size:1.1rem;color:rgba(255,255,255,0.3)">You</span>' : ''}
+    </div>`).join('');
+  body.querySelectorAll<HTMLElement>('[data-uid]').forEach(el => {
+    el.addEventListener('click', () => {
+      const uid = el.dataset.uid!;
+      modal.remove();
+      if (uid !== myUserId) openPublicProfile(uid);
+    });
+  });
+}
+
 export async function openPublicProfile(targetUserId: string): Promise<void> {
   const myUserId = getUserId();
   if (targetUserId === myUserId) return;
@@ -172,6 +216,18 @@ function _renderFull(
 
   sheet.querySelector('#ppBack')?.addEventListener('click', closePublicProfile);
   _bindSwipe(sheet);
+
+  // Followers / Following lists — use profile.userId (in scope here)
+  sheet.querySelector('#ppFollowersBtn')?.addEventListener('click', async () => {
+    const res  = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(profile.userId)}`);
+    const data = await res.json() as { status: string; data: { followers?: string[] } };
+    if (data.status === 'ok') void _showFollowList('Followers', data.data.followers ?? [], myUserId, overlay);
+  });
+  sheet.querySelector('#ppFollowingBtn')?.addEventListener('click', async () => {
+    const res  = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(profile.userId)}`);
+    const data = await res.json() as { status: string; data: { following?: string[] } };
+    if (data.status === 'ok') void _showFollowList('Following', data.data.following ?? [], myUserId, overlay);
+  });
 
   // Follow
   const followBtn = sheet.querySelector<HTMLButtonElement>('#ppFollowBtn')!;

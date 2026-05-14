@@ -8,7 +8,7 @@
 // - Heatmap (day × hour) + activity type pie chart
 import { loadUnifiedWorkouts, SPORT_ICONS_U, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
 import { BACKEND_URL } from '../config.js';
-import { loadProfileFromLocal } from './UserProfile.js';
+import { loadProfileFromLocal, getUserId } from './UserProfile.js';
 import { loadPosts } from './db.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 const LS_WEEKLY_WINS = 'mapyou_weekly_wins'; // number — count of weeks goal was hit
@@ -251,12 +251,23 @@ export class ProfileView {
                 .then((d) => {
                 if (d.status !== 'ok')
                     return;
-                const followersEl = el.querySelector('.pv-stats-row__item:nth-child(1) .pv-stats-row__val');
-                const followingEl = el.querySelector('.pv-stats-row__item:nth-child(2) .pv-stats-row__val');
+                const followers = d.data.followers ?? [];
+                const following = d.data.following ?? [];
+                const followersEl = el.querySelector('#pvFollowersBtn .pv-stats-row__val');
+                const followingEl = el.querySelector('#pvFollowingBtn .pv-stats-row__val');
                 if (followersEl)
-                    followersEl.textContent = String(d.data.followers?.length ?? 0);
+                    followersEl.textContent = String(followers.length);
                 if (followingEl)
-                    followingEl.textContent = String(d.data.following?.length ?? 0);
+                    followingEl.textContent = String(following.length);
+                const myUserId = getUserId();
+                // Followers click — show who follows me
+                el.querySelector('#pvFollowersBtn')?.addEventListener('click', () => {
+                    _showFollowList(el, 'Followers', followers, myUserId);
+                });
+                // Following click — show who I follow
+                el.querySelector('#pvFollowingBtn')?.addEventListener('click', () => {
+                    _showFollowList(el, 'Following', following, myUserId);
+                });
             }).catch(() => { });
         }
         return;
@@ -306,11 +317,11 @@ export class ProfileView {
 
         <!-- Stats row -->
         <div class="pv-stats-row">
-          <div class="pv-stats-row__item">
+          <div class="pv-stats-row__item" id="pvFollowersBtn" style="cursor:pointer">
             <span class="pv-stats-row__val">0</span>
             <span class="pv-stats-row__lbl">Followers</span>
           </div>
-          <div class="pv-stats-row__item">
+          <div class="pv-stats-row__item" id="pvFollowingBtn" style="cursor:pointer">
             <span class="pv-stats-row__val">0</span>
             <span class="pv-stats-row__lbl">Following</span>
           </div>
@@ -562,4 +573,57 @@ export class ProfileView {
     }
 }
 export const profileView = new ProfileView();
+// ── Follow list modal ─────────────────────────────────────────────────────────
+async function _showFollowList(parent, title, userIds, myUserId) {
+    const existing = document.getElementById('pvFollowListModal');
+    if (existing)
+        existing.remove();
+    const modal = document.createElement('div');
+    modal.id = 'pvFollowListModal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end';
+    modal.innerHTML = `
+    <div style="width:100%;max-height:75vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">
+        <span style="font-size:1.7rem;font-weight:700;color:#fff">${title}</span>
+        <button id="pvFollowListClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
+      </div>
+      <div id="pvFollowListBody" style="overflow-y:auto;padding:8px 0 32px">
+        <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#pvFollowListClose')?.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal)
+        modal.remove(); });
+    // Fetch user details
+    const { BACKEND_URL } = await import('../config.js');
+    const body = document.getElementById('pvFollowListBody');
+    if (!userIds.length) {
+        body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">No users yet</div>';
+        return;
+    }
+    const users = await Promise.all(userIds.slice(0, 50).map(uid => fetch(`${BACKEND_URL}/users/${encodeURIComponent(uid)}`)
+        .then(r => r.json())
+        .then((d) => d.status === 'ok' ? d.data : { userId: uid, name: uid.slice(0, 10) + '…', avatarB64: null })
+        .catch(() => ({ userId: uid, name: uid.slice(0, 10) + '…', avatarB64: null }))));
+    body.innerHTML = users.map(u => `
+    <div data-open-profile="${u.userId}" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
+      <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
+        ${u.avatarB64
+        ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>`
+        : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff">${u.name[0]}</div>`}
+      </div>
+      <span style="font-size:1.4rem;font-weight:600;color:#fff;flex:1">${u.name}</span>
+      ${u.userId === myUserId ? '<span style="font-size:1.1rem;color:rgba(255,255,255,0.3)">You</span>' : ''}
+    </div>`).join('');
+    body.querySelectorAll('[data-open-profile]').forEach(el => {
+        el.addEventListener('click', () => {
+            const uid = el.dataset.openProfile;
+            modal.remove();
+            if (uid !== myUserId) {
+                import('./PublicProfile.js').then(m => m.openPublicProfile(uid));
+            }
+        });
+    });
+}
 //# sourceMappingURL=ProfileView.js.map

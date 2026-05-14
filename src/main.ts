@@ -40,6 +40,7 @@ import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified, saveUnifiedWorkout } from './modules/UnifiedWorkout.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
+import { syncJoinedClubsFromBackend } from './modules/SearchView.js';
 import { FriendsView }          from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal } from './modules/UserName.js';
 import { initUserProfile } from './modules/UserProfile.js';
@@ -313,6 +314,7 @@ class App {
     });
     // Przy każdym starcie wyślij subskrypcję do backendu (naprawia reset MemoryDB)
     void resubscribeIfNeeded();
+    void syncJoinedClubsFromBackend(); // sync clubs for accepted members
     void initPushNotifications().then(async () => {
       // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
       const longBreakSent = await sendLongBreakPush();
