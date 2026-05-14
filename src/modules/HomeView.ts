@@ -680,11 +680,24 @@ function _relTimeNotif(ts: number): string {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
+function _renderNotifList(notifs: Array<{id:string;title:string;body:string;icon?:string;read:boolean;timestamp:number}>, list: HTMLElement): void {
+  list.innerHTML = notifs.length === 0
+    ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
+    : notifs.map(n => `
+        <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
+          <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
+          <div class="hn-item__body">
+            <div class="hn-item__title">${n.title}</div>
+            <div class="hn-item__body-text">${n.body}</div>
+            <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
+          </div>
+        </div>`).join('');
+}
+
 function _openNotifPanel(): void {
   document.getElementById('homeNotifPanel')?.remove();
   markAllRead();
 
-  const notifs   = getNotifications();
   const panel    = document.createElement('div');
   panel.id       = 'homeNotifPanel';
   panel.className = 'hn-panel';
@@ -698,17 +711,7 @@ function _openNotifPanel(): void {
         <button class="hn-clear" id="hnClear">Clear all</button>
       </div>
       <div class="hn-list" id="hnList">
-        ${notifs.length === 0
-          ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
-          : notifs.map(n => `
-            <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
-              <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
-              <div class="hn-item__body">
-                <div class="hn-item__title">${n.title}</div>
-                <div class="hn-item__body-text">${n.body}</div>
-                <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
-              </div>
-            </div>`).join('')}
+        <div class="hn-empty"><span>⏳</span><p>Loading…</p></div>
       </div>
     </div>`;
 
@@ -717,6 +720,33 @@ function _openNotifPanel(): void {
     panel.querySelector<HTMLElement>('#hnSheet')?.classList.add('hn-sheet--open');
     panel.querySelector<HTMLElement>('#hnOverlay')?.classList.add('hn-overlay--visible');
   });
+
+  const userId  = localStorage.getItem('mapyou_userId_profile') ?? '';
+  const hnList  = panel.querySelector<HTMLElement>('#hnList')!;
+
+  // Load from backend + merge with local
+  const loadNotifs = async () => {
+    try {
+      const res  = await fetch(`${BACKEND_URL}/notifications?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+      const data = await res.json() as { status: string; data: Array<{notifId:string;title:string;body:string;icon:string;read:boolean;timestamp:number}> };
+      if (data.status === 'ok') {
+        // Merge backend notifs with local notifs
+        const backendNotifs = data.data.map(n => ({ id: n.notifId, title: n.title, body: n.body, icon: n.icon, read: n.read, timestamp: n.timestamp }));
+        const localNotifs   = getNotifications();
+        // Merge — backend takes priority, add local ones not in backend
+        const backendIds    = new Set(backendNotifs.map(n => n.id));
+        const merged        = [...backendNotifs, ...localNotifs.filter(n => !backendIds.has(n.id))];
+        merged.sort((a, b) => b.timestamp - a.timestamp);
+        _renderNotifList(merged, hnList);
+        // Mark backend notifs as read
+        if (userId) void fetch(`${BACKEND_URL}/notifications/read-all?userId=${encodeURIComponent(userId)}`, { method: 'PUT' });
+        return;
+      }
+    } catch { /* offline fallback */ }
+    // Fallback to local
+    _renderNotifList(getNotifications(), hnList);
+  };
+  void loadNotifs();
 
   const close = () => {
     panel.querySelector('#hnSheet')?.classList.remove('hn-sheet--open');
@@ -727,10 +757,11 @@ function _openNotifPanel(): void {
   panel.querySelector('#hnOverlay')?.addEventListener('click', close);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, { once: true });
 
-  panel.querySelector('#hnClear')?.addEventListener('click', () => {
+  panel.querySelector('#hnClear')?.addEventListener('click', async () => {
+    // Clear both backend and local
+    if (userId) await fetch(`${BACKEND_URL}/notifications/all?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => {});
     clearAll();
-    panel.querySelector('#hnList')!.innerHTML =
-      '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
+    hnList.innerHTML = '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
   });
 
   // Swipe to close
@@ -977,6 +1008,29 @@ export class HomeView {
         badge?.remove();
       }
     });
+
+    // Sync unread count from backend on init
+    void (async () => {
+      try {
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        if (!userId) return;
+        const res  = await fetch(`${BACKEND_URL}/notifications?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+        const data = await res.json() as { status: string; unread: number };
+        if (data.status === 'ok' && data.unread > 0) {
+          const bell  = document.getElementById('homeNotifBell');
+          if (!bell) return;
+          const badge = bell.querySelector('.home-bell__badge');
+          const count = data.unread;
+          if (badge) { badge.textContent = count > 9 ? '9+' : String(count); }
+          else {
+            const b = document.createElement('span');
+            b.className   = 'home-bell__badge';
+            b.textContent = count > 9 ? '9+' : String(count);
+            bell.appendChild(b);
+          }
+        }
+      } catch { /* offline */ }
+    })();
 
     return greeting;
   }
