@@ -70,11 +70,28 @@ export class LiveTracker {
     const userName  = getUserName();
     const liveUrl   = getLiveUrl(this._token);
 
-    // Zbierz push subskrypcje znajomych
-    const friends   = await getAllFriends();
-    const friendSubs = friends
-      .filter(f => f.pushSub?.endpoint)
-      .map(f => f.pushSub);
+    // Zbierz push subskrypcje znajomych — pobierz świeże z backendu po userId
+    const friends = await getAllFriends();
+    const friendUserIds = friends
+      .map(f => f.friendUserId)
+      .filter((id): id is string => !!id);
+
+    // Pobierz aktualne subskrypcje z backendu dla każdego znajomego
+    const freshSubs: object[] = [];
+    await Promise.all(friendUserIds.map(async uid => {
+      try {
+        const res  = await fetch(`${BACKEND_URL}/push/subscriptions-for/${encodeURIComponent(uid)}`);
+        if (res.ok) {
+          const data = await res.json() as { status: string; data: object[] };
+          if (data.status === 'ok') freshSubs.push(...data.data);
+        }
+      } catch { /* offline */ }
+    }));
+
+    // Fallback — użyj lokalnych subskrypcji jeśli backend nie odpowiedział
+    const friendSubs = freshSubs.length > 0
+      ? freshSubs
+      : friends.filter(f => f.pushSub?.endpoint).map(f => f.pushSub);
 
     // Zarejestruj sesję na backendzie + wyślij push do znajomych
     try {
