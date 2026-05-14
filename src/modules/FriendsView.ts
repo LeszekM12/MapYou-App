@@ -774,16 +774,22 @@ export class FriendsView {
       ? Math.floor((Date.now() - data.startedAt) / 60000)
       : 0;
 
-    const statusMap: Record<string, string> = {
-      running:   '🟢 Running',
-      paused:    '⏸ Paused',
+    const sportIcons: Record<string,string> = { running:'🏃', cycling:'🚴', walking:'🚶' };
+    const sportLabel: Record<string,string>  = { running:'Running', cycling:'Cycling', walking:'Walking' };
+    const sport = (data as unknown as Record<string,unknown>).sport as string ?? 'running';
+    const icon  = sportIcons[sport] ?? '🏅';
+    const label = sportLabel[sport] ?? sport;
+
+    const sessionMap: Record<string, string> = {
+      running:   `🟢 ${label}`,
+      paused:    `⏸ ${label} (paused)`,
       finished:  '✅ Finished',
       not_found: '❌ Session not found',
     };
 
     const speed = data.current?.speed ?? 0;
     statusEl.innerHTML = `
-      <span class="fls-status">${statusMap[data.session] ?? data.session}</span>
+      <span class="fls-status">${sessionMap[data.session] ?? data.session}</span>
       <span class="fls-meta">${elapsed} min · ${speed} km/h</span>
     `;
   }

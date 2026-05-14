@@ -145,7 +145,7 @@ export class LiveTracker {
     try {
       await fetch(`${BACKEND_URL}/live/finish`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: this._token }),
+        body: JSON.stringify({ token: this._token, sport: this._sport }),
       });
     } catch { /* ignoruj */ }
 
