@@ -139,8 +139,8 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
     <div class="pv-header">
       <button class="pv-back" id="ppBack">←</button>
       <div class="pv-header__actions">
-        <button class="pv-header__btn ${profile.isFollowing ? '' : 'pv-header__btn--follow'}" id="ppFollowBtn">
-          ${profile.isFollowing ? '✓ Following' : 'Follow'}
+        <button class="pv-header__btn ${profile.isFollowing ? '' : (profile.isPending ? 'pv-header__btn--pending' : 'pv-header__btn--follow')}" id="ppFollowBtn">
+          ${profile.isFollowing ? '✓ Following' : profile.isPending ? '⏳ Pending' : profile.isPrivate ? 'Request' : 'Follow'}
         </button>
       </div>
     </div>
@@ -169,6 +169,13 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
         <span class="pv-stats-row__lbl">km total</span>
       </div>
     </div>
+    <div id="ppPhotoStrip" style="display:flex;gap:3px;padding:12px 0 4px;overflow:hidden"></div>
+    ${(profile.isPrivate && !profile.isFollowing) ? `
+      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:28px;text-align:center;margin:12px 0">
+        <div style="font-size:2.4rem;margin-bottom:8px">🔒</div>
+        <div style="font-weight:700;color:#fff;font-size:1.6rem;margin-bottom:6px">Ten profil jest prywatny</div>
+        <div style="color:rgba(255,255,255,0.45);font-size:1.3rem">Zaobserwuj, żeby zobaczyć aktywności i posty.</div>
+      </div>` : `
     <div class="pv-subtabs">
       <button class="pv-subtab pv-subtab--active" data-pp="activities">Activities</button>
       <button class="pv-subtab" data-pp="stats">Stats</button>
@@ -176,7 +183,8 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
       <button class="pv-subtab" data-pp="trophies">Trophies</button>
       <button class="pv-subtab" data-pp="posts">Posts</button>
     </div>
-    <div class="pv-content" id="ppContent"></div>`;
+    <div class="pv-content" id="ppContent"></div>`}
+  `;
     sheet.innerHTML = '';
     while (tmp.firstChild)
         sheet.appendChild(tmp.firstChild);
@@ -198,6 +206,7 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
     // Follow
     const followBtn = sheet.querySelector('#ppFollowBtn');
     let isFollowing = profile.isFollowing;
+    let isPending = profile.isPending ?? false;
     followBtn.addEventListener('click', async () => {
         followBtn.disabled = true;
         try {
@@ -452,21 +461,96 @@ function _renderActivitiesTab(el, activities) {
     }).join('')}</div>`;
 }
 function _renderPostsTab(el, posts) {
-    if (!posts.length) {
-        el.innerHTML = `<div class="pv-empty"><div class="pv-empty__icon">📝</div><p>No posts yet</p></div>`;
+    const visible = posts.filter(p => p.data.type !== 'club_event');
+    if (!visible.length) {
+        el.innerHTML = '<div class="pv-empty"><div class="pv-empty__icon">📝</div><p>No posts yet</p></div>';
         return;
     }
-    el.innerHTML = `<div class="pv-posts-list">${posts.map(p => {
+    el.innerHTML = '';
+    visible.forEach(p => {
         const d = p.data;
-        return `<div class="pv-post-item">
-      ${d.photoUrl ? `<div class="pv-post-item__photo"><img src="${d.photoUrl}" loading="lazy"/></div>` : ''}
-      <div class="pv-post-item__body">
-        <span class="pv-post-item__title">${(d.title ?? '')}</span>
-        <span class="pv-post-item__date">${_relDate(p.date)}</span>
-        ${d.body ? `<p class="pv-post-item__text">${d.body.slice(0, 120)}${d.body.length > 120 ? '…' : ''}</p>` : ''}
+        const card = document.createElement('div');
+        card.style.cssText = 'margin:0 0 16px;border-radius:16px;overflow:hidden;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07)';
+        const av = d.authorAvatarUrl
+            ? `<img src="${d.authorAvatarUrl}" style="width:36px;height:36px;border-radius:50%;object-fit:cover"/>`
+            : `<div style="width:36px;height:36px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff;font-size:14px">${(d.authorName?.[0] ?? '?')}</div>`;
+        card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;padding:12px 14px 8px">
+        ${av}
+        <div>
+          <div style="font-weight:700;color:#fff;font-size:1.35rem">${(d.authorName ?? '')}</div>
+          <div style="color:rgba(255,255,255,0.35);font-size:1.1rem">${_relDate(p.date)}</div>
+        </div>
       </div>
-    </div>`;
-    }).join('')}</div>`;
+      ${d.photoUrl ? `<img src="${d.photoUrl}" style="width:100%;max-height:320px;object-fit:cover;display:block" loading="lazy"/>` : ''}
+      <div style="padding:10px 14px 12px">
+        ${d.title ? `<div style="font-weight:700;color:#fff;font-size:1.4rem;margin-bottom:4px">${d.title}</div>` : ''}
+        ${d.body ? `<div style="color:rgba(255,255,255,0.65);font-size:1.3rem">${d.body}</div>` : ''}
+      </div>`;
+        el.appendChild(card);
+    });
+}
+// ── Photo strip + viewer ──────────────────────────────────────────────────────
+function _renderPhotoStrip(sheet, activities, posts, overlay) {
+    const strip = sheet.querySelector('#ppPhotoStrip');
+    if (!strip)
+        return;
+    const photos = [];
+    [...activities, ...posts.filter(p => !p.data.clubOnly && p.data.type !== 'club_event')].forEach(f => {
+        if (f.data.photoUrl)
+            photos.push({ url: f.data.photoUrl, title: (f.data.name ?? f.data.title ?? '') });
+    });
+    if (!photos.length) {
+        strip.style.display = 'none';
+        return;
+    }
+    const MAX = 4;
+    strip.innerHTML = photos.slice(0, MAX).map((ph, i) => `
+    <div data-pi="${i}" style="flex:1;aspect-ratio:1;border-radius:8px;overflow:hidden;cursor:pointer;position:relative;min-width:0">
+      <img src="${ph.url}" style="width:100%;height:100%;object-fit:cover" loading="lazy"/>
+      ${photos.length > MAX && i === MAX - 1 ? `<div style="position:absolute;inset:0;background:rgba(0,0,0,0.55);display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:700;color:#fff">+${photos.length - MAX + 1}</div>` : ''}
+    </div>`).join('');
+    strip.querySelectorAll('[data-pi]').forEach(el => {
+        el.addEventListener('click', () => _openPhotoViewer(photos, overlay));
+    });
+}
+function _openPhotoViewer(photos, parent) {
+    document.getElementById('ppPhotoViewer')?.remove();
+    const viewer = document.createElement('div');
+    viewer.id = 'ppPhotoViewer';
+    viewer.style.cssText = 'position:fixed;inset:0;z-index:9700;background:#000;display:flex;flex-direction:column';
+    let mode = 'grid';
+    const render = () => {
+        viewer.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,0.08)">
+        <button id="pvClose" style="background:none;border:none;color:#fff;font-size:2rem;cursor:pointer">✕</button>
+        <div style="display:flex;background:rgba(255,255,255,0.08);border-radius:10px;overflow:hidden">
+          <button id="pvGrid" style="padding:7px 18px;border:none;cursor:pointer;font-family:inherit;font-size:1.3rem;font-weight:${mode === 'grid' ? 700 : 400};background:${mode === 'grid' ? 'rgba(255,255,255,0.15)' : 'none'};color:#fff">Grid</button>
+          <button id="pvList" style="padding:7px 18px;border:none;cursor:pointer;font-family:inherit;font-size:1.3rem;font-weight:${mode === 'list' ? 700 : 400};background:${mode === 'list' ? 'rgba(255,255,255,0.15)' : 'none'};color:#fff">List</button>
+        </div>
+        <div style="width:40px"></div>
+      </div>
+      <div id="pvBody" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch">
+        ${mode === 'grid'
+            ? `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px">${photos.map((ph, i) => `<div data-vi="${i}" style="aspect-ratio:1;overflow:hidden;cursor:pointer"><img src="${ph.url}" style="width:100%;height:100%;object-fit:cover" loading="lazy"/></div>`).join('')}</div>`
+            : `<div style="padding:8px 0">${photos.map((ph, i) => `<div data-vi="${i}" style="margin-bottom:8px;cursor:pointer">${ph.title ? `<div style="padding:10px 16px 6px;font-weight:700;color:#fff;font-size:1.4rem">${ph.title}</div>` : ''}<img src="${ph.url}" style="width:100%;display:block;max-height:400px;object-fit:cover" loading="lazy"/></div>`).join('')}</div>`}
+      </div>`;
+        viewer.querySelector('#pvClose')?.addEventListener('click', () => viewer.remove());
+        viewer.querySelector('#pvGrid')?.addEventListener('click', () => { mode = 'grid'; render(); });
+        viewer.querySelector('#pvList')?.addEventListener('click', () => { mode = 'list'; render(); });
+        viewer.querySelectorAll('[data-vi]').forEach(el => {
+            el.addEventListener('click', () => {
+                const src = el.querySelector('img').src;
+                const big = document.createElement('div');
+                big.style.cssText = 'position:fixed;inset:0;z-index:9800;background:rgba(0,0,0,0.95);display:flex;align-items:center;justify-content:center';
+                big.innerHTML = `<img src="${src}" style="max-width:95vw;max-height:90vh;border-radius:8px;object-fit:contain"/>`;
+                big.addEventListener('click', () => big.remove());
+                document.body.appendChild(big);
+            });
+        });
+    };
+    render();
+    parent.appendChild(viewer);
 }
 export function closePublicProfile() {
     const overlay = document.getElementById('publicProfileOverlay');

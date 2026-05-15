@@ -221,13 +221,13 @@ function _buildTrophySVG(trophy: Trophy): string {
         <polygon points="40,2 78,22 78,68 40,88 2,68 2,22"
           fill="${fill}" stroke="${trophy.unlocked ? trophy.color : '#374151'}" stroke-width="2"/>
         ${trophy.unlocked
-          ? `<polygon points="40,12 68,28 68,62 40,78 12,62 12,28" fill="${fill}cc"/>
+    ? `<polygon points="40,12 68,28 68,62 40,78 12,62 12,28" fill="${fill}cc"/>
              <text x="40" y="50" text-anchor="middle" font-size="22" font-weight="900"
                font-family="Manrope,sans-serif" fill="white">${count}</text>
              <text x="40" y="65" text-anchor="middle" font-size="11"
                font-family="Manrope,sans-serif" fill="rgba(255,255,255,0.7)">${trophy.icon === '🏆' ? '🏆' : '⚡'}</text>`
-          : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`
-        }
+    : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`
+  }
       </svg>
     </div>
     <span class="pv-trophy__label">${trophy.label}</span>
@@ -271,25 +271,12 @@ export class ProfileView {
     if (userId) {
       fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, { cache: 'no-store' })
         .then(r => r.json())
-        .then((d: { status: string; data: { followers?: string[]; following?: string[]; userId?: string; name?: string; avatarB64?: string | null } }) => {
+        .then((d: { status: string; data: { followers?: string[]; following?: string[] } }) => {
           if (d.status !== 'ok') return;
-          const followers = d.data.followers ?? [];
-          const following = d.data.following ?? [];
-          const followersEl = el.querySelector<HTMLElement>('#pvFollowersBtn .pv-stats-row__val');
-          const followingEl = el.querySelector<HTMLElement>('#pvFollowingBtn .pv-stats-row__val');
-          if (followersEl) followersEl.textContent = String(followers.length);
-          if (followingEl) followingEl.textContent = String(following.length);
-
-          const myUserId = getUserId();
-
-          // Followers click — show who follows me
-          el.querySelector('#pvFollowersBtn')?.addEventListener('click', () => {
-            _showFollowList(el, 'Followers', followers, myUserId);
-          });
-          // Following click — show who I follow
-          el.querySelector('#pvFollowingBtn')?.addEventListener('click', () => {
-            _showFollowList(el, 'Following', following, myUserId);
-          });
+          const followersEl = el.querySelector<HTMLElement>('.pv-stats-row__item:nth-child(1) .pv-stats-row__val');
+          const followingEl = el.querySelector<HTMLElement>('.pv-stats-row__item:nth-child(2) .pv-stats-row__val');
+          if (followersEl) followersEl.textContent = String(d.data.followers?.length ?? 0);
+          if (followingEl) followingEl.textContent = String(d.data.following?.length ?? 0);
         }).catch(() => {});
     }
     return;
@@ -325,6 +312,7 @@ export class ProfileView {
           <button class="pv-back" id="pvBack">←</button>
           <div class="pv-header__actions">
             <button class="pv-header__btn" id="pvEditBtn">✏️ Edit</button>
+            <button class="pv-header__btn pv-header__btn--icon" id="pvSettingsBtn" aria-label="Settings" style="padding:8px 10px;font-size:1.6rem">⚙️</button>
           </div>
         </div>
 
@@ -339,11 +327,11 @@ export class ProfileView {
 
         <!-- Stats row -->
         <div class="pv-stats-row">
-          <div class="pv-stats-row__item" id="pvFollowersBtn" style="cursor:pointer">
+          <div class="pv-stats-row__item">
             <span class="pv-stats-row__val">0</span>
             <span class="pv-stats-row__lbl">Followers</span>
           </div>
-          <div class="pv-stats-row__item" id="pvFollowingBtn" style="cursor:pointer">
+          <div class="pv-stats-row__item">
             <span class="pv-stats-row__val">0</span>
             <span class="pv-stats-row__lbl">Following</span>
           </div>
@@ -380,6 +368,12 @@ export class ProfileView {
     // Close
     el.querySelector('#pvBack')?.addEventListener('click', () => this.close());
     el.addEventListener('click', e => { if (e.target === el) this.close(); });
+
+    // Settings
+    el.querySelector('#pvSettingsBtn')?.addEventListener('click', () => {
+      const settingsUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
+      _openSettingsModal(el, settingsUserId);
+    });
 
     // Edit
     el.querySelector('#pvEditBtn')?.addEventListener('click', () => {
@@ -473,11 +467,11 @@ export class ProfileView {
             <div class="pv-heatmap__row">
               <span class="pv-heatmap__day">${day}</span>
               ${hours.map((_,hi) => {
-                const v = heatmap[di][hi];
-                const a = v > 0 ? Math.max(0.15, v / maxHeat) : 0;
-                return `<div class="pv-heatmap__cell" style="opacity:${a};background:${v>0?'#00c46a':'rgba(255,255,255,0.05)'}"
+      const v = heatmap[di][hi];
+      const a = v > 0 ? Math.max(0.15, v / maxHeat) : 0;
+      return `<div class="pv-heatmap__cell" style="opacity:${a};background:${v>0?'#00c46a':'rgba(255,255,255,0.05)'}"
                   title="${v} workout${v!==1?'s':''} at ${String(hi).padStart(2,'0')}:00 on ${day}"></div>`;
-              }).join('')}
+    }).join('')}
             </div>`).join('')}
         </div>
       </div>
@@ -486,8 +480,8 @@ export class ProfileView {
       <div class="pv-section-title" style="margin-top:20px">Activity Types</div>
       <div class="pv-pie-wrap">
         ${Object.keys(typeCounts).length === 0
-          ? '<p class="pv-empty-sub">No data yet</p>'
-          : `<div class="pv-pie-container"><canvas id="pvPieChart" width="180" height="180"></canvas></div>
+      ? '<p class="pv-empty-sub">No data yet</p>'
+      : `<div class="pv-pie-container"><canvas id="pvPieChart" width="180" height="180"></canvas></div>
              <div class="pv-pie-legend">
                ${Object.entries(typeCounts).map(([type, cnt]) => `
                  <div class="pv-pie-legend__item">
@@ -535,9 +529,9 @@ export class ProfileView {
             <span class="pv-effort__dist">${e.label}</span>
             <div class="pv-effort__right">
               ${e.timeStr
-                ? `<span class="pv-effort__time">${e.timeStr}</span>
+      ? `<span class="pv-effort__time">${e.timeStr}</span>
                    <span class="pv-effort__date">${e.date ? _relDate(e.date) : ''}</span>`
-                : `<span class="pv-effort__empty">—</span>`}
+      : `<span class="pv-effort__empty">—</span>`}
             </div>
           </div>`).join('')}
       </div>
@@ -603,65 +597,124 @@ export class ProfileView {
 export const profileView = new ProfileView();
 
 
-// ── Follow list modal ─────────────────────────────────────────────────────────
+// ── Settings modal ────────────────────────────────────────────────────────────
 
-async function _showFollowList(parent: HTMLElement, title: string, userIds: string[], myUserId: string): Promise<void> {
-  const existing = document.getElementById('pvFollowListModal');
-  if (existing) existing.remove();
+const PUSH_SETTINGS_KEY = 'mapyou_push_settings';
 
+function _getPushSettings(): Record<string, boolean> {
+  try { return JSON.parse(localStorage.getItem(PUSH_SETTINGS_KEY) ?? '{}'); } catch { return {}; }
+}
+
+function _savePushSettings(s: Record<string, boolean>): void {
+  localStorage.setItem(PUSH_SETTINGS_KEY, JSON.stringify(s));
+}
+
+const PUSH_TOGGLES = [
+  { key: 'like',             label: 'Lajki',                     desc: 'Gdy ktoś polubi Twój post lub aktywność' },
+  { key: 'comment',          label: 'Komentarze',                 desc: 'Gdy ktoś skomentuje Twój post lub aktywność' },
+  { key: 'follow',           label: 'Nowy obserwujący',           desc: 'Gdy ktoś zacznie Cię obserwować' },
+  { key: 'follow_request',   label: 'Prośba o obserwowanie',      desc: 'Gdy ktoś wyśle request do Twojego profilu' },
+  { key: 'friend_activity',  label: 'Aktywność znajomego',        desc: 'Gdy ktoś kogo obserwujesz zapisze aktywność' },
+  { key: 'friend_post',      label: 'Post znajomego',             desc: 'Gdy ktoś kogo obserwujesz doda post' },
+  { key: 'club_post',        label: 'Post w klubie',              desc: 'Gdy ktoś doda post w Twoim klubie' },
+  { key: 'activity_saved',   label: 'Trening zapisany',           desc: 'Potwierdzenie po zapisaniu treningu' },
+  { key: 'break_reminder',   label: 'Przypomnienie o treningu',   desc: 'Po 3h i 24h przerwy od aplikacji' },
+];
+
+async function _openSettingsModal(parent: HTMLElement, userId: string): Promise<void> {
+  document.getElementById('pvSettingsModal')?.remove();
   const modal = document.createElement('div');
-  modal.id = 'pvFollowListModal';
-  modal.style.cssText = 'position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end';
+  modal.id = 'pvSettingsModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end';
+
+  // Fetch current isPrivate from backend
+  let isPrivate = false;
+  try {
+    const res  = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, { cache: 'no-store' });
+    const data = await res.json() as { status: string; data: { isPrivate?: boolean } };
+    if (data.status === 'ok') isPrivate = data.data.isPrivate ?? false;
+  } catch {}
+
+  const settings = _getPushSettings();
+  const togId = (k: string) => `pvPush_${k}`;
+
   modal.innerHTML = `
-    <div style="width:100%;max-height:75vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
+    <div style="width:100%;max-height:90vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">
-        <span style="font-size:1.7rem;font-weight:700;color:#fff">${title}</span>
-        <button id="pvFollowListClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
+        <span style="font-size:1.7rem;font-weight:700;color:#fff">Ustawienia</span>
+        <button id="pvSetClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
       </div>
-      <div id="pvFollowListBody" style="overflow-y:auto;padding:8px 0 32px">
-        <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>
+      <div style="overflow-y:auto;padding:16px 20px 40px">
+
+        <!-- Privacy -->
+        <div style="margin-bottom:24px">
+          <div style="font-size:1.1rem;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px">Profil</div>
+          <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+            <div>
+              <div style="font-weight:600;color:#fff;font-size:1.4rem">Profil prywatny</div>
+              <div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px">Tylko zaakceptowani mogą widzieć Twoje aktywności</div>
+            </div>
+            <label style="position:relative;width:48px;height:28px;flex-shrink:0;margin-left:12px">
+              <input type="checkbox" id="pvPrivateToggle" ${isPrivate ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute"/>
+              <span id="pvPrivateSlider" style="position:absolute;inset:0;border-radius:28px;background:${isPrivate ? '#00c46a' : 'rgba(255,255,255,0.15)'};cursor:pointer;transition:background 0.2s">
+                <span style="position:absolute;top:3px;left:${isPrivate ? '23px' : '3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s" id="pvPrivateThumb"></span>
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Push notifications -->
+        <div>
+          <div style="font-size:1.1rem;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px">Powiadomienia push</div>
+          ${PUSH_TOGGLES.map(t => {
+    const on = settings[t.key] !== false;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
+              <div style="flex:1;margin-right:12px">
+                <div style="font-weight:600;color:#fff;font-size:1.4rem">${t.label}</div>
+                <div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px">${t.desc}</div>
+              </div>
+              <label style="position:relative;width:48px;height:28px;flex-shrink:0">
+                <input type="checkbox" id="${togId(t.key)}" ${on ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute"/>
+                <span class="pvPushSlider" data-key="${t.key}" style="position:absolute;inset:0;border-radius:28px;background:${on ? '#00c46a' : 'rgba(255,255,255,0.15)'};cursor:pointer;transition:background 0.2s">
+                  <span style="position:absolute;top:3px;left:${on ? '23px' : '3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s"></span>
+                </span>
+              </label>
+            </div>`;
+  }).join('')}
+        </div>
       </div>
     </div>`;
-  document.body.appendChild(modal);
 
-  modal.querySelector('#pvFollowListClose')?.addEventListener('click', () => modal.remove());
+  document.body.appendChild(modal);
+  modal.querySelector('#pvSetClose')?.addEventListener('click', () => modal.remove());
   modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 
-  // Fetch user details
-  const { BACKEND_URL } = await import('../config.js');
-  const body = document.getElementById('pvFollowListBody')!;
+  // Private toggle
+  const privCb     = modal.querySelector<HTMLInputElement>('#pvPrivateToggle')!;
+  const privSlider = modal.querySelector<HTMLElement>('#pvPrivateSlider')!;
+  const privThumb  = modal.querySelector<HTMLElement>('#pvPrivateThumb')!;
+  privCb.addEventListener('change', async () => {
+    const val = privCb.checked;
+    privSlider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
+    privThumb.style.left = val ? '23px' : '3px';
+    await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isPrivate: val }),
+    });
+  });
 
-  if (!userIds.length) {
-    body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">No users yet</div>';
-    return;
-  }
-
-  const users = await Promise.all(userIds.slice(0, 50).map(uid =>
-    fetch(`${BACKEND_URL}/users/${encodeURIComponent(uid)}`)
-      .then(r => r.json())
-      .then((d: { status: string; data: { userId: string; name: string; avatarB64: string | null } }) =>
-        d.status === 'ok' ? d.data : { userId: uid, name: uid.slice(0,10)+'…', avatarB64: null })
-      .catch(() => ({ userId: uid, name: uid.slice(0,10)+'…', avatarB64: null }))
-  ));
-
-  body.innerHTML = users.map(u => `
-    <div data-open-profile="${u.userId}" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer;transition:background 0.15s" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
-      <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
-        ${u.avatarB64
-          ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>`
-          : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff">${u.name[0]}</div>`}
-      </div>
-      <span style="font-size:1.4rem;font-weight:600;color:#fff;flex:1">${u.name}</span>
-      ${u.userId === myUserId ? '<span style="font-size:1.1rem;color:rgba(255,255,255,0.3)">You</span>' : ''}
-    </div>`).join('');
-
-  body.querySelectorAll<HTMLElement>('[data-open-profile]').forEach(el => {
-    el.addEventListener('click', () => {
-      const uid = el.dataset.openProfile!;
-      modal.remove();
-      if (uid !== myUserId) {
-        import('./PublicProfile.js').then(m => m.openPublicProfile(uid));
-      }
+  // Push toggles
+  modal.querySelectorAll<HTMLElement>('.pvPushSlider').forEach(slider => {
+    const key = slider.dataset.key!;
+    const cb  = modal.querySelector<HTMLInputElement>(`#${togId(key)}`)!;
+    const thumb = slider.querySelector<HTMLElement>('span')!;
+    cb.addEventListener('change', () => {
+      const val = cb.checked;
+      slider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
+      thumb.style.left = val ? '23px' : '3px';
+      const s = _getPushSettings();
+      s[key] = val;
+      _savePushSettings(s);
     });
   });
 }

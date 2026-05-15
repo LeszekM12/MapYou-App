@@ -624,7 +624,7 @@ function _relTimeNotif(ts) {
     const days = Math.floor(hrs / 24);
     return `${days} day${days > 1 ? 's' : ''} ago`;
 }
-function _renderNotifList(notifs, list) {
+function _renderNotifList(notifs, list, userId) {
     list.innerHTML = notifs.length === 0
         ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
         : notifs.map(n => `
@@ -634,8 +634,30 @@ function _renderNotifList(notifs, list) {
             <div class="hn-item__title">${n.title}</div>
             <div class="hn-item__body-text">${n.body}</div>
             <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
+            ${n.type === 'follow_request' && n.meta ? `
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="hn-approve-btn" data-requester="${n.meta}" data-notif="${n.id}"
+                  style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Accept</button>
+                <button class="hn-reject-btn" data-requester="${n.meta}" data-notif="${n.id}"
+                  style="background:rgba(248,113,113,0.12);border:1.5px solid #f87171;color:#f87171;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Decline</button>
+              </div>` : ''}
           </div>
         </div>`).join('');
+    // Approve/Reject handlers
+    list.querySelectorAll('.hn-approve-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const requesterId = btn.dataset.requester;
+            await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}/follow-approve/${encodeURIComponent(requesterId)}`, { method: 'POST' });
+            btn.closest('.hn-item').innerHTML = '<div class="hn-item__icon">✅</div><div class="hn-item__body"><div class="hn-item__title">Accepted</div></div>';
+        });
+    });
+    list.querySelectorAll('.hn-reject-btn').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            const requesterId = btn.dataset.requester;
+            await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}/follow-reject/${encodeURIComponent(requesterId)}`, { method: 'POST' });
+            btn.closest('.hn-item')?.remove();
+        });
+    });
 }
 function _openNotifPanel() {
     document.getElementById('homeNotifPanel')?.remove();
@@ -675,7 +697,7 @@ function _openNotifPanel() {
                 const backendIds = new Set(backendNotifs.map(n => n.id));
                 const merged = [...backendNotifs, ...localNotifs.filter(n => !backendIds.has(n.id))];
                 merged.sort((a, b) => b.timestamp - a.timestamp);
-                _renderNotifList(merged, hnList);
+                _renderNotifList(merged, hnList, userId);
                 // Mark backend notifs as read
                 if (userId)
                     void fetch(`${BACKEND_URL}/notifications/read-all?userId=${encodeURIComponent(userId)}`, { method: 'PUT' });
@@ -684,7 +706,7 @@ function _openNotifPanel() {
         }
         catch { /* offline fallback */ }
         // Fallback to local
-        _renderNotifList(getNotifications(), hnList);
+        _renderNotifList(getNotifications(), hnList, userId);
     };
     void loadNotifs();
     const close = () => {
