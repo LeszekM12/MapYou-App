@@ -204,6 +204,42 @@ function _buildTrophySVG(trophy) {
 }
 // ── Main class ────────────────────────────────────────────────────────────────
 let _pieChart = null;
+function _openPhotoViewer(photos, parent) {
+    document.getElementById('pvMyPhotoViewer')?.remove();
+    const viewer = document.createElement('div');
+    viewer.id = 'pvMyPhotoViewer';
+    viewer.className = 'pv-photo-viewer';
+    let mode = 'grid';
+    const render = () => {
+        viewer.innerHTML =
+            '<div class="pv-photo-viewer__header">'
+                + '<button id="pvMyClose" class="pv-photo-viewer__close">✕</button>'
+                + '<div class="pv-photo-viewer__tabs">'
+                + '<button id="pvMyGrid" class="pv-photo-viewer__tab' + (mode === 'grid' ? ' pv-photo-viewer__tab--active' : '') + '">Grid</button>'
+                + '<button id="pvMyList" class="pv-photo-viewer__tab' + (mode === 'list' ? ' pv-photo-viewer__tab--active' : '') + '">List</button>'
+                + '</div><div style="width:40px"></div></div>'
+                + '<div id="pvMyBody" class="pv-photo-viewer__body">'
+                + (mode === 'grid'
+                    ? '<div class="pv-photo-viewer__grid">' + photos.map((ph, i) => '<div data-vi="' + i + '" class="pv-photo-viewer__grid-item"><img src="' + ph.url + '" loading="lazy"/></div>').join('') + '</div>'
+                    : '<div>' + photos.map((ph, i) => '<div data-vi="' + i + '" class="pv-photo-viewer__list-item">' + (ph.title ? '<div class="pv-photo-viewer__list-title">' + ph.title + '</div>' : '') + '<img class="pv-photo-viewer__list-img" src="' + ph.url + '" loading="lazy"/></div>').join('') + '</div>')
+                + '</div>';
+        viewer.querySelector('#pvMyClose')?.addEventListener('click', () => viewer.remove());
+        viewer.querySelector('#pvMyGrid')?.addEventListener('click', () => { mode = 'grid'; render(); });
+        viewer.querySelector('#pvMyList')?.addEventListener('click', () => { mode = 'list'; render(); });
+        viewer.querySelectorAll('[data-vi]').forEach(el => {
+            el.addEventListener('click', () => {
+                const src = el.querySelector('img').src;
+                const big = document.createElement('div');
+                big.className = 'pv-photo-viewer__enlarge';
+                big.innerHTML = '<img src="' + src + '"/>';
+                big.addEventListener('click', () => big.remove());
+                document.body.appendChild(big);
+            });
+        });
+    };
+    render();
+    parent.appendChild(viewer);
+}
 export class ProfileView {
     constructor() {
         Object.defineProperty(this, "_workouts", {
@@ -237,6 +273,7 @@ export class ProfileView {
         const profile = loadProfileFromLocal();
         const el = this._buildShell(profile);
         document.body.appendChild(el);
+        this._renderPhotoStrip(el);
         requestAnimationFrame(() => {
             el.classList.add('pv-overlay--visible');
             setTimeout(() => el.querySelector('.pv-sheet')?.classList.add('pv-sheet--open'), 10);
@@ -337,6 +374,7 @@ export class ProfileView {
 
 
         <!-- Sub-tabs -->
+        <div id="pvPhotoStrip" class="pv-photo-strip"></div>
         <div class="pv-subtabs" id="pvSubtabs">
           <button class="pv-subtab pv-subtab--active" data-pv="activities">Activities</button>
           <button class="pv-subtab" data-pv="stats">Stats</button>
@@ -561,19 +599,60 @@ export class ProfileView {
     }
     // ── Posts ───────────────────────────────────────────────────────────────────
     _renderPosts(el) {
-        if (this._posts.length === 0) {
-            el.innerHTML = `<div class="pv-empty"><div class="pv-empty__icon">📝</div><p>No posts yet</p><p class="pv-empty__sub">Create a post from the Home tab</p></div>`;
+        const visible = this._posts.filter(p => !p.clubOnly);
+        if (visible.length === 0) {
+            el.innerHTML = '<div class="pv-empty"><div class="pv-empty__icon">📝</div><p>No posts yet</p><p class="pv-empty__sub">Create a post from the Home tab</p></div>';
             return;
         }
-        el.innerHTML = `<div class="pv-posts-list">${this._posts.map(p => `
-        <div class="pv-post-item">
-          ${p.photoUrl ? `<div class="pv-post-item__photo"><img src="${p.photoUrl}" alt=""/></div>` : ''}
-          <div class="pv-post-item__body">
-            <span class="pv-post-item__title">${p.title}</span>
-            <span class="pv-post-item__date">${_relDate(String(p.date))}</span>
-            ${p.body ? `<p class="pv-post-item__text">${p.body}</p>` : ''}
-          </div>
-        </div>`).join('')}</div>`;
+        el.style.padding = '12px 16px 32px';
+        el.innerHTML = '';
+        const profile = loadProfileFromLocal();
+        const myName = profile?.name ?? localStorage.getItem('mapyou_userName') ?? '';
+        const myAvatar = profile?.avatarB64 ?? localStorage.getItem('mapyou_avatar') ?? null;
+        visible.forEach(p => {
+            const card = document.createElement('div');
+            card.className = 'feed-card';
+            const avImg = myAvatar ? `<img src="${myAvatar}" loading="lazy"/>` : '';
+            card.innerHTML =
+                '<div class="feed-card__header">'
+                    + '<div class="feed-card__avatar">' + (avImg || myName[0] || '?') + '</div>'
+                    + '<div class="feed-card__meta">'
+                    + '<span class="feed-card__author">' + myName + '</span>'
+                    + '<span class="feed-card__date">' + _relDate(String(p.date)) + '</span>'
+                    + '</div></div>'
+                    + (p.photoUrl ? '<img class="feed-card__photo" src="' + p.photoUrl + '" loading="lazy"/>' : '')
+                    + '<div class="feed-card__body">'
+                    + (p.title ? '<div class="feed-card__title">' + p.title + '</div>' : '')
+                    + (p.body ? '<div class="feed-card__text">' + p.body + '</div>' : '')
+                    + '</div>';
+            el.appendChild(card);
+        });
+    }
+    // ── Photo strip ───────────────────────────────────────────────────────────────
+    _renderPhotoStrip(el) {
+        const strip = el.querySelector('#pvPhotoStrip');
+        if (!strip)
+            return;
+        const photos = [];
+        this._posts.filter(p => !p.clubOnly && p.photoUrl).forEach(p => {
+            photos.push({ url: p.photoUrl, title: p.title || '' });
+        });
+        this._workouts.filter(w => w.photoUrl).forEach(w => {
+            const url = w.photoUrl;
+            photos.push({ url, title: w.name || w.description || '' });
+        });
+        if (!photos.length) {
+            strip.style.display = 'none';
+            return;
+        }
+        const MAX = 4;
+        strip.innerHTML = photos.slice(0, MAX).map((ph, i) => '<div data-pv-pi="' + i + '" class="pv-photo-strip__thumb">'
+            + '<img src="' + ph.url + '" loading="lazy"/>'
+            + (photos.length > MAX && i === MAX - 1 ? '<div class="pv-photo-strip__more">+' + (photos.length - MAX + 1) + '</div>' : '')
+            + '</div>').join('');
+        strip.querySelectorAll('[data-pv-pi]').forEach(thumb => {
+            thumb.addEventListener('click', () => _openPhotoViewer(photos, el));
+        });
     }
 }
 export const profileView = new ProfileView();
@@ -684,21 +763,21 @@ async function _openSettingsModal(parent, userId) {
         modal.innerHTML = `
       <div style="width:100%;max-height:90vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
         <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">
-          <span style="font-size:1.7rem;font-weight:700;color:#fff">Ustawienia</span>
+          <span style="font-size:1.7rem;font-weight:700;color:#fff">Settings</span>
           <button id="pvSetClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
         </div>
         <!-- Tabs -->
         <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.07)">
-          <button id="pvTabProfile" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'profile' ? 700 : 500};color:${activeTab === 'profile' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'profile' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Profil</button>
-          <button id="pvTabNotif" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'notifications' ? 700 : 500};color:${activeTab === 'notifications' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'notifications' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Powiadomienia</button>
+          <button id="pvTabProfile" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'profile' ? 700 : 500};color:${activeTab === 'profile' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'profile' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Profile</button>
+          <button id="pvTabNotif" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'notifications' ? 700 : 500};color:${activeTab === 'notifications' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'notifications' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Notifications</button>
         </div>
         <div style="overflow-y:auto;padding:16px 20px 40px">
           ${activeTab === 'profile' ? `
           <!-- Privacy -->
           <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
             <div>
-              <div style="font-weight:600;color:#fff;font-size:1.4rem">Profil prywatny</div>
-              <div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px">Tylko zaakceptowani mogą widzieć Twoje aktywności</div>
+              <div style="font-weight:600;color:#fff;font-size:1.4rem">Private profile</div>
+              <div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px">Only approved followers can see your activities</div>
             </div>
             <label style="position:relative;width:48px;height:28px;flex-shrink:0;margin-left:12px">
               <input type="checkbox" id="pvPrivateToggle" ${isPrivate ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute"/>
@@ -746,6 +825,11 @@ async function _openSettingsModal(parent, userId) {
                 const s = _getPushSettings();
                 s[key] = val;
                 _savePushSettings(s);
+                // Sync to backend
+                fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ pushSettings: s }),
+                }).catch(() => { });
             });
         });
     };

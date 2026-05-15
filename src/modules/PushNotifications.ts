@@ -19,6 +19,14 @@ import { getIPLocation, hasGPSPermission, getGPSLocation } from './LocationServi
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 
 const LS_USER_ID   = 'mapty_userId';
+
+// ── Push settings check ───────────────────────────────────────────────────────
+function _isPushEnabled(key: string): boolean {
+  try {
+    const s = JSON.parse(localStorage.getItem('mapyou_push_settings') ?? '{}') as Record<string,boolean>;
+    return s[key] !== false; // default true if not set
+  } catch { return true; }
+}
 const LS_DEVICE_ID = 'mapty_deviceId';
 
 // ── UUID generator (crypto API — dostępna w każdej nowoczesnej przeglądarce) ──
@@ -241,6 +249,7 @@ export async function sendActivityFinishedPush(
   distanceKm:  number,
   durationSec: number,
 ): Promise<void> {
+  if (!_isPushEnabled('activity_saved')) return;
   const icons: Record<string, string> = { running: '🏃', walking: '🚶', cycling: '🚴' };
   const emoji   = icons[sport] ?? '🏅';
   const h       = Math.floor(durationSec / 3600);
@@ -254,6 +263,7 @@ export async function sendActivityFinishedPush(
 }
 
 export async function sendWelcomeBackPush(): Promise<void> {
+  if (!_isPushEnabled('break_reminder')) return;
   const KEY  = 'mapty_last_welcome_push';
   const now  = Date.now();
   const last = Number(localStorage.getItem(KEY) ?? 0);
@@ -264,6 +274,7 @@ export async function sendWelcomeBackPush(): Promise<void> {
 }
 
 export async function sendLongBreakPush(): Promise<boolean> {
+  if (!_isPushEnabled('break_reminder')) return false;
   const KEY      = 'mapty_last_open';
   const KEY_SENT = 'mapty_last_break_push';
   const now      = Date.now();

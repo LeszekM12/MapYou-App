@@ -202,8 +202,10 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
     }
     sheet.querySelector('#ppBack')?.addEventListener('click', closePublicProfile);
     _bindSwipe(sheet);
-    // Render photo strip
-    _renderPhotoStrip(sheet, activities, posts, overlay);
+    // Render photo strip — only when profile is public or user is following
+    if (!profile.isPrivate || profile.isFollowing) {
+        _renderPhotoStrip(sheet, activities, posts, overlay);
+    }
     // Followers / Following lists — use profile.userId (in scope here)
     sheet.querySelector('#ppFollowersBtn')?.addEventListener('click', async () => {
         const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(profile.userId)}`);
@@ -219,7 +221,7 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
     });
     // Follow
     const followBtn = sheet.querySelector('#ppFollowBtn');
-    let isFollowing = profile.isFollowing;
+    let isFollowing = profile.isFollowing && !profile.isPending;
     let isPending = profile.isPending ?? false;
     followBtn.addEventListener('click', async () => {
         followBtn.disabled = true;
