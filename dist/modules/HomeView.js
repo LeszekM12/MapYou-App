@@ -42,7 +42,7 @@ function intensityColor(n) {
 }
 // ── Mini map — uses renderMinimapCanvas from cloudSync.ts ──────────────────
 // ── Comment panel ─────────────────────────────────────────────────────────────
-function openCommentPanel(card, actId) {
+export function openCommentPanel(card, actId) {
     card.querySelector('.home-card__comment-panel')?.remove();
     const panel = document.createElement('div');
     panel.className = 'home-card__comment-panel';

@@ -54,7 +54,7 @@ function intensityColor(n: number): string {
 
 // ── Comment panel ─────────────────────────────────────────────────────────────
 
-function openCommentPanel(card: HTMLElement, actId: string): void {
+export function openCommentPanel(card: HTMLElement, actId: string): void {
   card.querySelector('.home-card__comment-panel')?.remove();
 
   const panel = document.createElement('div');

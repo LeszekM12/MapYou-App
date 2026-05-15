@@ -1075,27 +1075,90 @@ export class SearchView {
               </div>`;
                     }
                     if (f.kind === 'post' && d.type === 'club_event') {
-                        return `<div class="sv2-club-feed-item" style="background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);text-align:center;padding:10px">
-                <span style="font-size:1.2rem;color:rgba(255,255,255,0.4)">${d.title}</span>
-                <span style="font-size:1.1rem;color:rgba(255,255,255,0.25);margin-left:8px">${new Date(f.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>
+                        return `<div class="sv2-club-feed-item--event">
+                <span style="color:rgba(255,255,255,0.4)">${d.title}</span>
+                <span style="color:rgba(255,255,255,0.25);margin-left:8px;font-size:1.1rem">${new Date(f.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>
               </div>`;
                     }
                     const canDelete = d.userId === myUserId || club.isOwner;
                     const postId = (d.postId ?? d._id?.toString?.() ?? '');
-                    return `<div class="sv2-club-feed-item" data-feed-post-id="${postId}">
-              <div class="sv2-club-feed-item__top" style="display:flex;align-items:center;gap:8px">
-                <div data-feed-profile="${d.userId}" style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0;cursor:pointer">
-                  ${d.authorAvatarUrl ? `<img src="${d.authorAvatarUrl}" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display='none'"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">${(d.authorName || '?')[0]}</div>`}
+                    const avImg = d.authorAvatarUrl
+                        ? `<img src="${d.authorAvatarUrl}" onerror="this.style.display='none'" loading="lazy"/>`
+                        : ``;
+                    const dateStr = new Date(f.date).toLocaleDateString('en', { month: 'short', day: 'numeric' });
+                    const title = (d.name ?? d.title ?? '');
+                    const body = (d.body ?? '');
+                    return `<div data-feed-post-id="${postId}" class="sv2-club-feed-item">
+              <div class="feed-card__header">
+                <div class="feed-card__avatar" data-feed-profile="${d.userId}" style="cursor:pointer">${avImg || (d.authorName || '?')[0]}</div>
+                <div class="feed-card__meta">
+                  <span class="feed-card__author" data-feed-profile="${d.userId}">${d.authorName ?? ''}</span>
+                  <span class="feed-card__date">${dateStr}</span>
                 </div>
-                <span class="sv2-club-feed-item__author" data-feed-profile="${d.userId}" style="cursor:pointer;flex:1">${d.authorName ?? ''}</span>
-                <span class="sv2-club-feed-item__date">${new Date(f.date).toLocaleDateString('en', { month: 'short', day: 'numeric' })}</span>
-                ${canDelete ? `<button data-delete-post="${postId}" style="background:none;border:none;color:rgba(255,255,255,0.3);font-size:1.3rem;cursor:pointer;padding:0 4px">🗑</button>` : ''}
+                ${canDelete ? `<button data-delete-post="${postId}" class="feed-card__delete">🗑</button>` : ''}
               </div>
-              <div class="sv2-club-feed-item__title" style="margin-top:6px">${d.name ?? d.title ?? d.body ?? ''}</div>
-              ${d.distanceKm ? `<div class="sv2-club-feed-item__stats"><span>${d.distanceKm.toFixed(2)} km</span>${d.durationSec ? `<span>${Math.floor(d.durationSec / 60)}m</span>` : ''}</div>` : ''}
-              ${d.photoUrl && d.mediaType !== 'video' ? `<img src="${d.photoUrl}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px" onerror="this.style.display='none'"/>` : ''}
+              ${d.photoUrl && d.mediaType !== 'video' ? `<img class="feed-card__photo" src="${d.photoUrl}" onerror="this.style.display='none'" loading="lazy"/>` : ''}
+              <div class="feed-card__body">
+                ${title ? `<div class="feed-card__title">${title}</div>` : ''}
+                ${body ? `<div class="feed-card__text">${body}</div>` : ''}
+                ${d.distanceKm ? `<div class="feed-card__stats"><span>📍 ${d.distanceKm.toFixed(2)} km</span>${d.durationSec ? `<span>⏱ ${Math.floor(d.durationSec / 60)}min</span>` : ''}</div>` : ''}
+              </div>
+              <div class="home-card__footer" style="border-top:1px solid rgba(255,255,255,0.06)">
+                <button class="home-card__action home-card__action--like" data-club-like="${postId}" data-item-type="${f.kind === 'activity' ? 'activity' : 'post'}" aria-label="Like">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                  <span class="home-card__action-count" data-like-count="${postId}">${(d._likeCount ?? 0)}</span>
+                </button>
+                <button class="home-card__action home-card__action--comment" data-club-comment="${postId}" data-item-type="${f.kind === 'activity' ? 'activity' : 'post'}" aria-label="Comment">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                  <span class="home-card__action-count" data-comment-count="${postId}">${(d._commentCount ?? 0)}</span>
+                </button>
+              </div>
             </div>`;
                 }).join('');
+                // Like handlers
+                feedEl.querySelectorAll('[data-club-like]').forEach(btn => {
+                    const itemId = btn.dataset.clubLike;
+                    const itemType = btn.dataset.itemType;
+                    // Fetch initial state
+                    void fetch(`${BACKEND_URL}/feed/likes/${encodeURIComponent(itemId)}?userId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' })
+                        .then(r => r.json())
+                        .then((d) => {
+                        btn.classList.toggle('home-card__action--liked', d.liked);
+                        const el = feedEl.querySelector(`[data-like-count="${itemId}"]`);
+                        if (el)
+                            el.textContent = String(d.count);
+                    }).catch(() => { });
+                    btn.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        btn.classList.add('home-card__action--pulse');
+                        setTimeout(() => btn.classList.remove('home-card__action--pulse'), 400);
+                        const res = await fetch(`${BACKEND_URL}/feed/like`, {
+                            method: 'POST', headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ userId: myUserId, itemId, itemType }),
+                        }).catch(() => null);
+                        if (res?.ok) {
+                            const d = await res.json();
+                            btn.classList.toggle('home-card__action--liked', d.liked);
+                            const el = feedEl.querySelector(`[data-like-count="${itemId}"]`);
+                            if (el)
+                                el.textContent = String(d.count);
+                        }
+                    });
+                });
+                // Comment handlers
+                feedEl.querySelectorAll('[data-club-comment]').forEach(btn => {
+                    const itemId = btn.dataset.clubComment;
+                    btn.addEventListener('click', e => {
+                        e.stopPropagation();
+                        const card = btn.closest('[data-feed-post-id]');
+                        import('./HomeView.js').then(m => {
+                            const mod = m;
+                            if (typeof mod.openCommentPanel === 'function') {
+                                mod.openCommentPanel(card, itemId, btn.dataset.itemType ?? 'post');
+                            }
+                        });
+                    });
+                });
                 // Approve/reject from feed
                 feedEl.querySelectorAll('[data-feed-approve]').forEach(btn => {
                     btn.addEventListener('click', async () => {

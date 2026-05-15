@@ -8,7 +8,7 @@
 // - Heatmap (day × hour) + activity type pie chart
 import { loadUnifiedWorkouts, SPORT_ICONS_U, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
 import { BACKEND_URL } from '../config.js';
-import { loadProfileFromLocal } from './UserProfile.js';
+import { loadProfileFromLocal, getUserId } from './UserProfile.js';
 import { loadPosts } from './db.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 const LS_WEEKLY_WINS = 'mapyou_weekly_wins'; // number — count of weeks goal was hit
@@ -253,10 +253,19 @@ export class ProfileView {
                     return;
                 const followersEl = el.querySelector('.pv-stats-row__item:nth-child(1) .pv-stats-row__val');
                 const followingEl = el.querySelector('.pv-stats-row__item:nth-child(2) .pv-stats-row__val');
+                const followers = d.data.followers ?? [];
+                const following = d.data.following ?? [];
                 if (followersEl)
-                    followersEl.textContent = String(d.data.followers?.length ?? 0);
+                    followersEl.textContent = String(followers.length);
                 if (followingEl)
-                    followingEl.textContent = String(d.data.following?.length ?? 0);
+                    followingEl.textContent = String(following.length);
+                const myUserId = getUserId();
+                el.querySelector('#pvFollowersBtn')?.addEventListener('click', () => {
+                    _showFollowList(el, 'Followers', followers, myUserId);
+                });
+                el.querySelector('#pvFollowingBtn')?.addEventListener('click', () => {
+                    _showFollowList(el, 'Following', following, myUserId);
+                });
             }).catch(() => { });
         }
         return;
@@ -307,11 +316,11 @@ export class ProfileView {
 
         <!-- Stats row -->
         <div class="pv-stats-row">
-          <div class="pv-stats-row__item">
+          <div class="pv-stats-row__item" id="pvFollowersBtn" style="cursor:pointer">
             <span class="pv-stats-row__val">0</span>
             <span class="pv-stats-row__lbl">Followers</span>
           </div>
-          <div class="pv-stats-row__item">
+          <div class="pv-stats-row__item" id="pvFollowingBtn" style="cursor:pointer">
             <span class="pv-stats-row__val">0</span>
             <span class="pv-stats-row__lbl">Following</span>
           </div>
@@ -592,6 +601,68 @@ const PUSH_TOGGLES = [
     { key: 'activity_saved', label: 'Trening zapisany', desc: 'Potwierdzenie po zapisaniu treningu' },
     { key: 'break_reminder', label: 'Przypomnienie o treningu', desc: 'Po 3h i 24h przerwy od aplikacji' },
 ];
+async function _showFollowList(parent, title, userIds, myUserId) {
+    document.getElementById('pvFollowListModal')?.remove();
+    const modal = document.createElement('div');
+    modal.id = 'pvFollowListModal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9600;background:rgba(0,0,0,0.7);display:flex;align-items:flex-end';
+    modal.innerHTML = `
+    <div style="width:100%;max-height:75vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">
+        <span style="font-size:1.7rem;font-weight:700;color:#fff">${title}</span>
+        <button id="pvFlClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
+      </div>
+      <div id="pvFlBody" style="overflow-y:auto;padding:8px 0 32px">
+        <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.querySelector('#pvFlClose')?.addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal)
+        modal.remove(); });
+    const body = modal.querySelector('#pvFlBody');
+    if (!userIds.length) {
+        body.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">No users yet</div>';
+        return;
+    }
+    const users = await Promise.all(userIds.slice(0, 50).map(uid => fetch(`${BACKEND_URL}/users/${encodeURIComponent(uid)}`)
+        .then(r => r.json())
+        .then((d) => d.status === 'ok' ? d.data : { userId: uid, name: uid.slice(0, 10) + '…', avatarB64: null })
+        .catch(() => ({ userId: uid, name: uid.slice(0, 10) + '…', avatarB64: null }))));
+    body.innerHTML = users.map(u => '<div data-uid="' + u.userId + '" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer">'
+        + '<div style="width:44px;height:44px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">'
+        + (u.avatarB64 ? '<img src="' + u.avatarB64 + '" style="width:100%;height:100%;object-fit:cover"/>' : '<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff">' + u.name[0] + '</div>')
+        + '</div>'
+        + '<span style="font-size:1.4rem;font-weight:600;color:#fff;flex:1">' + u.name + '</span>'
+        + (u.userId === myUserId ? '<span style="font-size:1.1rem;color:rgba(255,255,255,0.3)">You</span>' : '')
+        + '</div>').join('');
+    body.querySelectorAll('[data-uid]').forEach(el => {
+        el.addEventListener('click', () => {
+            const uid = el.dataset.uid;
+            modal.remove();
+            if (uid !== myUserId) {
+                import('./PublicProfile.js').then(m => m.openPublicProfile(uid));
+            }
+        });
+    });
+}
+function _buildPushTogglesHtml(settings, togId) {
+    return PUSH_TOGGLES.map(t => {
+        const on = settings[t.key] !== false;
+        const bg = on ? '#00c46a' : 'rgba(255,255,255,0.15)';
+        const lft = on ? '23px' : '3px';
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">'
+            + '<div style="flex:1;margin-right:12px">'
+            + '<div style="font-weight:600;color:#fff;font-size:1.4rem">' + t.label + '</div>'
+            + '<div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px">' + t.desc + '</div>'
+            + '</div>'
+            + '<label style="position:relative;width:48px;height:28px;flex-shrink:0">'
+            + '<input type="checkbox" id="' + togId(t.key) + '" ' + (on ? 'checked' : '') + ' style="opacity:0;width:0;height:0;position:absolute"/>'
+            + '<span class="pvPushSlider" data-key="' + t.key + '" style="position:absolute;inset:0;border-radius:28px;background:' + bg + ';cursor:pointer;transition:background 0.2s">'
+            + '<span style="position:absolute;top:3px;left:' + lft + ';width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s"></span>'
+            + '</span></label></div>';
+    }).join('');
+}
 async function _openSettingsModal(parent, userId) {
     document.getElementById('pvSettingsModal')?.remove();
     const modal = document.createElement('div');
@@ -608,17 +679,22 @@ async function _openSettingsModal(parent, userId) {
     catch { }
     const settings = _getPushSettings();
     const togId = (k) => `pvPush_${k}`;
-    modal.innerHTML = `
-    <div style="width:100%;max-height:90vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">
-        <span style="font-size:1.7rem;font-weight:700;color:#fff">Ustawienia</span>
-        <button id="pvSetClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
-      </div>
-      <div style="overflow-y:auto;padding:16px 20px 40px">
-
-        <!-- Privacy -->
-        <div style="margin-bottom:24px">
-          <div style="font-size:1.1rem;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px">Profil</div>
+    let activeTab = 'profile';
+    const renderModal = () => {
+        modal.innerHTML = `
+      <div style="width:100%;max-height:90vh;background:#1a1f23;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.07)">
+          <span style="font-size:1.7rem;font-weight:700;color:#fff">Ustawienia</span>
+          <button id="pvSetClose" style="background:rgba(255,255,255,0.08);border:none;color:#aaa;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:1.3rem">✕</button>
+        </div>
+        <!-- Tabs -->
+        <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.07)">
+          <button id="pvTabProfile" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'profile' ? 700 : 500};color:${activeTab === 'profile' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'profile' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Profil</button>
+          <button id="pvTabNotif" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'notifications' ? 700 : 500};color:${activeTab === 'notifications' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'notifications' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Powiadomienia</button>
+        </div>
+        <div style="overflow-y:auto;padding:16px 20px 40px">
+          ${activeTab === 'profile' ? `
+          <!-- Privacy -->
           <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
             <div>
               <div style="font-weight:600;color:#fff;font-size:1.4rem">Profil prywatny</div>
@@ -630,60 +706,50 @@ async function _openSettingsModal(parent, userId) {
                 <span style="position:absolute;top:3px;left:${isPrivate ? '23px' : '3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s" id="pvPrivateThumb"></span>
               </span>
             </label>
-          </div>
+          </div>` : `
+          <!-- Push notifications -->
+          ${_buildPushTogglesHtml(settings, togId)}`}
         </div>
-
-        <!-- Push notifications -->
-        <div>
-          <div style="font-size:1.1rem;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:12px">Powiadomienia push</div>
-          ${PUSH_TOGGLES.map(t => {
-        const on = settings[t.key] !== false;
-        return `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-              <div style="flex:1;margin-right:12px">
-                <div style="font-weight:600;color:#fff;font-size:1.4rem">${t.label}</div>
-                <div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px">${t.desc}</div>
-              </div>
-              <label style="position:relative;width:48px;height:28px;flex-shrink:0">
-                <input type="checkbox" id="${togId(t.key)}" ${on ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute"/>
-                <span class="pvPushSlider" data-key="${t.key}" style="position:absolute;inset:0;border-radius:28px;background:${on ? '#00c46a' : 'rgba(255,255,255,0.15)'};cursor:pointer;transition:background 0.2s">
-                  <span style="position:absolute;top:3px;left:${on ? '23px' : '3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s"></span>
-                </span>
-              </label>
-            </div>`;
-    }).join('')}
-        </div>
-      </div>
-    </div>`;
+      </div>`;
+        modal.querySelector('#pvSetClose')?.addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', e => { if (e.target === modal)
+            modal.remove(); });
+        modal.querySelector('#pvTabProfile')?.addEventListener('click', () => { activeTab = 'profile'; renderModal(); });
+        modal.querySelector('#pvTabNotif')?.addEventListener('click', () => { activeTab = 'notifications'; renderModal(); });
+        // Private toggle
+        const privCb = modal.querySelector('#pvPrivateToggle');
+        const privSlider = modal.querySelector('#pvPrivateSlider');
+        const privThumb = modal.querySelector('#pvPrivateThumb');
+        if (privCb && privSlider && privThumb) {
+            privCb.addEventListener('change', async () => {
+                const val = privCb.checked;
+                privSlider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
+                privThumb.style.left = val ? '23px' : '3px';
+                isPrivate = val;
+                await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, {
+                    method: 'PUT', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ isPrivate: val }),
+                });
+            });
+        }
+        // Push toggles
+        modal.querySelectorAll('.pvPushSlider').forEach(slider => {
+            const key = slider.dataset.key;
+            const cb = modal.querySelector(`#${togId(key)}`);
+            const thumb = slider.querySelector('span');
+            if (!cb || !thumb)
+                return;
+            cb.addEventListener('change', () => {
+                const val = cb.checked;
+                slider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
+                thumb.style.left = val ? '23px' : '3px';
+                const s = _getPushSettings();
+                s[key] = val;
+                _savePushSettings(s);
+            });
+        });
+    };
+    renderModal();
     document.body.appendChild(modal);
-    modal.querySelector('#pvSetClose')?.addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => { if (e.target === modal)
-        modal.remove(); });
-    // Private toggle
-    const privCb = modal.querySelector('#pvPrivateToggle');
-    const privSlider = modal.querySelector('#pvPrivateSlider');
-    const privThumb = modal.querySelector('#pvPrivateThumb');
-    privCb.addEventListener('change', async () => {
-        const val = privCb.checked;
-        privSlider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
-        privThumb.style.left = val ? '23px' : '3px';
-        await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, {
-            method: 'PUT', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ isPrivate: val }),
-        });
-    });
-    // Push toggles
-    modal.querySelectorAll('.pvPushSlider').forEach(slider => {
-        const key = slider.dataset.key;
-        const cb = modal.querySelector(`#${togId(key)}`);
-        const thumb = slider.querySelector('span');
-        cb.addEventListener('change', () => {
-            const val = cb.checked;
-            slider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
-            thumb.style.left = val ? '23px' : '3px';
-            const s = _getPushSettings();
-            s[key] = val;
-            _savePushSettings(s);
-        });
-    });
 }
 //# sourceMappingURL=ProfileView.js.map
