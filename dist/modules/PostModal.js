@@ -56,6 +56,12 @@ function buildHTML() {
       </div>
 
       <div class="pm-share-clubs" id="pmShareClubs"></div>
+      <div id="pmAddToHomeWrap" style="display:none;padding:8px 16px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:1.3rem;color:rgba(255,255,255,0.7)">
+          <input type="checkbox" id="pmAddToHome" style="width:18px;height:18px;accent-color:#00c46a;cursor:pointer"/>
+          Also share to home feed
+        </label>
+      </div>
       <div class="pm-footer">
         <button class="pm-btn pm-btn--cancel" id="pmCancel">Cancel</button>
         <button class="pm-btn pm-btn--post" id="pmPost">
@@ -131,6 +137,16 @@ export class PostModal {
     }
     _bindEvents(el) {
         el.querySelector('#pmClose')?.addEventListener('click', () => this.close());
+        // Show/hide "also share to home" when club is selected
+        el.addEventListener('change', (e) => {
+            const target = e.target;
+            if (target.classList.contains('pm-club-check')) {
+                const anyChecked = el.querySelectorAll('.pm-club-check:checked').length > 0;
+                const wrap = el.querySelector('#pmAddToHomeWrap');
+                if (wrap)
+                    wrap.style.display = anyChecked ? 'block' : 'none';
+            }
+        });
         el.querySelector('#pmCancel')?.addEventListener('click', () => this.close());
         el.addEventListener('click', e => { if (e.target === el)
             this.close(); });
@@ -323,6 +339,14 @@ export class PostModal {
         const checkedClubs = el.querySelectorAll('.pm-club-check:checked');
         if (checkedClubs.length > 0) {
             post.clubIds = [...checkedClubs].map(cb => cb.dataset.clubId);
+            // Check if user wants to also share to home feed
+            const shareHome = el.querySelector('#pmAddToHome');
+            post.addToHome = shareHome ? shareHome.checked : false;
+            post.clubOnly = !post.addToHome;
+        }
+        else {
+            post.addToHome = true;
+            post.clubOnly = false;
         }
         await CS.savePost(post);
         this.close();

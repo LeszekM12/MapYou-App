@@ -619,15 +619,15 @@ function _savePushSettings(s: Record<string, boolean>): void {
 }
 
 const PUSH_TOGGLES = [
-  { key: 'like',             label: 'Lajki',                     desc: 'Gdy ktoś polubi Twój post lub aktywność' },
-  { key: 'comment',          label: 'Komentarze',                 desc: 'Gdy ktoś skomentuje Twój post lub aktywność' },
-  { key: 'follow',           label: 'Nowy obserwujący',           desc: 'Gdy ktoś zacznie Cię obserwować' },
-  { key: 'follow_request',   label: 'Prośba o obserwowanie',      desc: 'Gdy ktoś wyśle request do Twojego profilu' },
-  { key: 'friend_activity',  label: 'Aktywność znajomego',        desc: 'Gdy ktoś kogo obserwujesz zapisze aktywność' },
-  { key: 'friend_post',      label: 'Post znajomego',             desc: 'Gdy ktoś kogo obserwujesz doda post' },
-  { key: 'club_post',        label: 'Post w klubie',              desc: 'Gdy ktoś doda post w Twoim klubie' },
-  { key: 'activity_saved',   label: 'Trening zapisany',           desc: 'Potwierdzenie po zapisaniu treningu' },
-  { key: 'break_reminder',   label: 'Przypomnienie o treningu',   desc: 'Po 3h i 24h przerwy od aplikacji' },
+  { key: 'like',             label: 'Likes',                     desc: 'When someone likes your post or activity' },
+  { key: 'comment',          label: 'Comments',                 desc: 'When someone comments on your post or activity' },
+  { key: 'follow',           label: 'New follower',           desc: 'When someone starts following you' },
+  { key: 'follow_request',   label: 'Follow request',      desc: 'When someone sends a follow request' },
+  { key: 'friend_activity',  label: 'Friend activity',        desc: 'When someone you follow saves an activity' },
+  { key: 'friend_post',      label: 'Friend post',             desc: 'When someone you follow adds a post' },
+  { key: 'club_post',        label: 'Club post',              desc: 'When someone posts in your club' },
+  { key: 'activity_saved',   label: 'Workout saved',           desc: 'Confirmation after saving a workout' },
+  { key: 'break_reminder',   label: 'Training reminder',   desc: 'After 3h and 24h away from the app' },
 ];
 
 async function _showFollowList(parent: HTMLElement, title: string, userIds: string[], myUserId: string): Promise<void> {

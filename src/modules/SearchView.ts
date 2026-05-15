@@ -1047,7 +1047,7 @@ export class SearchView {
                   <span class="feed-card__author" data-feed-profile="${d.userId}">${d.authorName ?? ''}</span>
                   <span class="feed-card__date">${dateStr}</span>
                 </div>
-                ${canDelete ? `<button data-delete-post="${postId}" class="feed-card__delete">🗑</button>` : ''}
+                <button class="feed-card__more" data-more-post="${postId}" data-can-delete="${canDelete}" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:1.6rem;cursor:pointer;padding:4px;line-height:1">⋯</button>
               </div>
               ${d.photoUrl && d.mediaType !== 'video' ? `<img class="feed-card__photo" src="${d.photoUrl}" onerror="this.style.display='none'" loading="lazy"/>` : ''}
               <div class="feed-card__body">
@@ -1109,6 +1109,40 @@ export class SearchView {
                   (mod.openCommentPanel as (c:HTMLElement,id:string,t:string)=>void)(card, itemId, btn.dataset.itemType ?? 'post');
                 }
               });
+            });
+          });
+
+          // 3-dot more menu
+          feedEl.querySelectorAll<HTMLElement>('[data-more-post]').forEach(btn => {
+            btn.addEventListener('click', e => {
+              e.stopPropagation();
+              document.querySelectorAll('.sv2-more-menu').forEach(m => m.remove());
+              const pid       = btn.dataset.morePost!;
+              const canDel    = btn.dataset.canDelete === 'true';
+              const menu      = document.createElement('div');
+              menu.className  = 'sv2-more-menu';
+              menu.style.cssText = 'position:absolute;right:8px;background:#252830;border:1px solid rgba(255,255,255,0.1);border-radius:12px;z-index:9999;min-width:140px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.5)';
+              if (canDel) {
+                const del = document.createElement('button');
+                del.textContent = '🗑 Delete';
+                del.style.cssText = 'width:100%;padding:12px 16px;background:none;border:none;color:#f87171;font-size:1.3rem;cursor:pointer;text-align:left;font-family:inherit';
+                del.addEventListener('click', async () => {
+                  menu.remove();
+                  const delUrl = `${BACKEND_URL}/posts/${encodeURIComponent(pid)}?userId=${encodeURIComponent(myUserId)}`;
+                  const delRes = await fetch(delUrl, { method: 'DELETE' }).catch(() => null);
+                  if (delRes && !delRes.ok && club.isOwner) {
+                    await fetch(`${delUrl}&ownerId=${encodeURIComponent(myUserId)}`, { method: 'DELETE' }).catch(() => {});
+                  }
+                  loadFeed();
+                });
+                menu.appendChild(del);
+              }
+              // Position near button
+              const rect = btn.getBoundingClientRect();
+              menu.style.top  = (rect.bottom + window.scrollY + 4) + 'px';
+              menu.style.right = '16px';
+              document.body.appendChild(menu);
+              setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 10);
             });
           });
 

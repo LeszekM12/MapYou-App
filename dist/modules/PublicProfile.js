@@ -90,7 +90,7 @@ export async function openPublicProfile(targetUserId) {
     try {
         const [profileRes, feedRes] = await Promise.all([
             fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
-            fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(targetUserId)}`, { cache: 'no-store' }),
+            fetch(`${BACKEND_URL}/users/${encodeURIComponent(targetUserId)}/feed`, { cache: 'no-store' }),
         ]);
         const profile = profileRes.ok
             ? (await profileRes.json()).data
@@ -98,9 +98,13 @@ export async function openPublicProfile(targetUserId) {
         const feedData = feedRes.ok
             ? (await feedRes.json()).data ?? []
             : [];
-        const userItems = feedData.filter(f => f.data.userId === targetUserId);
-        const activities = userItems.filter(f => f.kind === 'activity');
-        const posts = userItems.filter(f => f.kind === 'post');
+        // Inject avatar and name into all items
+        feedData.forEach(f => {
+            f.data.authorAvatarUrl = profile.avatarB64 ?? null;
+            f.data.authorName = f.data.authorName ?? profile.name;
+        });
+        const activities = feedData.filter(f => f.kind === 'activity');
+        const posts = feedData.filter(f => f.kind === 'post');
         _renderFull(overlay, sheet, profile, activities, posts, myUserId);
     }
     catch {
@@ -530,12 +534,13 @@ function _attachLikeComment(card, itemId, itemType) {
     });
 }
 function _renderPostsTab(el, posts) {
-    const visible = posts.filter(p => p.data.type !== 'club_event');
+    const visible = posts.filter(p => p.data.type !== 'club_event' && !p.data.clubOnly);
     if (!visible.length) {
         el.innerHTML = '<div class="pv-empty"><div class="pv-empty__icon">📝</div><p>No posts yet</p></div>';
         return;
     }
     el.innerHTML = '';
+    el.style.padding = '12px 16px 32px';
     visible.forEach(p => {
         const d = p.data;
         const card = document.createElement('div');

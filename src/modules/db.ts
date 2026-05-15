@@ -112,6 +112,7 @@ export interface PostRecord {
   mediaType?:  'image' | 'video' | null;
   clubIds?:    string[];
   addToHome?:  boolean;
+  clubOnly?:   boolean;
   authorName: string;
   avatarB64:  string | null;
 }
