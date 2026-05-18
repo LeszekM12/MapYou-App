@@ -16,6 +16,16 @@ import { BACKEND_URL } from '../config.js';
 import { getIPLocation, hasGPSPermission, getGPSLocation } from './LocationService.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const LS_USER_ID = 'mapty_userId';
+// ── Push settings check ───────────────────────────────────────────────────────
+function _isPushEnabled(key) {
+    try {
+        const s = JSON.parse(localStorage.getItem('mapyou_push_settings') ?? '{}');
+        return s[key] !== false; // default true if not set
+    }
+    catch {
+        return true;
+    }
+}
 const LS_DEVICE_ID = 'mapty_deviceId';
 // ── UUID generator (crypto API — dostępna w każdej nowoczesnej przeglądarce) ──
 function generateUUID() {
@@ -211,6 +221,8 @@ export async function sendWorkoutDeletedPush() {
     await sendPushToSelf('Trening usunięty.', 'Chcesz go przywrócić? Wróć do aplikacji.');
 }
 export async function sendActivityFinishedPush(sport, distanceKm, durationSec) {
+    if (!_isPushEnabled('activity_saved'))
+        return;
     const icons = { running: '🏃', walking: '🚶', cycling: '🚴' };
     const emoji = icons[sport] ?? '🏅';
     const h = Math.floor(durationSec / 3600);
@@ -219,6 +231,8 @@ export async function sendActivityFinishedPush(sport, distanceKm, durationSec) {
     await sendPushToSelf(`${emoji} Aktywność zakończona!`, `${distanceKm.toFixed(2)} km · ${timeStr} — nieźle! Zapisano w historii.`);
 }
 export async function sendWelcomeBackPush() {
+    if (!_isPushEnabled('break_reminder'))
+        return;
     const KEY = 'mapty_last_welcome_push';
     const now = Date.now();
     const last = Number(localStorage.getItem(KEY) ?? 0);
@@ -229,6 +243,8 @@ export async function sendWelcomeBackPush() {
     await sendPushToSelf('Witaj ponownie! 👋', 'Gotowy na kolejny trening?');
 }
 export async function sendLongBreakPush() {
+    if (!_isPushEnabled('break_reminder'))
+        return false;
     const KEY = 'mapty_last_open';
     const KEY_SENT = 'mapty_last_break_push';
     const now = Date.now();

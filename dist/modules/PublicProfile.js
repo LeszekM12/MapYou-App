@@ -223,18 +223,57 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
     const followBtn = sheet.querySelector('#ppFollowBtn');
     let isFollowing = profile.isFollowing && !profile.isPending;
     let isPending = profile.isPending ?? false;
+    const updateFollowBtn = () => {
+        if (isFollowing) {
+            followBtn.textContent = '✓ Following';
+            followBtn.className = 'pv-header__btn';
+        }
+        else if (isPending) {
+            followBtn.textContent = '⏳ Pending';
+            followBtn.className = 'pv-header__btn pv-header__btn--pending';
+        }
+        else {
+            followBtn.textContent = profile.isPrivate ? 'Request' : 'Follow';
+            followBtn.className = 'pv-header__btn pv-header__btn--follow';
+        }
+    };
+    updateFollowBtn();
     followBtn.addEventListener('click', async () => {
         followBtn.disabled = true;
         try {
-            const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(profile.userId)}`, { method: isFollowing ? 'DELETE' : 'POST' });
-            if (res.ok) {
-                isFollowing = !isFollowing;
-                followBtn.textContent = isFollowing ? '✓ Following' : 'Follow';
-                followBtn.classList.toggle('pv-header__btn--follow', !isFollowing);
-                const el = sheet.querySelector('#ppFollowersCount');
-                if (el)
-                    el.textContent = String(Math.max(0, parseInt(el.textContent ?? '0', 10) + (isFollowing ? 1 : -1)));
+            if (isFollowing) {
+                // Unfollow
+                const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(profile.userId)}`, { method: 'DELETE' });
+                if (res.ok) {
+                    isFollowing = false;
+                    isPending = false;
+                }
             }
+            else if (isPending) {
+                // Cancel request
+                const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow-cancel/${encodeURIComponent(profile.userId)}`, { method: 'POST' });
+                if (res.ok) {
+                    isPending = false;
+                }
+            }
+            else if (profile.isPrivate) {
+                // Send follow request — do NOT follow directly
+                const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow-request/${encodeURIComponent(profile.userId)}`, { method: 'POST' });
+                if (res.ok) {
+                    isPending = true;
+                }
+            }
+            else {
+                // Follow public profile directly
+                const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(profile.userId)}`, { method: 'POST' });
+                if (res.ok) {
+                    isFollowing = true;
+                }
+            }
+            updateFollowBtn();
+            const countEl = sheet.querySelector('#ppFollowersCount');
+            if (countEl && isFollowing)
+                countEl.textContent = String(parseInt(countEl.textContent ?? '0', 10) + 1);
         }
         catch { }
         followBtn.disabled = false;
