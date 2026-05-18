@@ -298,7 +298,10 @@ export class SearchView {
                 ${u.followersCount ? `<span class="sv2-item__desc">${u.followersCount} followers</span>` : ''}
               </div>
               <button class="sv2-badge ${isFollowing ? 'sv2-badge--gray' : 'sv2-badge--green'}"
-                data-follow="${u.userId}">${isFollowing ? 'Following' : 'Follow'}</button>
+                data-follow="${u.userId}"
+                data-is-private="${u.isPrivate ?? false}"
+                data-pending="false"
+              >${isFollowing ? 'Following' : (u.isPrivate ? 'Request' : 'Follow')}</button>
             </div>`;
             }).join('')}
         </div>`;
@@ -308,13 +311,34 @@ export class SearchView {
                     e.stopPropagation();
                     const targetId = btn.dataset.follow;
                     const isNow = this._followingSet.has(targetId);
+                    const isPending = btn.dataset.pending === 'true';
+                    const isPrivate = btn.dataset.isPrivate === 'true';
                     if (isNow) {
+                        // Unfollow
                         await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(targetId)}`, { method: 'DELETE' });
                         this._followingSet.delete(targetId);
-                        btn.textContent = 'Follow';
+                        btn.textContent = isPrivate ? 'Request' : 'Follow';
                         btn.className = 'sv2-badge sv2-badge--green';
+                        btn.dataset.pending = 'false';
+                    }
+                    else if (isPending) {
+                        // Cancel request
+                        await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow-cancel/${encodeURIComponent(targetId)}`, { method: 'POST' });
+                        btn.textContent = 'Request';
+                        btn.className = 'sv2-badge sv2-badge--green';
+                        btn.dataset.pending = 'false';
+                    }
+                    else if (isPrivate) {
+                        // Send follow request
+                        const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow-request/${encodeURIComponent(targetId)}`, { method: 'POST' });
+                        if (res.ok) {
+                            btn.textContent = '⏳ Pending';
+                            btn.className = 'sv2-badge sv2-badge--gray';
+                            btn.dataset.pending = 'true';
+                        }
                     }
                     else {
+                        // Follow public
                         await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/follow/${encodeURIComponent(targetId)}`, { method: 'POST' });
                         this._followingSet.add(targetId);
                         btn.textContent = 'Following';

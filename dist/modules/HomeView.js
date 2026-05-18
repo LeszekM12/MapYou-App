@@ -691,7 +691,7 @@ function _openNotifPanel() {
             const data = await res.json();
             if (data.status === 'ok') {
                 // Merge backend notifs with local notifs
-                const backendNotifs = data.data.map(n => ({ id: n.notifId, title: n.title, body: n.body, icon: n.icon, read: n.read, timestamp: n.timestamp }));
+                const backendNotifs = data.data.map(n => ({ id: n.notifId, title: n.title, body: n.body, icon: n.icon, read: n.read, timestamp: n.timestamp, type: n.type, meta: n.meta }));
                 const localNotifs = getNotifications();
                 // Merge — backend takes priority, add local ones not in backend
                 const backendIds = new Set(backendNotifs.map(n => n.id));

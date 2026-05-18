@@ -751,10 +751,10 @@ function _openNotifPanel(): void {
   const loadNotifs = async () => {
     try {
       const res  = await fetch(`${BACKEND_URL}/notifications?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-      const data = await res.json() as { status: string; data: Array<{notifId:string;title:string;body:string;icon:string;read:boolean;timestamp:number}> };
+      const data = await res.json() as { status: string; data: Array<{notifId:string;title:string;body:string;icon:string;read:boolean;timestamp:number;type?:string;meta?:string}> };
       if (data.status === 'ok') {
         // Merge backend notifs with local notifs
-        const backendNotifs = data.data.map(n => ({ id: n.notifId, title: n.title, body: n.body, icon: n.icon, read: n.read, timestamp: n.timestamp }));
+        const backendNotifs = data.data.map(n => ({ id: n.notifId, title: n.title, body: n.body, icon: n.icon, read: n.read, timestamp: n.timestamp, type: n.type, meta: n.meta }));
         const localNotifs   = getNotifications();
         // Merge — backend takes priority, add local ones not in backend
         const backendIds    = new Set(backendNotifs.map(n => n.id));
