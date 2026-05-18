@@ -547,8 +547,8 @@ export async function pushNow(
       } catch {}
     }
 
-    // Push brakujących posts
-    const missingPosts = posts.filter(p => !atlasPostIds.has(p.id));
+    // Push brakujących posts (tylko home feed — nie club-only)
+    const missingPosts = posts.filter(p => !atlasPostIds.has(p.id) && !p.clubOnly && p.addToHome !== false);
     for (const post of missingPosts) {
       try {
         const uploaded = await uploadIfBase64(post.photoUrl, userId, 'posts', `posts/${userId}/${post.id}`);

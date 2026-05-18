@@ -85,16 +85,24 @@ export async function syncJoinedClubsFromBackend(): Promise<void> {
     const mine = data.data.filter(c => c.members.includes(myUserId) || c.ownerId === myUserId);
     if (!mine.length) return;
     const existing = loadClubs();
-    const existingIds = new Set(existing.map(c => c.id));
+    const existingMap = new Map(existing.map(c => [c.id, c]));
     let changed = false;
     for (const cd of mine) {
-      if (!existingIds.has(cd.clubId)) {
+      const isOwner = cd.ownerId === myUserId;
+      const joined  = cd.members.includes(myUserId) || isOwner;
+      if (existingMap.has(cd.clubId)) {
+        // Update existing — ensure joined/isOwner are correct
+        const ex = existingMap.get(cd.clubId)!;
+        if (ex.joined !== joined || ex.isOwner !== isOwner) {
+          ex.joined = joined; ex.isOwner = isOwner;
+          changed = true;
+        }
+      } else {
         existing.push({
           id: cd.clubId, name: cd.name, sport: cd.sport, description: cd.description,
           location: [cd.city, cd.region ?? ''].filter(Boolean).join(', '),
-          memberCount: cd.members.length, isOwner: cd.ownerId === myUserId,
-          joined: true, createdAt: Date.now(), feed: [],
-          logoB64: cd.avatarB64 ?? undefined,
+          memberCount: cd.members.length, isOwner, joined: true,
+          createdAt: Date.now(), feed: [], logoB64: cd.avatarB64 ?? undefined,
         });
         changed = true;
       }
@@ -1133,6 +1141,8 @@ export class SearchView {
                   if (delRes && !delRes.ok && club.isOwner) {
                     await fetch(`${delUrl}&ownerId=${encodeURIComponent(myUserId)}`, { method: 'DELETE' }).catch(() => {});
                   }
+                  // Also remove from IndexedDB to prevent sync re-uploading
+                  import('./cloudSync.js').then(cs => cs.CS.deletePost(pid)).catch(() => {});
                   loadFeed();
                 });
                 menu.appendChild(del);
