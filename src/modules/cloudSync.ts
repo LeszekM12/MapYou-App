@@ -730,7 +730,7 @@ export async function uploadReel(
 ): Promise<ReelRecord | null> {
   if (!file || !userId) return null;
   try {
-    const up = await uploadMediaFile(file as File, userId, 'activities');
+    const up = await uploadMediaFile(file as File, userId, 'posts'); // reels use posts folder
     if (!up) return null;
 
     const reelId    = `reel_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;

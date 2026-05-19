@@ -189,26 +189,13 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId, hasRe
     sheet.innerHTML = '';
     while (tmp.firstChild)
         sheet.appendChild(tmp.firstChild);
-    // Inject private overlay or tabs
+    // Build private section or tabs
     const privSection = sheet.querySelector('#ppPrivateSection');
     if (profile.isPrivate && !profile.isFollowing) {
-        privSection.innerHTML = `
-      <div class="pv-private-box">
-        <div class="pv-private-box__icon">🔒</div>
-        <div class="pv-private-box__title">Ten profil jest prywatny</div>
-        <div class="pv-private-box__desc">Zaobserwuj, żeby zobaczyć aktywności i posty.</div>
-      </div>`;
+        privSection.innerHTML = '<div class="pv-private-box"><div class="pv-private-box__icon">🔒</div><div class="pv-private-box__title">This profile is private</div><div class="pv-private-box__desc">Follow to see activities and posts.</div></div>';
     }
     else {
-        privSection.innerHTML = `
-      <div class="pv-subtabs">
-        <button class="pv-subtab pv-subtab--active" data-pp="activities">Activities</button>
-        <button class="pv-subtab" data-pp="stats">Stats</button>
-        <button class="pv-subtab" data-pp="efforts">Best Efforts</button>
-        <button class="pv-subtab" data-pp="trophies">Trophies</button>
-        <button class="pv-subtab" data-pp="posts">Posts</button>
-      </div>
-      <div class="pv-content" id="ppContent"></div>`;
+        privSection.innerHTML = '<div class="pv-subtabs" id="ppSubtabs"><button class="pv-subtab pv-subtab--active" data-pp="activities">Activities</button><button class="pv-subtab" data-pp="stats">Stats</button><button class="pv-subtab" data-pp="efforts">Best Efforts</button><button class="pv-subtab" data-pp="trophies">Trophies</button><button class="pv-subtab" data-pp="posts">Posts</button></div><div class="pv-content" id="ppContent"></div>';
     }
     sheet.querySelector('#ppBack')?.addEventListener('click', closePublicProfile);
     _bindSwipe(sheet);

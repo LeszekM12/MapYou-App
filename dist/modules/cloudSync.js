@@ -631,7 +631,7 @@ export async function uploadReel(file, userId, meta = {}) {
     if (!file || !userId)
         return null;
     try {
-        const up = await uploadMediaFile(file, userId, 'activities');
+        const up = await uploadMediaFile(file, userId, 'posts'); // reels use posts folder
         if (!up)
             return null;
         const reelId = `reel_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
