@@ -689,13 +689,13 @@ function _renderNotifList(notifs: Array<{id:string;title:string;body:string;icon
   list.innerHTML = notifs.map(n => {
     // Parse meta for follow_request/follow: userId|userName|avatarB64
     let requesterId = '', requesterName = '', avatarB64 = '';
-    if ((n.type === 'follow_request' || n.type === 'follow') && n.meta) {
+    if ((n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted') && n.meta) {
       const parts = n.meta.split('|');
       requesterId   = parts[0] ?? '';
       requesterName = parts[1] ?? '';
       avatarB64     = parts[2] ?? '';
     }
-    const avatarHtml = (n.type === 'follow_request' || n.type === 'follow')
+    const avatarHtml = (n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted')
       ? (avatarB64
           ? `<img src="${avatarB64}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0"/>`
           : `<div style="width:44px;height:44px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${requesterName[0] ?? '?'}</div>`)
@@ -703,11 +703,11 @@ function _renderNotifList(notifs: Array<{id:string;title:string;body:string;icon
 
     return `<div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
       <div style="display:flex;align-items:flex-start;gap:12px;width:100%">
-        ${(n.type === 'follow_request' || n.type === 'follow') && requesterId
+        ${(n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted') && requesterId
           ? `<div data-open-profile="${requesterId}" style="cursor:pointer;flex-shrink:0">${avatarHtml}</div>`
           : avatarHtml}
         <div class="hn-item__body" style="flex:1">
-          <div class="hn-item__title">${(n.type === 'follow_request' || n.type === 'follow') && requesterName ? requesterName : n.title}</div>
+          <div class="hn-item__title">${(n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted') && requesterName ? requesterName : n.title}</div>
           <div class="hn-item__body-text">${n.body}</div>
           <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
           ${n.type === 'follow_request' && requesterId ? `
