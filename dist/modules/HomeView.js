@@ -625,24 +625,52 @@ function _relTimeNotif(ts) {
     return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 function _renderNotifList(notifs, list, userId) {
-    list.innerHTML = notifs.length === 0
-        ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
-        : notifs.map(n => `
-        <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
-          <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
-          <div class="hn-item__body">
-            <div class="hn-item__title">${n.title}</div>
-            <div class="hn-item__body-text">${n.body}</div>
-            <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
-            ${n.type === 'follow_request' && n.meta ? `
-              <div style="display:flex;gap:8px;margin-top:8px">
-                <button class="hn-approve-btn" data-requester="${n.meta}" data-notif="${n.id}"
-                  style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Accept</button>
-                <button class="hn-reject-btn" data-requester="${n.meta}" data-notif="${n.id}"
-                  style="background:rgba(248,113,113,0.12);border:1.5px solid #f87171;color:#f87171;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Decline</button>
-              </div>` : ''}
-          </div>
-        </div>`).join('');
+    if (notifs.length === 0) {
+        list.innerHTML = '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
+        return;
+    }
+    list.innerHTML = notifs.map(n => {
+        // Parse meta for follow_request: requesterId|requesterName|avatarB64
+        let requesterId = '', requesterName = '', avatarB64 = '';
+        if (n.type === 'follow_request' && n.meta) {
+            const parts = n.meta.split('|');
+            requesterId = parts[0] ?? '';
+            requesterName = parts[1] ?? '';
+            avatarB64 = parts[2] ?? '';
+        }
+        const avatarHtml = n.type === 'follow_request'
+            ? (avatarB64
+                ? `<img src="${avatarB64}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0"/>`
+                : `<div style="width:44px;height:44px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${requesterName[0] ?? '?'}</div>`)
+            : `<div class="hn-item__icon">${n.icon ?? '🔔'}</div>`;
+        return `<div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
+      <div style="display:flex;align-items:flex-start;gap:12px;width:100%">
+        ${n.type === 'follow_request'
+            ? `<div data-open-profile="${requesterId}" style="cursor:pointer;flex-shrink:0">${avatarHtml}</div>`
+            : avatarHtml}
+        <div class="hn-item__body" style="flex:1">
+          <div class="hn-item__title">${n.type === 'follow_request' && requesterName ? requesterName : n.title}</div>
+          <div class="hn-item__body-text">${n.body}</div>
+          <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
+          ${n.type === 'follow_request' && requesterId ? `
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="hn-approve-btn" data-requester="${requesterId}" data-notif="${n.id}"
+                style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Accept</button>
+              <button class="hn-reject-btn" data-requester="${requesterId}" data-notif="${n.id}"
+                style="background:rgba(248,113,113,0.12);border:1.5px solid #f87171;color:#f87171;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Decline</button>
+            </div>` : ''}
+        </div>
+      </div>
+    </div>`;
+    }).join('');
+    // Open profile from notification
+    list.querySelectorAll('[data-open-profile]').forEach(el => {
+        el.addEventListener('click', () => {
+            const uid = el.dataset.openProfile;
+            if (uid)
+                import('./PublicProfile.js').then(m => m.openPublicProfile(uid));
+        });
+    });
     // Approve/Reject handlers
     list.querySelectorAll('.hn-approve-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
