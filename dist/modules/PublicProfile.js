@@ -88,9 +88,10 @@ export async function openPublicProfile(targetUserId) {
     const sheet = overlay.querySelector('.pv-sheet');
     _bindSwipe(sheet);
     try {
-        const [profileRes, feedRes] = await Promise.all([
+        const [profileRes, feedRes, reelRes] = await Promise.all([
             fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
             fetch(`${BACKEND_URL}/users/${encodeURIComponent(targetUserId)}/feed`, { cache: 'no-store' }),
+            fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
         ]);
         const profile = profileRes.ok
             ? (await profileRes.json()).data
@@ -98,6 +99,12 @@ export async function openPublicProfile(targetUserId) {
         const feedData = feedRes.ok
             ? (await feedRes.json()).data ?? []
             : [];
+        const reelGroups = reelRes?.ok
+            ? ((await reelRes.json()).data ?? [])
+            : [];
+        const targetReelGroup = reelGroups.find(g => g.userId === targetUserId);
+        const hasReels = !!targetReelGroup && targetReelGroup.reels.length > 0;
+        const hasUnseen = hasReels && targetReelGroup.hasUnseen;
         // Inject avatar and name into all items
         feedData.forEach(f => {
             f.data.authorAvatarUrl = profile.avatarB64 ?? null;
@@ -105,7 +112,7 @@ export async function openPublicProfile(targetUserId) {
         });
         const activities = feedData.filter(f => f.kind === 'activity');
         const posts = feedData.filter(f => f.kind === 'post');
-        _renderFull(overlay, sheet, profile, activities, posts, myUserId);
+        _renderFull(overlay, sheet, profile, activities, posts, myUserId, hasReels, hasUnseen, targetReelGroup);
     }
     catch {
         closePublicProfile();
@@ -132,11 +139,14 @@ function _bindSwipe(sheet) {
             sheet.style.transform = '';
     });
 }
-function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
+function _renderFull(overlay, sheet, profile, activities, posts, myUserId, hasReels = false, hasUnseen = false, targetReelGroup = null) {
     const totalKm = activities.reduce((s, a) => s + (+(a.data.distanceKm ?? 0)), 0);
     const avatarHtml = profile.avatarB64
         ? `<img src="${profile.avatarB64}" class="pv-avatar__img" alt="avatar"/>`
         : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="44" height="44"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
+    const reelRingClass = hasReels
+        ? (hasUnseen ? 'pv-avatar--reel-active' : 'pv-avatar--reel-seen')
+        : '';
     const tmp = document.createElement('div');
     tmp.innerHTML = `
     <div class="pv-handle"></div>
@@ -149,7 +159,7 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
       </div>
     </div>
     <div class="pv-hero">
-      <div class="pv-avatar">${avatarHtml}</div>
+      <div class="pv-avatar ${reelRingClass}" id="ppAvatarReel" style="${hasReels ? 'cursor:pointer' : ''}">${avatarHtml}</div>
       <div class="pv-hero__info">
         <h2 class="pv-name">${profile.name}</h2>
         ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
@@ -202,6 +212,24 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId) {
     }
     sheet.querySelector('#ppBack')?.addEventListener('click', closePublicProfile);
     _bindSwipe(sheet);
+    // Reel avatar click
+    if (hasReels && targetReelGroup) {
+        sheet.querySelector('#ppAvatarReel')?.addEventListener('click', () => {
+            import('./HomeView.js').then(m => {
+                const mod = m;
+                if (typeof mod.openReelViewer === 'function') {
+                    mod.openReelViewer(targetReelGroup, () => {
+                        // After viewing — update ring to seen
+                        const avatarEl = sheet.querySelector('#ppAvatarReel');
+                        if (avatarEl) {
+                            avatarEl.classList.remove('pv-avatar--reel-active');
+                            avatarEl.classList.add('pv-avatar--reel-seen');
+                        }
+                    });
+                }
+            });
+        });
+    }
     // Render photo strip — only when profile is public or user is following
     if (!profile.isPrivate || profile.isFollowing) {
         _renderPhotoStrip(sheet, activities, posts, overlay);

@@ -27,7 +27,7 @@
   flex-direction: column;
   transform: translateY(100%);
   transition: transform 0.38s cubic-bezier(0.32,0.72,0,1);
-  overflow: hidden;
+  overflow: clip; /* allows child scroll without blocking touch */
 }
 .pv-sheet--open { transform: translateY(0); }
 
@@ -71,14 +71,12 @@
 .pv-header__btn:hover { background: rgba(255,255,255,0.13); }
 
 /* Scrollable content */
-.pv-sheet > *:not(.pv-handle):not(.pv-header):not(.pv-subtabs) {
-  flex-shrink: 0;
-}
 .pv-content {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 0 0 32px;
+  min-height: 0; /* critical for flex scroll */
 }
 
 /* Hero */

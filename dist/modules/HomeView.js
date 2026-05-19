@@ -675,14 +675,20 @@ function _renderNotifList(notifs, list, userId) {
     list.querySelectorAll('.hn-approve-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const requesterId = btn.dataset.requester;
+            const notifId = btn.dataset.notif;
             await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}/follow-approve/${encodeURIComponent(requesterId)}`, { method: 'POST' });
-            btn.closest('.hn-item').innerHTML = '<div class="hn-item__icon">✅</div><div class="hn-item__body"><div class="hn-item__title">Accepted</div></div>';
+            // Delete from backend so it doesn't come back
+            await fetch(`${BACKEND_URL}/notifications/${encodeURIComponent(notifId)}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => { });
+            btn.closest('.hn-item').innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:4px 0"><div style="font-size:1.8rem">✅</div><div style="color:#fff;font-size:1.3rem;font-weight:600">Accepted</div></div>';
         });
     });
     list.querySelectorAll('.hn-reject-btn').forEach(btn => {
         btn.addEventListener('click', async () => {
             const requesterId = btn.dataset.requester;
+            const notifId = btn.dataset.notif;
             await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}/follow-reject/${encodeURIComponent(requesterId)}`, { method: 'POST' });
+            // Delete from backend so it doesn't come back
+            await fetch(`${BACKEND_URL}/notifications/${encodeURIComponent(notifId)}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => { });
             btn.closest('.hn-item')?.remove();
         });
     });
@@ -2008,4 +2014,60 @@ export class HomeView {
     }
 }
 export const homeView = new HomeView();
+// ── Exported reel viewer for profile views ────────────────────────────────────
+export function openReelViewer(group, onAllViewed) {
+    const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
+    let reelIdx = 0;
+    const overlay = document.createElement('div');
+    overlay.className = 'home-reel-viewer';
+    document.body.appendChild(overlay);
+    requestAnimationFrame(() => overlay.classList.add('home-reel-viewer--visible'));
+    const render = () => {
+        const reel = group.reels[reelIdx];
+        const reelId = reel.reelId;
+        const url = reel.mediaUrl;
+        const isVideo = reel.mediaType === 'video';
+        const views = reel.views ?? [];
+        overlay.innerHTML = `
+      <div class="home-reel-viewer__bg">
+        ${isVideo
+            ? `<video class="home-reel-viewer__media" src="${url}" autoplay muted playsinline></video>`
+            : `<img class="home-reel-viewer__media" src="${url}" alt="reel" draggable="false"/>`}
+        <div class="home-reel-viewer__top">
+          <div class="home-reel-viewer__bars">
+            ${group.reels.map((_, i) => `<div class="home-reel-viewer__bar ${i < reelIdx ? 'done' : i === reelIdx ? 'active' : ''}" id="reelBar${i}"></div>`).join('')}
+          </div>
+          <div class="home-reel-viewer__author">
+            <div class="home-reel-avatar ${views.includes(myUserId) ? 'home-reel-avatar--seen' : 'home-reel-avatar--active'} home-reel-avatar--sm">
+              ${group.avatarB64 ? `<img src="${group.avatarB64}" class="home-reel-avatar__img"/>` : ''}
+            </div>
+            <span class="home-reel-viewer__name">${group.authorName ?? ''}</span>
+          </div>
+          <button class="home-reel-viewer__close" id="reelClose">✕</button>
+        </div>
+      </div>`;
+        // Mark as viewed
+        if (!views.includes(myUserId)) {
+            void fetch(`${BACKEND_URL}/reels/${encodeURIComponent(reelId)}/view`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: myUserId }),
+            });
+        }
+        overlay.querySelector('#reelClose')?.addEventListener('click', () => {
+            overlay.classList.remove('home-reel-viewer--visible');
+            setTimeout(() => { overlay.remove(); onAllViewed?.(); }, 300);
+        });
+        overlay.querySelector('.home-reel-viewer__media')?.addEventListener('click', () => {
+            if (reelIdx < group.reels.length - 1) {
+                reelIdx++;
+                render();
+            }
+            else {
+                overlay.classList.remove('home-reel-viewer--visible');
+                setTimeout(() => { overlay.remove(); onAllViewed?.(); }, 300);
+            }
+        });
+    };
+    render();
+}
 //# sourceMappingURL=HomeView.js.map

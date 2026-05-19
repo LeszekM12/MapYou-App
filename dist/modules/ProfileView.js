@@ -264,14 +264,20 @@ export class ProfileView {
     async open() {
         document.getElementById('profileViewOverlay')?.remove();
         _pieChart = null;
-        const [workouts, posts] = await Promise.all([
+        const myUserId = getUserId();
+        const [workouts, posts, reelRes] = await Promise.all([
             loadUnifiedWorkouts(),
             loadPosts(),
+            fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }).catch(() => null),
         ]);
         this._workouts = workouts;
         this._posts = posts;
+        const reelData = (reelRes?.ok ? ((await reelRes.json()).data ?? []) : []);
+        const myReel = reelData.find(g => g.userId === myUserId);
+        const hasReels = !!myReel && myReel.reels.length > 0;
+        const hasUnseen = hasReels && myReel.hasUnseen;
         const profile = loadProfileFromLocal();
-        const el = this._buildShell(profile);
+        const el = this._buildShell(profile, hasReels, hasUnseen);
         document.body.appendChild(el);
         this._renderPhotoStrip(el);
         requestAnimationFrame(() => {
@@ -319,7 +325,7 @@ export class ProfileView {
         }
         setTimeout(() => el.remove(), 360);
     }
-    _buildShell(profile) {
+    _buildShell(profile, hasReels = false, hasUnseen = false) {
         const wrapper = document.createElement('div');
         const totalKm = this._workouts.reduce((s, w) => s + w.distanceKm, 0);
         const weeklyWins = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);
@@ -344,7 +350,7 @@ export class ProfileView {
 
         <!-- Hero -->
         <div class="pv-hero">
-          <div class="pv-avatar">${avatarHtml}</div>
+          <div class="pv-avatar ${hasReels ? (hasUnseen ? 'pv-avatar--reel-active' : 'pv-avatar--reel-seen') : ''}" id="pvAvatarReel" style="${hasReels ? 'cursor:pointer' : ''}">${avatarHtml}</div>
           <div class="pv-hero__info">
             <h2 class="pv-name">${profile.name}</h2>
             ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
@@ -394,6 +400,28 @@ export class ProfileView {
         el.querySelector('#pvBack')?.addEventListener('click', () => this.close());
         el.addEventListener('click', e => { if (e.target === el)
             this.close(); });
+        // Reel avatar click
+        el.querySelector('#pvAvatarReel')?.addEventListener('click', () => {
+            const avatarEl = el.querySelector('#pvAvatarReel');
+            if (!avatarEl?.classList.contains('pv-avatar--reel-active') && !avatarEl?.classList.contains('pv-avatar--reel-seen'))
+                return;
+            const myUid = getUserId();
+            void (async () => {
+                const { openReelViewer } = await import('./HomeView.js');
+                if (!openReelViewer)
+                    return;
+                const res = await fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(myUid)}`, { cache: 'no-store' });
+                const d = await res.json();
+                const group = d.data?.find(g => g.userId === myUid);
+                if (group)
+                    openReelViewer(group, () => {
+                        if (avatarEl) {
+                            avatarEl.classList.remove('pv-avatar--reel-active');
+                            avatarEl.classList.add('pv-avatar--reel-seen');
+                        }
+                    });
+            })();
+        });
         // Settings
         el.querySelector('#pvSettingsBtn')?.addEventListener('click', () => {
             const settingsUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
