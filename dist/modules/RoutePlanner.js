@@ -1,7 +1,7 @@
 // ─── ROUTE PLANNER ───────────────────────────────────────────────────────────
 /// <reference types="leaflet" />
 import L from 'leaflet';
-import { MAPBOX_TOKEN } from '../config.js';
+import { BACKEND_URL } from '../config.js';
 import { ActivityMode } from '../types/index.js';
 import { qidSafe, show, hide } from '../utils/dom.js';
 const ACTIVITY_SPEEDS = {
@@ -71,7 +71,6 @@ export class RoutePlanner {
             writable: true,
             value: void 0
         });
-        // Last computed route coords (saved to workout)
         Object.defineProperty(this, "lastRouteCoords", {
             enumerable: true,
             configurable: true,
@@ -90,7 +89,6 @@ export class RoutePlanner {
     get isActive() { return this.active; }
     get currentStep() { return this.step; }
     get activityMode() { return this.mode; }
-    /** Start route planning mode */
     start() {
         this.active = true;
         this.step = 1;
@@ -107,7 +105,6 @@ export class RoutePlanner {
             stepB.textContent = 'Click the end point on the map';
         this.map.getContainer().style.cursor = 'crosshair';
     }
-    /** Cancel and clean up */
     cancel() {
         this.active = false;
         this.step = 0;
@@ -133,7 +130,6 @@ export class RoutePlanner {
         hide(qidSafe('routeLoading'));
         this.map.getContainer().style.cursor = '';
     }
-    /** Handle a map click during route planning */
     handleClick(latlng) {
         if (!this.active)
             return;
@@ -167,7 +163,6 @@ export class RoutePlanner {
             void this.draw();
         }
     }
-    /** Set preselected point A (e.g. from POI search) */
     setPointA(coords) {
         if (!this.active)
             this.start();
@@ -183,11 +178,9 @@ export class RoutePlanner {
             t.textContent = 'Start point set ✓';
         this.map.setView(coords, 15);
     }
-    /** Change activity mode (running/cycling/walking) */
     setMode(mode) {
         this.mode = mode;
     }
-    // ── Private: draw route via Mapbox Directions API ────────────────────────
     async draw() {
         if (!this.pointA || !this.pointB)
             return;
@@ -199,9 +192,10 @@ export class RoutePlanner {
         }
         const [aLat, aLng] = this.pointA;
         const [bLat, bLng] = this.pointB;
-        const profileMapbox = this.mode === ActivityMode.Cycling ? 'cycling' :
+        const profile = this.mode === ActivityMode.Cycling ? 'cycling' :
             this.mode === ActivityMode.Walking ? 'walking' : 'walking';
-        const url = `https://api.mapbox.com/directions/v5/mapbox/${profileMapbox}/${aLng},${aLat};${bLng},${bLat}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+        // Use backend proxy — token never exposed to frontend
+        const url = `${BACKEND_URL}/directions/${profile}/${aLng},${aLat};${bLng},${bLat}`;
         try {
             const res = await fetch(url);
             const data = await res.json();
@@ -220,7 +214,6 @@ export class RoutePlanner {
                 rTime.textContent = String(mins);
             hide(qidSafe('routeLoading'));
             show(qidSafe('routeResult'));
-            // Rysuj trasę jako L.polyline — bez LRM, bez OSRM
             const latLngs = this.lastRouteCoords.map(coord => L.latLng(coord[0], coord[1]));
             this.routeLine = L.polyline(latLngs, {
                 color: '#00c46a',
@@ -241,7 +234,6 @@ export class RoutePlanner {
             show(qidSafe('routeResult'));
         }
     }
-    /** Initialise route mode buttons */
     initControls(onStart, onCancel) {
         qidSafe('btnRoute')?.addEventListener('click', () => {
             this.start();

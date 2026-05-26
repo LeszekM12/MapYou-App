@@ -6,7 +6,7 @@
 
 
 
-import { MAPBOX_TOKEN } from './config.js';
+import { BACKEND_URL } from './config.js';
 import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
 import type { Coords } from './types/index.js';
@@ -40,7 +40,6 @@ import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified, saveUnifiedWorkout } from './modules/UnifiedWorkout.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
-import { syncJoinedClubsFromBackend } from './modules/SearchView.js';
 import { FriendsView }          from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal } from './modules/UserName.js';
 import { initUserProfile } from './modules/UserProfile.js';
@@ -314,7 +313,6 @@ class App {
     });
     // Przy każdym starcie wyślij subskrypcję do backendu (naprawia reset MemoryDB)
     void resubscribeIfNeeded();
-    void syncJoinedClubsFromBackend(); // sync clubs for accepted members
     void initPushNotifications().then(async () => {
       // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
       const longBreakSent = await sendLongBreakPush();
@@ -1211,7 +1209,6 @@ class App {
       document.querySelectorAll('.trk-sport-tab').forEach(b => b.classList.remove('trk-sport-tab--active'));
       btn.classList.add('trk-sport-tab--active');
       this.#tracker?.setSport(btn.dataset.sport as SportType);
-      liveTracker.setSport(btn.dataset.sport as string);
       const color = SPORT_COLORS[btn.dataset.sport as SportType];
       const sb = document.getElementById('trkBtnStart') as HTMLElement | null;
       if (sb) { sb.style.background = color; sb.style.boxShadow = `0 6px 28px ${color}80`; }
@@ -1877,7 +1874,7 @@ class App {
       this.#routeActivityMode === 'cycling' ? 'cycling' :
       this.#routeActivityMode === 'walking' ? 'walking' : 'walking';
 
-    const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${aLng},${aLat};${bLng},${bLat}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+    const url = `${BACKEND_URL}/directions/${profile}/${aLng},${aLat};${bLng},${bLat}`;
 
     fetch(url)
       .then(r => r.json())

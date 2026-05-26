@@ -15,7 +15,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
 var _a, _App_map, _App_tileLayer, _App_mapZoomLevel, _App_mapEvent, _App_workouts, _App_routeMode, _App_routeStep, _App_routePointA, _App_routePointB, _App_routeLine, _App_routeMarkerA, _App_routeMarkerB, _App_routeActivityMode, _App_routeCoords, _App_routeTotalDist, _App_progressLine, _App_progressWatchId, _App_coveredUpToIndex, _App_arrivedShown, _App_nearDestCount, _App_ARRIVAL_CONSEC, _App_ARRIVAL_DIST, _App_voiceEnabled, _App_voiceKmAnnounced, _App_voiceStartTime, _App_voiceDistCovered, _App_trackingActive, _App_watchId, _App_trackingMarker, _App_trackingCoords, _App_prevTrackingCoords, _App_userTouchingMap, _App_recenterTimer, _App_tracker, _App_historyPanel, _App_nightMode, _App_wakeLock, _App_deferredInstallPrompt, _App_markers, _App_clusterGroup, _App_clusterEnabled, _App_poiMarkers, _App_userCoords, _App_autocompleteTimer, _App_filterDrag, _App_activitySpeeds, _App_activeWorkoutId, _App_workoutRouteLayer, _App_customFilters, _App_pinnedCoord, _App_goalKm, _App_goalTime, _App_goalCount, _App_statsExpanded, _App_statsWeekOffset, _App_statsSelectedDay, _App_statsPrevGoalReached;
-import { MAPBOX_TOKEN } from './config.js';
+import { BACKEND_URL } from './config.js';
 import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
 import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryBtn, } from './modules/OfflineDetector.js';
@@ -31,7 +31,6 @@ import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified } from './modules/UnifiedWorkout.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker } from './modules/LiveTracker.js';
-import { syncJoinedClubsFromBackend } from './modules/SearchView.js';
 import { FriendsView } from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal } from './modules/UserName.js';
 import { initUserProfile } from './modules/UserProfile.js';
@@ -253,7 +252,6 @@ class App {
         });
         // Przy każdym starcie wyślij subskrypcję do backendu (naprawia reset MemoryDB)
         void resubscribeIfNeeded();
-        void syncJoinedClubsFromBackend(); // sync clubs for accepted members
         void initPushNotifications().then(async () => {
             // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
             const longBreakSent = await sendLongBreakPush();
@@ -1256,7 +1254,6 @@ class App {
             document.querySelectorAll('.trk-sport-tab').forEach(b => b.classList.remove('trk-sport-tab--active'));
             btn.classList.add('trk-sport-tab--active');
             __classPrivateFieldGet(this, _App_tracker, "f")?.setSport(btn.dataset.sport);
-            liveTracker.setSport(btn.dataset.sport);
             const color = SPORT_COLORS[btn.dataset.sport];
             const sb = document.getElementById('trkBtnStart');
             if (sb) {
@@ -2095,7 +2092,7 @@ class App {
         const [bLat, bLng] = __classPrivateFieldGet(this, _App_routePointB, "f");
         const profile = __classPrivateFieldGet(this, _App_routeActivityMode, "f") === 'cycling' ? 'cycling' :
             __classPrivateFieldGet(this, _App_routeActivityMode, "f") === 'walking' ? 'walking' : 'walking';
-        const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${aLng},${aLat};${bLng},${bLat}?geometries=geojson&overview=full&access_token=${MAPBOX_TOKEN}`;
+        const url = `${BACKEND_URL}/directions/${profile}/${aLng},${aLat};${bLng},${bLat}`;
         fetch(url)
             .then(r => r.json())
             .then((data) => {
