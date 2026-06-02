@@ -24,7 +24,7 @@ interface FeedItem {
   data: Record<string, unknown>;
 }
 
-import { getIcon as _getIcon, getColor as _getColor } from './Tracker.js';
+import { getIcon as _getIcon, getColor as _getColor, getSportLabel as _getSportLabel } from './Tracker.js';
 
 function _relDate(ts: number | string): string {
   return new Date(typeof ts === 'number' ? ts : ts).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -468,11 +468,13 @@ function _heatmap(activities: FeedItem[]): number[][] {
   return grid;
 }
 
+let _ppPieChart: unknown = null;
+
 function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
   const heatmap = _heatmap(activities);
   const maxHeat = Math.max(...heatmap.flat(), 1);
+  // Show every 3rd hour for readability: 00,03,06,09,12,15,18,21
   const days  = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const hours = Array.from({length:24},(_,i)=>`${String(i).padStart(2,'0')}`);
 
   const typeCounts: Record<string, number> = {};
   activities.forEach(a => {
@@ -480,29 +482,54 @@ function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
     typeCounts[t] = (typeCounts[t] ?? 0) + 1;
   });
 
+  el.style.padding = '0 0 32px';
   el.innerHTML = `
-    <div class="pv-section-title">Activity Heatmap</div>
+    <div class="pv-section-title" style="padding:16px 16px 8px">Activity Heatmap</div>
     <div class="pv-heatmap-wrap">
       <div class="pv-heatmap">
         <div class="pv-heatmap__hour-labels">
           <span></span>
-          ${hours.map(h => `<span>${h}</span>`).join('')}
+          ${Array.from({length:24},(_,i) => `<span>${i % 3 === 0 ? String(i).padStart(2,'0') : ''}</span>`).join('')}
         </div>
         ${heatmap.map((row, di) => `
           <div class="pv-heatmap__row">
             <span class="pv-heatmap__day">${days[di]}</span>
-            ${row.map(v => `<div class="pv-heatmap__cell" style="background:rgba(0,196,106,${v > 0 ? 0.15 + (v/maxHeat)*0.85 : 0})"></div>`).join('')}
+            ${row.map(v => `<div class="pv-heatmap__cell" style="background:rgba(0,196,106,${v > 0 ? 0.2 + (v/maxHeat)*0.8 : 0})"></div>`).join('')}
           </div>`).join('')}
       </div>
     </div>
-    <div class="pv-section-title" style="margin-top:16px">Sport breakdown</div>
-    <div style="padding:0 16px">
-      ${Object.entries(typeCounts).map(([type, count]) => `
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-          <span style="color:#fff;font-size:1.3rem">${(_getIcon ? _getIcon(type) : '🏅')} ${type}</span>
-          <span style="color:${_getColor(type)};font-weight:700">${count}</span>
-        </div>`).join('')}
+
+    <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
+    <div class="pv-pie-wrap">
+      ${Object.keys(typeCounts).length === 0
+        ? '<p class="pv-empty-sub" style="padding:0 16px">No data yet</p>'
+        : `<div class="pv-pie-container"><canvas id="ppPieChart" width="160" height="160"></canvas></div>
+           <div class="pv-pie-legend">
+             ${Object.entries(typeCounts).map(([type, cnt]) => `
+               <div class="pv-pie-legend__item">
+                 <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
+                 <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
+               </div>`).join('')}
+           </div>`}
     </div>`;
+
+  // Render pie chart
+  if (Object.keys(typeCounts).length > 0) {
+    setTimeout(() => {
+      const canvas = document.getElementById('ppPieChart') as HTMLCanvasElement | null;
+      if (!canvas || typeof (window as unknown as Record<string,unknown>).Chart === 'undefined') return;
+      const Chart = (window as unknown as Record<string,unknown>).Chart as new (el: HTMLCanvasElement, cfg: unknown) => unknown;
+      if (_ppPieChart) (_ppPieChart as Record<string,()=>void>).destroy?.();
+      _ppPieChart = new Chart(canvas, {
+        type: 'doughnut',
+        data: {
+          labels:   Object.keys(typeCounts),
+          datasets: [{ data: Object.values(typeCounts), backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }],
+        },
+        options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
+      });
+    }, 100);
+  }
 }
 
 function _renderEffortsTab(el: HTMLElement, activities: FeedItem[]): void {
