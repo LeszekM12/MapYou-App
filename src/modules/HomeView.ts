@@ -1763,6 +1763,15 @@ export class HomeView {
       for (const item of friendItems) {
         const card = this._buildFriendFeedCard(item.kind, item.data, userId);
         feedEl.appendChild(card);
+        // Render minimap for activities with coordsEnc
+        const enc = (item.data.coordsEnc ?? item.data._coordsEncResolved ?? null) as string | null;
+        if (enc && item.kind === 'activity') {
+          const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
+          if (mapEl) {
+            const coords = decodePolyline(enc);
+            if (coords.length > 0) renderMinimapCanvas(mapEl, coords, (item.data.sport ?? 'running') as string);
+          }
+        }
       }
     } catch {
       feedEl.innerHTML = '';
