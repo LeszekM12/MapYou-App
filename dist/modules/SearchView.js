@@ -1200,6 +1200,29 @@ export class SearchView {
                             });
                             card.querySelector('.home-card__header')?.appendChild(moreBtn);
                         }
+                        // Override avatar click — open correct profile (own or friend's)
+                        const cardUserId = (d.userId ?? '');
+                        const avatarEl = card.querySelector('.home-card__avatar--user');
+                        if (avatarEl && cardUserId) {
+                            const newAvatar = avatarEl.cloneNode(true);
+                            avatarEl.replaceWith(newAvatar);
+                            newAvatar.style.cursor = 'pointer';
+                            newAvatar.addEventListener('click', e => {
+                                e.stopPropagation();
+                                if (cardUserId === myUserId) {
+                                    import('./ProfileView.js').then(m => {
+                                        const PV = m.ProfileView;
+                                        if (PV)
+                                            new PV().open();
+                                    });
+                                }
+                                else {
+                                    import('./PublicProfile.js').then(m => {
+                                        m.openPublicProfile(cardUserId);
+                                    });
+                                }
+                            });
+                        }
                         feedEl.appendChild(card);
                         // Render minimap if activity has coordsEnc
                         const enc = d.coordsEnc;

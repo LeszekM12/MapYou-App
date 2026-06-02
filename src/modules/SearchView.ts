@@ -1153,6 +1153,28 @@ export class SearchView {
                 card.querySelector('.home-card__header')?.appendChild(moreBtn);
               }
 
+              // Override avatar click — open correct profile (own or friend's)
+              const cardUserId = (d.userId ?? '') as string;
+              const avatarEl   = card.querySelector<HTMLElement>('.home-card__avatar--user');
+              if (avatarEl && cardUserId) {
+                const newAvatar = avatarEl.cloneNode(true) as HTMLElement;
+                avatarEl.replaceWith(newAvatar);
+                newAvatar.style.cursor = 'pointer';
+                newAvatar.addEventListener('click', e => {
+                  e.stopPropagation();
+                  if (cardUserId === myUserId) {
+                    import('./ProfileView.js').then(m => {
+                      const PV = (m as unknown as Record<string, new () => { open(): void }>).ProfileView;
+                      if (PV) new PV().open();
+                    });
+                  } else {
+                    import('./PublicProfile.js').then(m => {
+                      (m as Record<string,(id:string)=>void>).openPublicProfile(cardUserId);
+                    });
+                  }
+                });
+              }
+
               feedEl.appendChild(card);
 
               // Render minimap if activity has coordsEnc
