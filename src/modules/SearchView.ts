@@ -1063,7 +1063,9 @@ export class SearchView {
               </div>`;
             }
             const canDelete = d.userId === myUserId || club.isOwner;
-            const postId = (d.postId ?? (d._id as Record<string,unknown>|undefined)?.toString?.() ?? '') as string;
+            const postId = (f.kind === 'activity'
+              ? (d.activityId ?? d.id ?? (d._id as Record<string,unknown>|undefined)?.toString?.() ?? '')
+              : (d.postId ?? (d._id as Record<string,unknown>|undefined)?.toString?.() ?? '')) as string;
             const avImg = d.authorAvatarUrl
               ? `<img src="${d.authorAvatarUrl}" onerror="this.style.display='none'" loading="lazy"/>`
               : ``;
@@ -1080,6 +1082,7 @@ export class SearchView {
                 <button class="feed-card__more" data-more-post="${postId}" data-can-delete="${canDelete}" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:1.6rem;cursor:pointer;padding:4px;line-height:1">⋯</button>
               </div>
               ${d.photoUrl && d.mediaType !== 'video' ? `<img class="feed-card__photo" src="${d.photoUrl}" onerror="this.style.display='none'" loading="lazy"/>` : ''}
+              ${f.kind === 'activity' && d.coordsEnc ? `<canvas class="home-card__minimap" data-coords-enc="${d.coordsEnc}" width="400" height="160" style="width:100%;height:160px;display:block;border-radius:8px;margin-bottom:8px"></canvas>` : ''}
               <div class="feed-card__body">
                 ${title ? `<div class="feed-card__title">${title}</div>` : ''}
                 ${body  ? `<div class="feed-card__text">${body}</div>` : ''}
@@ -1097,6 +1100,17 @@ export class SearchView {
               </div>
             </div>`;
           }).join('');
+
+          // Render minimaps for activities
+          feedEl.querySelectorAll<HTMLCanvasElement>('canvas[data-coords-enc]').forEach(canvas => {
+            const enc = canvas.dataset.coordsEnc!;
+            import('./cloudSync.js').then(m => {
+              const mod = m as Record<string, unknown>;
+              if (typeof mod.renderMinimapCanvas === 'function') {
+                (mod.renderMinimapCanvas as (canvas: HTMLCanvasElement, enc: string) => void)(canvas, enc);
+              }
+            });
+          });
 
           // Like handlers
           feedEl.querySelectorAll<HTMLElement>('[data-club-like]').forEach(btn => {
