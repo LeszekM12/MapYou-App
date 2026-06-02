@@ -1201,6 +1201,23 @@ export class SearchView {
                             card.querySelector('.home-card__header')?.appendChild(moreBtn);
                         }
                         feedEl.appendChild(card);
+                        // Render minimap if activity has coordsEnc
+                        const enc = d.coordsEnc;
+                        if (enc && f.kind === 'activity') {
+                            const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
+                            if (mapEl) {
+                                import('./cloudSync.js').then(m => {
+                                    const mod = m;
+                                    const decode = mod.decodePolyline;
+                                    const render = mod.renderMinimapCanvas;
+                                    if (!decode || !render)
+                                        return;
+                                    const coords = decode(enc);
+                                    if (coords.length > 0)
+                                        render(mapEl, coords, (d.sport ?? 'running'));
+                                });
+                            }
+                        }
                     });
                 });
                 // Like handlers

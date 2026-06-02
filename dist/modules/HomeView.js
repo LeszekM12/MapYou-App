@@ -473,8 +473,9 @@ export function buildCard(act) {
         ? `<p class="home-card__notes">🔒 ${act.notes}</p>`
         : '';
     const profile = loadProfileFromLocal();
-    const userAvatarHtml = profile.avatarB64
-        ? `<img src="${profile.avatarB64}" class="home-card__avatar-img" alt="avatar"/>`
+    const avatarSrc = act.avatarB64 ?? profile.avatarB64;
+    const userAvatarHtml = avatarSrc
+        ? `<img src="${avatarSrc}" class="home-card__avatar-img" alt="avatar"/>`
         : `<span>${icon}</span>`;
     card.innerHTML = `
     <div class="home-card__header">
@@ -482,6 +483,7 @@ export function buildCard(act) {
         ${userAvatarHtml}
       </div>
       <div class="home-card__meta">
+        ${act.authorName ? `<span class="home-card__author-name" style="font-size:1.2rem;font-weight:700;color:#fff;display:block;line-height:1.2">${act.authorName}</span>` : ''}
         <h3 class="home-card__name">${act.name || act.description}</h3>
         <span class="home-card__time">${relativeDate(act.date)}</span>
       </div>

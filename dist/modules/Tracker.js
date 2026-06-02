@@ -92,8 +92,13 @@ export function getSportLabel(key) {
     const found = getAllSports().find(s => s.key === key);
     if (found)
         return found.label;
+    // Check custom sports by label match (handles old keys like 'si_ownia')
+    const customs = getCustomSports();
+    const byLabel = customs.find(s => s.label.toLowerCase().replace(/[^a-z0-9]/g, '_') === key);
+    if (byLabel)
+        return byLabel.label;
     // Fallback — capitalize and replace underscores
-    return key.replace(/_/g, ' ').replace(/\w/g, c => c.toUpperCase());
+    return key.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
 }
 export function getAllSports() {
     return [...ALL_SPORTS, ...getCustomSports()];

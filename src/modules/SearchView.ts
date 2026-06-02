@@ -1154,6 +1154,22 @@ export class SearchView {
               }
 
               feedEl.appendChild(card);
+
+              // Render minimap if activity has coordsEnc
+              const enc = d.coordsEnc as string | null;
+              if (enc && f.kind === 'activity') {
+                const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
+                if (mapEl) {
+                  import('./cloudSync.js').then(m => {
+                    const mod    = m as Record<string, unknown>;
+                    const decode = mod.decodePolyline as ((e: string) => [number,number][]) | undefined;
+                    const render = mod.renderMinimapCanvas as ((el: HTMLElement, coords: [number,number][], sport: string) => void) | undefined;
+                    if (!decode || !render) return;
+                    const coords = decode(enc);
+                    if (coords.length > 0) render(mapEl, coords, (d.sport ?? 'running') as string);
+                  });
+                }
+              }
             });
           });
 
