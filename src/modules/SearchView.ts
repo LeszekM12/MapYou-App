@@ -1062,55 +1062,98 @@ export class SearchView {
                 <span style="color:rgba(255,255,255,0.25);margin-left:8px;font-size:1.1rem">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>
               </div>`;
             }
-            const canDelete = d.userId === myUserId || club.isOwner;
-            const postId = (f.kind === 'activity'
-              ? (d.activityId ?? d.id ?? (d._id as Record<string,unknown>|undefined)?.toString?.() ?? '')
-              : (d.postId ?? (d._id as Record<string,unknown>|undefined)?.toString?.() ?? '')) as string;
-            const avImg = d.authorAvatarUrl
-              ? `<img src="${d.authorAvatarUrl}" onerror="this.style.display='none'" loading="lazy"/>`
-              : ``;
-            const dateStr = new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'});
-            const title   = (d.name ?? d.title ?? '') as string;
-            const body    = (d.body ?? '') as string;
-            return `<div data-feed-post-id="${postId}" class="sv2-club-feed-item">
-              <div class="feed-card__header">
-                <div class="feed-card__avatar" data-feed-profile="${d.userId}" style="cursor:pointer">${avImg || ((d.authorName as string)||'?')[0]}</div>
-                <div class="feed-card__meta">
-                  <span class="feed-card__author" data-feed-profile="${d.userId}">${d.authorName ?? ''}</span>
-                  <span class="feed-card__date">${dateStr}</span>
-                </div>
-                <button class="feed-card__more" data-more-post="${postId}" data-can-delete="${canDelete}" style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:1.6rem;cursor:pointer;padding:4px;line-height:1">⋯</button>
-              </div>
-              ${d.photoUrl && d.mediaType !== 'video' ? `<img class="feed-card__photo" src="${d.photoUrl}" onerror="this.style.display='none'" loading="lazy"/>` : ''}
-              ${f.kind === 'activity' && d.coordsEnc ? `<div class="home-card__minimap" data-coords-enc="${d.coordsEnc}" style="width:100%;height:160px;border-radius:8px;margin-bottom:8px;overflow:hidden"></div>` : ''}
-              <div class="feed-card__body">
-                ${title ? `<div class="feed-card__title">${title}</div>` : ''}
-                ${body  ? `<div class="feed-card__text">${body}</div>` : ''}
-                ${d.distanceKm ? `<div class="feed-card__stats"><span>📍 ${(d.distanceKm as number).toFixed(2)} km</span>${d.durationSec ? `<span>⏱ ${Math.floor((d.durationSec as number)/60)}min</span>` : ''}</div>` : ''}
-              </div>
-              <div class="home-card__footer" style="border-top:1px solid rgba(255,255,255,0.06)">
-                <button class="home-card__action home-card__action--like" data-club-like="${postId}" data-item-type="${f.kind === 'activity' ? 'activity' : 'post'}" aria-label="Like">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-                  <span class="home-card__action-count" data-like-count="${postId}">${(d._likeCount ?? 0) as number}</span>
-                </button>
-                <button class="home-card__action home-card__action--comment" data-club-comment="${postId}" data-item-type="${f.kind === 'activity' ? 'activity' : 'post'}" aria-label="Comment">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                  <span class="home-card__action-count" data-comment-count="${postId}">${(d._commentCount ?? 0) as number}</span>
-                </button>
-              </div>
-            </div>`;
+            // use empty string — card will be built as DOM element below
+            return '';
           }).join('');
 
-          // Render minimaps for activities
-          feedEl.querySelectorAll<HTMLElement>('[data-coords-enc]').forEach(mapEl => {
-            const enc = mapEl.dataset.coordsEnc!;
-            import('./cloudSync.js').then(m => {
-              const mod = m as Record<string, unknown>;
-              const decode = mod.decodePolyline as ((e: string) => [number,number][]) | undefined;
-              const render = mod.renderMinimapCanvas as ((el: HTMLElement, coords: [number,number][], sport: string) => void) | undefined;
-              if (!decode || !render) return;
-              const coords = decode(enc);
-              if (coords.length > 0) render(mapEl, coords, 'running');
+          // Rebuild feed using HomeView's buildCard/buildPostCard for identical look
+          feedEl.innerHTML = '';
+          import('./HomeView.js').then((hv) => {
+            const mod = hv as unknown as Record<string, unknown>;
+            const buildCard     = mod.buildCard     as ((act: unknown) => HTMLElement) | undefined;
+            const buildPostCard = mod.buildPostCard as ((post: unknown, onRefresh: () => void) => HTMLElement) | undefined;
+
+            data.data.forEach(f => {
+              const d = f.data;
+
+              // Skip requests and events — already handled above
+              if (f.kind === 'request') return;
+              if (f.kind === 'post' && d.type === 'club_event') {
+                const ev = document.createElement('div');
+                ev.className = 'sv2-club-feed-item--event';
+                ev.innerHTML = `<span style="color:rgba(255,255,255,0.4)">${d.title as string}</span><span style="color:rgba(255,255,255,0.25);margin-left:8px;font-size:1.1rem">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>`;
+                feedEl.appendChild(ev);
+                return;
+              }
+
+              let card: HTMLElement | null = null;
+              const canDelete = d.userId === myUserId || club.isOwner;
+              const itemId = (f.kind === 'activity'
+                ? (d.activityId ?? d.id ?? '')
+                : (d.postId ?? '')) as string;
+
+              if (f.kind === 'activity' && buildCard) {
+                card = buildCard({
+                  ...d,
+                  id: d.activityId ?? d.id,
+                  sport: d.sport ?? 'running',
+                  distanceKm: d.distanceKm ?? 0,
+                  durationSec: d.durationSec ?? 0,
+                  paceMinKm: d.paceMinKm ?? 0,
+                  speedKmH: d.speedKmH ?? 0,
+                  coords: [],
+                  coordsEnc: d.coordsEnc ?? null,
+                  authorName: d.authorName,
+                  avatarB64: d.authorAvatarUrl ?? d.avatarB64 ?? null,
+                });
+              } else if (f.kind === 'post' && buildPostCard) {
+                card = buildPostCard({
+                  id: d.postId ?? d._id ?? itemId,
+                  type: 'post' as const,
+                  date: f.date,
+                  title: (d.name ?? d.title ?? '') as string,
+                  body: (d.body ?? '') as string,
+                  photoUrl: (d.photoUrl ?? null) as string | null,
+                  mediaType: d.mediaType as 'image' | 'video' | null,
+                  authorName: (d.authorName ?? '') as string,
+                  avatarB64: (d.authorAvatarUrl ?? d.avatarB64 ?? null) as string | null,
+                }, loadFeed);
+              }
+
+              if (!card) return;
+
+              // Add delete option via 3-dot menu
+              if (canDelete) {
+                const existingMore = card.querySelector<HTMLElement>('.home-card__action--share');
+                const moreBtn = document.createElement('button');
+                moreBtn.className = 'feed-card__more';
+                moreBtn.style.cssText = 'background:none;border:none;color:rgba(255,255,255,0.4);font-size:1.6rem;cursor:pointer;padding:4px;line-height:1;margin-left:auto';
+                moreBtn.textContent = '⋯';
+                moreBtn.addEventListener('click', e => {
+                  e.stopPropagation();
+                  document.querySelectorAll('.sv2-more-menu').forEach(m => m.remove());
+                  const menu = document.createElement('div');
+                  menu.className = 'sv2-more-menu';
+                  menu.style.cssText = 'position:fixed;right:16px;background:#252830;border:1px solid rgba(255,255,255,0.1);border-radius:12px;z-index:9999;min-width:140px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.5)';
+                  const delBtn = document.createElement('button');
+                  delBtn.textContent = '🗑 Delete';
+                  delBtn.style.cssText = 'width:100%;padding:12px 16px;background:none;border:none;color:#f87171;font-size:1.3rem;cursor:pointer;text-align:left;font-family:inherit';
+                  delBtn.addEventListener('click', async () => {
+                    menu.remove();
+                    await fetch(`${BACKEND_URL}/posts/${encodeURIComponent(itemId)}?userId=${encodeURIComponent(myUserId)}`, { method: 'DELETE' }).catch(() => {});
+                    import('./cloudSync.js').then(cs => { const CS = (cs as unknown as Record<string,unknown>).CS as Record<string,(id:string)=>void> | undefined; CS?.deletePost?.(itemId); }).catch(() => {});
+                    loadFeed();
+                  });
+                  menu.appendChild(delBtn);
+                  const rect = moreBtn.getBoundingClientRect();
+                  menu.style.top = (rect.bottom + 4) + 'px';
+                  document.body.appendChild(menu);
+                  setTimeout(() => document.addEventListener('click', () => menu.remove(), { once: true }), 10);
+                });
+                card.querySelector('.home-card__header')?.appendChild(moreBtn);
+              }
+
+              feedEl.appendChild(card);
             });
           });
 

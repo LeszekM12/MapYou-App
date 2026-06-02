@@ -226,7 +226,7 @@ function openLightbox(src) {
         close(); }, { once: true });
 }
 // ── Post card builder ─────────────────────────────────────────────────────────
-function buildPostCard(post, onRefresh) {
+export function buildPostCard(post, onRefresh) {
     const card = document.createElement('article');
     card.className = 'home-card home-card--post';
     card.dataset.id = post.id;
@@ -449,7 +449,7 @@ function _openEditPostModal(post, onSave) {
     });
 }
 // ── Card builder ──────────────────────────────────────────────────────────────
-function buildCard(act) {
+export function buildCard(act) {
     const card = document.createElement('article');
     card.className = 'home-card';
     card.dataset.id = act.id;

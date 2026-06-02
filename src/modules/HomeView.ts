@@ -252,7 +252,7 @@ function openLightbox(src: string): void {
 
 // ── Post card builder ─────────────────────────────────────────────────────────
 
-function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> | void): HTMLElement {
+export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> | void): HTMLElement {
   const card = document.createElement('article');
   card.className = 'home-card home-card--post';
   card.dataset.id = post.id;
@@ -494,7 +494,7 @@ function _openEditPostModal(post: PostRecord, onSave: () => void): void {
 
 // ── Card builder ──────────────────────────────────────────────────────────────
 
-function buildCard(act: EnrichedActivity): HTMLElement {
+export function buildCard(act: EnrichedActivity): HTMLElement {
   const card = document.createElement('article');
   card.className = 'home-card';
   card.dataset.id = act.id;
