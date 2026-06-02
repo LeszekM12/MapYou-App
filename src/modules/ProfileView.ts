@@ -8,7 +8,7 @@
 // - Heatmap (day × hour) + activity type pie chart
 
 import { loadUnifiedWorkouts, type UnifiedWorkout, SPORT_ICONS_U, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
-import { getIcon as _getIcon, getColor as _getColor } from './Tracker.js';
+import { getIcon as _getIcon, getColor as _getColor, getSportLabel as _getSportLabel } from './Tracker.js';
 import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId, type ProfileData } from './UserProfile.js';
 import type { ProfileRecord } from './db.js';
@@ -560,7 +560,7 @@ export class ProfileView {
                ${Object.entries(typeCounts).map(([type, cnt]) => `
                  <div class="pv-pie-legend__item">
                    <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
-                   <span>${_getIcon(type)} ${type} — ${cnt}</span>
+                   <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
                  </div>`).join('')}
              </div>`}
       </div>`;

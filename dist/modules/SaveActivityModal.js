@@ -4,7 +4,7 @@
 // Bottom-sheet modal shown after clicking Finish.
 // User fills in name, description, photo, intensity, notes.
 // On save → writes EnrichedActivity to IndexedDB → triggers Home refresh.
-import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getAllSports, saveCustomSport, deleteCustomSport, getCustomSports } from './Tracker.js';
+import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, getAllSports, saveCustomSport, deleteCustomSport, getCustomSports } from './Tracker.js';
 import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs } from './SearchView.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -461,7 +461,7 @@ export class SaveActivityModal {
                 if (moreBtn) {
                     moreBtn.classList.add('sam-sport-btn--active');
                     moreBtn.style.setProperty('--sb-color', '#ffffff');
-                    moreBtn.textContent = getIcon(sport) + ' ' + sport.charAt(0).toUpperCase() + sport.slice(1).replace(/_/g, ' ');
+                    moreBtn.textContent = getIcon(sport) + ' ' + getSportLabel(sport);
                 }
             }
         };

@@ -60,11 +60,12 @@ export function getCustomSports(): { key: string; icon: string; label: string }[
 }
 
 export function saveCustomSport(label: string): { key: string; icon: string; label: string } {
-  const key  = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  // Key uses index-based ID to avoid encoding issues with non-ASCII chars
+  const existing = getCustomSports();
+  const key  = 'custom_' + (existing.length + 1);
   const icon = getSportIcon(label);
   const sport = { key, icon, label };
-  const existing = getCustomSports();
-  if (!existing.find(s => s.key === key)) {
+  if (!existing.find(s => s.label.toLowerCase() === label.toLowerCase())) {
     existing.push(sport);
     localStorage.setItem('mapyou_custom_sports', JSON.stringify(existing));
   }
@@ -74,6 +75,13 @@ export function saveCustomSport(label: string): { key: string; icon: string; lab
 export function deleteCustomSport(key: string): void {
   const updated = getCustomSports().filter(s => s.key !== key);
   localStorage.setItem('mapyou_custom_sports', JSON.stringify(updated));
+}
+
+export function getSportLabel(key: string): string {
+  const found = getAllSports().find(s => s.key === key);
+  if (found) return found.label;
+  // Fallback — capitalize and replace underscores
+  return key.replace(/_/g, ' ').replace(/\w/g, c => c.toUpperCase());
 }
 
 export function getAllSports(): { key: string; icon: string; label: string }[] {

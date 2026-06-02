@@ -4,7 +4,7 @@ import { loadEnrichedActivities } from './db.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
-import { getIcon, getColor, formatDuration, formatPace, formatDistance } from './Tracker.js';
+import { getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { getNotifications, getUnreadCount, markAllRead, clearAll, onNotificationsChange, notifyActivityAdded, } from './NotificationsService.js';
@@ -487,7 +487,7 @@ function buildCard(act) {
       </div>
       <div class="home-card__badges">
         ${intenHtml}
-        <span class="home-card__sport-badge" style="color:${color}">${act.sport}</span>
+        <span class="home-card__sport-badge" style="color:${color}">${getSportLabel(act.sport)}</span>
       </div>
     </div>
 
