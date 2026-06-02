@@ -1,15 +1,111 @@
 // ─── TRACKER MODULE ──────────────────────────────────────────────────────────
 // src/modules/Tracker.ts
+export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'];
+export const ALL_SPORTS = [
+    { key: 'running', icon: '🏃', label: 'Running' },
+    { key: 'walking', icon: '🚶', label: 'Walking' },
+    { key: 'cycling', icon: '🚴', label: 'Cycling' },
+    { key: 'swimming', icon: '🏊', label: 'Swimming' },
+    { key: 'hiking', icon: '🥾', label: 'Hiking' },
+    { key: 'skiing', icon: '⛷️', label: 'Skiing' },
+    { key: 'tennis', icon: '🎾', label: 'Tennis' },
+    { key: 'football', icon: '⚽', label: 'Football' },
+    { key: 'basketball', icon: '🏀', label: 'Basketball' },
+    { key: 'volleyball', icon: '🏐', label: 'Volleyball' },
+    { key: 'yoga', icon: '🧘', label: 'Yoga' },
+    { key: 'gym', icon: '🏋️', label: 'Gym' },
+    { key: 'boxing', icon: '🥊', label: 'Boxing' },
+    { key: 'rowing', icon: '🚣', label: 'Rowing' },
+    { key: 'climbing', icon: '🧗', label: 'Climbing' },
+    { key: 'skateboard', icon: '🛹', label: 'Skateboard' },
+    { key: 'martial_arts', icon: '🥋', label: 'Martial Arts' },
+    { key: 'dance', icon: '💃', label: 'Dance' },
+    { key: 'crossfit', icon: '💪', label: 'CrossFit' },
+    { key: 'pilates', icon: '🤸', label: 'Pilates' },
+];
+export function getSportIcon(sport) {
+    const found = ALL_SPORTS.find(s => s.key === sport);
+    if (found)
+        return found.icon;
+    const l = sport.toLowerCase();
+    if (l.includes('run'))
+        return '🏃';
+    if (l.includes('walk'))
+        return '🚶';
+    if (l.includes('cycl') || l.includes('bike'))
+        return '🚴';
+    if (l.includes('swim'))
+        return '🏊';
+    if (l.includes('hik'))
+        return '🥾';
+    if (l.includes('ski'))
+        return '⛷️';
+    if (l.includes('tenn') || l.includes('teni'))
+        return '🎾';
+    if (l.includes('foot') || l.includes('soccer'))
+        return '⚽';
+    if (l.includes('basket'))
+        return '🏀';
+    if (l.includes('yoga'))
+        return '🧘';
+    if (l.includes('gym') || l.includes('weight'))
+        return '🏋️';
+    if (l.includes('box'))
+        return '🥊';
+    if (l.includes('row'))
+        return '🚣';
+    if (l.includes('climb'))
+        return '🧗';
+    if (l.includes('dance'))
+        return '💃';
+    if (l.includes('cross'))
+        return '💪';
+    if (l.includes('pilat'))
+        return '🤸';
+    return '🏅';
+}
+export function getCustomSports() {
+    try {
+        return JSON.parse(localStorage.getItem('mapyou_custom_sports') ?? '[]');
+    }
+    catch {
+        return [];
+    }
+}
+export function saveCustomSport(label) {
+    const key = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const icon = getSportIcon(label);
+    const sport = { key, icon, label };
+    const existing = getCustomSports();
+    if (!existing.find(s => s.key === key)) {
+        existing.push(sport);
+        localStorage.setItem('mapyou_custom_sports', JSON.stringify(existing));
+    }
+    return sport;
+}
+export function deleteCustomSport(key) {
+    const updated = getCustomSports().filter(s => s.key !== key);
+    localStorage.setItem('mapyou_custom_sports', JSON.stringify(updated));
+}
+export function getAllSports() {
+    return [...ALL_SPORTS, ...getCustomSports()];
+}
 export const SPORT_ICONS = {
     running: '🏃',
     walking: '🚶',
     cycling: '🚴',
 };
+export function getIcon(sport) {
+    return SPORT_ICONS[sport] ?? getSportIcon(sport);
+}
 export const SPORT_COLORS = {
     running: '#00c46a',
     walking: '#5badea',
     cycling: '#ffb545',
 };
+export function getColor(sport) {
+    return SPORT_COLORS[sport] ?? '#ffffff';
+}
 export class Tracker {
     constructor(map, onUpdate) {
         Object.defineProperty(this, "map", {

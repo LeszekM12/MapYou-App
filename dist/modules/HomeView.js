@@ -4,7 +4,7 @@ import { loadEnrichedActivities } from './db.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
-import { SPORT_COLORS, SPORT_ICONS, formatDuration, formatPace, formatDistance } from './Tracker.js';
+import { getIcon, getColor, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { getNotifications, getUnreadCount, markAllRead, clearAll, onNotificationsChange, notifyActivityAdded, } from './NotificationsService.js';
@@ -42,7 +42,7 @@ function intensityColor(n) {
 }
 // ── Mini map — uses renderMinimapCanvas from cloudSync.ts ──────────────────
 // ── Comment panel ─────────────────────────────────────────────────────────────
-export function openCommentPanel(card, actId) {
+function openCommentPanel(card, actId) {
     card.querySelector('.home-card__comment-panel')?.remove();
     const panel = document.createElement('div');
     panel.className = 'home-card__comment-panel';
@@ -453,8 +453,8 @@ function buildCard(act) {
     const card = document.createElement('article');
     card.className = 'home-card';
     card.dataset.id = act.id;
-    const color = SPORT_COLORS[act.sport] ?? '#00c46a';
-    const icon = SPORT_ICONS[act.sport] ?? '🏅';
+    const color = getColor(act.sport);
+    const icon = getIcon(act.sport);
     const distFmt = formatDistance(act.distanceKm);
     const timeFmt = formatDuration(act.durationSec);
     const paceFmt = act.sport !== 'cycling' ? formatPace(act.paceMinKm) : act.speedKmH.toFixed(1);
@@ -624,78 +624,10 @@ function _relTimeNotif(ts) {
     const days = Math.floor(hrs / 24);
     return `${days} day${days > 1 ? 's' : ''} ago`;
 }
-function _renderNotifList(notifs, list, userId) {
-    if (notifs.length === 0) {
-        list.innerHTML = '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
-        return;
-    }
-    list.innerHTML = notifs.map(n => {
-        // Parse meta for follow_request/follow: userId|userName|avatarB64
-        let requesterId = '', requesterName = '', avatarB64 = '';
-        if ((n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted') && n.meta) {
-            const parts = n.meta.split('|');
-            requesterId = parts[0] ?? '';
-            requesterName = parts[1] ?? '';
-            avatarB64 = parts[2] ?? '';
-        }
-        const avatarHtml = (n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted')
-            ? (avatarB64
-                ? `<img src="${avatarB64}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0"/>`
-                : `<div style="width:44px;height:44px;border-radius:50%;background:#333;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff;flex-shrink:0">${requesterName[0] ?? '?'}</div>`)
-            : `<div class="hn-item__icon">${n.icon ?? '🔔'}</div>`;
-        return `<div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
-      <div style="display:flex;align-items:flex-start;gap:12px;width:100%">
-        ${(n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted') && requesterId
-            ? `<div data-open-profile="${requesterId}" style="cursor:pointer;flex-shrink:0">${avatarHtml}</div>`
-            : avatarHtml}
-        <div class="hn-item__body" style="flex:1">
-          <div class="hn-item__title">${(n.type === 'follow_request' || n.type === 'follow' || n.type === 'follow_accepted') && requesterName ? requesterName : n.title}</div>
-          <div class="hn-item__body-text">${n.body}</div>
-          <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
-          ${n.type === 'follow_request' && requesterId ? `
-            <div style="display:flex;gap:8px;margin-top:8px">
-              <button class="hn-approve-btn" data-requester="${requesterId}" data-notif="${n.id}"
-                style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Accept</button>
-              <button class="hn-reject-btn" data-requester="${requesterId}" data-notif="${n.id}"
-                style="background:rgba(248,113,113,0.12);border:1.5px solid #f87171;color:#f87171;border-radius:8px;padding:6px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;font-weight:700">Decline</button>
-            </div>` : ''}
-        </div>
-      </div>
-    </div>`;
-    }).join('');
-    // Open profile from notification
-    list.querySelectorAll('[data-open-profile]').forEach(el => {
-        el.addEventListener('click', () => {
-            const uid = el.dataset.openProfile;
-            if (uid)
-                import('./PublicProfile.js').then(m => m.openPublicProfile(uid));
-        });
-    });
-    // Approve/Reject handlers
-    list.querySelectorAll('.hn-approve-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const requesterId = btn.dataset.requester;
-            const notifId = btn.dataset.notif;
-            await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}/follow-approve/${encodeURIComponent(requesterId)}`, { method: 'POST' });
-            // Delete from backend so it doesn't come back
-            await fetch(`${BACKEND_URL}/notifications/${encodeURIComponent(notifId)}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => { });
-            btn.closest('.hn-item').innerHTML = '<div style="display:flex;align-items:center;gap:10px;padding:4px 0"><div style="font-size:1.8rem">✅</div><div style="color:#fff;font-size:1.3rem;font-weight:600">Accepted</div></div>';
-        });
-    });
-    list.querySelectorAll('.hn-reject-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            const requesterId = btn.dataset.requester;
-            const notifId = btn.dataset.notif;
-            await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}/follow-reject/${encodeURIComponent(requesterId)}`, { method: 'POST' });
-            // Delete from backend so it doesn't come back
-            await fetch(`${BACKEND_URL}/notifications/${encodeURIComponent(notifId)}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => { });
-            btn.closest('.hn-item')?.remove();
-        });
-    });
-}
 function _openNotifPanel() {
     document.getElementById('homeNotifPanel')?.remove();
     markAllRead();
+    const notifs = getNotifications();
     const panel = document.createElement('div');
     panel.id = 'homeNotifPanel';
     panel.className = 'hn-panel';
@@ -708,7 +640,17 @@ function _openNotifPanel() {
         <button class="hn-clear" id="hnClear">Clear all</button>
       </div>
       <div class="hn-list" id="hnList">
-        <div class="hn-empty"><span>⏳</span><p>Loading…</p></div>
+        ${notifs.length === 0
+        ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
+        : notifs.map(n => `
+            <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
+              <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
+              <div class="hn-item__body">
+                <div class="hn-item__title">${n.title}</div>
+                <div class="hn-item__body-text">${n.body}</div>
+                <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
+              </div>
+            </div>`).join('')}
       </div>
     </div>`;
     document.body.appendChild(panel);
@@ -716,33 +658,6 @@ function _openNotifPanel() {
         panel.querySelector('#hnSheet')?.classList.add('hn-sheet--open');
         panel.querySelector('#hnOverlay')?.classList.add('hn-overlay--visible');
     });
-    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-    const hnList = panel.querySelector('#hnList');
-    // Load from backend + merge with local
-    const loadNotifs = async () => {
-        try {
-            const res = await fetch(`${BACKEND_URL}/notifications?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-            const data = await res.json();
-            if (data.status === 'ok') {
-                // Merge backend notifs with local notifs
-                const backendNotifs = data.data.map(n => ({ id: n.notifId, title: n.title, body: n.body, icon: n.icon, read: n.read, timestamp: n.timestamp, type: n.type, meta: n.meta }));
-                const localNotifs = getNotifications();
-                // Merge — backend takes priority, add local ones not in backend
-                const backendIds = new Set(backendNotifs.map(n => n.id));
-                const merged = [...backendNotifs, ...localNotifs.filter(n => !backendIds.has(n.id))];
-                merged.sort((a, b) => b.timestamp - a.timestamp);
-                _renderNotifList(merged, hnList, userId);
-                // Mark backend notifs as read
-                if (userId)
-                    void fetch(`${BACKEND_URL}/notifications/read-all?userId=${encodeURIComponent(userId)}`, { method: 'PUT' });
-                return;
-            }
-        }
-        catch { /* offline fallback */ }
-        // Fallback to local
-        _renderNotifList(getNotifications(), hnList, userId);
-    };
-    void loadNotifs();
     const close = () => {
         panel.querySelector('#hnSheet')?.classList.remove('hn-sheet--open');
         panel.querySelector('#hnOverlay')?.classList.remove('hn-overlay--visible');
@@ -751,17 +666,10 @@ function _openNotifPanel() {
     panel.querySelector('#hnOverlay')?.addEventListener('click', close);
     document.addEventListener('keydown', e => { if (e.key === 'Escape')
         close(); }, { once: true });
-    panel.querySelector('#hnClear')?.addEventListener('click', async () => {
-        // Clear backend
-        if (userId) {
-            await fetch(`${BACKEND_URL}/notifications/all?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' }).catch(() => { });
-        }
-        // Clear local
+    panel.querySelector('#hnClear')?.addEventListener('click', () => {
         clearAll();
-        // Update badge
-        const bell = document.getElementById('homeNotifBell');
-        bell?.querySelector('.home-bell__badge')?.remove();
-        hnList.innerHTML = '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
+        panel.querySelector('#hnList').innerHTML =
+            '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
     });
     // Swipe to close
     const sheet = panel.querySelector('#hnSheet');
@@ -1053,33 +961,6 @@ export class HomeView {
                 badge?.remove();
             }
         });
-        // Sync unread count from backend on init
-        void (async () => {
-            try {
-                const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-                if (!userId)
-                    return;
-                const res = await fetch(`${BACKEND_URL}/notifications?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-                const data = await res.json();
-                if (data.status === 'ok' && data.unread > 0) {
-                    const bell = document.getElementById('homeNotifBell');
-                    if (!bell)
-                        return;
-                    const badge = bell.querySelector('.home-bell__badge');
-                    const count = data.unread;
-                    if (badge) {
-                        badge.textContent = count > 9 ? '9+' : String(count);
-                    }
-                    else {
-                        const b = document.createElement('span');
-                        b.className = 'home-bell__badge';
-                        b.textContent = count > 9 ? '9+' : String(count);
-                        bell.appendChild(b);
-                    }
-                }
-            }
-            catch { /* offline */ }
-        })();
         return greeting;
     }
     _buildStreakWidget() {
@@ -2014,60 +1895,7 @@ export class HomeView {
     }
 }
 export const homeView = new HomeView();
-// ── Exported reel viewer for profile views ────────────────────────────────────
-export function openReelViewer(group, onAllViewed) {
-    const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
-    let reelIdx = 0;
-    const overlay = document.createElement('div');
-    overlay.className = 'home-reel-viewer';
-    document.body.appendChild(overlay);
-    requestAnimationFrame(() => overlay.classList.add('home-reel-viewer--visible'));
-    const render = () => {
-        const reel = group.reels[reelIdx];
-        const reelId = reel.reelId;
-        const url = reel.mediaUrl;
-        const isVideo = reel.mediaType === 'video';
-        const views = reel.views ?? [];
-        overlay.innerHTML = `
-      <div class="home-reel-viewer__bg">
-        ${isVideo
-            ? `<video class="home-reel-viewer__media" src="${url}" autoplay muted playsinline></video>`
-            : `<img class="home-reel-viewer__media" src="${url}" alt="reel" draggable="false"/>`}
-        <div class="home-reel-viewer__top">
-          <div class="home-reel-viewer__bars">
-            ${group.reels.map((_, i) => `<div class="home-reel-viewer__bar ${i < reelIdx ? 'done' : i === reelIdx ? 'active' : ''}" id="reelBar${i}"></div>`).join('')}
-          </div>
-          <div class="home-reel-viewer__author">
-            <div class="home-reel-avatar ${views.includes(myUserId) ? 'home-reel-avatar--seen' : 'home-reel-avatar--active'} home-reel-avatar--sm">
-              ${group.avatarB64 ? `<img src="${group.avatarB64}" class="home-reel-avatar__img"/>` : ''}
-            </div>
-            <span class="home-reel-viewer__name">${group.authorName ?? ''}</span>
-          </div>
-          <button class="home-reel-viewer__close" id="reelClose">✕</button>
-        </div>
-      </div>`;
-        // Mark as viewed
-        if (!views.includes(myUserId)) {
-            void fetch(`${BACKEND_URL}/reels/${encodeURIComponent(reelId)}/view`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: myUserId }),
-            });
-        }
-        overlay.querySelector('#reelClose')?.addEventListener('click', () => {
-            overlay.classList.remove('home-reel-viewer--visible');
-            setTimeout(() => { overlay.remove(); onAllViewed?.(); }, 300);
-        });
-        overlay.querySelector('.home-reel-viewer__media')?.addEventListener('click', () => {
-            if (reelIdx < group.reels.length - 1) {
-                reelIdx++;
-                render();
-            }
-            else {
-                overlay.classList.remove('home-reel-viewer--visible');
-                setTimeout(() => { overlay.remove(); onAllViewed?.(); }, 300);
-            }
-        });
-    };
-    render();
-}
+import { getIcon as _gi2, getColor as _gc2 } from './Tracker.js';
+window._mapyouGetIcon = _gi2;
+window._mapyouGetColor = _gc2;
 //# sourceMappingURL=HomeView.js.map

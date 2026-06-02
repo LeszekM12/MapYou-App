@@ -536,6 +536,19 @@
   border-color: var(--sb-color, #00c46a);
   color: var(--sb-color, #00c46a);
 }
+.sam-sport-btn--more {
+  flex: 0 0 auto;
+  padding: 10px 14px;
+  color: rgba(255,255,255,0.5);
+  font-size: 1.2rem;
+  letter-spacing: 0.02em;
+}
+.sam-sport-btns {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.sam-sport-btns::-webkit-scrollbar { display: none; }
 
 /* Intensity slider */
 .sam-intensity-track {
@@ -2473,7 +2486,7 @@
   display: flex; align-items: center; justify-content: center;
 }
 .home-reel-viewer__media {
-  width: 100%; height: 100%; object-fit: contain;
+  width: 100%; height: 100%; object-fit: cover;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;

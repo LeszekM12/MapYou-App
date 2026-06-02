@@ -4,7 +4,7 @@
 // Bottom-sheet modal shown after clicking Finish.
 // User fills in name, description, photo, intensity, notes.
 // On save → writes EnrichedActivity to IndexedDB → triggers Home refresh.
-import { SPORT_COLORS, SPORT_ICONS } from './Tracker.js';
+import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getAllSports, saveCustomSport, deleteCustomSport, getCustomSports } from './Tracker.js';
 import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs } from './SearchView.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -148,6 +148,7 @@ function buildModalHtml(activity, isManual) {
                 style="${s === activity.sport ? `--sb-color:${SPORT_COLORS[s]}` : ''}">
                 ${SPORT_ICONS[s]} ${s.charAt(0).toUpperCase() + s.slice(1)}
               </button>`).join('')}
+            <button class="sam-sport-btn sam-sport-btn--more" id="samSportMore">••• More</button>
           </div>
         </div>
 
@@ -198,6 +199,60 @@ function buildModalHtml(activity, isManual) {
 }
 // ── SaveActivityModal class ───────────────────────────────────────────────────
 export class SaveActivityModal {
+    _openSportPicker(onSelect) {
+        document.getElementById('samSportPickerOverlay')?.remove();
+        const overlay = document.createElement('div');
+        overlay.id = 'samSportPickerOverlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+        const renderPicker = () => {
+            const customs = getCustomSports();
+            const all = getAllSports();
+            overlay.innerHTML = '<div style="background:#1a1d24;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">'
+                + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08)">'
+                + '<span style="color:#fff;font-size:1.6rem;font-weight:700">Choose sport</span>'
+                + '<button id="samPickerClose" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:2rem;cursor:pointer;line-height:1">✕</button>'
+                + '</div>'
+                + '<div style="overflow-y:auto;padding:12px 16px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+                + all.map(s => '<button data-pick="' + s.key + '" style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative">'
+                    + '<span style="font-size:2rem">' + s.icon + '</span>'
+                    + '<span style="color:#fff;font-size:1.2rem;font-weight:600;text-align:center">' + s.label + '</span>'
+                    + (customs.find(c => c.key === s.key) ? '<button data-delete-sport="' + s.key + '" style="position:absolute;top:4px;right:4px;background:none;border:none;color:rgba(255,255,255,0.25);font-size:1rem;cursor:pointer;padding:2px">×</button>' : '')
+                    + '</button>').join('')
+                + '<button id="samAddCustomSport" style="background:rgba(255,255,255,0.04);border:1.5px dashed rgba(255,255,255,0.15);border-radius:12px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px">'
+                + '<span style="font-size:2rem">➕</span>'
+                + '<span style="color:rgba(255,255,255,0.5);font-size:1.2rem;font-weight:600">Add custom</span>'
+                + '</button>'
+                + '</div></div>';
+            overlay.querySelector('#samPickerClose')?.addEventListener('click', () => overlay.remove());
+            overlay.addEventListener('click', e => { if (e.target === overlay)
+                overlay.remove(); });
+            overlay.querySelectorAll('[data-pick]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    if (e.target.hasAttribute('data-delete-sport'))
+                        return;
+                    overlay.remove();
+                    onSelect(btn.dataset.pick);
+                });
+            });
+            overlay.querySelectorAll('[data-delete-sport]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    deleteCustomSport(btn.dataset.deleteSport);
+                    renderPicker();
+                });
+            });
+            overlay.querySelector('#samAddCustomSport')?.addEventListener('click', () => {
+                const name = prompt('Enter sport name:')?.trim();
+                if (!name)
+                    return;
+                const sport = saveCustomSport(name);
+                overlay.remove();
+                onSelect(sport.key);
+            });
+        };
+        renderPicker();
+        document.body.appendChild(overlay);
+    }
     constructor(_activity, _onSave, _onCancel) {
         Object.defineProperty(this, "_activity", {
             enumerable: true,
@@ -389,17 +444,32 @@ export class SaveActivityModal {
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape')
             this.close(); }, { once: true });
         // Sport buttons
-        el.querySelectorAll('.sam-sport-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                el.querySelectorAll('.sam-sport-btn').forEach(b => {
-                    b.classList.remove('sam-sport-btn--active');
-                    b.style.removeProperty('--sb-color');
-                });
-                btn.classList.add('sam-sport-btn--active');
-                const sport = btn.dataset.sport;
-                this._selectedSport = sport;
-                btn.style.setProperty('--sb-color', SPORT_COLORS[sport]);
+        const updateSportBtn = (sport) => {
+            el.querySelectorAll('.sam-sport-btn').forEach(b => {
+                b.classList.remove('sam-sport-btn--active');
+                b.style.removeProperty('--sb-color');
             });
+            this._selectedSport = sport;
+            // Find existing btn or update "More" btn
+            const existing = el.querySelector(`[data-sport="${sport}"]`);
+            if (existing) {
+                existing.classList.add('sam-sport-btn--active');
+                existing.style.setProperty('--sb-color', getColor(sport));
+            }
+            else {
+                const moreBtn = el.querySelector('#samSportMore');
+                if (moreBtn) {
+                    moreBtn.classList.add('sam-sport-btn--active');
+                    moreBtn.style.setProperty('--sb-color', '#ffffff');
+                    moreBtn.textContent = getIcon(sport) + ' ' + sport.charAt(0).toUpperCase() + sport.slice(1).replace(/_/g, ' ');
+                }
+            }
+        };
+        el.querySelectorAll('.sam-sport-btn:not(#samSportMore)').forEach(btn => {
+            btn.addEventListener('click', () => updateSportBtn(btn.dataset.sport));
+        });
+        el.querySelector('#samSportMore')?.addEventListener('click', () => {
+            this._openSportPicker(sport => updateSportBtn(sport));
         });
         // Intensity slider
         const slider = el.querySelector('#samIntensity');

@@ -8,6 +8,7 @@
 // - Heatmap (day × hour) + activity type pie chart
 
 import { loadUnifiedWorkouts, type UnifiedWorkout, SPORT_ICONS_U, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
+import { getIcon as _getIcon, getColor as _getColor } from './Tracker.js';
 import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId, type ProfileData } from './UserProfile.js';
 import type { ProfileRecord } from './db.js';
@@ -503,13 +504,13 @@ export class ProfileView {
     el.innerHTML = `<div class="pv-act-list">${
       this._workouts.slice(0, 20).map(w => `
       <div class="pv-act-item">
-        <span class="pv-act-item__icon">${SPORT_ICONS_U[w.type as keyof typeof SPORT_ICONS_U] ?? '🏅'}</span>
+        <span class="pv-act-item__icon">${_getIcon(w.type)}</span>
         <div class="pv-act-item__info">
           <span class="pv-act-item__name">${w.name || w.description || w.type}</span>
           <span class="pv-act-item__date">${_relDate(w.date)}</span>
         </div>
         <div class="pv-act-item__stats">
-          <span style="color:${SPORT_COLORS_U[w.type as keyof typeof SPORT_COLORS_U] ?? '#00c46a'}">${w.distanceKm.toFixed(2)} km</span>
+          <span style="color:${_getColor(w.type)}">${w.distanceKm.toFixed(2)} km</span>
           <span class="pv-act-item__time">${formatDurSec(w.durationSec)}</span>
         </div>
       </div>`).join('')
@@ -558,8 +559,8 @@ export class ProfileView {
              <div class="pv-pie-legend">
                ${Object.entries(typeCounts).map(([type, cnt]) => `
                  <div class="pv-pie-legend__item">
-                   <span class="pv-pie-legend__dot" style="background:${SPORT_COLORS_U[type as keyof typeof SPORT_COLORS_U]??'#00c46a'}"></span>
-                   <span>${SPORT_ICONS_U[type as keyof typeof SPORT_ICONS_U]??'🏅'} ${type} — ${cnt}</span>
+                   <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
+                   <span>${_getIcon(type)} ${type} — ${cnt}</span>
                  </div>`).join('')}
              </div>`}
       </div>`;
@@ -575,7 +576,7 @@ export class ProfileView {
             labels:   Object.keys(typeCounts),
             datasets: [{
               data:            Object.values(typeCounts),
-              backgroundColor: Object.keys(typeCounts).map(t => SPORT_COLORS_U[t as keyof typeof SPORT_COLORS_U] ?? '#00c46a'),
+              backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)),
               borderWidth:     0,
               hoverOffset:     6,
             }],

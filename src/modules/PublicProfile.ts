@@ -24,8 +24,7 @@ interface FeedItem {
   data: Record<string, unknown>;
 }
 
-const SPORT_ICONS: Record<string, string> = { running: '🏃', walking: '🚶', cycling: '🚴' };
-const SPORT_COLORS: Record<string, string> = { running: '#00c46a', walking: '#5badea', cycling: '#ffb545' };
+import { getIcon as _getIcon, getColor as _getColor } from './Tracker.js';
 
 function _relDate(ts: number | string): string {
   return new Date(typeof ts === 'number' ? ts : ts).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -500,8 +499,8 @@ function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
     <div style="padding:0 16px">
       ${Object.entries(typeCounts).map(([type, count]) => `
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-          <span style="color:#fff;font-size:1.3rem">${SPORT_ICONS[type] ?? '🏅'} ${type}</span>
-          <span style="color:${SPORT_COLORS[type] ?? '#00c46a'};font-weight:700">${count}</span>
+          <span style="color:#fff;font-size:1.3rem">${(_getIcon ? _getIcon(type) : '🏅')} ${type}</span>
+          <span style="color:${_getColor(type)};font-weight:700">${count}</span>
         </div>`).join('')}
     </div>`;
 }
@@ -566,13 +565,13 @@ function _renderActivitiesTab(el: HTMLElement, activities: FeedItem[]): void {
     const d = a.data;
     const sport = (d.sport ?? 'running') as string;
     return `<div class="pv-act-item">
-      <span class="pv-act-item__icon">${SPORT_ICONS[sport] ?? '🏅'}</span>
+      <span class="pv-act-item__icon">${_getIcon(sport)}</span>
       <div class="pv-act-item__info">
         <span class="pv-act-item__name">${(d.name ?? d.description ?? sport) as string}</span>
         <span class="pv-act-item__date">${_relDate(a.date)}</span>
       </div>
       <div class="pv-act-item__stats">
-        <span style="color:${SPORT_COLORS[sport] ?? '#00c46a'}">${(+(d.distanceKm ?? 0)).toFixed(2)} km</span>
+        <span style="color:${_getColor(sport)}">${(+(d.distanceKm ?? 0)).toFixed(2)} km</span>
         <span class="pv-act-item__time">${_fmtDur(+(d.durationSec ?? 0))}</span>
       </div>
     </div>`;
@@ -633,8 +632,9 @@ function _attachLikeComment(card: HTMLElement, itemId: string, itemType: 'post'|
   // Comment
   card.querySelector<HTMLElement>('.home-card__action--comment')?.addEventListener('click', e => {
     e.stopPropagation();
-    import('./HomeView.js').then(({ openCommentPanel }) => {
-      openCommentPanel(card, itemId);
+    import('./HomeView.js').then((mod) => {
+      const fn = (mod as unknown as Record<string,(c:HTMLElement,id:string)=>void>).openCommentPanel;
+      if (fn) fn(card, itemId);
     });
   });
 }

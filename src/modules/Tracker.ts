@@ -3,7 +3,82 @@
 
 import type { Coords } from '../types/index.js';
 
-export type SportType = 'running' | 'walking' | 'cycling';
+export type SportType = string;
+
+export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'] as const;
+
+export const ALL_SPORTS: { key: string; icon: string; label: string }[] = [
+  { key: 'running',      icon: '🏃',  label: 'Running'      },
+  { key: 'walking',      icon: '🚶',  label: 'Walking'      },
+  { key: 'cycling',      icon: '🚴',  label: 'Cycling'      },
+  { key: 'swimming',     icon: '🏊',  label: 'Swimming'     },
+  { key: 'hiking',       icon: '🥾',  label: 'Hiking'       },
+  { key: 'skiing',       icon: '⛷️',   label: 'Skiing'       },
+  { key: 'tennis',       icon: '🎾',  label: 'Tennis'       },
+  { key: 'football',     icon: '⚽',  label: 'Football'     },
+  { key: 'basketball',   icon: '🏀',  label: 'Basketball'   },
+  { key: 'volleyball',   icon: '🏐',  label: 'Volleyball'   },
+  { key: 'yoga',         icon: '🧘',  label: 'Yoga'         },
+  { key: 'gym',          icon: '🏋️',   label: 'Gym'          },
+  { key: 'boxing',       icon: '🥊',  label: 'Boxing'       },
+  { key: 'rowing',       icon: '🚣',  label: 'Rowing'       },
+  { key: 'climbing',     icon: '🧗',  label: 'Climbing'     },
+  { key: 'skateboard',   icon: '🛹',  label: 'Skateboard'   },
+  { key: 'martial_arts', icon: '🥋',  label: 'Martial Arts' },
+  { key: 'dance',        icon: '💃',  label: 'Dance'        },
+  { key: 'crossfit',     icon: '💪',  label: 'CrossFit'     },
+  { key: 'pilates',      icon: '🤸',  label: 'Pilates'      },
+];
+
+export function getSportIcon(sport: string): string {
+  const found = ALL_SPORTS.find(s => s.key === sport);
+  if (found) return found.icon;
+  const l = sport.toLowerCase();
+  if (l.includes('run'))   return '🏃';
+  if (l.includes('walk'))  return '🚶';
+  if (l.includes('cycl') || l.includes('bike')) return '🚴';
+  if (l.includes('swim'))  return '🏊';
+  if (l.includes('hik'))   return '🥾';
+  if (l.includes('ski'))   return '⛷️';
+  if (l.includes('tenn') || l.includes('teni')) return '🎾';
+  if (l.includes('foot') || l.includes('soccer')) return '⚽';
+  if (l.includes('basket')) return '🏀';
+  if (l.includes('yoga'))  return '🧘';
+  if (l.includes('gym') || l.includes('weight')) return '🏋️';
+  if (l.includes('box'))   return '🥊';
+  if (l.includes('row'))   return '🚣';
+  if (l.includes('climb')) return '🧗';
+  if (l.includes('dance')) return '💃';
+  if (l.includes('cross')) return '💪';
+  if (l.includes('pilat')) return '🤸';
+  return '🏅';
+}
+
+export function getCustomSports(): { key: string; icon: string; label: string }[] {
+  try { return JSON.parse(localStorage.getItem('mapyou_custom_sports') ?? '[]'); }
+  catch { return []; }
+}
+
+export function saveCustomSport(label: string): { key: string; icon: string; label: string } {
+  const key  = label.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  const icon = getSportIcon(label);
+  const sport = { key, icon, label };
+  const existing = getCustomSports();
+  if (!existing.find(s => s.key === key)) {
+    existing.push(sport);
+    localStorage.setItem('mapyou_custom_sports', JSON.stringify(existing));
+  }
+  return sport;
+}
+
+export function deleteCustomSport(key: string): void {
+  const updated = getCustomSports().filter(s => s.key !== key);
+  localStorage.setItem('mapyou_custom_sports', JSON.stringify(updated));
+}
+
+export function getAllSports(): { key: string; icon: string; label: string }[] {
+  return [...ALL_SPORTS, ...getCustomSports()];
+}
 
 export interface TrackerStats {
   distanceKm:  number;
@@ -27,21 +102,29 @@ export interface ActivityRecord {
 
 type OnUpdate = (stats: TrackerStats) => void;
 
-export const SPORT_ICONS: Record<SportType, string> = {
+export const SPORT_ICONS: Record<string, string> = {
   running: '🏃',
   walking: '🚶',
   cycling: '🚴',
 };
 
-export const SPORT_COLORS: Record<SportType, string> = {
+export function getIcon(sport: string): string {
+  return SPORT_ICONS[sport] ?? getSportIcon(sport);
+}
+
+export const SPORT_COLORS: Record<string, string> = {
   running: '#00c46a',
   walking: '#5badea',
   cycling: '#ffb545',
 };
 
+export function getColor(sport: string): string {
+  return SPORT_COLORS[sport] ?? '#ffffff';
+}
+
 export class Tracker {
   private map:           L.Map;
-  private sport:         SportType = 'running';
+  private sport:         string = 'running';
   private coords:        Coords[]  = [];
   private polyline:      L.Polyline | null = null;
   private dotMarker:     L.CircleMarker | null = null;
@@ -64,7 +147,7 @@ export class Tracker {
   get isPaused(): boolean  { return this._paused; }
   get currentSport(): SportType { return this.sport; }
 
-  setSport(sport: SportType): void { this.sport = sport; }
+  setSport(sport: string): void { this.sport = sport; }
 
   // ── Start ───────────────────────────────────────────────────────────────────
 
