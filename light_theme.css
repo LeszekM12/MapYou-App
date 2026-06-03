@@ -1,0 +1,557 @@
+/* ══════════════════════════════════════════════════════════════════════════════
+   MAPYOU — FULL LIGHT THEME
+   Aktywowany przez body.light-mode
+   Hierarchia odcieni (jak iOS):
+     --lt-bg-0:  #f2f2f7  — główne tło (najciemniejsze)
+     --lt-bg-1:  #ffffff  — karty, panele (jasne)
+     --lt-bg-2:  #f8f8fb  — sekcje wewnątrz kart
+     --lt-bg-3:  #efefef  — inputy, inactive
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+body.light-mode {
+  --lt-bg-0:        #f2f2f7;
+  --lt-bg-1:        #ffffff;
+  --lt-bg-2:        #f8f8fb;
+  --lt-bg-3:        #efefef;
+  --lt-text-1:      #111111;
+  --lt-text-2:      #444444;
+  --lt-text-3:      #888888;
+  --lt-text-4:      #bbbbbb;
+  --lt-divider:     rgba(0,0,0,0.08);
+  --lt-shadow:      0 1px 4px rgba(0,0,0,0.08);
+  --lt-shadow-md:   0 2px 12px rgba(0,0,0,0.10);
+  --lt-brand:       #00c46a;
+  --lt-danger:      #ef4444;
+  --color-dark--1:  #f2f2f7;
+  --color-dark--2:  #ffffff;
+  --color-light--1: #888888;
+  --color-light--2: #111111;
+  --color-light--3: #efefef;
+
+  background-color: var(--lt-bg-0) !important;
+  color: var(--lt-text-1);
+}
+
+/* ── Base ──────────────────────────────────────────────────────────────────── */
+body.light-mode * { -webkit-font-smoothing: antialiased; }
+
+/* ── App shell / tab panels ────────────────────────────────────────────────── */
+body.light-mode #tabHome,
+body.light-mode #tabMap,
+body.light-mode #tabTrack,
+body.light-mode #tabStats,
+body.light-mode #tabFriends,
+body.light-mode .tab-panel,
+body.light-mode .home-scroll,
+body.light-mode .app-shell,
+body.light-mode #tabHome .home-scroll { background: var(--lt-bg-0) !important; }
+
+/* ── Bottom navigation ─────────────────────────────────────────────────────── */
+body.light-mode .bottom-nav {
+  background: rgba(255,255,255,0.95) !important;
+  border-top: 1px solid rgba(0,0,0,0.1) !important;
+  box-shadow: 0 -1px 8px rgba(0,0,0,0.08) !important;
+  backdrop-filter: blur(12px);
+}
+body.light-mode .bottom-nav__item { color: var(--lt-text-3) !important; }
+body.light-mode .bottom-nav__item--active { color: var(--lt-brand) !important; }
+body.light-mode .bottom-nav__label { color: inherit !important; }
+
+/* ── Home header / greeting ────────────────────────────────────────────────── */
+body.light-mode .home-greeting,
+body.light-mode .home-greeting__row { background: transparent !important; }
+body.light-mode .home-greeting__text { color: var(--lt-text-2) !important; }
+body.light-mode .home-greeting__text strong { color: var(--lt-text-1) !important; }
+body.light-mode .home-greeting__sub { color: var(--lt-text-3) !important; }
+body.light-mode .home-greeting__bell-btn,
+body.light-mode .home-greeting__search-btn,
+body.light-mode .home-greeting__profile-btn {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+  color: var(--lt-text-1) !important;
+}
+body.light-mode .home-greeting__bell-btn svg,
+body.light-mode .home-greeting__search-btn svg { stroke: var(--lt-text-2) !important; }
+
+/* ── Reels row ─────────────────────────────────────────────────────────────── */
+body.light-mode .home-reel-row { background: transparent !important; }
+body.light-mode .home-reel-avatar { border-color: var(--lt-divider) !important; }
+body.light-mode .home-reel-avatar--active {
+  border-color: transparent !important;
+  background: linear-gradient(var(--lt-bg-0), var(--lt-bg-0)) padding-box,
+              linear-gradient(135deg, #f97316, #ec4899) border-box !important;
+}
+body.light-mode .home-reel-avatar--seen { border-color: #ccc !important; }
+body.light-mode .home-reel-avatar__label { color: var(--lt-text-2) !important; }
+
+/* ── Streak card ───────────────────────────────────────────────────────────── */
+body.light-mode .home-streak {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .home-streak__inner { background: transparent !important; }
+body.light-mode .home-streak__title,
+body.light-mode .home-streak__label { color: var(--lt-text-1) !important; }
+body.light-mode .home-streak__day { color: var(--lt-text-3) !important; }
+body.light-mode .home-streak__day--today { color: var(--lt-text-1) !important; font-weight: 700; }
+
+/* ── Activity / post cards ─────────────────────────────────────────────────── */
+body.light-mode .home-card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+  border: none !important;
+}
+body.light-mode .home-card__header { background: transparent !important; }
+body.light-mode .home-card__name,
+body.light-mode .home-card__title { color: var(--lt-text-1) !important; }
+body.light-mode .home-card__time { color: var(--lt-text-3) !important; }
+body.light-mode .home-card__sport-badge { color: var(--lt-text-3) !important; }
+body.light-mode .home-card__badges { background: transparent !important; }
+body.light-mode .home-card__intensity-badge {
+  background: var(--lt-bg-3) !important;
+  color: var(--lt-text-2) !important;
+  border: none !important;
+}
+body.light-mode .home-card__stat-val { color: var(--lt-text-1) !important; }
+body.light-mode .home-card__stat-lbl { color: var(--lt-text-3) !important; }
+body.light-mode .home-card__divider { background: var(--lt-divider) !important; }
+body.light-mode .home-card__footer {
+  border-top-color: var(--lt-divider) !important;
+  background: transparent !important;
+}
+body.light-mode .home-card__action { color: var(--lt-text-3) !important; background: none !important; }
+body.light-mode .home-card__action svg { stroke: var(--lt-text-3) !important; }
+body.light-mode .home-card__action--liked svg { stroke: var(--lt-danger) !important; fill: var(--lt-danger) !important; }
+body.light-mode .home-card__action-count { color: var(--lt-text-3) !important; }
+body.light-mode .home-card__notes { color: var(--lt-text-3) !important; background: var(--lt-bg-2) !important; }
+body.light-mode .home-card__desc { color: var(--lt-text-2) !important; }
+body.light-mode .home-card__map-wrap { background: var(--lt-bg-3) !important; }
+body.light-mode .home-card__author-name { color: var(--lt-text-1) !important; }
+
+/* Comment panel */
+body.light-mode .home-card__comment-panel,
+body.light-mode .hcc__form {
+  background: var(--lt-bg-2) !important;
+  border-top-color: var(--lt-divider) !important;
+}
+body.light-mode .hcc__input {
+  background: var(--lt-bg-1) !important;
+  color: var(--lt-text-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .hcc__input::placeholder { color: var(--lt-text-4) !important; }
+body.light-mode .hcc__author { color: var(--lt-text-1) !important; }
+body.light-mode .hcc__text { color: var(--lt-text-2) !important; }
+body.light-mode .hcc__time { color: var(--lt-text-3) !important; }
+body.light-mode .hcc__item { border-bottom-color: var(--lt-divider) !important; }
+
+/* Share panel */
+body.light-mode .hcs__panel {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow-md) !important;
+}
+body.light-mode .hcs__opt { color: var(--lt-text-2) !important; }
+body.light-mode .hcs__opt:hover { background: var(--lt-bg-2) !important; }
+
+/* ── Notification panel ─────────────────────────────────────────────────────── */
+body.light-mode .hn-sheet {
+  background: var(--lt-bg-1) !important;
+}
+body.light-mode .hn-header__title { color: var(--lt-text-1) !important; }
+body.light-mode .hn-clear { color: var(--lt-brand) !important; }
+body.light-mode .hn-item { border-bottom-color: var(--lt-divider) !important; }
+body.light-mode .hn-item--unread { background: rgba(0,196,106,0.05) !important; }
+body.light-mode .hn-item__title { color: var(--lt-text-1) !important; }
+body.light-mode .hn-item__body-text { color: var(--lt-text-2) !important; }
+body.light-mode .hn-item__time { color: var(--lt-text-3) !important; }
+body.light-mode .hn-empty { color: var(--lt-text-3) !important; }
+
+/* ── Profile sheet ─────────────────────────────────────────────────────────── */
+body.light-mode .pv-overlay { background: rgba(0,0,0,0.35) !important; }
+body.light-mode .pv-sheet { background: var(--lt-bg-0) !important; }
+body.light-mode .pv-handle { background: rgba(0,0,0,0.18) !important; }
+body.light-mode .pv-header { background: var(--lt-bg-0) !important; }
+body.light-mode .pv-back,
+body.light-mode .pv-header__btn {
+  background: var(--lt-bg-1) !important;
+  color: var(--lt-text-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .pv-header__btn--follow { background: var(--lt-brand) !important; color: #fff !important; }
+body.light-mode .pv-header__btn--pending { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
+body.light-mode .pv-name { color: var(--lt-text-1) !important; }
+body.light-mode .pv-bio { color: var(--lt-text-2) !important; }
+body.light-mode .pv-stats-row {
+  background: var(--lt-bg-0) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .pv-stats-row__val { color: var(--lt-text-1) !important; }
+body.light-mode .pv-stats-row__lbl { color: var(--lt-text-3) !important; }
+body.light-mode .pv-subtabs {
+  background: var(--lt-bg-0) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .pv-subtab { color: var(--lt-text-3) !important; background: none !important; }
+body.light-mode .pv-subtab--active { color: var(--lt-brand) !important; border-bottom-color: var(--lt-brand) !important; }
+body.light-mode .pv-content { background: var(--lt-bg-0) !important; }
+body.light-mode .pv-section-title { color: var(--lt-text-3) !important; letter-spacing: 0.05em; }
+body.light-mode .pv-act-list { background: var(--lt-bg-1) !important; border-radius: 16px; overflow: hidden; margin: 0 16px; }
+body.light-mode .pv-act-item {
+  background: var(--lt-bg-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .pv-act-item__name { color: var(--lt-text-1) !important; }
+body.light-mode .pv-act-item__date,
+body.light-mode .pv-act-item__time { color: var(--lt-text-3) !important; }
+body.light-mode .pv-heatmap__day { color: var(--lt-text-3) !important; }
+body.light-mode .pv-heatmap__hour-labels span { color: var(--lt-text-4) !important; }
+body.light-mode .pv-heatmap__cell { opacity: 1; }
+body.light-mode .pv-pie-legend__item { color: var(--lt-text-2) !important; }
+body.light-mode .pv-efforts { background: var(--lt-bg-1) !important; border-radius: 16px; overflow: hidden; margin: 0 16px; }
+body.light-mode .pv-effort { border-bottom-color: var(--lt-divider) !important; }
+body.light-mode .pv-effort__dist { color: var(--lt-text-1) !important; }
+body.light-mode .pv-effort__empty { color: var(--lt-text-4) !important; }
+body.light-mode .pv-effort__date { color: var(--lt-text-3) !important; }
+body.light-mode .pv-efforts__note { color: var(--lt-text-4) !important; }
+body.light-mode .pv-trophy__label { color: var(--lt-text-2) !important; }
+body.light-mode .pv-trophy-summary__count { color: var(--lt-text-1) !important; }
+body.light-mode .pv-trophy-summary__label { color: var(--lt-text-3) !important; }
+body.light-mode .pv-goal-cup { background: var(--lt-bg-1) !important; border-color: var(--lt-divider) !important; }
+body.light-mode .pv-goal-cup__title { color: var(--lt-text-1) !important; }
+body.light-mode .pv-goal-cup__sub { color: var(--lt-text-3) !important; }
+body.light-mode .pv-empty p { color: var(--lt-text-3) !important; }
+body.light-mode .pv-empty__sub { color: var(--lt-text-4) !important; }
+body.light-mode .pv-private-box {
+  background: var(--lt-bg-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .pv-private-box__title { color: var(--lt-text-1) !important; }
+body.light-mode .pv-private-box__desc { color: var(--lt-text-3) !important; }
+body.light-mode .pv-photo-strip__thumb { background: var(--lt-bg-3) !important; }
+body.light-mode #ppPrivateSection { background: transparent !important; }
+
+/* ── Feed cards (profile/club) ─────────────────────────────────────────────── */
+body.light-mode .feed-card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+  border: none !important;
+}
+body.light-mode .feed-card__header { background: transparent !important; }
+body.light-mode .feed-card__author { color: var(--lt-text-1) !important; }
+body.light-mode .feed-card__date { color: var(--lt-text-3) !important; }
+body.light-mode .feed-card__title { color: var(--lt-text-1) !important; }
+body.light-mode .feed-card__text { color: var(--lt-text-2) !important; }
+body.light-mode .feed-card__stats { color: var(--lt-text-3) !important; }
+body.light-mode .feed-card__avatar { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
+
+/* ── Search / Club ─────────────────────────────────────────────────────────── */
+body.light-mode .sv2-overlay { background: rgba(0,0,0,0.35) !important; }
+body.light-mode .sv2-sheet { background: var(--lt-bg-0) !important; }
+body.light-mode .sv2-handle { background: rgba(0,0,0,0.18) !important; }
+body.light-mode .sv2-header {
+  background: var(--lt-bg-0) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .sv2-title { color: var(--lt-text-1) !important; }
+body.light-mode .sv2-back { color: var(--lt-brand) !important; background: none !important; }
+body.light-mode .sv2-search-input {
+  background: var(--lt-bg-1) !important;
+  color: var(--lt-text-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .sv2-search-input::placeholder { color: var(--lt-text-4) !important; }
+body.light-mode .sv2-tab-bar {
+  background: var(--lt-bg-0) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .sv2-tab { color: var(--lt-text-3) !important; }
+body.light-mode .sv2-tab--active { color: var(--lt-brand) !important; border-bottom-color: var(--lt-brand) !important; }
+body.light-mode .sv2-user-card,
+body.light-mode .sv2-club-card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .sv2-user-card__name,
+body.light-mode .sv2-club-card__name { color: var(--lt-text-1) !important; }
+body.light-mode .sv2-user-card__sub,
+body.light-mode .sv2-club-card__sub { color: var(--lt-text-3) !important; }
+body.light-mode .sv2-badge--gray {
+  background: var(--lt-bg-3) !important;
+  color: var(--lt-text-2) !important;
+}
+body.light-mode .sv2-empty { color: var(--lt-text-4) !important; }
+/* Club modal */
+body.light-mode .sv2-club-detail-bg,
+body.light-mode [id^="clubDetailModal"] { background: var(--lt-bg-0) !important; }
+body.light-mode .cdb-modal { background: var(--lt-bg-0) !important; }
+body.light-mode .cdb-header {
+  background: var(--lt-bg-0) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .cdb-title { color: var(--lt-text-1) !important; }
+body.light-mode .cdb-tab { color: var(--lt-text-3) !important; }
+body.light-mode .cdb-tab--active { color: var(--lt-brand) !important; }
+body.light-mode .cdb-stat-val { color: var(--lt-text-1) !important; }
+body.light-mode .cdb-stat-lbl { color: var(--lt-text-3) !important; }
+body.light-mode .cdb-section-title { color: var(--lt-text-3) !important; }
+body.light-mode .cdb-member-name { color: var(--lt-text-1) !important; }
+body.light-mode .sv2-club-feed-item--event {
+  color: var(--lt-text-3) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .sv2-more-menu {
+  background: var(--lt-bg-1) !important;
+  border-color: var(--lt-divider) !important;
+  box-shadow: var(--lt-shadow-md) !important;
+}
+
+/* ── Friends / Live tracking ───────────────────────────────────────────────── */
+body.light-mode .ff-overlay { background: rgba(0,0,0,0.35) !important; }
+body.light-mode .ff-sheet { background: var(--lt-bg-0) !important; }
+body.light-mode .ff-header {
+  background: var(--lt-bg-0) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .ff-title { color: var(--lt-text-1) !important; }
+body.light-mode .ff-card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .ff-card__name { color: var(--lt-text-1) !important; }
+body.light-mode .ff-card__sub { color: var(--lt-text-3) !important; }
+body.light-mode .ff-card__stat-val { color: var(--lt-text-1) !important; }
+body.light-mode .ff-card__stat-lbl { color: var(--lt-text-3) !important; }
+body.light-mode .ff-empty { color: var(--lt-text-4) !important; }
+body.light-mode .ff-section-title { color: var(--lt-text-3) !important; }
+
+/* ── Stats view ────────────────────────────────────────────────────────────── */
+body.light-mode .stats-overlay { background: rgba(0,0,0,0.35) !important; }
+body.light-mode .stats-sheet { background: var(--lt-bg-0) !important; }
+body.light-mode .stats-header {
+  background: var(--lt-bg-0) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .stats-title { color: var(--lt-text-1) !important; }
+body.light-mode .stats-card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .stats-card__title { color: var(--lt-text-3) !important; }
+body.light-mode .stats-card__val { color: var(--lt-text-1) !important; }
+body.light-mode .stats-card__lbl { color: var(--lt-text-3) !important; }
+body.light-mode .stats-tab { color: var(--lt-text-3) !important; }
+body.light-mode .stats-tab--active { color: var(--lt-brand) !important; border-bottom-color: var(--lt-brand) !important; }
+body.light-mode .stats-section-title { color: var(--lt-text-3) !important; }
+body.light-mode .stats-bar-track { background: var(--lt-bg-3) !important; }
+body.light-mode .stats-goal-row { border-bottom-color: var(--lt-divider) !important; }
+body.light-mode .stats-goal-label { color: var(--lt-text-1) !important; }
+body.light-mode .stats-goal-sub { color: var(--lt-text-3) !important; }
+body.light-mode .stats-input {
+  background: var(--lt-bg-1) !important;
+  color: var(--lt-text-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .stats-history-item { border-bottom-color: var(--lt-divider) !important; }
+body.light-mode .stats-history-name { color: var(--lt-text-1) !important; }
+body.light-mode .stats-history-date { color: var(--lt-text-3) !important; }
+
+/* ── Map settings / sidebar ────────────────────────────────────────────────── */
+body.light-mode .sidebar { background: var(--lt-bg-0) !important; }
+body.light-mode .settings-panel {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow-md) !important;
+}
+body.light-mode .settings-header {
+  color: var(--lt-text-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .settings-item {
+  color: var(--lt-text-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .settings-item__icon {
+  background: var(--lt-bg-3) !important;
+  color: var(--lt-text-2) !important;
+}
+body.light-mode .settings-item__sub { color: var(--lt-text-3) !important; }
+body.light-mode .settings-item__chevron { color: var(--lt-text-4) !important; }
+
+/* ── Modals (SaveActivity, PostModal, UserProfile) ─────────────────────────── */
+body.light-mode .sam-overlay,
+body.light-mode .pm-overlay,
+body.light-mode .up-overlay { background: rgba(0,0,0,0.35) !important; }
+
+body.light-mode .sam-sheet,
+body.light-mode .pm-sheet,
+body.light-mode .up-sheet { background: var(--lt-bg-1) !important; }
+
+body.light-mode .sam-handle,
+body.light-mode .pm-handle,
+body.light-mode .up-handle { background: rgba(0,0,0,0.18) !important; }
+
+body.light-mode .sam-header,
+body.light-mode .pm-header,
+body.light-mode .up-header {
+  background: var(--lt-bg-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .sam-title,
+body.light-mode .pm-title,
+body.light-mode .up-header__title { color: var(--lt-text-1) !important; }
+body.light-mode .sam-close,
+body.light-mode .pm-close,
+body.light-mode .up-close {
+  background: var(--lt-bg-3) !important;
+  color: var(--lt-text-2) !important;
+}
+body.light-mode .sam-label,
+body.light-mode .pm-label,
+body.light-mode .up-label { color: var(--lt-text-3) !important; }
+body.light-mode .sam-input,
+body.light-mode .sam-textarea,
+body.light-mode .sam-select,
+body.light-mode .pm-input,
+body.light-mode .pm-textarea,
+body.light-mode .up-input,
+body.light-mode .up-textarea,
+body.light-mode .up-select {
+  background: var(--lt-bg-0) !important;
+  color: var(--lt-text-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .sam-sport-btn {
+  background: var(--lt-bg-0) !important;
+  border-color: var(--lt-divider) !important;
+  color: var(--lt-text-2) !important;
+}
+body.light-mode .sam-sport-btn--more { color: var(--lt-text-3) !important; }
+body.light-mode .sam-intensity-track { background: var(--lt-bg-3) !important; }
+body.light-mode .sam-photo-zone {
+  background: var(--lt-bg-0) !important;
+  border-color: var(--lt-divider) !important;
+  color: var(--lt-text-3) !important;
+}
+body.light-mode .sam-media-hint { color: var(--lt-text-4) !important; }
+body.light-mode .up-char-count { color: var(--lt-text-4) !important; }
+body.light-mode .up-save-btn { background: var(--lt-brand) !important; color: #fff !important; }
+body.light-mode .pm-footer,
+body.light-mode .up-footer {
+  background: var(--lt-bg-1) !important;
+  border-top-color: var(--lt-divider) !important;
+}
+body.light-mode .pm-btn--cancel {
+  color: var(--lt-text-2) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .pm-share-clubs label { color: var(--lt-text-2) !important; }
+body.light-mode #pmAddToHomeWrap { background: transparent !important; }
+body.light-mode #pmAddToHomeWrap label { color: var(--lt-text-2) !important; }
+
+/* ── Activity view ─────────────────────────────────────────────────────────── */
+body.light-mode .av-overlay { background: rgba(0,0,0,0.35) !important; }
+body.light-mode .av-sheet { background: var(--lt-bg-0) !important; }
+body.light-mode .av-header {
+  background: var(--lt-bg-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .av-title { color: var(--lt-text-1) !important; }
+body.light-mode .av-close { color: var(--lt-text-2) !important; background: var(--lt-bg-3) !important; }
+body.light-mode .av-stat-val { color: var(--lt-text-1) !important; }
+body.light-mode .av-stat-lbl { color: var(--lt-text-3) !important; }
+body.light-mode .av-section-title { color: var(--lt-text-3) !important; }
+body.light-mode .av-note { color: var(--lt-text-2) !important; background: var(--lt-bg-2) !important; }
+
+/* ── Map search bar ─────────────────────────────────────────────────────────── */
+body.light-mode .map-search-bar,
+body.light-mode .msb-container {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow-md) !important;
+}
+body.light-mode .msb-input {
+  background: transparent !important;
+  color: var(--lt-text-1) !important;
+}
+body.light-mode .msb-input::placeholder { color: var(--lt-text-4) !important; }
+body.light-mode .msb-results { background: var(--lt-bg-1) !important; }
+body.light-mode .msb-result-item {
+  color: var(--lt-text-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .msb-result-item:hover { background: var(--lt-bg-2) !important; }
+body.light-mode .msb-icon svg { stroke: var(--lt-text-3) !important; }
+
+/* ── Route info ─────────────────────────────────────────────────────────────── */
+body.light-mode .route-info {
+  background: var(--lt-bg-1) !important;
+  border-top-color: var(--lt-divider) !important;
+  box-shadow: 0 -2px 12px rgba(0,0,0,0.08) !important;
+}
+body.light-mode .route-info__step { color: var(--lt-text-2) !important; }
+body.light-mode .route-info__step--done { color: var(--lt-brand) !important; }
+body.light-mode .route-result__val { color: var(--lt-text-1) !important; }
+body.light-mode .route-result__lbl { color: var(--lt-text-3) !important; }
+body.light-mode .route-mini-pill {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+  color: var(--lt-text-1) !important;
+}
+
+/* ── WorkoutList / sidebar items ───────────────────────────────────────────── */
+body.light-mode .workout {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+  border-left-color: currentColor;
+}
+body.light-mode .workout__title { color: var(--lt-text-1) !important; }
+body.light-mode .workout__details { color: var(--lt-text-2) !important; }
+body.light-mode .workout__unit { color: var(--lt-text-3) !important; }
+body.light-mode .workout__date { color: var(--lt-text-3) !important; }
+body.light-mode .form {
+  background: var(--lt-bg-1) !important;
+  border-top-color: var(--lt-brand) !important;
+}
+body.light-mode .form__input,
+body.light-mode .form__select {
+  background: var(--lt-bg-0) !important;
+  color: var(--lt-text-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+
+/* ── Name setup modal ───────────────────────────────────────────────────────── */
+body.light-mode .name-modal { background: rgba(0,0,0,0.35) !important; }
+body.light-mode .name-modal__card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow-md) !important;
+  color: var(--lt-text-1) !important;
+}
+body.light-mode .name-modal__title { color: var(--lt-text-1) !important; }
+body.light-mode .name-modal__sub { color: var(--lt-text-3) !important; }
+body.light-mode .name-modal__input {
+  background: var(--lt-bg-0) !important;
+  color: var(--lt-text-1) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .name-modal__recover-link { color: var(--lt-brand) !important; }
+body.light-mode .recovery-code__display {
+  background: var(--lt-bg-0) !important;
+  border-color: var(--lt-divider) !important;
+}
+body.light-mode .recovery-code__digits { color: var(--lt-text-1) !important; }
+
+/* ── Sport picker overlay ───────────────────────────────────────────────────── */
+body.light-mode #samSportPickerOverlay > div {
+  background: var(--lt-bg-1) !important;
+}
+body.light-mode #samSportPickerOverlay [data-pick] {
+  background: var(--lt-bg-0) !important;
+  border-color: var(--lt-divider) !important;
+  color: var(--lt-text-1) !important;
+}
+body.light-mode #samSportPickerOverlay [id="samAddCustomSport"] {
+  background: var(--lt-bg-2) !important;
+  border-color: var(--lt-divider) !important;
+}
+
+/* ── iOS safe area / status bar spacing ─────────────────────────────────────── */
+body.light-mode .app-header,
+body.light-mode .safe-area-top { background: var(--lt-bg-0) !important; }
