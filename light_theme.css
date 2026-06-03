@@ -555,3 +555,224 @@ body.light-mode #samSportPickerOverlay [id="samAddCustomSport"] {
 /* ── iOS safe area / status bar spacing ─────────────────────────────────────── */
 body.light-mode .app-header,
 body.light-mode .safe-area-top { background: var(--lt-bg-0) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   FIXES — v2
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+/* ── CRITICAL: Map tab must be transparent — Leaflet renders on canvas ──────── */
+body.light-mode #tabMap,
+body.light-mode #tabMap.tab-panel,
+body.light-mode #tabMap.tab-panel--active {
+  background: transparent !important;
+}
+/* Map search bar container */
+body.light-mode .map-search-bar { background: rgba(255,255,255,0.95) !important; }
+body.light-mode .map-search-bar__inner { background: transparent !important; }
+/* Map filter chips */
+body.light-mode .map-filter-chip {
+  background: rgba(255,255,255,0.95) !important;
+  color: var(--lt-text-2) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .map-filter-chip--active {
+  background: var(--lt-brand) !important;
+  color: #fff !important;
+}
+/* Route mini pill on map */
+body.light-mode .route-mini-pill {
+  background: rgba(255,255,255,0.95) !important;
+  color: var(--lt-text-1) !important;
+  box-shadow: var(--lt-shadow-md) !important;
+}
+/* Map buttons */
+body.light-mode .btn-route,
+body.light-mode #btnRoute,
+body.light-mode .map-btn {
+  background: var(--lt-bg-1) !important;
+  color: var(--lt-text-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+
+/* ── Streak card — text invisible ───────────────────────────────────────────── */
+body.light-mode .home-streak { background: var(--lt-bg-1) !important; }
+body.light-mode .home-streak * { color: var(--lt-text-1) !important; }
+body.light-mode .home-streak__title { color: var(--lt-text-1) !important; font-weight: 700; }
+body.light-mode .home-streak__day { color: var(--lt-text-3) !important; }
+body.light-mode .home-streak__day--today { color: var(--lt-text-1) !important; }
+body.light-mode .home-streak__count { color: var(--lt-brand) !important; }
+
+/* ── Club detail — texts invisible ─────────────────────────────────────────── */
+body.light-mode [class*="cdb-"] { color: var(--lt-text-1) !important; }
+body.light-mode [class*="cdb-"]  * { color: inherit !important; }
+body.light-mode .cdb-name,
+body.light-mode .cdb-header__title { color: var(--lt-text-1) !important; }
+body.light-mode .cdb-meta,
+body.light-mode .cdb-desc,
+body.light-mode .cdb-bio { color: var(--lt-text-2) !important; }
+body.light-mode .cdb-stat-val { color: var(--lt-text-1) !important; font-weight: 700; }
+body.light-mode .cdb-stat-lbl { color: var(--lt-text-3) !important; }
+/* Club hero background */
+body.light-mode .cdb-hero,
+body.light-mode .cdb-hero-bg { background: var(--lt-bg-2) !important; }
+body.light-mode .cdb-action-btn {
+  background: var(--lt-bg-1) !important;
+  color: var(--lt-text-2) !important;
+  border-color: var(--lt-divider) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .cdb-action-btn span { color: var(--lt-text-2) !important; }
+body.light-mode .cdb-action-btn--danger span { color: var(--lt-danger) !important; }
+body.light-mode .cdb-action-btn--active {
+  background: rgba(0,196,106,0.1) !important;
+  border-color: var(--lt-brand) !important;
+}
+body.light-mode .cdb-action-btn--active span { color: var(--lt-brand) !important; }
+body.light-mode .cdb-add-post-btn {
+  background: rgba(0,196,106,0.1) !important;
+  border-color: var(--lt-brand) !important;
+  color: var(--lt-brand) !important;
+}
+body.light-mode .cdb-feed-section { background: var(--lt-bg-0) !important; }
+body.light-mode .cdb-members-list { background: var(--lt-bg-0) !important; }
+body.light-mode .cdb-member-item {
+  background: var(--lt-bg-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+
+/* ── Profile — rozjechany ───────────────────────────────────────────────────── */
+body.light-mode .pv-sheet { background: var(--lt-bg-0) !important; }
+body.light-mode .pv-content { background: var(--lt-bg-0) !important; }
+/* Photo strip */
+body.light-mode .pv-photo-strip { background: transparent !important; }
+body.light-mode .pv-photo-strip__thumb {
+  background: var(--lt-bg-3) !important;
+  border-radius: 8px;
+  overflow: hidden;
+}
+/* Private section */
+body.light-mode #ppPrivateSection { background: transparent !important; }
+body.light-mode #ppPrivateSection .pv-subtabs { background: var(--lt-bg-0) !important; }
+body.light-mode #ppPrivateSection .pv-content { background: var(--lt-bg-0) !important; }
+/* Avatar ring */
+body.light-mode .pv-avatar { background: var(--lt-bg-3) !important; }
+body.light-mode .pv-avatar--reel-active {
+  background: linear-gradient(var(--lt-bg-0), var(--lt-bg-0)) padding-box,
+              linear-gradient(135deg, #f97316, #ec4899) border-box !important;
+}
+/* Stats tab */
+body.light-mode .pv-heatmap-wrap { background: var(--lt-bg-1) !important; border-radius: 16px; margin: 0 16px; }
+body.light-mode .pv-pie-wrap {
+  background: var(--lt-bg-1) !important;
+  border-radius: 16px;
+  margin: 0 16px;
+  padding: 16px;
+}
+/* Settings in profile */
+body.light-mode #pvSettingsModal > div { background: var(--lt-bg-1) !important; }
+body.light-mode #pvSettingsModal * { color: var(--lt-text-1); }
+body.light-mode #pvSettingsModal input[type="checkbox"] + span {
+  background: rgba(0,0,0,0.15) !important;
+}
+
+/* ── Track tab ──────────────────────────────────────────────────────────────── */
+body.light-mode #tabTrack,
+body.light-mode #tabTrack.tab-panel--active { background: transparent !important; }
+body.light-mode .tracking-panel,
+body.light-mode .track-bottom-sheet {
+  background: var(--lt-bg-1) !important;
+  box-shadow: 0 -2px 16px rgba(0,0,0,0.1) !important;
+}
+body.light-mode .tracking-panel * { color: var(--lt-text-1) !important; }
+body.light-mode .track-stat-val { color: var(--lt-text-1) !important; font-weight: 700; }
+body.light-mode .track-stat-lbl { color: var(--lt-text-3) !important; }
+body.light-mode .track-btn {
+  background: var(--lt-bg-3) !important;
+  color: var(--lt-text-2) !important;
+}
+body.light-mode .track-btn--primary { background: var(--lt-brand) !important; color: #fff !important; }
+body.light-mode .track-btn--danger { background: #fee2e2 !important; color: var(--lt-danger) !important; }
+/* Sport selection in track */
+body.light-mode .sport-btn {
+  background: var(--lt-bg-1) !important;
+  border-color: var(--lt-divider) !important;
+  color: var(--lt-text-2) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .sport-btn--active {
+  border-color: var(--lt-brand) !important;
+  color: var(--lt-brand) !important;
+}
+
+/* ── Stats tab ──────────────────────────────────────────────────────────────── */
+body.light-mode #tabStats,
+body.light-mode #tabStats.tab-panel--active { background: var(--lt-bg-0) !important; }
+body.light-mode .stats-view,
+body.light-mode .stats-wrap { background: var(--lt-bg-0) !important; }
+body.light-mode .stats-summary-card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .stats-summary-val { color: var(--lt-text-1) !important; font-weight: 700; }
+body.light-mode .stats-summary-lbl { color: var(--lt-text-3) !important; }
+body.light-mode .stats-period-btn {
+  background: var(--lt-bg-3) !important;
+  color: var(--lt-text-3) !important;
+}
+body.light-mode .stats-period-btn--active {
+  background: var(--lt-brand) !important;
+  color: #fff !important;
+}
+body.light-mode .stats-chart-wrap {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+  border-radius: 16px;
+}
+body.light-mode .stats-history-item {
+  background: var(--lt-bg-1) !important;
+  border-bottom-color: var(--lt-divider) !important;
+}
+body.light-mode .stats-history-name { color: var(--lt-text-1) !important; }
+body.light-mode .stats-history-val { color: var(--lt-brand) !important; }
+body.light-mode .stats-goal-card {
+  background: var(--lt-bg-1) !important;
+  box-shadow: var(--lt-shadow) !important;
+}
+body.light-mode .stats-goal-title { color: var(--lt-text-1) !important; }
+body.light-mode .stats-progress-track { background: var(--lt-bg-3) !important; }
+
+/* ── Friends tab ────────────────────────────────────────────────────────────── */
+body.light-mode #tabFriends,
+body.light-mode #tabFriends.tab-panel--active { background: transparent !important; }
+body.light-mode .friends-map-wrap { background: transparent !important; }
+body.light-mode .friends-bottom-sheet,
+body.light-mode .friends-panel {
+  background: var(--lt-bg-1) !important;
+  box-shadow: 0 -2px 16px rgba(0,0,0,0.08) !important;
+}
+body.light-mode .friends-panel * { color: var(--lt-text-1) !important; }
+body.light-mode .friends-tab { color: var(--lt-text-3) !important; }
+body.light-mode .friends-tab--active { color: var(--lt-brand) !important; }
+
+/* ── Generic — wszystkie ciemne tła które mogły być pominięte ───────────────── */
+body.light-mode [style*="background:#1"],
+body.light-mode [style*="background: #1"],
+body.light-mode [style*="background:#0f"],
+body.light-mode [style*="background: #0f"],
+body.light-mode [style*="background:#14"],
+body.light-mode [style*="background: #14"] {
+  background: var(--lt-bg-1) !important;
+}
+body.light-mode [style*="color:#fff"],
+body.light-mode [style*="color: #fff"],
+body.light-mode [style*="color:white"],
+body.light-mode [style*="color: white"],
+body.light-mode [style*="color:rgba(255,255,255"],
+body.light-mode [style*="color: rgba(255,255,255"] {
+  color: var(--lt-text-1) !important;
+}
+/* Ale nie nadpisuj brandowych białych tekstów na zielonym tle */
+body.light-mode [style*="background:#00c46a"] [style*="color:#fff"],
+body.light-mode [style*="background: #00c46a"] [style*="color:#fff"],
+body.light-mode .pm-btn--post [style*="color"],
+body.light-mode .up-save-btn { color: #fff !important; }
