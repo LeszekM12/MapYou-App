@@ -1,409 +1,452 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   MAPYOU — FULL LIGHT THEME
-   Aktywowany przez body.light-mode
-   Hierarchia odcieni (jak iOS):
-     --lt-bg-0:  #f2f2f7  — główne tło (najciemniejsze)
-     --lt-bg-1:  #ffffff  — karty, panele (jasne)
-     --lt-bg-2:  #f8f8fb  — sekcje wewnątrz kart
-     --lt-bg-3:  #efefef  — inputy, inactive
+   MAPYOU — FULL PROFESSIONAL LIGHT THEME
+   Używa body.light-mode jako selektora
    ══════════════════════════════════════════════════════════════════════════════ */
 
 body.light-mode {
-  --lt-bg-0:        #f2f2f7;
-  --lt-bg-1:        #ffffff;
-  --lt-bg-2:        #f8f8fb;
-  --lt-bg-3:        #efefef;
-  --lt-text-1:      #111111;
-  --lt-text-2:      #444444;
-  --lt-text-3:      #888888;
-  --lt-text-4:      #bbbbbb;
-  --lt-divider:     rgba(0,0,0,0.08);
-  --lt-shadow:      0 1px 4px rgba(0,0,0,0.08);
-  --lt-shadow-md:   0 2px 12px rgba(0,0,0,0.10);
-  --lt-brand:       #00c46a;
-  --lt-danger:      #ef4444;
-  --color-dark--1:  #f2f2f7;
-  --color-dark--2:  #ffffff;
-  --color-light--1: #888888;
-  --color-light--2: #111111;
-  --color-light--3: #efefef;
+  /* Paleta */
+  --lt-bg-0:      #f2f2f7;   /* główne tło */
+  --lt-bg-1:      #ffffff;   /* karty, panele */
+  --lt-bg-2:      #f8f8fb;   /* sekcje wewnątrz */
+  --lt-bg-3:      #efefef;   /* inputy, inactive */
+  --lt-text-1:    #0a0a0a;   /* główny tekst */
+  --lt-text-2:    #3a3a3c;   /* secondary */
+  --lt-text-3:    #6b6b6b;   /* tertiary / labels */
+  --lt-text-4:    #aeaeb2;   /* placeholder */
+  --lt-divider:   rgba(0,0,0,0.09);
+  --lt-shadow:    0 1px 4px rgba(0,0,0,0.08), 0 0 1px rgba(0,0,0,0.04);
+  --lt-shadow-md: 0 4px 16px rgba(0,0,0,0.10), 0 0 1px rgba(0,0,0,0.06);
+  --lt-brand:     #00c46a;
+  --lt-danger:    #ef4444;
+
+  /* Nadpisz globalne zmienne */
+  --color-dark--1:  #f2f2f7 !important;
+  --color-dark--2:  #ffffff !important;
+  --color-light--1: #6b6b6b !important;
+  --color-light--2: #0a0a0a !important;
+  --color-light--3: #efefef !important;
+
+  /* Friends variables */
+  --f-bg:         #f2f2f7 !important;
+  --f-card:       #ffffff !important;
+  --f-card-hover: #f5f5f5 !important;
+  --f-border:     rgba(0,0,0,0.08) !important;
+  --f-text:       #0a0a0a !important;
 
   background-color: var(--lt-bg-0) !important;
-  color: var(--lt-text-1);
+  color: var(--lt-text-1) !important;
 }
 
-/* ── Base ──────────────────────────────────────────────────────────────────── */
-body.light-mode * { -webkit-font-smoothing: antialiased; }
+/* ── Tab panels — base ──────────────────────────────────────────────────────── */
+body.light-mode .tab-scroll {
+  background: var(--lt-bg-0) !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important;
+}
+body.light-mode .tab-scroll::before { background: rgba(0,0,0,0.15) !important; }
+body.light-mode .tab-header { background: transparent !important; }
 
-/* ── App shell / tab panels ────────────────────────────────────────────────── */
-body.light-mode #tabHome,
+/* Map/Track/Friends — transparent so Leaflet shows through */
 body.light-mode #tabMap,
+body.light-mode #tabMap.tab-panel--active,
 body.light-mode #tabTrack,
-body.light-mode #tabStats,
+body.light-mode #tabTrack.tab-panel--active,
 body.light-mode #tabFriends,
-body.light-mode .tab-panel,
-body.light-mode .home-scroll,
-body.light-mode .app-shell,
-body.light-mode #tabHome .home-scroll { background: var(--lt-bg-0) !important; }
+body.light-mode #tabFriends.tab-panel--active { background: transparent !important; }
 
-/* ── Bottom navigation ─────────────────────────────────────────────────────── */
+/* Map/Track tab-scroll — must be transparent */
+body.light-mode #tabMap .tab-scroll,
+body.light-mode #tabTrack .tab-scroll { background: var(--lt-bg-1) !important; }
+
+/* Stats tab */
+body.light-mode #tabStats,
+body.light-mode #tabStats.tab-panel--active { background: var(--lt-bg-0) !important; }
+body.light-mode #tabStats .tab-scroll { background: var(--lt-bg-0) !important; }
+
+/* ── Bottom nav ─────────────────────────────────────────────────────────────── */
 body.light-mode .bottom-nav {
-  background: rgba(255,255,255,0.95) !important;
+  background: rgba(255,255,255,0.92) !important;
   border-top: 1px solid rgba(0,0,0,0.1) !important;
-  box-shadow: 0 -1px 8px rgba(0,0,0,0.08) !important;
-  backdrop-filter: blur(12px);
+  box-shadow: 0 -1px 8px rgba(0,0,0,0.06) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
 }
 body.light-mode .bottom-nav__item { color: var(--lt-text-3) !important; }
 body.light-mode .bottom-nav__item--active { color: var(--lt-brand) !important; }
-body.light-mode .bottom-nav__label { color: inherit !important; }
+body.light-mode .bottom-nav__icon { stroke: currentColor !important; }
+body.light-mode .bottom-nav__label { color: inherit !important; font-size: inherit !important; }
 
-/* ── Home header / greeting ────────────────────────────────────────────────── */
-body.light-mode .home-greeting,
-body.light-mode .home-greeting__row { background: transparent !important; }
+/* ══════════════════════════════════════════════════════════════════════════════
+   HOME TAB
+   ══════════════════════════════════════════════════════════════════════════════ */
+
+body.light-mode #tabHome,
+body.light-mode #tabHome.tab-panel--active,
+body.light-mode #tabHome .tab-scroll,
+body.light-mode .home-scroll { background: var(--lt-bg-0) !important; }
+
+/* Header */
+body.light-mode .home-greeting { background: transparent !important; }
 body.light-mode .home-greeting__text { color: var(--lt-text-2) !important; }
-body.light-mode .home-greeting__text strong { color: var(--lt-text-1) !important; }
+body.light-mode .home-greeting__text strong { color: var(--lt-text-1) !important; font-weight: 800 !important; }
 body.light-mode .home-greeting__sub { color: var(--lt-text-3) !important; }
 body.light-mode .home-greeting__bell-btn,
-body.light-mode .home-greeting__search-btn,
-body.light-mode .home-greeting__profile-btn {
+body.light-mode .home-greeting__search-btn {
   background: var(--lt-bg-1) !important;
   box-shadow: var(--lt-shadow) !important;
   color: var(--lt-text-1) !important;
+  border: none !important;
 }
 body.light-mode .home-greeting__bell-btn svg,
 body.light-mode .home-greeting__search-btn svg { stroke: var(--lt-text-2) !important; }
+body.light-mode .home-greeting__profile-btn {
+  box-shadow: var(--lt-shadow) !important;
+}
 
-/* ── Reels row ─────────────────────────────────────────────────────────────── */
+/* Reels row */
 body.light-mode .home-reel-row { background: transparent !important; }
-body.light-mode .home-reel-avatar { border-color: var(--lt-divider) !important; }
+body.light-mode .home-reel-avatar { border-color: rgba(0,0,0,0.1) !important; background: var(--lt-bg-3) !important; }
 body.light-mode .home-reel-avatar--active {
   border-color: transparent !important;
   background: linear-gradient(var(--lt-bg-0), var(--lt-bg-0)) padding-box,
-              linear-gradient(135deg, #f97316, #ec4899) border-box !important;
+              linear-gradient(135deg,#f97316,#ec4899) border-box !important;
 }
-body.light-mode .home-reel-avatar--seen { border-color: #ccc !important; }
+body.light-mode .home-reel-avatar--seen { border-color: #ccc !important; background: var(--lt-bg-3) !important; }
 body.light-mode .home-reel-avatar__label { color: var(--lt-text-2) !important; }
 
-/* ── Streak card ───────────────────────────────────────────────────────────── */
-body.light-mode .home-streak {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .home-streak__inner { background: transparent !important; }
-body.light-mode .home-streak__title,
-body.light-mode .home-streak__label { color: var(--lt-text-1) !important; }
+/* Streak */
+body.light-mode .home-streak,
+body.light-mode .home-streak__inner { background: var(--lt-bg-1) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .home-streak__title { color: var(--lt-text-1) !important; }
 body.light-mode .home-streak__day { color: var(--lt-text-3) !important; }
-body.light-mode .home-streak__day--today { color: var(--lt-text-1) !important; font-weight: 700; }
+body.light-mode .home-streak__day--today { color: var(--lt-text-1) !important; font-weight: 700 !important; }
 
-/* ── Activity / post cards ─────────────────────────────────────────────────── */
+/* Activity/Post cards */
 body.light-mode .home-card {
   background: var(--lt-bg-1) !important;
   box-shadow: var(--lt-shadow) !important;
   border: none !important;
 }
 body.light-mode .home-card__header { background: transparent !important; }
-body.light-mode .home-card__name,
-body.light-mode .home-card__title { color: var(--lt-text-1) !important; }
+body.light-mode .home-card__name { color: var(--lt-text-1) !important; }
+body.light-mode .home-card__author-name { color: var(--lt-text-1) !important; font-weight: 700 !important; }
 body.light-mode .home-card__time { color: var(--lt-text-3) !important; }
 body.light-mode .home-card__sport-badge { color: var(--lt-text-3) !important; }
-body.light-mode .home-card__badges { background: transparent !important; }
-body.light-mode .home-card__intensity-badge {
-  background: var(--lt-bg-3) !important;
-  color: var(--lt-text-2) !important;
-  border: none !important;
-}
+body.light-mode .home-card__intensity-badge { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; border: none !important; }
 body.light-mode .home-card__stat-val { color: var(--lt-text-1) !important; }
 body.light-mode .home-card__stat-lbl { color: var(--lt-text-3) !important; }
-body.light-mode .home-card__divider { background: var(--lt-divider) !important; }
-body.light-mode .home-card__footer {
-  border-top-color: var(--lt-divider) !important;
-  background: transparent !important;
-}
-body.light-mode .home-card__action { color: var(--lt-text-3) !important; background: none !important; }
-body.light-mode .home-card__action svg { stroke: var(--lt-text-3) !important; }
+body.light-mode .home-card__footer { border-top: 1px solid var(--lt-divider) !important; background: transparent !important; }
+body.light-mode .home-card__action { color: var(--lt-text-3) !important; background: none !important; border: none !important; }
+body.light-mode .home-card__action svg { stroke: var(--lt-text-3) !important; fill: none !important; }
 body.light-mode .home-card__action--liked svg { stroke: var(--lt-danger) !important; fill: var(--lt-danger) !important; }
 body.light-mode .home-card__action-count { color: var(--lt-text-3) !important; }
-body.light-mode .home-card__notes { color: var(--lt-text-3) !important; background: var(--lt-bg-2) !important; }
-body.light-mode .home-card__desc { color: var(--lt-text-2) !important; }
+body.light-mode .home-card__desc,
+body.light-mode .home-card__post-body { color: var(--lt-text-2) !important; }
+body.light-mode .home-card__title,
+body.light-mode .home-card__post-title { color: var(--lt-text-1) !important; }
+body.light-mode .home-card__notes { color: var(--lt-text-3) !important; background: var(--lt-bg-2) !important; border-radius: 8px !important; }
 body.light-mode .home-card__map-wrap { background: var(--lt-bg-3) !important; }
-body.light-mode .home-card__author-name { color: var(--lt-text-1) !important; }
 
 /* Comment panel */
 body.light-mode .home-card__comment-panel,
-body.light-mode .hcc__form {
-  background: var(--lt-bg-2) !important;
-  border-top-color: var(--lt-divider) !important;
-}
-body.light-mode .hcc__input {
-  background: var(--lt-bg-1) !important;
-  color: var(--lt-text-1) !important;
-  border-color: var(--lt-divider) !important;
-}
+body.light-mode .hcc__form { background: var(--lt-bg-2) !important; border-top: 1px solid var(--lt-divider) !important; }
+body.light-mode .hcc__input { background: var(--lt-bg-1) !important; color: var(--lt-text-1) !important; border-color: var(--lt-divider) !important; }
 body.light-mode .hcc__input::placeholder { color: var(--lt-text-4) !important; }
 body.light-mode .hcc__author { color: var(--lt-text-1) !important; }
 body.light-mode .hcc__text { color: var(--lt-text-2) !important; }
 body.light-mode .hcc__time { color: var(--lt-text-3) !important; }
-body.light-mode .hcc__item { border-bottom-color: var(--lt-divider) !important; }
+body.light-mode .hcc__item { border-bottom: 1px solid var(--lt-divider) !important; }
 
 /* Share panel */
-body.light-mode .hcs__panel {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow-md) !important;
-}
-body.light-mode .hcs__opt { color: var(--lt-text-2) !important; }
+body.light-mode .hcs__panel { background: var(--lt-bg-1) !important; box-shadow: var(--lt-shadow-md) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .hcs__opt { color: var(--lt-text-2) !important; background: none !important; }
 body.light-mode .hcs__opt:hover { background: var(--lt-bg-2) !important; }
 
-/* ── Notification panel ─────────────────────────────────────────────────────── */
-body.light-mode .hn-sheet {
-  background: var(--lt-bg-1) !important;
-}
+/* Notification panel */
+body.light-mode .hn-sheet { background: var(--lt-bg-1) !important; }
+body.light-mode .hn-header { border-bottom: 1px solid var(--lt-divider) !important; background: var(--lt-bg-1) !important; }
 body.light-mode .hn-header__title { color: var(--lt-text-1) !important; }
-body.light-mode .hn-clear { color: var(--lt-brand) !important; }
-body.light-mode .hn-item { border-bottom-color: var(--lt-divider) !important; }
-body.light-mode .hn-item--unread { background: rgba(0,196,106,0.05) !important; }
+body.light-mode .hn-clear { color: var(--lt-brand) !important; background: none !important; }
+body.light-mode .hn-item { border-bottom: 1px solid var(--lt-divider) !important; background: transparent !important; }
+body.light-mode .hn-item--unread { background: rgba(0,196,106,0.04) !important; }
 body.light-mode .hn-item__title { color: var(--lt-text-1) !important; }
 body.light-mode .hn-item__body-text { color: var(--lt-text-2) !important; }
 body.light-mode .hn-item__time { color: var(--lt-text-3) !important; }
 body.light-mode .hn-empty { color: var(--lt-text-3) !important; }
 
-/* ── Profile sheet ─────────────────────────────────────────────────────────── */
-body.light-mode .pv-overlay { background: rgba(0,0,0,0.35) !important; }
-body.light-mode .pv-sheet { background: var(--lt-bg-0) !important; }
-body.light-mode .pv-handle { background: rgba(0,0,0,0.18) !important; }
-body.light-mode .pv-header { background: var(--lt-bg-0) !important; }
-body.light-mode .pv-back,
-body.light-mode .pv-header__btn {
-  background: var(--lt-bg-1) !important;
-  color: var(--lt-text-1) !important;
-  border-color: var(--lt-divider) !important;
+/* ══════════════════════════════════════════════════════════════════════════════
+   PROFILE
+   ══════════════════════════════════════════════════════════════════════════════ */
+body.light-mode .pv-overlay { background: rgba(0,0,0,0.3) !important; }
+body.light-mode .pv-sheet {
+  background: var(--lt-bg-0) !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important;
 }
-body.light-mode .pv-header__btn--follow { background: var(--lt-brand) !important; color: #fff !important; }
+body.light-mode .pv-handle { background: rgba(0,0,0,0.2) !important; }
+body.light-mode .pv-header { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .pv-back { background: var(--lt-bg-1) !important; color: var(--lt-text-1) !important; box-shadow: var(--lt-shadow) !important; border: none !important; }
+body.light-mode .pv-header__btn { background: var(--lt-bg-1) !important; color: var(--lt-text-1) !important; box-shadow: var(--lt-shadow) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .pv-header__btn--follow { background: var(--lt-brand) !important; color: #fff !important; border-color: var(--lt-brand) !important; }
 body.light-mode .pv-header__btn--pending { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
+body.light-mode .pv-hero { background: transparent !important; }
+body.light-mode .pv-avatar { background: var(--lt-bg-3) !important; }
 body.light-mode .pv-name { color: var(--lt-text-1) !important; }
 body.light-mode .pv-bio { color: var(--lt-text-2) !important; }
-body.light-mode .pv-stats-row {
-  background: var(--lt-bg-0) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
+body.light-mode .pv-stats-row { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .pv-stats-row__item { background: transparent !important; }
 body.light-mode .pv-stats-row__val { color: var(--lt-text-1) !important; }
 body.light-mode .pv-stats-row__lbl { color: var(--lt-text-3) !important; }
-body.light-mode .pv-subtabs {
-  background: var(--lt-bg-0) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .pv-subtab { color: var(--lt-text-3) !important; background: none !important; }
+body.light-mode .pv-photo-strip { background: transparent !important; padding: 8px 16px !important; }
+body.light-mode .pv-photo-strip__thumb { background: var(--lt-bg-3) !important; border-radius: 8px !important; overflow: hidden !important; }
+body.light-mode .pv-photo-strip__more { background: rgba(0,0,0,0.5) !important; color: #fff !important; }
+body.light-mode .pv-subtabs { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .pv-subtab { color: var(--lt-text-3) !important; background: none !important; border-bottom: 2px solid transparent !important; }
 body.light-mode .pv-subtab--active { color: var(--lt-brand) !important; border-bottom-color: var(--lt-brand) !important; }
 body.light-mode .pv-content { background: var(--lt-bg-0) !important; }
-body.light-mode .pv-section-title { color: var(--lt-text-3) !important; letter-spacing: 0.05em; }
-body.light-mode .pv-act-list { background: var(--lt-bg-1) !important; border-radius: 16px; overflow: hidden; margin: 0 16px; }
-body.light-mode .pv-act-item {
-  background: var(--lt-bg-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
+body.light-mode #ppPrivateSection { background: transparent !important; }
+body.light-mode #ppPrivateSection .pv-content { background: var(--lt-bg-0) !important; }
+body.light-mode .pv-section-title { color: var(--lt-text-3) !important; text-transform: uppercase !important; font-size: 1.1rem !important; letter-spacing: 0.06em !important; padding: 16px 16px 8px !important; }
+body.light-mode .pv-act-list { background: var(--lt-bg-1) !important; border-radius: 16px !important; overflow: hidden !important; margin: 0 16px !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .pv-act-item { background: var(--lt-bg-1) !important; border-bottom: 1px solid var(--lt-divider) !important; }
 body.light-mode .pv-act-item__name { color: var(--lt-text-1) !important; }
 body.light-mode .pv-act-item__date,
 body.light-mode .pv-act-item__time { color: var(--lt-text-3) !important; }
+body.light-mode .pv-heatmap-wrap { background: var(--lt-bg-1) !important; border-radius: 16px !important; margin: 0 16px !important; padding: 16px !important; box-shadow: var(--lt-shadow) !important; overflow-x: auto !important; }
 body.light-mode .pv-heatmap__day { color: var(--lt-text-3) !important; }
 body.light-mode .pv-heatmap__hour-labels span { color: var(--lt-text-4) !important; }
-body.light-mode .pv-heatmap__cell { opacity: 1; }
+body.light-mode .pv-pie-wrap { background: var(--lt-bg-1) !important; border-radius: 16px !important; margin: 0 16px !important; padding: 16px !important; box-shadow: var(--lt-shadow) !important; }
 body.light-mode .pv-pie-legend__item { color: var(--lt-text-2) !important; }
-body.light-mode .pv-efforts { background: var(--lt-bg-1) !important; border-radius: 16px; overflow: hidden; margin: 0 16px; }
-body.light-mode .pv-effort { border-bottom-color: var(--lt-divider) !important; }
+body.light-mode .pv-efforts { background: var(--lt-bg-1) !important; border-radius: 16px !important; margin: 0 16px !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .pv-effort { border-bottom: 1px solid var(--lt-divider) !important; }
 body.light-mode .pv-effort__dist { color: var(--lt-text-1) !important; }
+body.light-mode .pv-effort__time { color: var(--lt-brand) !important; }
 body.light-mode .pv-effort__empty { color: var(--lt-text-4) !important; }
 body.light-mode .pv-effort__date { color: var(--lt-text-3) !important; }
 body.light-mode .pv-efforts__note { color: var(--lt-text-4) !important; }
 body.light-mode .pv-trophy__label { color: var(--lt-text-2) !important; }
+body.light-mode .pv-trophy-summary { background: transparent !important; }
 body.light-mode .pv-trophy-summary__count { color: var(--lt-text-1) !important; }
 body.light-mode .pv-trophy-summary__label { color: var(--lt-text-3) !important; }
-body.light-mode .pv-goal-cup { background: var(--lt-bg-1) !important; border-color: var(--lt-divider) !important; }
+body.light-mode .pv-goal-cup { background: var(--lt-bg-1) !important; border: 1px solid var(--lt-divider) !important; border-radius: 12px !important; }
 body.light-mode .pv-goal-cup__title { color: var(--lt-text-1) !important; }
 body.light-mode .pv-goal-cup__sub { color: var(--lt-text-3) !important; }
-body.light-mode .pv-empty p { color: var(--lt-text-3) !important; }
-body.light-mode .pv-empty__sub { color: var(--lt-text-4) !important; }
-body.light-mode .pv-private-box {
-  background: var(--lt-bg-1) !important;
-  border-color: var(--lt-divider) !important;
-}
+body.light-mode .pv-private-box { background: var(--lt-bg-1) !important; border: 1px solid var(--lt-divider) !important; border-radius: 16px !important; }
 body.light-mode .pv-private-box__title { color: var(--lt-text-1) !important; }
 body.light-mode .pv-private-box__desc { color: var(--lt-text-3) !important; }
-body.light-mode .pv-photo-strip__thumb { background: var(--lt-bg-3) !important; }
-body.light-mode #ppPrivateSection { background: transparent !important; }
+body.light-mode .pv-empty p { color: var(--lt-text-3) !important; }
+body.light-mode .pv-empty__sub { color: var(--lt-text-4) !important; }
+body.light-mode .pv-empty__icon { opacity: 0.5 !important; }
 
-/* ── Feed cards (profile/club) ─────────────────────────────────────────────── */
-body.light-mode .feed-card {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-  border: none !important;
-}
+/* Feed cards in profile */
+body.light-mode .feed-card { background: var(--lt-bg-1) !important; box-shadow: var(--lt-shadow) !important; border: none !important; border-radius: 16px !important; }
 body.light-mode .feed-card__header { background: transparent !important; }
-body.light-mode .feed-card__author { color: var(--lt-text-1) !important; }
+body.light-mode .feed-card__avatar { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
+body.light-mode .feed-card__author { color: var(--lt-text-1) !important; font-weight: 700 !important; }
 body.light-mode .feed-card__date { color: var(--lt-text-3) !important; }
 body.light-mode .feed-card__title { color: var(--lt-text-1) !important; }
 body.light-mode .feed-card__text { color: var(--lt-text-2) !important; }
 body.light-mode .feed-card__stats { color: var(--lt-text-3) !important; }
-body.light-mode .feed-card__avatar { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
+body.light-mode .feed-card__more { color: var(--lt-text-3) !important; }
 
-/* ── Search / Club ─────────────────────────────────────────────────────────── */
-body.light-mode .sv2-overlay { background: rgba(0,0,0,0.35) !important; }
+/* Profile settings modal */
+body.light-mode #pvSettingsModal > div > div:first-child { background: transparent !important; }
+body.light-mode #pvSettingsModal > div > div:nth-child(2) > div:first-child { background: var(--lt-bg-0) !important; }
+body.light-mode #pvSettingsModal [style*="background:#1a1f23"],
+body.light-mode #pvSettingsModal [style*="background: #1a1f23"] { background: var(--lt-bg-1) !important; }
+body.light-mode #pvSettingsModal span[style*="color:#fff"],
+body.light-mode #pvSettingsModal div[style*="color:#fff"] { color: var(--lt-text-1) !important; }
+body.light-mode #pvFollowListModal [style*="background:#1a1f23"] { background: var(--lt-bg-1) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   SEARCH & CLUBS
+   ══════════════════════════════════════════════════════════════════════════════ */
+body.light-mode .sv2-overlay { background: rgba(0,0,0,0.3) !important; }
 body.light-mode .sv2-sheet { background: var(--lt-bg-0) !important; }
-body.light-mode .sv2-handle { background: rgba(0,0,0,0.18) !important; }
-body.light-mode .sv2-header {
-  background: var(--lt-bg-0) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
+body.light-mode .sv2-handle { background: rgba(0,0,0,0.2) !important; }
+body.light-mode .sv2-header { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
 body.light-mode .sv2-title { color: var(--lt-text-1) !important; }
-body.light-mode .sv2-back { color: var(--lt-brand) !important; background: none !important; }
-body.light-mode .sv2-search-input {
-  background: var(--lt-bg-1) !important;
-  color: var(--lt-text-1) !important;
-  border-color: var(--lt-divider) !important;
-}
+body.light-mode .sv2-back { color: var(--lt-brand) !important; background: none !important; border: none !important; }
+body.light-mode .sv2-search-wrap { background: var(--lt-bg-0) !important; }
+body.light-mode .sv2-search-input { background: var(--lt-bg-1) !important; color: var(--lt-text-1) !important; border: 1px solid var(--lt-divider) !important; box-shadow: var(--lt-shadow) !important; }
 body.light-mode .sv2-search-input::placeholder { color: var(--lt-text-4) !important; }
-body.light-mode .sv2-tab-bar {
-  background: var(--lt-bg-0) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .sv2-tab { color: var(--lt-text-3) !important; }
+body.light-mode .sv2-tab-bar { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv2-tab { color: var(--lt-text-3) !important; background: none !important; }
 body.light-mode .sv2-tab--active { color: var(--lt-brand) !important; border-bottom-color: var(--lt-brand) !important; }
 body.light-mode .sv2-user-card,
-body.light-mode .sv2-club-card {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
+body.light-mode .sv2-club-card { background: var(--lt-bg-1) !important; box-shadow: var(--lt-shadow) !important; border: none !important; }
 body.light-mode .sv2-user-card__name,
 body.light-mode .sv2-club-card__name { color: var(--lt-text-1) !important; }
 body.light-mode .sv2-user-card__sub,
 body.light-mode .sv2-club-card__sub { color: var(--lt-text-3) !important; }
-body.light-mode .sv2-badge--gray {
-  background: var(--lt-bg-3) !important;
-  color: var(--lt-text-2) !important;
-}
-body.light-mode .sv2-empty { color: var(--lt-text-4) !important; }
-/* Club modal */
-body.light-mode .sv2-club-detail-bg,
-body.light-mode [id^="clubDetailModal"] { background: var(--lt-bg-0) !important; }
-body.light-mode .cdb-modal { background: var(--lt-bg-0) !important; }
-body.light-mode .cdb-header {
-  background: var(--lt-bg-0) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .cdb-title { color: var(--lt-text-1) !important; }
-body.light-mode .cdb-tab { color: var(--lt-text-3) !important; }
-body.light-mode .cdb-tab--active { color: var(--lt-brand) !important; }
-body.light-mode .cdb-stat-val { color: var(--lt-text-1) !important; }
-body.light-mode .cdb-stat-lbl { color: var(--lt-text-3) !important; }
-body.light-mode .cdb-section-title { color: var(--lt-text-3) !important; }
-body.light-mode .cdb-member-name { color: var(--lt-text-1) !important; }
-body.light-mode .sv2-club-feed-item--event {
-  color: var(--lt-text-3) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .sv2-more-menu {
-  background: var(--lt-bg-1) !important;
-  border-color: var(--lt-divider) !important;
-  box-shadow: var(--lt-shadow-md) !important;
-}
+body.light-mode .sv2-badge--gray { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv2-empty { color: var(--lt-text-3) !important; }
+body.light-mode .sv2-more-menu { background: var(--lt-bg-1) !important; border: 1px solid var(--lt-divider) !important; box-shadow: var(--lt-shadow-md) !important; }
+body.light-mode .sv2-more-menu button { color: var(--lt-danger) !important; background: none !important; }
 
-/* ── Friends / Live tracking ───────────────────────────────────────────────── */
-body.light-mode .ff-overlay { background: rgba(0,0,0,0.35) !important; }
-body.light-mode .ff-sheet { background: var(--lt-bg-0) !important; }
-body.light-mode .ff-header {
-  background: var(--lt-bg-0) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .ff-title { color: var(--lt-text-1) !important; }
-body.light-mode .ff-card {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .ff-card__name { color: var(--lt-text-1) !important; }
-body.light-mode .ff-card__sub { color: var(--lt-text-3) !important; }
-body.light-mode .ff-card__stat-val { color: var(--lt-text-1) !important; }
-body.light-mode .ff-card__stat-lbl { color: var(--lt-text-3) !important; }
-body.light-mode .ff-empty { color: var(--lt-text-4) !important; }
-body.light-mode .ff-section-title { color: var(--lt-text-3) !important; }
+/* Club detail modal */
+body.light-mode .sv2-club-detail-bg { background: var(--lt-bg-2) !important; }
+/* Club modal dynamically styled — override inline styles */
+body.light-mode [id*="clubDetail"],
+body.light-mode [id*="cdbModal"] { background: var(--lt-bg-0) !important; }
 
-/* ── Stats view ────────────────────────────────────────────────────────────── */
-body.light-mode .stats-overlay { background: rgba(0,0,0,0.35) !important; }
-body.light-mode .stats-sheet { background: var(--lt-bg-0) !important; }
-body.light-mode .stats-header {
-  background: var(--lt-bg-0) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .stats-title { color: var(--lt-text-1) !important; }
-body.light-mode .stats-card {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .stats-card__title { color: var(--lt-text-3) !important; }
-body.light-mode .stats-card__val { color: var(--lt-text-1) !important; }
-body.light-mode .stats-card__lbl { color: var(--lt-text-3) !important; }
-body.light-mode .stats-tab { color: var(--lt-text-3) !important; }
-body.light-mode .stats-tab--active { color: var(--lt-brand) !important; border-bottom-color: var(--lt-brand) !important; }
-body.light-mode .stats-section-title { color: var(--lt-text-3) !important; }
-body.light-mode .stats-bar-track { background: var(--lt-bg-3) !important; }
-body.light-mode .stats-goal-row { border-bottom-color: var(--lt-divider) !important; }
-body.light-mode .stats-goal-label { color: var(--lt-text-1) !important; }
-body.light-mode .stats-goal-sub { color: var(--lt-text-3) !important; }
-body.light-mode .stats-input {
-  background: var(--lt-bg-1) !important;
-  color: var(--lt-text-1) !important;
-  border-color: var(--lt-divider) !important;
-}
-body.light-mode .stats-history-item { border-bottom-color: var(--lt-divider) !important; }
-body.light-mode .stats-history-name { color: var(--lt-text-1) !important; }
-body.light-mode .stats-history-date { color: var(--lt-text-3) !important; }
+/* ══════════════════════════════════════════════════════════════════════════════
+   FRIENDS TAB
+   ══════════════════════════════════════════════════════════════════════════════ */
+body.light-mode .friends-header { background: var(--lt-bg-1) !important; border-bottom: 1px solid var(--lt-divider) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .friends-header__title { color: var(--lt-text-1) !important; }
+body.light-mode .friends-header__btn { background: var(--lt-bg-1) !important; border-color: var(--lt-divider) !important; color: var(--lt-text-1) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .friends-header__btn--share { background: var(--lt-brand) !important; border-color: var(--lt-brand) !important; color: #fff !important; }
+body.light-mode .friends-list { background: transparent !important; }
+body.light-mode .friends-empty p { color: var(--lt-text-3) !important; }
+body.light-mode .friend-card { background: var(--lt-bg-1) !important; border: 1px solid var(--lt-divider) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .friend-card__name { color: var(--lt-text-1) !important; }
+body.light-mode .friend-card__meta { color: var(--lt-text-3) !important; }
+body.light-mode .friend-card__btn { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .friend-card__btn--watch { background: var(--lt-brand) !important; color: #fff !important; border-color: var(--lt-brand) !important; }
+body.light-mode .friend-card__btn--delete { color: var(--lt-danger) !important; background: #fee2e2 !important; border-color: #fecaca !important; }
+body.light-mode .fls-panel { background: var(--lt-bg-1) !important; box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important; }
+body.light-mode .fls-header { background: var(--lt-bg-1) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .fls-header__name { color: var(--lt-text-1) !important; }
+body.light-mode .fls-close { color: var(--lt-text-3) !important; background: var(--lt-bg-3) !important; }
+body.light-mode .fls-status-bar { background: var(--lt-bg-2) !important; }
+body.light-mode .fls-status,
+body.light-mode .fls-meta { color: var(--lt-text-2) !important; }
+body.light-mode .af-modal__sheet { background: var(--lt-bg-1) !important; box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important; }
+body.light-mode .af-modal__handle { background: rgba(0,0,0,0.2) !important; }
+body.light-mode .af-modal__title { color: var(--lt-text-1) !important; }
+body.light-mode .af-modal__hint { color: var(--lt-text-3) !important; }
+body.light-mode .af-modal__prefill { background: var(--lt-bg-0) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .af-modal__input { background: var(--lt-bg-0) !important; color: var(--lt-text-1) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .af-modal__input::placeholder { color: var(--lt-text-4) !important; }
+body.light-mode .af-modal__btn--cancel { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
 
-/* ── Map settings / sidebar ────────────────────────────────────────────────── */
-body.light-mode .sidebar { background: var(--lt-bg-0) !important; }
-body.light-mode .settings-panel {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow-md) !important;
-}
-body.light-mode .settings-header {
-  color: var(--lt-text-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .settings-item {
-  color: var(--lt-text-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .settings-item__icon {
-  background: var(--lt-bg-3) !important;
-  color: var(--lt-text-2) !important;
-}
+/* ══════════════════════════════════════════════════════════════════════════════
+   STATS TAB
+   ══════════════════════════════════════════════════════════════════════════════ */
+body.light-mode .sv-header { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-subtabs { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-subtab { color: var(--lt-text-3) !important; background: none !important; }
+body.light-mode .sv-subtab--active { color: var(--lt-brand) !important; background: none !important; }
+body.light-mode .sv-section { background: transparent !important; }
+body.light-mode .sv-section__title { color: var(--lt-text-3) !important; text-transform: uppercase !important; letter-spacing: 0.06em !important; }
+body.light-mode .sv-week-goal { background: var(--lt-bg-1) !important; border-radius: 16px !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .sv-week-goal__header { color: var(--lt-text-1) !important; }
+body.light-mode .sv-week-goal__bar { background: var(--lt-bg-3) !important; }
+body.light-mode .sv-week-nav { background: transparent !important; }
+body.light-mode .sv-week-label { color: var(--lt-text-1) !important; }
+body.light-mode .sv-icon-btn { background: var(--lt-bg-1) !important; color: var(--lt-text-2) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .sv-icon-btn:hover { background: var(--lt-bg-2) !important; }
+body.light-mode .sv-seg { background: var(--lt-bg-1) !important; border-radius: 12px !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .sv-seg__btn { color: var(--lt-text-3) !important; background: none !important; }
+body.light-mode .sv-seg__btn--active { background: var(--lt-bg-3) !important; color: var(--lt-text-1) !important; }
+body.light-mode .sv-records { background: var(--lt-bg-1) !important; border-radius: 16px !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .sv-record { border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-record__label { color: var(--lt-text-1) !important; }
+body.light-mode .sv-record__date { color: var(--lt-text-3) !important; }
+body.light-mode .sv-trend-label { color: var(--lt-text-3) !important; }
+body.light-mode .sv-trend-vals { color: var(--lt-text-1) !important; }
+body.light-mode .sv-goal-editor { background: var(--lt-bg-1) !important; border-radius: 16px !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .sv-goal-row { border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-goal-row span { color: var(--lt-text-1) !important; }
+body.light-mode .sv-goal-input { background: var(--lt-bg-0) !important; color: var(--lt-text-1) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-empty { color: var(--lt-text-3) !important; }
+body.light-mode .sv-toolbar { background: var(--lt-bg-0) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-filter { background: var(--lt-bg-1) !important; color: var(--lt-text-2) !important; border: 1px solid var(--lt-divider) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .sv-filter--active { background: var(--lt-brand) !important; color: #fff !important; border-color: var(--lt-brand) !important; }
+body.light-mode .sv-sort { background: var(--lt-bg-1) !important; color: var(--lt-text-2) !important; border: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-item { background: var(--lt-bg-1) !important; border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-item__name { color: var(--lt-text-1) !important; }
+body.light-mode .sv-item__date { color: var(--lt-text-3) !important; }
+body.light-mode .sv-item__src--manual { background: var(--lt-bg-3) !important; color: var(--lt-text-3) !important; }
+body.light-mode .sv-item__del { color: var(--lt-text-4) !important; background: none !important; }
+body.light-mode .sv-empty-history { background: transparent !important; }
+body.light-mode .sv-empty-history__text { color: var(--lt-text-3) !important; }
+body.light-mode .sv-empty-history__sub { color: var(--lt-text-4) !important; }
+/* Detail sheet */
+body.light-mode .sv-detail-sheet { background: transparent !important; }
+body.light-mode .sv-detail-overlay { background: rgba(0,0,0,0.3) !important; }
+body.light-mode .sv-detail-panel { background: var(--lt-bg-0) !important; box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important; }
+body.light-mode .sv-detail-handle { background: rgba(0,0,0,0.2) !important; }
+body.light-mode .sv-detail-header { background: var(--lt-bg-1) !important; border-radius: 16px !important; box-shadow: var(--lt-shadow) !important; margin: 0 16px !important; }
+body.light-mode .sv-detail-header__name { color: var(--lt-text-1) !important; }
+body.light-mode .sv-detail-header__date { color: var(--lt-text-3) !important; }
+body.light-mode .sv-detail-close { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
+body.light-mode .sv-detail-stats { background: var(--lt-bg-1) !important; border-radius: 16px !important; box-shadow: var(--lt-shadow) !important; margin: 0 16px !important; }
+body.light-mode .sv-detail-stat { border-bottom: 1px solid var(--lt-divider) !important; }
+body.light-mode .sv-detail-stat__val { color: var(--lt-text-1) !important; }
+body.light-mode .sv-detail-stat__lbl { color: var(--lt-text-3) !important; }
+body.light-mode .sv-detail-notes { background: var(--lt-bg-1) !important; color: var(--lt-text-2) !important; border-radius: 16px !important; margin: 0 16px !important; }
+body.light-mode .sv-detail-intensity { color: var(--lt-text-2) !important; }
+body.light-mode .sv-detail-src { color: var(--lt-text-3) !important; background: var(--lt-bg-3) !important; }
+body.light-mode .sv-chart-wrap { background: var(--lt-bg-1) !important; border-radius: 16px !important; box-shadow: var(--lt-shadow) !important; margin: 0 16px !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MAP TAB — search & settings overlay
+   ══════════════════════════════════════════════════════════════════════════════ */
+body.light-mode .map-search-bar { background: rgba(255,255,255,0.95) !important; box-shadow: var(--lt-shadow-md) !important; backdrop-filter: blur(12px) !important; }
+body.light-mode .msb-input { background: transparent !important; color: var(--lt-text-1) !important; }
+body.light-mode .msb-input::placeholder { color: var(--lt-text-4) !important; }
+body.light-mode .msb-results { background: var(--lt-bg-1) !important; border-top: 1px solid var(--lt-divider) !important; }
+body.light-mode .msb-result-item { color: var(--lt-text-1) !important; border-bottom: 1px solid var(--lt-divider) !important; background: none !important; }
+body.light-mode .msb-result-item:hover { background: var(--lt-bg-2) !important; }
+body.light-mode .msb-icon svg { stroke: var(--lt-text-3) !important; }
+body.light-mode .map-filter-chip { background: var(--lt-bg-1) !important; color: var(--lt-text-2) !important; border: 1px solid var(--lt-divider) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .map-filter-chip--active { background: var(--lt-brand) !important; color: #fff !important; border-color: var(--lt-brand) !important; }
+body.light-mode .route-mini-pill { background: rgba(255,255,255,0.95) !important; color: var(--lt-text-1) !important; box-shadow: var(--lt-shadow-md) !important; }
+body.light-mode .route-info { background: rgba(255,255,255,0.97) !important; border-top: 1px solid var(--lt-divider) !important; box-shadow: 0 -2px 16px rgba(0,0,0,0.08) !important; }
+body.light-mode .route-info__step { color: var(--lt-text-2) !important; }
+body.light-mode .route-info__step--done { color: var(--lt-brand) !important; }
+body.light-mode .route-result__val { color: var(--lt-text-1) !important; }
+body.light-mode .route-result__lbl { color: var(--lt-text-3) !important; }
+body.light-mode .route-marker { background: var(--lt-brand) !important; color: #fff !important; }
+body.light-mode .tab-header__city { color: var(--lt-text-1) !important; }
+body.light-mode .tab-header__weather { color: var(--lt-text-2) !important; }
+
+/* Settings panel */
+body.light-mode .settings-panel { background: var(--lt-bg-1) !important; box-shadow: var(--lt-shadow-md) !important; }
+body.light-mode .settings-header { color: var(--lt-text-1) !important; border-bottom: 1px solid var(--lt-divider) !important; background: var(--lt-bg-1) !important; }
+body.light-mode .settings-item { color: var(--lt-text-1) !important; border-bottom: 1px solid var(--lt-divider) !important; background: none !important; }
+body.light-mode .settings-item__icon { background: var(--lt-bg-3) !important; }
 body.light-mode .settings-item__sub { color: var(--lt-text-3) !important; }
 body.light-mode .settings-item__chevron { color: var(--lt-text-4) !important; }
 
-/* ── Modals (SaveActivity, PostModal, UserProfile) ─────────────────────────── */
+/* Sidebar workouts */
+body.light-mode .sidebar { background: var(--lt-bg-0) !important; }
+body.light-mode .workout { background: var(--lt-bg-1) !important; box-shadow: var(--lt-shadow) !important; }
+body.light-mode .workout__title { color: var(--lt-text-1) !important; }
+body.light-mode .workout__details { color: var(--lt-text-2) !important; }
+body.light-mode .workout__unit { color: var(--lt-text-3) !important; }
+body.light-mode .workout__date { color: var(--lt-text-3) !important; }
+body.light-mode .form { background: var(--lt-bg-1) !important; }
+body.light-mode .form__input,
+body.light-mode .form__select { background: var(--lt-bg-0) !important; color: var(--lt-text-1) !important; border-color: var(--lt-divider) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   TRACK TAB
+   ══════════════════════════════════════════════════════════════════════════════ */
+body.light-mode #tabTrack .tab-scroll { background: rgba(255,255,255,0.97) !important; }
+body.light-mode .tab-header__location { color: var(--lt-text-2) !important; }
+
+/* ══════════════════════════════════════════════════════════════════════════════
+   MODALS (SaveActivity, PostModal, UserProfile)
+   ══════════════════════════════════════════════════════════════════════════════ */
 body.light-mode .sam-overlay,
 body.light-mode .pm-overlay,
-body.light-mode .up-overlay { background: rgba(0,0,0,0.35) !important; }
-
+body.light-mode .up-overlay { background: rgba(0,0,0,0.3) !important; }
 body.light-mode .sam-sheet,
 body.light-mode .pm-sheet,
 body.light-mode .up-sheet { background: var(--lt-bg-1) !important; }
-
 body.light-mode .sam-handle,
 body.light-mode .pm-handle,
-body.light-mode .up-handle { background: rgba(0,0,0,0.18) !important; }
-
+body.light-mode .up-handle { background: rgba(0,0,0,0.2) !important; }
 body.light-mode .sam-header,
 body.light-mode .pm-header,
-body.light-mode .up-header {
-  background: var(--lt-bg-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
+body.light-mode .up-header { background: var(--lt-bg-1) !important; border-bottom: 1px solid var(--lt-divider) !important; }
 body.light-mode .sam-title,
 body.light-mode .pm-title,
 body.light-mode .up-header__title { color: var(--lt-text-1) !important; }
 body.light-mode .sam-close,
 body.light-mode .pm-close,
-body.light-mode .up-close {
-  background: var(--lt-bg-3) !important;
-  color: var(--lt-text-2) !important;
-}
+body.light-mode .up-close { background: var(--lt-bg-3) !important; color: var(--lt-text-2) !important; }
 body.light-mode .sam-label,
 body.light-mode .pm-label,
 body.light-mode .up-label { color: var(--lt-text-3) !important; }
@@ -414,365 +457,64 @@ body.light-mode .pm-input,
 body.light-mode .pm-textarea,
 body.light-mode .up-input,
 body.light-mode .up-textarea,
-body.light-mode .up-select {
-  background: var(--lt-bg-0) !important;
-  color: var(--lt-text-1) !important;
-  border-color: var(--lt-divider) !important;
-}
-body.light-mode .sam-sport-btn {
-  background: var(--lt-bg-0) !important;
-  border-color: var(--lt-divider) !important;
-  color: var(--lt-text-2) !important;
-}
+body.light-mode .up-select { background: var(--lt-bg-0) !important; color: var(--lt-text-1) !important; border-color: var(--lt-divider) !important; }
+body.light-mode .sam-sport-btn { background: var(--lt-bg-0) !important; border-color: var(--lt-divider) !important; color: var(--lt-text-2) !important; }
 body.light-mode .sam-sport-btn--more { color: var(--lt-text-3) !important; }
 body.light-mode .sam-intensity-track { background: var(--lt-bg-3) !important; }
-body.light-mode .sam-photo-zone {
-  background: var(--lt-bg-0) !important;
-  border-color: var(--lt-divider) !important;
-  color: var(--lt-text-3) !important;
-}
 body.light-mode .sam-media-hint { color: var(--lt-text-4) !important; }
+body.light-mode .sam-photo-zone { background: var(--lt-bg-0) !important; border-color: var(--lt-divider) !important; color: var(--lt-text-3) !important; }
 body.light-mode .up-char-count { color: var(--lt-text-4) !important; }
 body.light-mode .up-save-btn { background: var(--lt-brand) !important; color: #fff !important; }
 body.light-mode .pm-footer,
-body.light-mode .up-footer {
-  background: var(--lt-bg-1) !important;
-  border-top-color: var(--lt-divider) !important;
-}
-body.light-mode .pm-btn--cancel {
-  color: var(--lt-text-2) !important;
-  border-color: var(--lt-divider) !important;
-}
-body.light-mode .pm-share-clubs label { color: var(--lt-text-2) !important; }
-body.light-mode #pmAddToHomeWrap { background: transparent !important; }
+body.light-mode .up-footer { background: var(--lt-bg-1) !important; border-top: 1px solid var(--lt-divider) !important; }
+body.light-mode .pm-btn--cancel { color: var(--lt-text-2) !important; border-color: var(--lt-divider) !important; background: var(--lt-bg-0) !important; }
+body.light-mode .pm-share-clubs label,
 body.light-mode #pmAddToHomeWrap label { color: var(--lt-text-2) !important; }
 
-/* ── Activity view ─────────────────────────────────────────────────────────── */
-body.light-mode .av-overlay { background: rgba(0,0,0,0.35) !important; }
-body.light-mode .av-sheet { background: var(--lt-bg-0) !important; }
-body.light-mode .av-header {
-  background: var(--lt-bg-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .av-title { color: var(--lt-text-1) !important; }
-body.light-mode .av-close { color: var(--lt-text-2) !important; background: var(--lt-bg-3) !important; }
-body.light-mode .av-stat-val { color: var(--lt-text-1) !important; }
-body.light-mode .av-stat-lbl { color: var(--lt-text-3) !important; }
-body.light-mode .av-section-title { color: var(--lt-text-3) !important; }
-body.light-mode .av-note { color: var(--lt-text-2) !important; background: var(--lt-bg-2) !important; }
+/* Sport picker */
+body.light-mode #samSportPickerOverlay > div { background: var(--lt-bg-1) !important; }
+body.light-mode #samSportPickerOverlay span[style*="color:#fff"] { color: var(--lt-text-1) !important; }
+body.light-mode #samSportPickerOverlay [data-pick] { background: var(--lt-bg-0) !important; border-color: var(--lt-divider) !important; }
+body.light-mode #samSportPickerOverlay [id="samAddCustomSport"] { background: var(--lt-bg-2) !important; }
 
-/* ── Map search bar ─────────────────────────────────────────────────────────── */
-body.light-mode .map-search-bar,
-body.light-mode .msb-container {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow-md) !important;
-}
-body.light-mode .msb-input {
-  background: transparent !important;
-  color: var(--lt-text-1) !important;
-}
-body.light-mode .msb-input::placeholder { color: var(--lt-text-4) !important; }
-body.light-mode .msb-results { background: var(--lt-bg-1) !important; }
-body.light-mode .msb-result-item {
-  color: var(--lt-text-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .msb-result-item:hover { background: var(--lt-bg-2) !important; }
-body.light-mode .msb-icon svg { stroke: var(--lt-text-3) !important; }
-
-/* ── Route info ─────────────────────────────────────────────────────────────── */
-body.light-mode .route-info {
-  background: var(--lt-bg-1) !important;
-  border-top-color: var(--lt-divider) !important;
-  box-shadow: 0 -2px 12px rgba(0,0,0,0.08) !important;
-}
-body.light-mode .route-info__step { color: var(--lt-text-2) !important; }
-body.light-mode .route-info__step--done { color: var(--lt-brand) !important; }
-body.light-mode .route-result__val { color: var(--lt-text-1) !important; }
-body.light-mode .route-result__lbl { color: var(--lt-text-3) !important; }
-body.light-mode .route-mini-pill {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-  color: var(--lt-text-1) !important;
-}
-
-/* ── WorkoutList / sidebar items ───────────────────────────────────────────── */
-body.light-mode .workout {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-  border-left-color: currentColor;
-}
-body.light-mode .workout__title { color: var(--lt-text-1) !important; }
-body.light-mode .workout__details { color: var(--lt-text-2) !important; }
-body.light-mode .workout__unit { color: var(--lt-text-3) !important; }
-body.light-mode .workout__date { color: var(--lt-text-3) !important; }
-body.light-mode .form {
-  background: var(--lt-bg-1) !important;
-  border-top-color: var(--lt-brand) !important;
-}
-body.light-mode .form__input,
-body.light-mode .form__select {
-  background: var(--lt-bg-0) !important;
-  color: var(--lt-text-1) !important;
-  border-color: var(--lt-divider) !important;
-}
-
-/* ── Name setup modal ───────────────────────────────────────────────────────── */
-body.light-mode .name-modal { background: rgba(0,0,0,0.35) !important; }
-body.light-mode .name-modal__card {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow-md) !important;
-  color: var(--lt-text-1) !important;
-}
+/* Name / Recovery modal */
+body.light-mode .name-modal { background: rgba(0,0,0,0.3) !important; }
+body.light-mode .name-modal__card { background: var(--lt-bg-1) !important; box-shadow: var(--lt-shadow-md) !important; }
 body.light-mode .name-modal__title { color: var(--lt-text-1) !important; }
 body.light-mode .name-modal__sub { color: var(--lt-text-3) !important; }
-body.light-mode .name-modal__input {
-  background: var(--lt-bg-0) !important;
-  color: var(--lt-text-1) !important;
-  border-color: var(--lt-divider) !important;
-}
+body.light-mode .name-modal__input { background: var(--lt-bg-0) !important; color: var(--lt-text-1) !important; border-color: var(--lt-divider) !important; }
 body.light-mode .name-modal__recover-link { color: var(--lt-brand) !important; }
-body.light-mode .recovery-code__display {
-  background: var(--lt-bg-0) !important;
-  border-color: var(--lt-divider) !important;
-}
+body.light-mode .recovery-code__display { background: var(--lt-bg-0) !important; border-color: var(--lt-divider) !important; }
 body.light-mode .recovery-code__digits { color: var(--lt-text-1) !important; }
 
-/* ── Sport picker overlay ───────────────────────────────────────────────────── */
-body.light-mode #samSportPickerOverlay > div {
-  background: var(--lt-bg-1) !important;
-}
-body.light-mode #samSportPickerOverlay [data-pick] {
-  background: var(--lt-bg-0) !important;
-  border-color: var(--lt-divider) !important;
-  color: var(--lt-text-1) !important;
-}
-body.light-mode #samSportPickerOverlay [id="samAddCustomSport"] {
-  background: var(--lt-bg-2) !important;
-  border-color: var(--lt-divider) !important;
-}
-
-/* ── iOS safe area / status bar spacing ─────────────────────────────────────── */
-body.light-mode .app-header,
-body.light-mode .safe-area-top { background: var(--lt-bg-0) !important; }
-
 /* ══════════════════════════════════════════════════════════════════════════════
-   FIXES — v2
+   GLOBAL OVERRIDES — dynamicznie generowany HTML ze inline styles
    ══════════════════════════════════════════════════════════════════════════════ */
+/* Ciemne tła w inline styles → białe */
+body.light-mode [style*="background:#1a1f23"],
+body.light-mode [style*="background: #1a1f23"],
+body.light-mode [style*="background:#141417"],
+body.light-mode [style*="background: #141417"],
+body.light-mode [style*="background:#0f1114"],
+body.light-mode [style*="background: #0f1114"],
+body.light-mode [style*="background:#16191e"],
+body.light-mode [style*="background: #16191e"],
+body.light-mode [style*="background:#1e2229"],
+body.light-mode [style*="background: #1e2229"],
+body.light-mode [style*="background:#252830"],
+body.light-mode [style*="background: #252830"] { background: var(--lt-bg-1) !important; }
 
-/* ── CRITICAL: Map tab must be transparent — Leaflet renders on canvas ──────── */
-body.light-mode #tabMap,
-body.light-mode #tabMap.tab-panel,
-body.light-mode #tabMap.tab-panel--active {
-  background: transparent !important;
-}
-/* Map search bar container */
-body.light-mode .map-search-bar { background: rgba(255,255,255,0.95) !important; }
-body.light-mode .map-search-bar__inner { background: transparent !important; }
-/* Map filter chips */
-body.light-mode .map-filter-chip {
-  background: rgba(255,255,255,0.95) !important;
-  color: var(--lt-text-2) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .map-filter-chip--active {
-  background: var(--lt-brand) !important;
-  color: #fff !important;
-}
-/* Route mini pill on map */
-body.light-mode .route-mini-pill {
-  background: rgba(255,255,255,0.95) !important;
-  color: var(--lt-text-1) !important;
-  box-shadow: var(--lt-shadow-md) !important;
-}
-/* Map buttons */
-body.light-mode .btn-route,
-body.light-mode #btnRoute,
-body.light-mode .map-btn {
-  background: var(--lt-bg-1) !important;
-  color: var(--lt-text-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
+/* Białe teksty w inline styles → ciemne
+   Wyjątki: nie nadpisuj białego tekstu NA kolorowym tle (przyciski brand) */
+body.light-mode [style*="color:#fff"]:not([style*="background:#00c46a"]):not([style*="background: #00c46a"]):not(.pm-btn--post):not(.up-save-btn):not(.sv-filter--active):not(.sam-sport-btn--active),
+body.light-mode [style*="color: #fff"]:not([style*="background:#00c46a"]):not([style*="background: #00c46a"]):not(.pm-btn--post):not(.up-save-btn),
+body.light-mode [style*="color:rgba(255,255,255,0.4)"]:not([style*="background:#00c46a"]),
+body.light-mode [style*="color:rgba(255,255,255,0.5)"]:not([style*="background:#00c46a"]),
+body.light-mode [style*="color:rgba(255,255,255,0.3)"]:not([style*="background:#00c46a"]),
+body.light-mode [style*="color:rgba(255,255,255,0.7)"]:not([style*="background:#00c46a"]) { color: var(--lt-text-2) !important; }
 
-/* ── Streak card — text invisible ───────────────────────────────────────────── */
-body.light-mode .home-streak { background: var(--lt-bg-1) !important; }
-body.light-mode .home-streak * { color: var(--lt-text-1) !important; }
-body.light-mode .home-streak__title { color: var(--lt-text-1) !important; font-weight: 700; }
-body.light-mode .home-streak__day { color: var(--lt-text-3) !important; }
-body.light-mode .home-streak__day--today { color: var(--lt-text-1) !important; }
-body.light-mode .home-streak__count { color: var(--lt-brand) !important; }
-
-/* ── Club detail — texts invisible ─────────────────────────────────────────── */
-body.light-mode [class*="cdb-"] { color: var(--lt-text-1) !important; }
-body.light-mode [class*="cdb-"]  * { color: inherit !important; }
-body.light-mode .cdb-name,
-body.light-mode .cdb-header__title { color: var(--lt-text-1) !important; }
-body.light-mode .cdb-meta,
-body.light-mode .cdb-desc,
-body.light-mode .cdb-bio { color: var(--lt-text-2) !important; }
-body.light-mode .cdb-stat-val { color: var(--lt-text-1) !important; font-weight: 700; }
-body.light-mode .cdb-stat-lbl { color: var(--lt-text-3) !important; }
-/* Club hero background */
-body.light-mode .cdb-hero,
-body.light-mode .cdb-hero-bg { background: var(--lt-bg-2) !important; }
-body.light-mode .cdb-action-btn {
-  background: var(--lt-bg-1) !important;
-  color: var(--lt-text-2) !important;
-  border-color: var(--lt-divider) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .cdb-action-btn span { color: var(--lt-text-2) !important; }
-body.light-mode .cdb-action-btn--danger span { color: var(--lt-danger) !important; }
-body.light-mode .cdb-action-btn--active {
-  background: rgba(0,196,106,0.1) !important;
-  border-color: var(--lt-brand) !important;
-}
-body.light-mode .cdb-action-btn--active span { color: var(--lt-brand) !important; }
-body.light-mode .cdb-add-post-btn {
-  background: rgba(0,196,106,0.1) !important;
-  border-color: var(--lt-brand) !important;
-  color: var(--lt-brand) !important;
-}
-body.light-mode .cdb-feed-section { background: var(--lt-bg-0) !important; }
-body.light-mode .cdb-members-list { background: var(--lt-bg-0) !important; }
-body.light-mode .cdb-member-item {
-  background: var(--lt-bg-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-
-/* ── Profile — rozjechany ───────────────────────────────────────────────────── */
-body.light-mode .pv-sheet { background: var(--lt-bg-0) !important; }
-body.light-mode .pv-content { background: var(--lt-bg-0) !important; }
-/* Photo strip */
-body.light-mode .pv-photo-strip { background: transparent !important; }
-body.light-mode .pv-photo-strip__thumb {
-  background: var(--lt-bg-3) !important;
-  border-radius: 8px;
-  overflow: hidden;
-}
-/* Private section */
-body.light-mode #ppPrivateSection { background: transparent !important; }
-body.light-mode #ppPrivateSection .pv-subtabs { background: var(--lt-bg-0) !important; }
-body.light-mode #ppPrivateSection .pv-content { background: var(--lt-bg-0) !important; }
-/* Avatar ring */
-body.light-mode .pv-avatar { background: var(--lt-bg-3) !important; }
-body.light-mode .pv-avatar--reel-active {
-  background: linear-gradient(var(--lt-bg-0), var(--lt-bg-0)) padding-box,
-              linear-gradient(135deg, #f97316, #ec4899) border-box !important;
-}
-/* Stats tab */
-body.light-mode .pv-heatmap-wrap { background: var(--lt-bg-1) !important; border-radius: 16px; margin: 0 16px; }
-body.light-mode .pv-pie-wrap {
-  background: var(--lt-bg-1) !important;
-  border-radius: 16px;
-  margin: 0 16px;
-  padding: 16px;
-}
-/* Settings in profile */
-body.light-mode #pvSettingsModal > div { background: var(--lt-bg-1) !important; }
-body.light-mode #pvSettingsModal * { color: var(--lt-text-1); }
-body.light-mode #pvSettingsModal input[type="checkbox"] + span {
-  background: rgba(0,0,0,0.15) !important;
-}
-
-/* ── Track tab ──────────────────────────────────────────────────────────────── */
-body.light-mode #tabTrack,
-body.light-mode #tabTrack.tab-panel--active { background: transparent !important; }
-body.light-mode .tracking-panel,
-body.light-mode .track-bottom-sheet {
-  background: var(--lt-bg-1) !important;
-  box-shadow: 0 -2px 16px rgba(0,0,0,0.1) !important;
-}
-body.light-mode .tracking-panel * { color: var(--lt-text-1) !important; }
-body.light-mode .track-stat-val { color: var(--lt-text-1) !important; font-weight: 700; }
-body.light-mode .track-stat-lbl { color: var(--lt-text-3) !important; }
-body.light-mode .track-btn {
-  background: var(--lt-bg-3) !important;
-  color: var(--lt-text-2) !important;
-}
-body.light-mode .track-btn--primary { background: var(--lt-brand) !important; color: #fff !important; }
-body.light-mode .track-btn--danger { background: #fee2e2 !important; color: var(--lt-danger) !important; }
-/* Sport selection in track */
-body.light-mode .sport-btn {
-  background: var(--lt-bg-1) !important;
-  border-color: var(--lt-divider) !important;
-  color: var(--lt-text-2) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .sport-btn--active {
-  border-color: var(--lt-brand) !important;
-  color: var(--lt-brand) !important;
-}
-
-/* ── Stats tab ──────────────────────────────────────────────────────────────── */
-body.light-mode #tabStats,
-body.light-mode #tabStats.tab-panel--active { background: var(--lt-bg-0) !important; }
-body.light-mode .stats-view,
-body.light-mode .stats-wrap { background: var(--lt-bg-0) !important; }
-body.light-mode .stats-summary-card {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .stats-summary-val { color: var(--lt-text-1) !important; font-weight: 700; }
-body.light-mode .stats-summary-lbl { color: var(--lt-text-3) !important; }
-body.light-mode .stats-period-btn {
-  background: var(--lt-bg-3) !important;
-  color: var(--lt-text-3) !important;
-}
-body.light-mode .stats-period-btn--active {
-  background: var(--lt-brand) !important;
-  color: #fff !important;
-}
-body.light-mode .stats-chart-wrap {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-  border-radius: 16px;
-}
-body.light-mode .stats-history-item {
-  background: var(--lt-bg-1) !important;
-  border-bottom-color: var(--lt-divider) !important;
-}
-body.light-mode .stats-history-name { color: var(--lt-text-1) !important; }
-body.light-mode .stats-history-val { color: var(--lt-brand) !important; }
-body.light-mode .stats-goal-card {
-  background: var(--lt-bg-1) !important;
-  box-shadow: var(--lt-shadow) !important;
-}
-body.light-mode .stats-goal-title { color: var(--lt-text-1) !important; }
-body.light-mode .stats-progress-track { background: var(--lt-bg-3) !important; }
-
-/* ── Friends tab ────────────────────────────────────────────────────────────── */
-body.light-mode #tabFriends,
-body.light-mode #tabFriends.tab-panel--active { background: transparent !important; }
-body.light-mode .friends-map-wrap { background: transparent !important; }
-body.light-mode .friends-bottom-sheet,
-body.light-mode .friends-panel {
-  background: var(--lt-bg-1) !important;
-  box-shadow: 0 -2px 16px rgba(0,0,0,0.08) !important;
-}
-body.light-mode .friends-panel * { color: var(--lt-text-1) !important; }
-body.light-mode .friends-tab { color: var(--lt-text-3) !important; }
-body.light-mode .friends-tab--active { color: var(--lt-brand) !important; }
-
-/* ── Generic — wszystkie ciemne tła które mogły być pominięte ───────────────── */
-body.light-mode [style*="background:#1"],
-body.light-mode [style*="background: #1"],
-body.light-mode [style*="background:#0f"],
-body.light-mode [style*="background: #0f"],
-body.light-mode [style*="background:#14"],
-body.light-mode [style*="background: #14"] {
-  background: var(--lt-bg-1) !important;
-}
-body.light-mode [style*="color:#fff"],
-body.light-mode [style*="color: #fff"],
-body.light-mode [style*="color:white"],
-body.light-mode [style*="color: white"],
-body.light-mode [style*="color:rgba(255,255,255"],
-body.light-mode [style*="color: rgba(255,255,255"] {
-  color: var(--lt-text-1) !important;
-}
-/* Ale nie nadpisuj brandowych białych tekstów na zielonym tle */
-body.light-mode [style*="background:#00c46a"] [style*="color:#fff"],
-body.light-mode [style*="background: #00c46a"] [style*="color:#fff"],
-body.light-mode .pm-btn--post [style*="color"],
-body.light-mode .up-save-btn { color: #fff !important; }
+/* Border rgba(255,255,255 → rgba(0,0,0 */
+body.light-mode [style*="border:1px solid rgba(255,255,255,0.1)"],
+body.light-mode [style*="border: 1px solid rgba(255,255,255,0.1)"],
+body.light-mode [style*="border-bottom:1px solid rgba(255,255,255"],
+body.light-mode [style*="border-bottom: 1px solid rgba(255,255,255"] { border-color: var(--lt-divider) !important; }
