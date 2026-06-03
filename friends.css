@@ -430,3 +430,19 @@
   transition:    background 0.15s;
 }
 .name-modal__btn:hover { background: #22c55e; }
+
+/* ── Light mode — friends & live tracking ────────────────────────────────────── */
+body.light-mode .ff-overlay { background: rgba(0,0,0,0.4); }
+body.light-mode .ff-sheet { background: #f2f2f7; }
+body.light-mode .ff-header { border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .ff-title { color: #111; }
+body.light-mode .ff-card {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+body.light-mode .ff-card__name { color: #111; }
+body.light-mode .ff-card__sub { color: #888; }
+body.light-mode .ff-card__stat-val { color: #111; }
+body.light-mode .ff-card__stat-lbl { color: #888; }
+body.light-mode .ff-empty { color: #aaa; }
+body.light-mode .ff-section-title { color: #555; }

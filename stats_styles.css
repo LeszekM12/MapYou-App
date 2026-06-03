@@ -530,3 +530,26 @@
 .sv-chart-wrap canvas {
   display: block;
 }
+
+/* ── Light mode — stats ──────────────────────────────────────────────────────── */
+body.light-mode .stats-overlay { background: rgba(0,0,0,0.4); }
+body.light-mode .stats-sheet { background: #f2f2f7; }
+body.light-mode .stats-header { border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .stats-title { color: #111; }
+body.light-mode .stats-card {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+}
+body.light-mode .stats-card__title { color: #111; }
+body.light-mode .stats-card__val { color: #111; }
+body.light-mode .stats-card__lbl { color: #888; }
+body.light-mode .stats-tab { color: #888; }
+body.light-mode .stats-tab--active { color: #00c46a; border-bottom-color: #00c46a; }
+body.light-mode .stats-section-title { color: #555; }
+body.light-mode .stats-bar { background: rgba(0,0,0,0.06); }
+body.light-mode .stats-goal-row { border-bottom-color: rgba(0,0,0,0.06); }
+body.light-mode .stats-goal-label { color: #111; }
+body.light-mode .stats-goal-sub { color: #888; }
+body.light-mode .stats-input {
+  background: #f0f0f0; color: #111; border-color: #ccc;
+}

@@ -2954,30 +2954,91 @@ body {
   display:       block;
 }
 
-/* ── Light mode (system or manual) ──────────────────────────────────────────── */
+/* ── Light mode — główne elementy mapy i settings ────────────────────────────── */
 body.light-mode {
-  --color-dark--1:  #f5f5f5;
-  --color-dark--2:  #ffffff;
-  --color-light--1: #555555;
-  --color-light--2: #111111;
-  --color-light--3: #e0e0e0;
-  background-color: #f5f5f5;
-  color: #111111;
+  background-color: #f2f2f7;
+  color: #111;
 }
-body.light-mode .sidebar,
-body.light-mode .settings-panel,
-body.light-mode .workout,
-body.light-mode .form,
-body.light-mode .route-info {
-  background-color: #ffffff;
-  color: #111111;
+body.light-mode .sidebar { background: #f2f2f7; }
+body.light-mode .workout {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-body.light-mode .workout__icon,
-body.light-mode .workout__title { color: #111111; }
-body.light-mode .workout__details { color: #444444; }
-body.light-mode .settings-item { color: #111111; border-bottom-color: #e0e0e0; }
+body.light-mode .workout__title { color: #111; }
+body.light-mode .workout__details { color: #555; }
+body.light-mode .workout__unit { color: #888; }
+body.light-mode .form { background: #ffffff; }
+body.light-mode .form__input,
+body.light-mode .form__select {
+  background: #f0f0f0; color: #111; border-color: #ccc;
+}
+/* Settings panel */
+body.light-mode .settings-panel { background: #ffffff; }
+body.light-mode .settings-header { border-bottom-color: rgba(0,0,0,0.08); color: #111; }
+body.light-mode .settings-item { color: #111; border-bottom-color: rgba(0,0,0,0.06); }
 body.light-mode .settings-item__icon { background: #f0f0f0; }
-body.light-mode .settings-item__sub { color: #888888; }
-body.light-mode input, body.light-mode textarea, body.light-mode select {
-  background: #f0f0f0; color: #111111; border-color: #cccccc;
+body.light-mode .settings-item__sub { color: #888; }
+body.light-mode .settings-item__chevron { color: #ccc; }
+/* Route planner */
+body.light-mode .route-info { background: #ffffff; border-top-color: rgba(0,0,0,0.08); }
+body.light-mode .route-info__step { color: #111; }
+body.light-mode .route-info__step--done { color: #00c46a; }
+body.light-mode .route-result { color: #111; }
+/* Map search bar */
+body.light-mode .msb-container { background: #ffffff; box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+body.light-mode .msb-input { background: #ffffff; color: #111; }
+body.light-mode .msb-input::placeholder { color: #aaa; }
+body.light-mode .msb-results { background: #ffffff; }
+body.light-mode .msb-result-item { color: #111; border-bottom-color: rgba(0,0,0,0.06); }
+body.light-mode .msb-result-item:hover { background: #f5f5f5; }
+/* UserProfile modal */
+body.light-mode .up-overlay { background: rgba(0,0,0,0.4); }
+body.light-mode .up-sheet { background: #ffffff; }
+body.light-mode .up-header { border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .up-header__title { color: #111; }
+body.light-mode .up-close { color: #555; }
+body.light-mode .up-label { color: #555; }
+body.light-mode .up-input,
+body.light-mode .up-textarea,
+body.light-mode .up-select {
+  background: #f0f0f0; color: #111; border-color: #ccc;
 }
+body.light-mode .up-char-count { color: #aaa; }
+body.light-mode .up-save-btn { background: #00c46a; color: #fff; }
+/* PostModal */
+body.light-mode .pm-overlay { background: rgba(0,0,0,0.4); }
+body.light-mode .pm-sheet { background: #ffffff; }
+body.light-mode .pm-header { border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .pm-header__title { color: #111; }
+body.light-mode .pm-label { color: #555; }
+body.light-mode .pm-input,
+body.light-mode .pm-textarea {
+  background: #f0f0f0; color: #111; border-color: #ccc;
+}
+body.light-mode .pm-btn--cancel { color: #555; border-color: #ccc; }
+/* SaveActivityModal */
+body.light-mode .sam-overlay { background: rgba(0,0,0,0.4); }
+body.light-mode .sam-sheet { background: #ffffff; }
+body.light-mode .sam-label { color: #555; }
+body.light-mode .sam-input,
+body.light-mode .sam-textarea {
+  background: #f0f0f0; color: #111; border-color: #ccc;
+}
+body.light-mode .sam-sport-btn {
+  background: rgba(0,0,0,0.04);
+  border-color: rgba(0,0,0,0.1);
+  color: #555;
+}
+body.light-mode .sam-stats-input {
+  background: #f0f0f0; color: #111; border-color: #ccc;
+}
+body.light-mode .sam-intensity-track { background: rgba(0,0,0,0.06); }
+body.light-mode .sam-photo-zone {
+  background: #f0f0f0; border-color: rgba(0,0,0,0.15);
+}
+/* Activity view */
+body.light-mode .av-overlay { background: rgba(0,0,0,0.4); }
+body.light-mode .av-sheet { background: #ffffff; }
+body.light-mode .av-title { color: #111; }
+body.light-mode .av-stat-val { color: #111; }
+body.light-mode .av-stat-lbl { color: #888; }

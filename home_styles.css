@@ -2669,3 +2669,54 @@ body.light-mode .feed-card__author,
 body.light-mode .feed-card__title { color: var(--text-primary); }
 body.light-mode .feed-card__date,
 body.light-mode .feed-card__text { color: var(--text-secondary); }
+
+/* ── Light mode — uzupełnienia ───────────────────────────────────────────────── */
+body.light-mode .home-streak-card {
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+}
+body.light-mode .home-streak__label,
+body.light-mode .home-streak__day { color: #555; }
+body.light-mode .home-reel-avatar__label { color: #333; }
+body.light-mode .home-card__desc { color: #444; }
+body.light-mode .home-card__stat-val { color: #111; }
+body.light-mode .home-card__stat-lbl { color: #888; }
+body.light-mode .home-card__badges .home-card__intensity-badge {
+  background: rgba(0,0,0,0.06); color: #444;
+}
+body.light-mode .home-card__sport-badge { color: #555 !important; }
+body.light-mode .home-card__map-wrap { background: #e8e8e8; }
+body.light-mode .home-card__post-badge {
+  background: rgba(0,0,0,0.06); color: #555;
+}
+body.light-mode .home-card__post-title { color: #111; }
+body.light-mode .home-card__desc.home-card__post-body { color: #333; }
+body.light-mode .home-card__action svg { stroke: #666; }
+body.light-mode .home-card__action--liked svg { stroke: #e74c3c; fill: #e74c3c; }
+body.light-mode .home-card__action-count { color: #666; }
+body.light-mode .home-empty { color: #888; }
+
+/* Comment panel */
+body.light-mode .home-card__comment-panel {
+  background: #ffffff;
+  border-top: 1px solid #e0e0e0;
+}
+body.light-mode .home-card__comment-input {
+  background: #f0f0f0; color: #111; border-color: #ccc;
+}
+body.light-mode .home-card__comment-item { border-bottom-color: #eee; }
+body.light-mode .home-card__comment-author { color: #111; }
+body.light-mode .home-card__comment-text { color: #444; }
+
+/* Reels */
+body.light-mode .home-reel-avatar { border-color: #e0e0e0; }
+body.light-mode .home-reel-avatar--active {
+  border-color: transparent;
+  background: linear-gradient(45deg, #f97316, #ec4899) border-box;
+}
+
+/* Notification panel */
+body.light-mode #hnOverlay { background: rgba(0,0,0,0.4); }
+body.light-mode .hn-clear { color: #00c46a; }
+body.light-mode .hn-item--unread { background: rgba(0,196,106,0.05); }
+body.light-mode .hn-empty { color: #999; }

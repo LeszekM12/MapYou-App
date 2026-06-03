@@ -27,7 +27,7 @@
   flex-direction: column;
   transform: translateY(100%);
   transition: transform 0.38s cubic-bezier(0.32,0.72,0,1);
-  overflow: clip; /* allows child scroll without blocking touch */
+  overflow: hidden;
 }
 .pv-sheet--open { transform: translateY(0); }
 
@@ -71,12 +71,14 @@
 .pv-header__btn:hover { background: rgba(255,255,255,0.13); }
 
 /* Scrollable content */
+.pv-sheet > *:not(.pv-handle):not(.pv-header):not(.pv-subtabs) {
+  flex-shrink: 0;
+}
 .pv-content {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 0 0 32px;
-  min-height: 0; /* critical for flex scroll */
 }
 
 /* Hero */
@@ -225,34 +227,31 @@
 .pv-heatmap-wrap {
   padding: 0 16px 8px;
   overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
 }
 .pv-heatmap {
-  display: flex; flex-direction: column; gap: 4px;
-  min-width: 340px;
+  display: flex; flex-direction: column; gap: 3px;
+  min-width: 320px;
 }
 .pv-heatmap__hour-labels {
-  display: grid; grid-template-columns: 32px repeat(24, 1fr);
-  font-size: 1rem; color: rgba(255,255,255,0.3);
-  margin-bottom: 2px;
+  display: grid; grid-template-columns: 28px repeat(24, 1fr);
+  font-size: 0.9rem; color: rgba(255,255,255,0.25);
+  margin-bottom: 2px; padding-left: 0;
 }
 .pv-heatmap__row {
-  display: grid;
-  grid-template-columns: 32px repeat(24, 1fr);
-  gap: 2px;
-  align-items: center;
+  display: flex; align-items: center; gap: 2px;
 }
 .pv-heatmap__day {
-  font-size: 1.1rem;
-  color: rgba(255,255,255,0.35);
-  text-align: right;
-  padding-right: 6px;
+  width: 28px; font-size: 1rem;
+  color: rgba(255,255,255,0.3);
+  flex-shrink: 0; text-align: right;
+  padding-right: 4px;
 }
 .pv-heatmap__cell {
-  height: 14px;
-  border-radius: 3px;
+  flex: 1; height: 13px;
+  border-radius: 2px;
   transition: opacity 0.2s;
   cursor: default;
+  min-width: 10px;
 }
 
 .pv-pie-wrap {
@@ -408,211 +407,57 @@
   border-color: #ef4444 !important;
 }
 
-/* ── Feed cards (home-style) used in Posts tab + Club feed ───────────────── */
-.feed-card {
-  margin: 0 0 12px;
-  border-radius: 16px;
-  overflow: hidden;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+/* ── Light mode — profil ─────────────────────────────────────────────────────── */
+body.light-mode .pv-overlay { background: rgba(0,0,0,0.4); }
+body.light-mode .pv-sheet {
+  background: #ffffff;
+  color: #111;
 }
-.feed-card__header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 14px 8px;
+body.light-mode .pv-handle { background: rgba(0,0,0,0.15); }
+body.light-mode .pv-back,
+body.light-mode .pv-header__btn {
+  background: rgba(0,0,0,0.06);
+  color: #111;
+  border-color: rgba(0,0,0,0.1);
 }
-.feed-card__avatar {
-  width: 38px; height: 38px;
-  border-radius: 50%;
-  overflow: hidden;
-  background: #333;
-  flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-weight: 700; font-size: 14px; color: #fff;
+body.light-mode .pv-name { color: #111; }
+body.light-mode .pv-bio { color: #555; }
+body.light-mode .pv-stats-row { border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .pv-stats-row__val { color: #111; }
+body.light-mode .pv-stats-row__lbl { color: #888; }
+body.light-mode .pv-subtabs { border-bottom-color: rgba(0,0,0,0.08); }
+body.light-mode .pv-subtab { color: #888; }
+body.light-mode .pv-subtab--active { color: #00c46a; border-bottom-color: #00c46a; }
+body.light-mode .pv-section-title { color: #111; }
+body.light-mode .pv-act-item { border-bottom-color: rgba(0,0,0,0.06); }
+body.light-mode .pv-act-item__name { color: #111; }
+body.light-mode .pv-act-item__date,
+body.light-mode .pv-act-item__time { color: #888; }
+body.light-mode .pv-heatmap__day { color: #888; }
+body.light-mode .pv-heatmap__hour-labels span { color: #aaa; }
+body.light-mode .pv-pie-legend__item { color: #333; }
+body.light-mode .pv-effort { border-bottom-color: rgba(0,0,0,0.06); }
+body.light-mode .pv-effort__dist { color: #111; }
+body.light-mode .pv-effort__empty { color: #ccc; }
+body.light-mode .pv-effort__date { color: #888; }
+body.light-mode .pv-efforts__note { color: #aaa; }
+body.light-mode .pv-trophy__label { color: #333; }
+body.light-mode .pv-trophy-summary__count { color: #111; }
+body.light-mode .pv-trophy-summary__label { color: #888; }
+body.light-mode .pv-goal-cup { background: rgba(0,0,0,0.04); border-color: rgba(0,0,0,0.08); }
+body.light-mode .pv-goal-cup__title { color: #111; }
+body.light-mode .pv-goal-cup__sub { color: #888; }
+body.light-mode .pv-empty p { color: #888; }
+body.light-mode .pv-empty__sub { color: #aaa; }
+/* Settings modal */
+body.light-mode #pvSettingsModal > div > div:first-child,
+body.light-mode #pvFollowListModal > div { background: #ffffff; }
+body.light-mode .feed-card {
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
-.feed-card__avatar img {
-  width: 100%; height: 100%; object-fit: cover;
-}
-.feed-card__meta { flex: 1; }
-.feed-card__author {
-  display: block;
-  font-weight: 700; color: #fff; font-size: 1.35rem;
-  cursor: pointer;
-}
-.feed-card__date {
-  font-size: 1.1rem; color: rgba(255,255,255,0.35);
-}
-.feed-card__delete {
-  background: none; border: none;
-  color: rgba(255,255,255,0.3);
-  font-size: 1.4rem; cursor: pointer;
-  padding: 4px;
-}
-.feed-card__photo {
-  width: 100%;
-  max-height: 320px;
-  object-fit: cover;
-  display: block;
-}
-.feed-card__body {
-  padding: 8px 14px 12px;
-}
-.feed-card__title {
-  font-weight: 700; color: #fff;
-  font-size: 1.4rem; margin-bottom: 4px;
-}
-.feed-card__text {
-  color: rgba(255,255,255,0.65);
-  font-size: 1.3rem;
-}
-.feed-card__stats {
-  margin-top: 6px;
-  display: flex; gap: 12px;
-  color: rgba(255,255,255,0.5);
-  font-size: 1.2rem;
-}
-
-/* ── Photo strip ─────────────────────────────────────────────────────────── */
-.pv-photo-strip {
-  display: flex;
-  gap: 3px;
-  padding: 12px 0 4px;
-  overflow: hidden;
-}
-.pv-photo-strip__thumb {
-  flex: 1;
-  aspect-ratio: 1;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  position: relative;
-  min-width: 0;
-}
-.pv-photo-strip__thumb img {
-  width: 100%; height: 100%; object-fit: cover;
-}
-.pv-photo-strip__more {
-  position: absolute;
-  inset: 0;
-  background: rgba(0,0,0,0.55);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 1.6rem; font-weight: 700; color: #fff;
-}
-
-/* ── Photo viewer ────────────────────────────────────────────────────────── */
-.pv-photo-viewer {
-  position: fixed; inset: 0;
-  z-index: 9700;
-  background: #000;
-  display: flex; flex-direction: column;
-}
-.pv-photo-viewer__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.08);
-  flex-shrink: 0;
-}
-.pv-photo-viewer__close {
-  background: none; border: none;
-  color: #fff; font-size: 2rem; cursor: pointer;
-  padding: 4px; width: 40px;
-}
-.pv-photo-viewer__tabs {
-  display: flex;
-  background: rgba(255,255,255,0.08);
-  border-radius: 10px;
-  overflow: hidden;
-}
-.pv-photo-viewer__tab {
-  padding: 7px 18px;
-  border: none; cursor: pointer;
-  font-family: inherit; font-size: 1.3rem;
-  background: none; color: rgba(255,255,255,0.5);
-  font-weight: 500; transition: all 0.15s;
-}
-.pv-photo-viewer__tab--active {
-  background: rgba(255,255,255,0.15);
-  color: #fff; font-weight: 700;
-}
-.pv-photo-viewer__body {
-  flex: 1; overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
-.pv-photo-viewer__grid {
-  display: grid;
-  grid-template-columns: repeat(3,1fr);
-  gap: 2px; padding: 2px;
-}
-.pv-photo-viewer__grid-item {
-  aspect-ratio: 1; overflow: hidden; cursor: pointer;
-}
-.pv-photo-viewer__grid-item img {
-  width: 100%; height: 100%; object-fit: cover;
-}
-.pv-photo-viewer__list-item {
-  margin-bottom: 8px; cursor: pointer;
-}
-.pv-photo-viewer__list-title {
-  padding: 10px 16px 6px;
-  font-weight: 700; color: #fff; font-size: 1.4rem;
-}
-.pv-photo-viewer__list-img {
-  width: 100%; display: block;
-  max-height: 400px; object-fit: cover;
-}
-.pv-photo-viewer__enlarge {
-  position: fixed; inset: 0;
-  z-index: 9800;
-  background: rgba(0,0,0,0.95);
-  display: flex; align-items: center; justify-content: center;
-}
-.pv-photo-viewer__enlarge img {
-  max-width: 95vw; max-height: 90vh;
-  border-radius: 8px; object-fit: contain;
-}
-
-/* ── Private profile overlay ─────────────────────────────────────────────── */
-.pv-private-box {
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.08);
-  border-radius: 16px;
-  padding: 28px;
-  text-align: center;
-  margin: 12px 16px;
-}
-.pv-private-box__icon { font-size: 2.4rem; margin-bottom: 8px; }
-.pv-private-box__title {
-  font-weight: 700; color: #fff;
-  font-size: 1.6rem; margin-bottom: 6px;
-}
-.pv-private-box__desc {
-  color: rgba(255,255,255,0.45);
-  font-size: 1.3rem;
-}
-
-/* ── Pending follow button ───────────────────────────────────────────────── */
-.pv-header__btn--pending {
-  background: rgba(255,255,255,0.07);
-  color: rgba(255,255,255,0.5);
-  border-color: rgba(255,255,255,0.15);
-}
-
-/* ── Public profile ppPrivateSection ────────────────────────────────────────── */
-#ppPrivateSection {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-#ppPrivateSection .pv-subtabs { flex-shrink: 0; }
-#ppPrivateSection .pv-content {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  min-height: 0;
-  padding: 0 0 32px;
-}
+body.light-mode .feed-card__author { color: #111; }
+body.light-mode .feed-card__date { color: #888; }
+body.light-mode .feed-card__title { color: #111; }
+body.light-mode .feed-card__text { color: #444; }
+body.light-mode .feed-card__stats { color: #666; }
