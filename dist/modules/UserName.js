@@ -46,7 +46,20 @@ export async function restoreAccountByCode(code) {
         if (!res.ok)
             return null;
         const data = await res.json();
-        return data.status === 'ok' ? data.userId : null;
+        if (data.status !== 'ok')
+            return null;
+        // Zapisz profil z backendu
+        if (data.name)
+            localStorage.setItem('mapyou_userName', data.name);
+        if (data.bio)
+            localStorage.setItem('mapyou_bio', data.bio);
+        if (data.avatarB64)
+            localStorage.setItem('mapyou_avatar', data.avatarB64);
+        if (data.city)
+            localStorage.setItem('mapyou_city', data.city);
+        if (data.region)
+            localStorage.setItem('mapyou_region', data.region);
+        return data.userId;
     }
     catch {
         return null;
@@ -115,10 +128,6 @@ export function isNameSet() {
     return !!localStorage.getItem(LS_SETUP_KEY);
 }
 // ── First-run modal ───────────────────────────────────────────────────────────
-/**
- * Pokazuje modal „Jak masz na imię?" jeśli imię nie zostało jeszcze ustawione.
- * Zwraca Promise który resolves po zamknięciu modalu.
- */
 export function showNameModalIfNeeded() {
     if (isNameSet())
         return Promise.resolve();
@@ -155,7 +164,6 @@ export function showNameModal(prefill) {
         document.body.appendChild(modal);
         const input = modal.querySelector('#nameModalInput');
         input.focus();
-        // Zapisz po kliknięciu przycisku
         modal.querySelector('#nameModalSave')?.addEventListener('click', () => {
             const name = input.value.trim();
             if (!name) {
@@ -168,12 +176,10 @@ export function showNameModal(prefill) {
             modal.style.transition = 'opacity 0.3s';
             setTimeout(() => { modal.remove(); resolve(); }, 300);
         });
-        // Enter = zapisz
         input.addEventListener('keydown', e => {
             if (e.key === 'Enter')
                 modal.querySelector('#nameModalSave')?.click();
         });
-        // Recover account
         modal.querySelector('#nameModalRecover')?.addEventListener('click', () => {
             _showRestorePanel(modal, resolve);
         });
@@ -204,7 +210,6 @@ function _showRestorePanel(modal, resolve) {
     const status = card.querySelector('#restoreStatus');
     input.focus();
     card.querySelector('#restoreBack')?.addEventListener('click', () => {
-        // Przeładuj modal z powrotem
         modal.remove();
         void showNameModal();
     });
@@ -225,19 +230,21 @@ function _showRestorePanel(modal, resolve) {
             btn.textContent = 'Restore account 🔑';
             return;
         }
-        // Przywróć userId i kod w localStorage
+        // Zapisz userId i kod
         localStorage.setItem('mapyou_userId_profile', userId);
+        localStorage.setItem('mapty_userId', userId);
         localStorage.setItem('mapyou_recovery_code', code);
         // Wyczyść flagę syncu żeby hydratacja pobrała dane
         localStorage.removeItem('mapyou_mongo_synced');
         localStorage.removeItem('mapyou_hydrated_at');
+        // Ustaw flagę że imię jest ustawione (zostało przywrócone)
+        localStorage.setItem('mapyou_nameSet', '1');
         status.style.color = '#4ade80';
         status.textContent = '✅ Account restored! Loading data…';
         btn.textContent = 'Done!';
         setTimeout(() => {
             modal.remove();
             resolve();
-            // Przeładuj stronę żeby hydratacja pobrała dane
             window.location.reload();
         }, 1500);
     };
@@ -246,10 +253,6 @@ function _showRestorePanel(modal, resolve) {
         void doRestore(); });
 }
 // ── Settings integration ──────────────────────────────────────────────────────
-/**
- * Otwiera modal zmiany imienia.
- * Podpnij do przycisku „Change name" w Settings.
- */
 export function openChangeNameModal() {
     void showNameModal(getUserName());
 }
