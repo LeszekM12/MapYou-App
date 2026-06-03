@@ -204,11 +204,26 @@ class App {
     this._initIOSBanner();
     this._initCustomFilters();
 
-    if (localStorage.getItem('nightMode') === 'true') {
+    // ── Theme init — manual override OR system preference ──────────────────
+    const _manualTheme = localStorage.getItem('nightMode');
+    if (_manualTheme === 'true') {
       this.#nightMode = true;
-      document.body.classList.add('night-mode');
-      document.getElementById('nightToggle')?.classList.add('active');
+    } else if (_manualTheme === 'false') {
+      this.#nightMode = false;
+    } else {
+      // No manual override — follow system
+      this.#nightMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
+    this._applyTheme();
+
+    // Listen for system theme changes (live — no restart needed)
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      // Only follow system if user hasn't set a manual override
+      if (localStorage.getItem('nightMode') === null) {
+        this.#nightMode = e.matches;
+        this._applyTheme();
+      }
+    });
     if (localStorage.getItem('voiceStats') === 'true') {
       this.#voiceEnabled = true;
       document.getElementById('voiceToggle')?.classList.add('active');
@@ -390,12 +405,30 @@ class App {
 
   _toggleNightMode(): void {
     this.#nightMode = !this.#nightMode;
-    document.body.classList.toggle('night-mode', this.#nightMode);
-    document.getElementById('nightToggle')?.classList.toggle('active', this.#nightMode);
-    localStorage.setItem('nightMode', String(this.#nightMode));
+    if (this.#nightMode) {
+      // User explicitly turned ON — override system
+      localStorage.setItem('nightMode', 'true');
+    } else {
+      // User turned OFF — remove override, let system decide
+      localStorage.removeItem('nightMode');
+      // Re-read system preference
+      this.#nightMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    this._applyTheme();
+  }
+
+  _applyTheme(): void {
+    const isDark = this.#nightMode;
+    document.body.classList.toggle('night-mode', isDark);
+    document.body.classList.toggle('light-mode', !isDark);
+    document.getElementById('nightToggle')?.classList.toggle('active', isDark);
+    // Update theme-color meta tag (status bar color on iOS/Android)
+    const metaTheme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.content = isDark ? '#141417' : '#ffffff';
+    // Update map tiles
     if (this.#map && this.#tileLayer) {
       this.#map.removeLayer(this.#tileLayer);
-      const key = this.#nightMode ? 'night' : 'day';
+      const key = isDark ? 'night' : 'day';
       this.#tileLayer = L.tileLayer(TILES[key], { attribution: TILE_ATTR[key] }).addTo(this.#map);
     }
   }

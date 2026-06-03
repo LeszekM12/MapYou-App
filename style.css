@@ -2954,16 +2954,30 @@ body {
   display:       block;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   iOS AUTO-ZOOM FIX
-   Safari/WKWebView zooms in when input font-size < 16px.
-   This targets iOS only via -webkit-touch-callout support query.
-   No effect on Android, desktop, or other browsers.
-   ═══════════════════════════════════════════════════════════════════════════ */
-@supports (-webkit-touch-callout: none) {
-  input,
-  textarea,
-  select {
-    font-size: 16px !important;
-  }
+/* ── Light mode (system or manual) ──────────────────────────────────────────── */
+body.light-mode {
+  --color-dark--1:  #f5f5f5;
+  --color-dark--2:  #ffffff;
+  --color-light--1: #555555;
+  --color-light--2: #111111;
+  --color-light--3: #e0e0e0;
+  background-color: #f5f5f5;
+  color: #111111;
+}
+body.light-mode .sidebar,
+body.light-mode .settings-panel,
+body.light-mode .workout,
+body.light-mode .form,
+body.light-mode .route-info {
+  background-color: #ffffff;
+  color: #111111;
+}
+body.light-mode .workout__icon,
+body.light-mode .workout__title { color: #111111; }
+body.light-mode .workout__details { color: #444444; }
+body.light-mode .settings-item { color: #111111; border-bottom-color: #e0e0e0; }
+body.light-mode .settings-item__icon { background: #f0f0f0; }
+body.light-mode .settings-item__sub { color: #888888; }
+body.light-mode input, body.light-mode textarea, body.light-mode select {
+  background: #f0f0f0; color: #111111; border-color: #cccccc;
 }

@@ -154,11 +154,27 @@ class App {
         this._initStats();
         this._initIOSBanner();
         this._initCustomFilters();
-        if (localStorage.getItem('nightMode') === 'true') {
+        // ── Theme init — manual override OR system preference ──────────────────
+        const _manualTheme = localStorage.getItem('nightMode');
+        if (_manualTheme === 'true') {
             __classPrivateFieldSet(this, _App_nightMode, true, "f");
-            document.body.classList.add('night-mode');
-            document.getElementById('nightToggle')?.classList.add('active');
         }
+        else if (_manualTheme === 'false') {
+            __classPrivateFieldSet(this, _App_nightMode, false, "f");
+        }
+        else {
+            // No manual override — follow system
+            __classPrivateFieldSet(this, _App_nightMode, window.matchMedia('(prefers-color-scheme: dark)').matches, "f");
+        }
+        this._applyTheme();
+        // Listen for system theme changes (live — no restart needed)
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            // Only follow system if user hasn't set a manual override
+            if (localStorage.getItem('nightMode') === null) {
+                __classPrivateFieldSet(this, _App_nightMode, e.matches, "f");
+                this._applyTheme();
+            }
+        });
         if (localStorage.getItem('voiceStats') === 'true') {
             __classPrivateFieldSet(this, _App_voiceEnabled, true, "f");
             document.getElementById('voiceToggle')?.classList.add('active');
@@ -325,12 +341,31 @@ class App {
     }
     _toggleNightMode() {
         __classPrivateFieldSet(this, _App_nightMode, !__classPrivateFieldGet(this, _App_nightMode, "f"), "f");
-        document.body.classList.toggle('night-mode', __classPrivateFieldGet(this, _App_nightMode, "f"));
-        document.getElementById('nightToggle')?.classList.toggle('active', __classPrivateFieldGet(this, _App_nightMode, "f"));
-        localStorage.setItem('nightMode', String(__classPrivateFieldGet(this, _App_nightMode, "f")));
+        if (__classPrivateFieldGet(this, _App_nightMode, "f")) {
+            // User explicitly turned ON — override system
+            localStorage.setItem('nightMode', 'true');
+        }
+        else {
+            // User turned OFF — remove override, let system decide
+            localStorage.removeItem('nightMode');
+            // Re-read system preference
+            __classPrivateFieldSet(this, _App_nightMode, window.matchMedia('(prefers-color-scheme: dark)').matches, "f");
+        }
+        this._applyTheme();
+    }
+    _applyTheme() {
+        const isDark = __classPrivateFieldGet(this, _App_nightMode, "f");
+        document.body.classList.toggle('night-mode', isDark);
+        document.body.classList.toggle('light-mode', !isDark);
+        document.getElementById('nightToggle')?.classList.toggle('active', isDark);
+        // Update theme-color meta tag (status bar color on iOS/Android)
+        const metaTheme = document.querySelector('meta[name="theme-color"]');
+        if (metaTheme)
+            metaTheme.content = isDark ? '#141417' : '#ffffff';
+        // Update map tiles
         if (__classPrivateFieldGet(this, _App_map, "f") && __classPrivateFieldGet(this, _App_tileLayer, "f")) {
             __classPrivateFieldGet(this, _App_map, "f").removeLayer(__classPrivateFieldGet(this, _App_tileLayer, "f"));
-            const key = __classPrivateFieldGet(this, _App_nightMode, "f") ? 'night' : 'day';
+            const key = isDark ? 'night' : 'day';
             __classPrivateFieldSet(this, _App_tileLayer, L.tileLayer(TILES[key], { attribution: TILE_ATTR[key] }).addTo(__classPrivateFieldGet(this, _App_map, "f")), "f");
         }
     }

@@ -536,19 +536,6 @@
   border-color: var(--sb-color, #00c46a);
   color: var(--sb-color, #00c46a);
 }
-.sam-sport-btn--more {
-  flex: 0 0 auto;
-  padding: 10px 14px;
-  color: rgba(255,255,255,0.5);
-  font-size: 1.2rem;
-  letter-spacing: 0.02em;
-}
-.sam-sport-btns {
-  flex-wrap: nowrap;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-.sam-sport-btns::-webkit-scrollbar { display: none; }
 
 /* Intensity slider */
 .sam-intensity-track {
@@ -2586,3 +2573,99 @@
   border-radius: 50%;
   background: conic-gradient(rgba(255,255,255,0.25) 0deg 360deg);
 }
+
+/* ── Light mode overrides for HomeView ───────────────────────────────────────── */
+body.light-mode {
+  --home-bg:        #f2f2f7;
+  --card-bg:        #ffffff;
+  --card-border:    rgba(0,0,0,0.08);
+  --text-primary:   #000000;
+  --text-secondary: #6b6b6b;
+  --text-tertiary:  #999999;
+  --divider:        rgba(0,0,0,0.08);
+}
+
+body.light-mode .home-feed-wrap,
+body.light-mode .home-tab-content { background: var(--home-bg); }
+
+body.light-mode .home-card {
+  background: var(--card-bg);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+body.light-mode .home-card__name,
+body.light-mode .home-card__title { color: var(--text-primary); }
+body.light-mode .home-card__time,
+body.light-mode .home-card__sport-badge { color: var(--text-secondary); }
+body.light-mode .home-card__footer { border-top-color: var(--divider); }
+body.light-mode .home-card__action { color: var(--text-secondary); }
+
+/* Bottom nav */
+body.light-mode .bottom-nav,
+body.light-mode .tab-bar {
+  background: rgba(255,255,255,0.92);
+  border-top: 1px solid rgba(0,0,0,0.1);
+}
+body.light-mode .tab-btn,
+body.light-mode .bottom-nav__btn { color: #999999; }
+body.light-mode .tab-btn--active,
+body.light-mode .bottom-nav__btn--active { color: #00c46a; }
+
+/* Header */
+body.light-mode .home-header,
+body.light-mode .home-greeting__text { color: var(--text-primary); }
+body.light-mode .home-greeting__sub { color: var(--text-secondary); }
+body.light-mode .home-header__icon-btn {
+  background: rgba(0,0,0,0.06);
+  color: var(--text-primary);
+}
+
+/* Notifications panel */
+body.light-mode .hn-sheet {
+  background: #ffffff;
+}
+body.light-mode .hn-item { border-bottom-color: var(--divider); }
+body.light-mode .hn-item__title { color: var(--text-primary); }
+body.light-mode .hn-item__body-text,
+body.light-mode .hn-item__time { color: var(--text-secondary); }
+body.light-mode .hn-header__title { color: var(--text-primary); }
+
+/* Profile sheet */
+body.light-mode .pv-sheet { background: #ffffff; }
+body.light-mode .pv-name { color: var(--text-primary); }
+body.light-mode .pv-bio { color: var(--text-secondary); }
+body.light-mode .pv-stats-row__val { color: var(--text-primary); }
+body.light-mode .pv-stats-row__lbl { color: var(--text-secondary); }
+body.light-mode .pv-subtab { color: var(--text-secondary); }
+body.light-mode .pv-subtab--active { color: #00c46a; }
+body.light-mode .pv-act-item__name { color: var(--text-primary); }
+body.light-mode .pv-act-item__date { color: var(--text-secondary); }
+
+/* Search / club */
+body.light-mode .sv2-sheet { background: #ffffff; }
+body.light-mode .sv2-search-input {
+  background: #f0f0f0; color: var(--text-primary);
+}
+
+/* Modal sheets */
+body.light-mode .pm-sheet,
+body.light-mode .sam-sheet,
+body.light-mode .up-sheet { background: #ffffff; }
+body.light-mode .pm-label,
+body.light-mode .sam-label,
+body.light-mode .up-label { color: var(--text-secondary); }
+body.light-mode .pm-input,
+body.light-mode .sam-input,
+body.light-mode .sam-textarea,
+body.light-mode .up-input {
+  background: #f0f0f0; color: var(--text-primary); border-color: #cccccc;
+}
+
+/* Feed cards in profile/club */
+body.light-mode .feed-card {
+  background: #ffffff;
+  border: 1px solid rgba(0,0,0,0.08);
+}
+body.light-mode .feed-card__author,
+body.light-mode .feed-card__title { color: var(--text-primary); }
+body.light-mode .feed-card__date,
+body.light-mode .feed-card__text { color: var(--text-secondary); }
