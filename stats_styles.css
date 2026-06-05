@@ -13,7 +13,7 @@
 .sv-subtabs {
   display: flex;
   gap: 4px;
-  background: rgba(255,255,255,0.05);
+  background: var(--app-surface-1);
   border-radius: 14px;
   padding: 4px;
 }
@@ -32,14 +32,14 @@
 }
 .sv-subtab--active {
   background: var(--color-brand--2, #00c46a);
-  color: #fff;
+  color: var(--app-text-primary);
 }
 
 /* ── Sections ── */
 .sv-section {
   margin: 16px 16px 0;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: var(--app-surface-1);
+  border: 1px solid var(--app-border);
   border-radius: 20px;
   padding: 16px;
   overflow: hidden;
@@ -85,7 +85,7 @@
 #svGoalPct { color: var(--color-brand--2, #00c46a); font-weight: 700; }
 .sv-week-goal__bar {
   height: 6px;
-  background: rgba(255,255,255,0.08);
+  background: var(--app-surface-2);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -106,9 +106,9 @@
   margin-bottom: 12px;
 }
 .sv-icon-btn {
-  background: rgba(255,255,255,0.07);
+  background: var(--app-surface-1);
   border: none;
-  color: #fff;
+  color: var(--app-text-primary);
   width: 32px; height: 32px;
   border-radius: 50%;
   font-size: 1.6rem;
@@ -116,12 +116,12 @@
   display: flex; align-items: center; justify-content: center;
   transition: background 0.2s;
 }
-.sv-icon-btn:hover { background: rgba(255,255,255,0.14); }
+.sv-icon-btn:hover { background: var(--app-surface-2); }
 .sv-icon-btn:disabled { opacity: 0.3; cursor: default; }
 .sv-week-label {
   font-size: 1.25rem;
   font-weight: 600;
-  color: #fff;
+  color: var(--app-text-primary);
   min-width: 120px;
   text-align: center;
 }
@@ -130,7 +130,7 @@
 .sv-seg {
   display: flex;
   gap: 3px;
-  background: rgba(255,255,255,0.06);
+  background: var(--app-surface-1);
   border-radius: 8px;
   padding: 3px;
 }
@@ -150,7 +150,7 @@
 }
 .sv-seg__btn--active {
   background: var(--color-brand--2, #00c46a);
-  color: #fff;
+  color: var(--app-text-primary);
 }
 
 /* ── Records ── */
@@ -163,19 +163,19 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(255,255,255,0.04);
+  background: var(--app-surface-1);
   border-radius: 12px;
   padding: 12px 14px;
 }
 .sv-record__icon { font-size: 1.8rem; flex-shrink: 0; }
 .sv-record__info { flex: 1; min-width: 0; }
-.sv-record__label { display: block; font-size: 1.25rem; font-weight: 600; color: #fff; }
+.sv-record__label { display: block; font-size: 1.25rem; font-weight: 600; color: var(--app-text-primary); }
 .sv-record__date  { font-size: 1.05rem; color: var(--color-light--2, #6c7175); }
 .sv-record__val   { font-size: 1.45rem; font-weight: 700; color: var(--color-brand--2, #00c46a); white-space: nowrap; }
 
 /* ── Trends ── */
 .sv-trend-row {
-  background: rgba(255,255,255,0.04);
+  background: var(--app-surface-1);
   border-radius: 12px;
   padding: 12px 14px;
   margin-bottom: 8px;
@@ -211,10 +211,10 @@
 .sv-goal-row span:first-child { flex: 1; }
 .sv-goal-input {
   width: 72px;
-  background: rgba(255,255,255,0.07);
+  background: var(--app-surface-1);
   border: 1.5px solid rgba(255,255,255,0.1);
   border-radius: 10px;
-  color: #fff;
+  color: var(--app-text-primary);
   font-size: 1.3rem;
   padding: 7px 10px;
   text-align: right;
@@ -258,7 +258,7 @@
   padding: 7px 14px;
   border-radius: 20px;
   border: 1.5px solid rgba(255,255,255,0.1);
-  background: rgba(255,255,255,0.04);
+  background: var(--app-surface-1);
   color: var(--color-light--1, #aaa);
   font-size: 1.25rem;
   font-weight: 600;
@@ -270,12 +270,12 @@
 .sv-filter--active {
   background: var(--color-brand--2, #00c46a);
   border-color: var(--color-brand--2, #00c46a);
-  color: #fff;
+  color: var(--app-text-primary);
 }
 
 /* Sort select */
 .sv-sort {
-  background: rgba(255,255,255,0.06);
+  background: var(--app-surface-1);
   border: 1.5px solid rgba(255,255,255,0.1);
   border-radius: 10px;
   color: var(--color-light--1, #aaa);
@@ -298,15 +298,15 @@
 .sv-item {
   display: flex;
   align-items: stretch;
-  background: rgba(255,255,255,0.04);
-  border: 1px solid rgba(255,255,255,0.07);
+  background: var(--app-surface-1);
+  border: 1px solid var(--app-border);
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
   transition: transform 0.15s, background 0.15s;
   animation: svItemIn 0.3s ease both;
 }
-.sv-item:active { transform: scale(0.985); background: rgba(255,255,255,0.07); }
+.sv-item:active { transform: scale(0.985); background: var(--app-surface-1); }
 @keyframes svItemIn {
   from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
@@ -330,7 +330,7 @@
   flex: 1;
   font-size: 1.35rem;
   font-weight: 700;
-  color: #fff;
+  color: var(--app-text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -364,7 +364,7 @@
 .sv-item__del {
   background: none;
   border: none;
-  color: rgba(255,255,255,0.2);
+  color: var(--app-text-muted);
   font-size: 1.2rem;
   padding: 0 14px;
   cursor: pointer;
@@ -410,7 +410,7 @@
   position: absolute;
   bottom: 0; left: 0; right: 0;
   max-height: 92vh;
-  background: #1a1f23;
+  background: var(--app-bg-card);
   border-radius: 24px 24px 0 0;
   overflow-y: auto;
   transform: translateY(100%);
@@ -422,7 +422,7 @@
 
 .sv-detail-handle {
   width: 40px; height: 4px;
-  background: rgba(255,255,255,0.14);
+  background: var(--app-surface-2);
   border-radius: 2px;
   margin: 12px auto;
   cursor: grab;
@@ -433,7 +433,7 @@
   align-items: center;
   gap: 12px;
   padding: 0 20px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid var(--app-border);
 }
 .sv-detail-header__icon {
   width: 48px; height: 48px;
@@ -444,14 +444,14 @@
   font-size: 2rem; flex-shrink: 0;
 }
 .sv-detail-header__name {
-  font-size: 1.5rem; font-weight: 700; color: #fff;
+  font-size: 1.5rem; font-weight: 700; color: var(--app-text-primary);
 }
 .sv-detail-header__date {
   font-size: 1.15rem; color: var(--color-light--2, #6c7175);
 }
 .sv-detail-close {
   margin-left: auto;
-  background: rgba(255,255,255,0.08);
+  background: var(--app-surface-2);
   border: none; color: #aaa;
   width: 32px; height: 32px;
   border-radius: 50%; font-size: 1.3rem;
@@ -463,7 +463,7 @@
   display: flex;
   padding: 16px 20px;
   gap: 0;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border: 1px solid var(--app-border);
 }
 .sv-detail-stat {
   flex: 1; text-align: center;
@@ -471,7 +471,7 @@
 .sv-detail-stat__val {
   display: block;
   font-size: 2rem; font-weight: 700;
-  color: #fff; letter-spacing: -0.5px;
+  color: var(--app-text-primary); letter-spacing: -0.5px;
   line-height: 1.1;
 }
 .sv-detail-stat__val .sv-detail__unit {
@@ -529,27 +529,4 @@
 }
 .sv-chart-wrap canvas {
   display: block;
-}
-
-/* ── Light mode — stats ──────────────────────────────────────────────────────── */
-body.light-mode .stats-overlay { background: rgba(0,0,0,0.4); }
-body.light-mode .stats-sheet { background: #f2f2f7; }
-body.light-mode .stats-header { border-bottom-color: rgba(0,0,0,0.08); }
-body.light-mode .stats-title { color: #111; }
-body.light-mode .stats-card {
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-}
-body.light-mode .stats-card__title { color: #111; }
-body.light-mode .stats-card__val { color: #111; }
-body.light-mode .stats-card__lbl { color: #888; }
-body.light-mode .stats-tab { color: #888; }
-body.light-mode .stats-tab--active { color: #00c46a; border-bottom-color: #00c46a; }
-body.light-mode .stats-section-title { color: #555; }
-body.light-mode .stats-bar { background: rgba(0,0,0,0.06); }
-body.light-mode .stats-goal-row { border-bottom-color: rgba(0,0,0,0.06); }
-body.light-mode .stats-goal-label { color: #111; }
-body.light-mode .stats-goal-sub { color: #888; }
-body.light-mode .stats-input {
-  background: #f0f0f0; color: #111; border-color: #ccc;
 }
