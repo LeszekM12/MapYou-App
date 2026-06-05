@@ -157,16 +157,18 @@ class App {
         // ── Theme init — manual override OR system preference ──────────────────
         const _manualTheme = localStorage.getItem('nightMode');
         if (_manualTheme === 'true') {
-            __classPrivateFieldSet(this, _App_nightMode, true, "f");
+            __classPrivateFieldSet(this, _App_nightMode, true, "f"); // user forced dark
         }
         else if (_manualTheme === 'false') {
-            __classPrivateFieldSet(this, _App_nightMode, false, "f");
+            __classPrivateFieldSet(this, _App_nightMode, false, "f"); // user forced light
         }
         else {
             // No manual override — follow system
             __classPrivateFieldSet(this, _App_nightMode, window.matchMedia('(prefers-color-scheme: dark)').matches, "f");
         }
         this._applyTheme();
+        // Update toggle button to reflect current state
+        document.getElementById('nightToggle')?.classList.toggle('active', __classPrivateFieldGet(this, _App_nightMode, "f"));
         // Listen for system theme changes (live — no restart needed)
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
             // Only follow system if user hasn't set a manual override
@@ -342,14 +344,12 @@ class App {
     _toggleNightMode() {
         __classPrivateFieldSet(this, _App_nightMode, !__classPrivateFieldGet(this, _App_nightMode, "f"), "f");
         if (__classPrivateFieldGet(this, _App_nightMode, "f")) {
-            // User explicitly turned ON — override system
+            // User explicitly turned ON dark mode
             localStorage.setItem('nightMode', 'true');
         }
         else {
-            // User turned OFF — remove override, let system decide
-            localStorage.removeItem('nightMode');
-            // Re-read system preference
-            __classPrivateFieldSet(this, _App_nightMode, window.matchMedia('(prefers-color-scheme: dark)').matches, "f");
+            // User explicitly turned OFF dark mode → force light regardless of system
+            localStorage.setItem('nightMode', 'false');
         }
         this._applyTheme();
     }

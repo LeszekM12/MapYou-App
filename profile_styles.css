@@ -71,11 +71,15 @@
 .pv-header__btn:hover { background: var(--app-surface-2); }
 
 /* Scrollable content */
-.pv-sheet > *:not(.pv-handle):not(.pv-header):not(.pv-subtabs) {
-  flex-shrink: 0;
-}
+.pv-handle    { flex-shrink: 0; }
+.pv-header    { flex-shrink: 0; }
+.pv-hero      { flex-shrink: 0; }
+.pv-stats-row { flex-shrink: 0; }
+.pv-photo-strip { flex-shrink: 0; }
+.pv-subtabs   { flex-shrink: 0; }
 .pv-content {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 0 0 32px;

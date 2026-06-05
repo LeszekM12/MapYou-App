@@ -65,9 +65,26 @@ body.light-mode .tab-scroll {
 }
 body.light-mode .tab-scroll::before { background: rgba(0,0,0,0.15) !important; }
 
-/* Map/Track/Friends tab-scroll transparent */
-body.light-mode #tabMap .tab-scroll,
-body.light-mode .tab-panel--map .tab-scroll { background: transparent !important; box-shadow: none !important; }
+/* Map tab-scroll — biały panel który wysuwa się od dołu */
+body.light-mode #tabMap .tab-scroll {
+  background: #ffffff !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important;
+}
+/* Drag handle na białym tle */
+body.light-mode #tabMap .tab-scroll::before {
+  background: rgba(0,0,0,0.15) !important;
+}
+/* Tab header — lekko szare tło dla sekcji z pogodą */
+body.light-mode #tabMap .tab-header {
+  background: #f2f2f7 !important;
+  border-radius: 12px !important;
+  padding: 8px 12px !important;
+  margin-bottom: 4px !important;
+}
+body.light-mode #tabMap .tab-header__city { color: #1a1a1a !important; }
+body.light-mode #tabMap .tab-header__weather { color: #555 !important; }
+body.light-mode .weather-widget__sun { color: #555 !important; }
+/* Track tab-scroll */
 body.light-mode #tabTrack .tab-scroll { background: rgba(255,255,255,0.97) !important; }
 
 /* Heatmap cells — invert opacity for light */

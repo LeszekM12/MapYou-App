@@ -207,14 +207,17 @@ class App {
     // ── Theme init — manual override OR system preference ──────────────────
     const _manualTheme = localStorage.getItem('nightMode');
     if (_manualTheme === 'true') {
-      this.#nightMode = true;
+      this.#nightMode = true;       // user forced dark
     } else if (_manualTheme === 'false') {
-      this.#nightMode = false;
+      this.#nightMode = false;      // user forced light
     } else {
       // No manual override — follow system
       this.#nightMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
     this._applyTheme();
+
+    // Update toggle button to reflect current state
+    document.getElementById('nightToggle')?.classList.toggle('active', this.#nightMode);
 
     // Listen for system theme changes (live — no restart needed)
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -406,13 +409,11 @@ class App {
   _toggleNightMode(): void {
     this.#nightMode = !this.#nightMode;
     if (this.#nightMode) {
-      // User explicitly turned ON — override system
+      // User explicitly turned ON dark mode
       localStorage.setItem('nightMode', 'true');
     } else {
-      // User turned OFF — remove override, let system decide
-      localStorage.removeItem('nightMode');
-      // Re-read system preference
-      this.#nightMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      // User explicitly turned OFF dark mode → force light regardless of system
+      localStorage.setItem('nightMode', 'false');
     }
     this._applyTheme();
   }
