@@ -76,13 +76,15 @@ body.light-mode #tabMap .tab-scroll::before {
 }
 /* Tab header — lekko szare tło dla sekcji z pogodą */
 body.light-mode #tabMap .tab-header {
-  background: #f2f2f7 !important;
+  background: #dddde0 !important;
   border-radius: 12px !important;
   padding: 8px 12px !important;
   margin-bottom: 4px !important;
 }
-body.light-mode #tabMap .tab-header__city { color: #1a1a1a !important; }
-body.light-mode #tabMap .tab-header__weather { color: #555 !important; }
+body.light-mode .tab-header__city { color: #555 !important; }
+body.light-mode .tab-header__desc { color: #666 !important; }
+body.light-mode .tab-header__temp { color: #1a1a1a !important; }
+body.light-mode .tab-header__weather { color: #555 !important; }
 body.light-mode .weather-widget__sun { color: #555 !important; }
 /* Track tab-scroll */
 body.light-mode #tabTrack .tab-scroll { background: rgba(255,255,255,0.97) !important; }
