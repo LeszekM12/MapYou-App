@@ -191,6 +191,33 @@ body.light-mode .map-search-bar__inner {
   border: none !important;
   padding: 0 !important;
 }
+/* Search input i container — transparent w light mode */
+body.light-mode .poi-search__input {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #1a1a1a !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+}
+body.light-mode .poi-search__input::placeholder { color: #aaa !important; }
+body.light-mode .btn-settings-gear {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  color: #555 !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+}
+/* poi-results — transparent background, floating cards */
+body.light-mode .poi-results { background: transparent !important; }
+body.light-mode .poi-result-item {
+  background: rgba(255,255,255,0.92) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+}
+body.light-mode .poi-result-item span,
+body.light-mode .poi-result-item p { color: #1a1a1a !important; }
 
 /* ── Stats rings — hardcoded SVG fill colors ────────────────────────────────── */
 body.light-mode .sv-ring-wrap text[fill="#ececec"],
