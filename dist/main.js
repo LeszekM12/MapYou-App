@@ -156,6 +156,7 @@ class App {
         this._initCustomFilters();
         // ── Theme init — manual override OR system preference ──────────────────
         const _manualTheme = localStorage.getItem('nightMode');
+        const _systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
         if (_manualTheme === 'true') {
             __classPrivateFieldSet(this, _App_nightMode, true, "f"); // user forced dark
         }
@@ -164,7 +165,7 @@ class App {
         }
         else {
             // No manual override — follow system
-            __classPrivateFieldSet(this, _App_nightMode, window.matchMedia('(prefers-color-scheme: dark)').matches, "f");
+            __classPrivateFieldSet(this, _App_nightMode, _systemDark, "f");
         }
         this._applyTheme();
         // Update toggle button to reflect current state
@@ -358,10 +359,10 @@ class App {
         document.body.classList.toggle('night-mode', isDark);
         document.body.classList.toggle('light-mode', !isDark);
         document.getElementById('nightToggle')?.classList.toggle('active', isDark);
-        // Update theme-color meta tag (status bar color on iOS/Android)
-        const metaTheme = document.querySelector('meta[name="theme-color"]');
-        if (metaTheme)
-            metaTheme.content = isDark ? '#141417' : '#ffffff';
+        // Update theme-color meta tags (status bar color on iOS/Android)
+        document.querySelectorAll('meta[name="theme-color"]').forEach(m => {
+            m.content = isDark ? '#141417' : '#ffffff';
+        });
         // Update map tiles
         if (__classPrivateFieldGet(this, _App_map, "f") && __classPrivateFieldGet(this, _App_tileLayer, "f")) {
             __classPrivateFieldGet(this, _App_map, "f").removeLayer(__classPrivateFieldGet(this, _App_tileLayer, "f"));

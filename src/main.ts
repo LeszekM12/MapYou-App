@@ -206,13 +206,14 @@ class App {
 
     // ── Theme init — manual override OR system preference ──────────────────
     const _manualTheme = localStorage.getItem('nightMode');
+    const _systemDark  = window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (_manualTheme === 'true') {
       this.#nightMode = true;       // user forced dark
     } else if (_manualTheme === 'false') {
       this.#nightMode = false;      // user forced light
     } else {
       // No manual override — follow system
-      this.#nightMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      this.#nightMode = _systemDark;
     }
     this._applyTheme();
 
@@ -423,9 +424,10 @@ class App {
     document.body.classList.toggle('night-mode', isDark);
     document.body.classList.toggle('light-mode', !isDark);
     document.getElementById('nightToggle')?.classList.toggle('active', isDark);
-    // Update theme-color meta tag (status bar color on iOS/Android)
-    const metaTheme = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (metaTheme) metaTheme.content = isDark ? '#141417' : '#ffffff';
+    // Update theme-color meta tags (status bar color on iOS/Android)
+    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach(m => {
+      m.content = isDark ? '#141417' : '#ffffff';
+    });
     // Update map tiles
     if (this.#map && this.#tileLayer) {
       this.#map.removeLayer(this.#tileLayer);
