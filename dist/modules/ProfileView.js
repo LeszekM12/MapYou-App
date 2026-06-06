@@ -239,7 +239,7 @@ function _openPhotoViewer(photos, parent) {
         });
     };
     render();
-    parent.appendChild(viewer);
+    document.body.appendChild(viewer);
 }
 export class ProfileView {
     constructor() {

@@ -273,7 +273,7 @@ function _openPhotoViewer(photos: { url: string; title: string }[], parent: HTML
     });
   };
   render();
-  parent.appendChild(viewer);
+  document.body.appendChild(viewer);
 }
 
 export class ProfileView {
