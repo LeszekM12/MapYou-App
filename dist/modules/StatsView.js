@@ -247,15 +247,15 @@ export class StatsView {
         return rings.map(([id, col, icon, lbl]) => `
       <div class="sv-ring-wrap">
         <svg viewBox="0 0 90 90">
-          <circle cx="45" cy="45" r="36" fill="none" stroke="#3a4147" stroke-width="7"/>
+          <circle cx="45" cy="45" r="36" fill="none" stroke="var(--app-surface-2,#3a4147)" stroke-width="7"/>
           <circle id="${id}" cx="45" cy="45" r="36" fill="none"
             stroke="${col}" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
             stroke-linecap="round" transform="rotate(-90 45 45)"
             style="transition:stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1)"/>
           <text x="45" y="25" text-anchor="middle" font-size="13">${icon}</text>
-          <text x="45" y="42" text-anchor="middle" fill="#ececec" font-size="12" font-weight="800"
+          <text x="45" y="42" text-anchor="middle" fill="var(--app-text-primary,#ececec)" font-size="12" font-weight="800"
             font-family="Manrope,sans-serif" id="${id}Val">—</text>
-          <text x="45" y="53" text-anchor="middle" fill="#aaa" font-size="8"
+          <text x="45" y="53" text-anchor="middle" fill="var(--app-text-tertiary,#aaa)" font-size="8"
             font-family="Manrope,sans-serif">${lbl}</text>
         </svg>
       </div>`).join('');

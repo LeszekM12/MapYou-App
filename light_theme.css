@@ -76,7 +76,7 @@ body.light-mode #tabMap .tab-scroll::before {
 }
 /* Tab header — lekko szare tło dla sekcji z pogodą */
 body.light-mode #tabMap .tab-header {
-  background: #dddde0 !important;
+  background: #f2f2f7 !important;
   border-radius: 12px !important;
   padding: 8px 12px !important;
   margin-bottom: 4px !important;
@@ -180,4 +180,36 @@ body.light-mode .friends-empty p {
   background: #ffffff !important;
   color: #555 !important;
   border-color: rgba(0,0,0,0.08) !important;
+}
+
+/* ── Map search bar — usuń szare tło ────────────────────────────────────────── */
+body.light-mode .map-search-bar__inner {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/* ── Stats rings — hardcoded SVG fill colors ────────────────────────────────── */
+body.light-mode .sv-ring-wrap text[fill="#ececec"],
+body.light-mode .sv-ring-wrap text[fill="#aaa"] {
+  fill: #1a1a1a !important;
+}
+/* CSS fallback — SVG text inherits currentColor gdy fill nie jest ustawiony */
+body.light-mode .sv-ring-wrap svg { color: #1a1a1a; }
+body.light-mode .sv-ring-wrap circle[stroke="#3a4147"] { stroke: #e0e0e0 !important; }
+
+/* ── Stats Progress/History tabs — sv-seg ───────────────────────────────────── */
+body.light-mode .sv-seg {
+  background: #e5e5ea !important;
+}
+body.light-mode .sv-seg__btn {
+  color: #888 !important;
+}
+body.light-mode .sv-seg__btn--active {
+  background: #ffffff !important;
+  color: #1a1a1a !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.12) !important;
 }
