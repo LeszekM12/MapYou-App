@@ -1944,6 +1944,23 @@ export class HomeView {
 
 export const homeView = new HomeView();
 
+/** Eksportowana funkcja do otwierania viewera z zewnątrz (ProfileView, PublicProfile) */
+export function openReelViewer(
+  group: { userId: string; authorName: string; avatarB64: string | null; reels: unknown[]; hasUnseen: boolean },
+  onSeen: () => void,
+): void {
+  // Inject the group into the feed temporarily so _openReelsViewer can find it
+  const hv = homeView as unknown as Record<string, unknown>;
+  const feed = hv._reelsFeed as typeof group[] | undefined;
+  if (feed) {
+    const existing = feed.findIndex(g => g.userId === group.userId);
+    if (existing >= 0) feed[existing] = group;
+    else feed.unshift(group);
+  }
+  void (hv._openReelsViewer as (uid: string, idx: number) => Promise<void>)(group.userId, 0);
+  onSeen();
+}
+
 import { getIcon as _gi2, getColor as _gc2 } from './Tracker.js';
 (window as unknown as Record<string, unknown>)._mapyouGetIcon  = _gi2;
 (window as unknown as Record<string, unknown>)._mapyouGetColor = _gc2;

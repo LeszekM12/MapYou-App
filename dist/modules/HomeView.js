@@ -1907,6 +1907,21 @@ export class HomeView {
     }
 }
 export const homeView = new HomeView();
+/** Eksportowana funkcja do otwierania viewera z zewnątrz (ProfileView, PublicProfile) */
+export function openReelViewer(group, onSeen) {
+    // Inject the group into the feed temporarily so _openReelsViewer can find it
+    const hv = homeView;
+    const feed = hv._reelsFeed;
+    if (feed) {
+        const existing = feed.findIndex(g => g.userId === group.userId);
+        if (existing >= 0)
+            feed[existing] = group;
+        else
+            feed.unshift(group);
+    }
+    void hv._openReelsViewer(group.userId, 0);
+    onSeen();
+}
 import { getIcon as _gi2, getColor as _gc2 } from './Tracker.js';
 window._mapyouGetIcon = _gi2;
 window._mapyouGetColor = _gc2;
