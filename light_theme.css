@@ -453,27 +453,3 @@ body.light-mode .pv-header__btn--follow,
 body.light-mode .friend-card__btn--watch,
 body.light-mode .sv-filter--active,
 body.light-mode .map-filter-chip--active { color: #fff !important; }
-
-/* ── iOS Safe Area / Status Bar ────────────────────────────────────────────── */
-/* Rozciąga apkę pod pasek statusu iOS */
-body {
-  padding-top: env(safe-area-inset-top);
-  padding-left: env(safe-area-inset-left);
-  padding-right: env(safe-area-inset-right);
-}
-
-/* Bottom nav już ma padding-bottom: env(safe-area-inset-bottom) */
-/* Tab panels muszą uwzględniać safe area na górze */
-.tab-panel {
-  top: 0 !important;
-}
-
-/* Home greeting — padding żeby nie chować się pod status barem */
-.home-greeting {
-  padding-top: calc(16px + env(safe-area-inset-top)) !important;
-}
-
-/* Light mode — status bar będzie biały (jasny tekst czarny) */
-body.light-mode {
-  background-color: #f2f2f7;
-}
