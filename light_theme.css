@@ -50,7 +50,10 @@ body.light-mode .tab-scroll {
 }
 body.light-mode .tab-scroll::before { background: rgba(0,0,0,0.15) !important; }
 body.light-mode #tabMap .tab-scroll,
-body.light-mode .tab-panel--map .tab-scroll { background: transparent !important; box-shadow: none !important; }
+body.light-mode .tab-panel--map .tab-scroll {
+  background: #ffffff !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important;
+}
 body.light-mode #tabTrack .tab-scroll { background: rgba(255,255,255,0.97) !important; }
 body.light-mode #tabStats .tab-scroll { background: #f2f2f7 !important; }
 
@@ -95,11 +98,26 @@ body.light-mode .home-reel-avatar--seen { border-color: #ccc !important; }
 body.light-mode .home-reel-avatar__label { color: #555 !important; }
 
 /* ── Streak card ────────────────────────────────────────────────────────────── */
-body.light-mode .home-streak,
-body.light-mode .home-streak__inner { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .home-streak {
+  background: #fff !important;
+  border-color: rgba(0,0,0,0.08) !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important;
+}
+body.light-mode .home-streak__inner { background: transparent !important; }
 body.light-mode .home-streak__title { color: #1a1a1a !important; }
 body.light-mode .home-streak__day { color: #999 !important; }
 body.light-mode .home-streak__day--today { color: #1a1a1a !important; font-weight: 700 !important; }
+body.light-mode .home-streak__dot {
+  background: rgba(0,0,0,0.06) !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+body.light-mode .home-streak__dot--active {
+  background: #f97316 !important;
+  border-color: #f97316 !important;
+}
+body.light-mode .home-streak__dot--today {
+  border-color: rgba(0,0,0,0.3) !important;
+}
 
 /* ── Activity/Post cards ────────────────────────────────────────────────────── */
 body.light-mode .home-card {
@@ -435,3 +453,27 @@ body.light-mode .pv-header__btn--follow,
 body.light-mode .friend-card__btn--watch,
 body.light-mode .sv-filter--active,
 body.light-mode .map-filter-chip--active { color: #fff !important; }
+
+/* ── iOS Safe Area / Status Bar ────────────────────────────────────────────── */
+/* Rozciąga apkę pod pasek statusu iOS */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Bottom nav już ma padding-bottom: env(safe-area-inset-bottom) */
+/* Tab panels muszą uwzględniać safe area na górze */
+.tab-panel {
+  top: 0 !important;
+}
+
+/* Home greeting — padding żeby nie chować się pod status barem */
+.home-greeting {
+  padding-top: calc(16px + env(safe-area-inset-top)) !important;
+}
+
+/* Light mode — status bar będzie biały (jasny tekst czarny) */
+body.light-mode {
+  background-color: #f2f2f7;
+}
