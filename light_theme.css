@@ -455,6 +455,10 @@ body.light-mode .sv-filter--active,
 body.light-mode .map-filter-chip--active { color: #fff !important; }
 
 /* ── Track tab light mode ───────────────────────────────────────────────────── */
+body.light-mode {
+  --trk-stats-bg:    rgba(255,255,255,0.92);
+  --trk-controls-bg: rgba(255,255,255,0.97);
+}
 body.light-mode .trk-bottom {
   background: #ffffff !important;
   border-top-color: rgba(0,0,0,0.08) !important;

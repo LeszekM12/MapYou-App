@@ -2147,7 +2147,7 @@ body {
 /* Stats bar na dole */
 .tracker-overlay__stats {
     pointer-events: all;
-    background: rgba(10,14,18,0.88);
+    background: var(--trk-stats-bg, rgba(10,14,18,0.88));
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border-radius: 1.6rem;
@@ -2166,13 +2166,13 @@ body {
 }
 .tracker-overlay__lbl {
     font-size: 1.1rem; font-weight: 700;
-    color: rgba(255,255,255,0.55); text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--app-text-tertiary, rgba(255,255,255,0.55)); text-transform: uppercase; letter-spacing: 0.08em;
 }
 
 /* Controls */
 .tracker-overlay__controls {
     pointer-events: all;
-    background: rgba(0,0,0,0.95);
+    background: var(--trk-controls-bg, rgba(0,0,0,0.95));
     padding: 1.4rem 2rem 3.2rem;
     display: flex; gap: 1.2rem; align-items: center;
 }
@@ -2185,7 +2185,7 @@ body {
 .tracker-overlay__pause:active { transform: scale(0.97); }
 .tracker-overlay__stop {
     flex: 0 0 auto; padding: 1.8rem 2.4rem;
-    border: 2px solid rgba(255,255,255,0.3); border-radius: 99px;
+    border: 2px solid var(--app-border, rgba(255,255,255,0.3)); border-radius: 99px;
     background: transparent; font-size: 1.6rem; font-weight: 700; color: var(--app-text-primary);
     cursor: pointer; transition: transform 0.15s;
 }
