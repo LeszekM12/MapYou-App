@@ -97,13 +97,32 @@ const routeTime        = document.getElementById('routeTime')!;
 const routeLoading     = document.getElementById('routeLoading')!;
 const btnTrack         = document.getElementById('btnTrack')!;
 
+// ── Map styles ───────────────────────────────────────────────────────────────
+const MAP_STYLES: Record<string, { url: string; attr: string; label: string; thumb: string; dark?: boolean }> = {
+  standard:  { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',       attr: '&copy; OpenStreetMap &copy; CARTO',  label: 'Standard',  thumb: '🗺️' },
+  satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri', label: 'Satellite', thumb: '🛰️' },
+  terrain:   { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                               attr: '&copy; OpenStreetMap &copy; OpenTopoMap', label: 'Terrain', thumb: '⛰️' },
+  dark:      { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',                  attr: '&copy; OpenStreetMap &copy; CARTO',  label: 'Dark',      thumb: '🌑', dark: true },
+  light:     { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',                 attr: '&copy; OpenStreetMap &copy; CARTO',  label: 'Light',     thumb: '☀️' },
+  streets:   { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',                             attr: '&copy; OpenStreetMap',               label: 'Streets',   thumb: '🏙️' },
+};
+const DEFAULT_DAY_STYLE   = 'standard';
+const DEFAULT_NIGHT_STYLE = 'dark';
+
+function _getActiveMapStyle(isDark: boolean): string {
+  const saved = localStorage.getItem('mapStyle');
+  if (saved && MAP_STYLES[saved]) return saved;
+  return isDark ? DEFAULT_NIGHT_STYLE : DEFAULT_DAY_STYLE;
+}
+
+// Legacy aliases used by _applyTheme tile switching
 const TILES = {
-  day:   'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
-  night: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  day:   MAP_STYLES.standard.url,
+  night: MAP_STYLES.dark.url,
 };
 const TILE_ATTR = {
-  day:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-  night: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
+  day:   MAP_STYLES.standard.attr,
+  night: MAP_STYLES.dark.attr,
 };
 
 // ─── App class ────────────────────────────────────────────────────────────────
@@ -208,12 +227,11 @@ class App {
     const _manualTheme = localStorage.getItem('nightMode');
     const _systemDark  = window.matchMedia('(prefers-color-scheme: dark)').matches;
     if (_manualTheme === 'true') {
-      this.#nightMode = true;       // user forced dark
-    } else if (_manualTheme === 'false') {
-      this.#nightMode = false;      // user forced light
+      this.#nightMode = true;   // user forced dark
     } else {
-      // No manual override — follow system
+      // null or 'false' — follow system
       this.#nightMode = _systemDark;
+      if (_manualTheme === 'false') localStorage.removeItem('nightMode');
     }
     this._applyTheme();
 
@@ -296,8 +314,9 @@ class App {
     const pane = this.#map.getPane('progressPane');
     if (pane) pane.style.zIndex = '650';
 
-    const tileKey = this.#nightMode ? 'night' : 'day';
-    this.#tileLayer = L.tileLayer(TILES[tileKey], { attribution: TILE_ATTR[tileKey] }).addTo(this.#map);
+    const _initStyleKey = _getActiveMapStyle(this.#nightMode);
+    const _initStyle    = MAP_STYLES[_initStyleKey];
+    this.#tileLayer = L.tileLayer(_initStyle.url, { attribution: _initStyle.attr }).addTo(this.#map);
 
     this.#map.on('click', this._handleMapClick.bind(this));
 
@@ -411,11 +430,13 @@ class App {
   _toggleNightMode(): void {
     this.#nightMode = !this.#nightMode;
     if (this.#nightMode) {
-      // User explicitly turned ON dark mode
+      // User turned ON — force dark
       localStorage.setItem('nightMode', 'true');
     } else {
-      // User explicitly turned OFF dark mode → force light regardless of system
-      localStorage.setItem('nightMode', 'false');
+      // User turned OFF — remove override so system can decide again
+      localStorage.removeItem('nightMode');
+      // Re-read system to apply correct state
+      this.#nightMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
     }
     this._applyTheme();
   }
@@ -432,8 +453,9 @@ class App {
     // Update map tiles
     if (this.#map && this.#tileLayer) {
       this.#map.removeLayer(this.#tileLayer);
-      const key = isDark ? 'night' : 'day';
-      this.#tileLayer = L.tileLayer(TILES[key], { attribution: TILE_ATTR[key] }).addTo(this.#map);
+      const styleKey = _getActiveMapStyle(isDark);
+      const style    = MAP_STYLES[styleKey];
+      this.#tileLayer = L.tileLayer(style.url, { attribution: style.attr }).addTo(this.#map);
     }
   }
 
@@ -1188,6 +1210,58 @@ class App {
     }
 
     // History toggle
+    // ── Map style picker ───────────────────────────────────────────────────────
+    const _initMapPicker = () => {
+      const panel   = document.getElementById('mapStylePanel')!;
+      const grid    = document.getElementById('mapStyleGrid')!;
+
+      // Build grid
+      grid.innerHTML = Object.entries(MAP_STYLES).map(([key, style]) => `
+        <div class="map-style-card ${_getActiveMapStyle(this.#nightMode) === key ? 'map-style-card--active' : ''}"
+             data-style="${key}">
+          <div class="map-style-card__thumb">${style.thumb}</div>
+          <div class="map-style-card__label">${style.label}</div>
+        </div>`).join('');
+
+      const openPanel = () => {
+        // Refresh active state
+        grid.querySelectorAll<HTMLElement>('.map-style-card').forEach(c => {
+          c.classList.toggle('map-style-card--active', c.dataset.style === _getActiveMapStyle(this.#nightMode));
+        });
+        panel.classList.remove('hidden');
+        requestAnimationFrame(() => panel.classList.add('visible'));
+      };
+
+      const closePanel = () => {
+        panel.classList.remove('visible');
+        setTimeout(() => panel.classList.add('hidden'), 300);
+      };
+
+      document.getElementById('trkMapStyleBtn')?.addEventListener('click', openPanel);
+      document.getElementById('mapTabStyleBtn')?.addEventListener('click', openPanel);
+
+      // Close on backdrop click
+      panel.addEventListener('click', e => { if (e.target === panel) closePanel(); });
+
+      // Style selection
+      grid.addEventListener('click', e => {
+        const card = (e.target as HTMLElement).closest<HTMLElement>('.map-style-card');
+        if (!card?.dataset.style) return;
+        const key = card.dataset.style;
+        localStorage.setItem('mapStyle', key);
+        grid.querySelectorAll('.map-style-card').forEach(c => c.classList.remove('map-style-card--active'));
+        card.classList.add('map-style-card--active');
+        // Apply new tile layer
+        if (this.#map && this.#tileLayer) {
+          this.#map.removeLayer(this.#tileLayer);
+          const style = MAP_STYLES[key];
+          this.#tileLayer = L.tileLayer(style.url, { attribution: style.attr }).addTo(this.#map);
+        }
+        setTimeout(closePanel, 400);
+      });
+    };
+    _initMapPicker();
+
     document.getElementById('trkHistoryToggle')?.addEventListener('click', () => {
       document.getElementById('trkHistoryPanel')?.classList.toggle('hidden');
     });

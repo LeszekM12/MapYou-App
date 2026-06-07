@@ -453,3 +453,49 @@ body.light-mode .pv-header__btn--follow,
 body.light-mode .friend-card__btn--watch,
 body.light-mode .sv-filter--active,
 body.light-mode .map-filter-chip--active { color: #fff !important; }
+
+/* ── Track tab light mode ───────────────────────────────────────────────────── */
+body.light-mode .trk-bottom {
+  background: #ffffff !important;
+  border-top-color: rgba(0,0,0,0.08) !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important;
+}
+body.light-mode .trk-sport-tabs {
+  background: #f2f2f7 !important;
+}
+body.light-mode .trk-sport-tab {
+  color: #555 !important;
+}
+body.light-mode .trk-sport-tab--active {
+  background: #00c46a !important;
+  color: #fff !important;
+}
+body.light-mode .trk-history-toggle {
+  background: rgba(255,255,255,0.92) !important;
+  color: #1a1a1a !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+body.light-mode .trk-history-panel {
+  background: #ffffff !important;
+}
+body.light-mode .trk-permission__sheet {
+  background: #ffffff !important;
+}
+body.light-mode .trk-map-style-btn {
+  background: rgba(255,255,255,0.92) !important;
+  color: #1a1a1a !important;
+  border-color: rgba(0,0,0,0.1) !important;
+}
+
+/* ── Map style picker panel ─────────────────────────────────────────────────── */
+body.light-mode .map-style-panel__inner {
+  background: #ffffff !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.1) !important;
+}
+body.light-mode .map-style-panel__title { color: #1a1a1a !important; }
+body.light-mode .map-style-card { background: #f2f2f7 !important; color: #1a1a1a !important; }
+body.light-mode .map-style-card--active {
+  border-color: #00c46a !important;
+  background: rgba(0,196,106,0.08) !important;
+}
+body.light-mode .map-style-card__label { color: #1a1a1a !important; }
