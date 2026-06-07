@@ -1,23 +1,20 @@
 /* ══════════════════════════════════════════════════════════════════════════════
-   MAPYOU LIGHT THEME — v4
-   Przestawia CSS variables zdefiniowane we wszystkich plikach CSS
+   MAPYOU LIGHT THEME — final
    ══════════════════════════════════════════════════════════════════════════════ */
 
-/* ── Dark mode defaults (w :root) ───────────────────────────────────────────── */
 :root {
-  --app-bg-base:       #0f1114;
-  --app-bg-card:       #1a1f23;
-  --app-bg-elevated:   #252830;
-  --app-text-primary:  #ffffff;
+  --app-bg-base:        #0f1114;
+  --app-bg-card:        #1a1f23;
+  --app-bg-elevated:    #252830;
+  --app-text-primary:   #ffffff;
   --app-text-secondary: rgba(255,255,255,0.75);
   --app-text-tertiary:  rgba(255,255,255,0.4);
   --app-text-muted:     rgba(255,255,255,0.2);
-  --app-surface-1:     rgba(255,255,255,0.05);
-  --app-surface-2:     rgba(255,255,255,0.1);
-  --app-border:        rgba(255,255,255,0.08);
+  --app-surface-1:      rgba(255,255,255,0.05);
+  --app-surface-2:      rgba(255,255,255,0.1);
+  --app-border:         rgba(255,255,255,0.08);
 }
 
-/* ── Light mode overrides ───────────────────────────────────────────────────── */
 body.light-mode {
   --app-bg-base:        #f2f2f7;
   --app-bg-card:        #ffffff;
@@ -30,7 +27,6 @@ body.light-mode {
   --app-surface-2:      rgba(0,0,0,0.06);
   --app-border:         rgba(0,0,0,0.09);
 
-  /* Globalne zmienne apki */
   --color-dark--1:  #f2f2f7 !important;
   --color-dark--2:  #ffffff !important;
   --color-light--1: #6b6b6b !important;
@@ -46,125 +42,104 @@ body.light-mode {
   color: #1a1a1a !important;
 }
 
-/* ── Elementy które używają var() ale nie przez --app-* ─────────────────────── */
+/* ── Tab panels ─────────────────────────────────────────────────────────────── */
+body.light-mode .tab-scroll {
+  background: #f2f2f7 !important;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.06) !important;
+  color: #1a1a1a !important;
+}
+body.light-mode .tab-scroll::before { background: rgba(0,0,0,0.15) !important; }
+body.light-mode #tabMap .tab-scroll,
+body.light-mode .tab-panel--map .tab-scroll { background: transparent !important; box-shadow: none !important; }
+body.light-mode #tabTrack .tab-scroll { background: rgba(255,255,255,0.97) !important; }
+body.light-mode #tabStats .tab-scroll { background: #f2f2f7 !important; }
 
-/* Bottom nav */
+/* ── Bottom nav ─────────────────────────────────────────────────────────────── */
 body.light-mode .bottom-nav {
   background: rgba(255,255,255,0.92) !important;
   border-top: 1px solid rgba(0,0,0,0.1) !important;
   box-shadow: 0 -1px 8px rgba(0,0,0,0.06) !important;
   backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
 }
-body.light-mode .bottom-nav__item { color: #888 !important; }
+body.light-mode .bottom-nav__item { color: #999 !important; }
 body.light-mode .bottom-nav__item--active { color: #00c46a !important; }
 
-/* tab-scroll */
-body.light-mode .tab-scroll {
-  background: var(--app-bg-base) !important;
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.06) !important;
+/* ── Home greeting ──────────────────────────────────────────────────────────── */
+body.light-mode .home-greeting { background: transparent !important; }
+body.light-mode .home-greeting__text { color: #555 !important; }
+body.light-mode .home-greeting__text strong { color: #1a1a1a !important; }
+body.light-mode .home-greeting__sub { color: #999 !important; }
+body.light-mode .home-greeting__bell-btn,
+body.light-mode .home-greeting__search-btn {
+  background: #fff !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+  border: none !important;
 }
-body.light-mode .tab-scroll::before { background: rgba(0,0,0,0.15) !important; }
-
-/* Map tab-scroll — biały panel który wysuwa się od dołu */
-body.light-mode #tabMap .tab-scroll {
-  background: #ffffff !important;
-  box-shadow: 0 -4px 20px rgba(0,0,0,0.08) !important;
+body.light-mode .home-greeting__bell-btn svg,
+body.light-mode .home-greeting__search-btn svg { stroke: #555 !important; }
+body.light-mode .home-greeting__profile-btn {
+  border-color: rgba(0,0,0,0.1) !important;
+  background: rgba(0,0,0,0.04) !important;
 }
-/* Drag handle na białym tle */
-body.light-mode #tabMap .tab-scroll::before {
-  background: rgba(0,0,0,0.15) !important;
+
+/* ── Reels row ──────────────────────────────────────────────────────────────── */
+body.light-mode .home-reel-row { background: transparent !important; }
+body.light-mode .home-reel-avatar { border-color: rgba(0,0,0,0.1) !important; background: #e5e5ea !important; }
+body.light-mode .home-reel-avatar--active {
+  border-color: transparent !important;
+  background: linear-gradient(var(--lt-bg-0,#f2f2f7),var(--lt-bg-0,#f2f2f7)) padding-box,
+              linear-gradient(135deg,#f97316,#ec4899) border-box !important;
 }
-/* Tab header — lekko szare tło dla sekcji z pogodą */
-body.light-mode #tabMap .tab-header {
-  background: #f2f2f7 !important;
-  border-radius: 12px !important;
-  padding: 8px 12px !important;
-  margin-bottom: 4px !important;
+body.light-mode .home-reel-avatar--seen { border-color: #ccc !important; }
+body.light-mode .home-reel-avatar__label { color: #555 !important; }
+
+/* ── Streak card ────────────────────────────────────────────────────────────── */
+body.light-mode .home-streak,
+body.light-mode .home-streak__inner { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .home-streak__title { color: #1a1a1a !important; }
+body.light-mode .home-streak__day { color: #999 !important; }
+body.light-mode .home-streak__day--today { color: #1a1a1a !important; font-weight: 700 !important; }
+
+/* ── Activity/Post cards ────────────────────────────────────────────────────── */
+body.light-mode .home-card {
+  background: #fff !important;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important;
+  border: none !important;
 }
-body.light-mode .tab-header__city { color: #555 !important; }
-body.light-mode .tab-header__desc { color: #666 !important; }
-body.light-mode .tab-header__temp { color: #1a1a1a !important; }
-body.light-mode .tab-header__weather { color: #555 !important; }
-body.light-mode .weather-widget__sun { color: #555 !important; }
-/* Track tab-scroll */
-body.light-mode #tabTrack .tab-scroll { background: rgba(255,255,255,0.97) !important; }
+body.light-mode .home-card__header { background: transparent !important; }
+body.light-mode .home-card__name,
+body.light-mode .home-card__author-name { color: #1a1a1a !important; }
+body.light-mode .home-card__time { color: #999 !important; }
+body.light-mode .home-card__sport-badge { color: #999 !important; }
+body.light-mode .home-card__intensity-badge { background: #f0f0f0 !important; color: #555 !important; border: none !important; }
+body.light-mode .home-card__stat-val { color: #1a1a1a !important; }
+body.light-mode .home-card__stat-lbl { color: #999 !important; }
+body.light-mode .home-card__footer { border-top-color: rgba(0,0,0,0.07) !important; background: transparent !important; }
+body.light-mode .home-card__action { color: #999 !important; background: none !important; }
+body.light-mode .home-card__action svg { stroke: #999 !important; fill: none !important; }
+body.light-mode .home-card__action--liked svg { stroke: #ef4444 !important; fill: #ef4444 !important; }
+body.light-mode .home-card__action-count { color: #999 !important; }
+body.light-mode .home-card__desc,
+body.light-mode .home-card__post-body { color: #555 !important; }
+body.light-mode .home-card__title,
+body.light-mode .home-card__post-title { color: #1a1a1a !important; }
+body.light-mode .home-card__map-wrap { background: #e5e5ea !important; }
+body.light-mode .home-card__notes { color: #999 !important; background: #f8f8f8 !important; }
 
-/* Heatmap cells — invert opacity for light */
-body.light-mode .pv-heatmap__cell[style*="background:rgba(0,196,106"] { opacity: 1 !important; }
+/* Comment panel */
+body.light-mode .home-card__comment-panel,
+body.light-mode .hcc__form { background: #f8f8f8 !important; border-top-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .hcc__input { background: #fff !important; color: #1a1a1a !important; border-color: rgba(0,0,0,0.1) !important; }
+body.light-mode .hcc__input::placeholder { color: #bbb !important; }
+body.light-mode .hcc__author { color: #1a1a1a !important; }
+body.light-mode .hcc__text { color: #555 !important; }
+body.light-mode .hcc__time { color: #999 !important; }
+body.light-mode .hcc__item { border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .hcs__panel { background: #fff !important; box-shadow: 0 4px 16px rgba(0,0,0,0.1) !important; border: 1px solid rgba(0,0,0,0.08) !important; }
+body.light-mode .hcs__opt { color: #555 !important; }
 
-/* Map search */
-body.light-mode .map-search-bar { background: rgba(255,255,255,0.96) !important; box-shadow: 0 2px 12px rgba(0,0,0,0.1) !important; }
-body.light-mode .msb-input { color: #1a1a1a !important; }
-body.light-mode .msb-input::placeholder { color: #bbb !important; }
-body.light-mode .msb-results { background: #fff !important; border-top: 1px solid rgba(0,0,0,0.07) !important; }
-body.light-mode .msb-result-item { color: #1a1a1a !important; border-color: rgba(0,0,0,0.07) !important; }
-body.light-mode .msb-result-item:hover { background: #f5f5f7 !important; }
-
-/* Settings */
-body.light-mode .settings-panel { background: #fff !important; }
-body.light-mode .settings-header { color: #1a1a1a !important; border-color: rgba(0,0,0,0.07) !important; }
-body.light-mode .settings-item { color: #1a1a1a !important; border-color: rgba(0,0,0,0.07) !important; }
-body.light-mode .settings-item__icon { background: #f0f0f0 !important; }
-body.light-mode .settings-item__sub { color: #888 !important; }
-body.light-mode .settings-item__chevron { color: #ccc !important; }
-
-/* Stats filters */
-body.light-mode .sv-filter--active { background: #00c46a !important; color: #fff !important; border-color: #00c46a !important; }
-body.light-mode .sv-subtab--active { color: #00c46a !important; }
-body.light-mode .sv-seg__btn--active { background: #e5e5ea !important; color: #1a1a1a !important; }
-
-/* Friends header btn share */
-body.light-mode .friends-header__btn--share { background: #00c46a !important; color: #fff !important; border-color: #00c46a !important; }
-body.light-mode .friend-card__btn--watch { background: #00c46a !important; color: #fff !important; }
-body.light-mode .friend-card__btn--delete { color: #ef4444 !important; }
-
-/* Buttons that should stay white text */
-body.light-mode .pm-btn--post,
-body.light-mode .up-save-btn,
-body.light-mode .name-modal__btn:not(.name-modal__btn--secondary) { color: #fff !important; }
-
-/* Profile sheet */
-body.light-mode .pv-overlay--visible { background: rgba(0,0,0,0.4) !important; }
-body.light-mode .pv-subtabs { background: var(--app-bg-base) !important; border-color: var(--app-border) !important; }
-body.light-mode .pv-subtab { color: #888 !important; }
-body.light-mode .pv-subtab--active { color: #00c46a !important; border-color: #00c46a !important; }
-body.light-mode .pv-stats-row { background: var(--app-bg-base) !important; border-color: var(--app-border) !important; }
-body.light-mode .pv-act-list,
-body.light-mode .pv-efforts,
-body.light-mode .pv-heatmap-wrap,
-body.light-mode .pv-pie-wrap { background: #fff !important; border-radius: 16px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
-body.light-mode .pv-back,
-body.light-mode .pv-header__btn { background: #fff !important; color: #1a1a1a !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; border-color: rgba(0,0,0,0.08) !important; }
-body.light-mode .pv-header__btn--follow { background: #00c46a !important; color: #fff !important; }
-
-/* Club detail dynamic modals */
-body.light-mode [id*="clubDetail"] > div,
-body.light-mode [id*="clubDetail"] { background: #f2f2f7 !important; }
-
-/* Global dynamic HTML fallback */
-body.light-mode [style*="color:#fff"]:not([style*="background:#00c46a"]):not([style*="background: #00c46a"]):not(.pm-btn--post):not(.up-save-btn) { color: #1a1a1a !important; }
-body.light-mode [style*="color: #fff"]:not([style*="background:#00c46a"]):not([style*="background: #00c46a"]) { color: #1a1a1a !important; }
-body.light-mode [style*="color:rgba(255,255,255,0.4)"],
-body.light-mode [style*="color:rgba(255,255,255,0.3)"],
-body.light-mode [style*="color:rgba(255,255,255,0.5)"] { color: #888 !important; }
-body.light-mode [style*="color:rgba(255,255,255,0.7)"],
-body.light-mode [style*="color:rgba(255,255,255,0.8)"] { color: #444 !important; }
-body.light-mode [style*="background:#1a1f23"],
-body.light-mode [style*="background: #1a1f23"],
-body.light-mode [style*="background:#141417"],
-body.light-mode [style*="background: #141417"],
-body.light-mode [style*="background:#0f1114"],
-body.light-mode [style*="background: #0f1114"],
-body.light-mode [style*="background:#252830"],
-body.light-mode [style*="background: #252830"] { background: #fff !important; }
-body.light-mode [style*="border-bottom:1px solid rgba(255,255,255"],
-body.light-mode [style*="border: 1px solid rgba(255,255,255"],
-body.light-mode [style*="border:1px solid rgba(255,255,255"] { border-color: rgba(0,0,0,0.08) !important; }
-
-/* ── Zoom controls — ukryj ──────────────────────────────────────────────────── */
-.leaflet-control-zoom { display: none !important; }
-
-/* ── FAB menu — light mode ──────────────────────────────────────────────────── */
+/* ── FAB (+) menu ───────────────────────────────────────────────────────────── */
 body.light-mode .home-fab__option {
   background: #ffffff !important;
   border-color: rgba(0,0,0,0.1) !important;
@@ -174,74 +149,289 @@ body.light-mode .home-fab__option {
 body.light-mode .home-fab__option:hover { background: #f5f5f7 !important; }
 body.light-mode .home-fab__option-label { color: #1a1a1a !important; }
 
-/* ── Friends empty — light mode ─────────────────────────────────────────────── */
-body.light-mode .friends-empty { background: transparent !important; }
-body.light-mode .friends-empty p {
-  background: #ffffff !important;
-  color: #555 !important;
-  border-color: rgba(0,0,0,0.08) !important;
-}
+/* ── Notification panel ─────────────────────────────────────────────────────── */
+body.light-mode .hn-sheet { background: #fff !important; }
+body.light-mode .hn-header { background: #fff !important; border-bottom-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .hn-header__title { color: #1a1a1a !important; }
+body.light-mode .hn-clear { color: #00c46a !important; background: none !important; }
+body.light-mode .hn-item { border-bottom-color: rgba(0,0,0,0.07) !important; background: transparent !important; }
+body.light-mode .hn-item--unread { background: rgba(0,196,106,0.04) !important; }
+body.light-mode .hn-item__title { color: #1a1a1a !important; }
+body.light-mode .hn-item__body-text { color: #555 !important; }
+body.light-mode .hn-item__time { color: #999 !important; }
+body.light-mode .hn-empty { color: #999 !important; }
 
-/* ── Map search bar — całkowicie usuń tło ───────────────────────────────────── */
+/* ── Profile ────────────────────────────────────────────────────────────────── */
+body.light-mode .pv-overlay--visible { background: rgba(0,0,0,0.4) !important; }
+body.light-mode .pv-sheet { background: #f2f2f7 !important; color: #1a1a1a !important; }
+body.light-mode .pv-handle { background: rgba(0,0,0,0.2) !important; }
+body.light-mode .pv-header { background: #f2f2f7 !important; border-bottom-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .pv-back,
+body.light-mode .pv-header__btn { background: #fff !important; color: #1a1a1a !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .pv-header__btn--follow { background: #00c46a !important; color: #fff !important; }
+body.light-mode .pv-name { color: #1a1a1a !important; }
+body.light-mode .pv-bio { color: #555 !important; }
+body.light-mode .pv-stats-row { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .pv-stats-row__val { color: #1a1a1a !important; }
+body.light-mode .pv-stats-row__lbl { color: #999 !important; }
+body.light-mode .pv-photo-strip { background: transparent !important; }
+body.light-mode .pv-photo-strip__thumb { background: #e5e5ea !important; }
+body.light-mode .pv-subtabs { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .pv-subtab { color: #999 !important; }
+body.light-mode .pv-subtab--active { color: #00c46a !important; border-color: #00c46a !important; }
+body.light-mode .pv-content { background: #f2f2f7 !important; }
+body.light-mode .pv-section-title { color: #999 !important; }
+body.light-mode .pv-act-list { background: #fff !important; border-radius: 16px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .pv-act-item { background: #fff !important; border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .pv-act-item__name { color: #1a1a1a !important; }
+body.light-mode .pv-act-item__date,
+body.light-mode .pv-act-item__time { color: #999 !important; }
+body.light-mode .pv-heatmap-wrap { background: #fff !important; border-radius: 16px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .pv-heatmap__day { color: #999 !important; }
+body.light-mode .pv-pie-wrap { background: #fff !important; border-radius: 16px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .pv-pie-legend__item,
+body.light-mode .pv-pie-legend span { color: #444 !important; }
+body.light-mode .pv-efforts { background: #fff !important; border-radius: 16px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .pv-effort { border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .pv-effort__dist { color: #1a1a1a !important; }
+body.light-mode .pv-effort__empty { color: #ccc !important; }
+body.light-mode .pv-effort__date { color: #999 !important; }
+body.light-mode .pv-efforts__note { color: #bbb !important; }
+body.light-mode .pv-trophy__label { color: #444 !important; }
+body.light-mode .pv-trophy-summary__count { color: #1a1a1a !important; }
+body.light-mode .pv-trophy-summary__label { color: #999 !important; }
+body.light-mode .pv-goal-cup { background: #fff !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .pv-goal-cup__title { color: #1a1a1a !important; }
+body.light-mode .pv-goal-cup__sub { color: #999 !important; }
+body.light-mode .pv-empty p { color: #999 !important; }
+body.light-mode .pv-empty__sub { color: #bbb !important; }
+body.light-mode .pv-private-box { background: #fff !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .pv-private-box__title { color: #1a1a1a !important; }
+body.light-mode .pv-private-box__desc { color: #999 !important; }
+body.light-mode #ppPrivateSection { background: transparent !important; }
+
+/* Feed cards */
+body.light-mode .feed-card { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; border: none !important; }
+body.light-mode .feed-card__avatar { background: #e5e5ea !important; color: #555 !important; }
+body.light-mode .feed-card__author { color: #1a1a1a !important; }
+body.light-mode .feed-card__date { color: #999 !important; }
+body.light-mode .feed-card__title { color: #1a1a1a !important; }
+body.light-mode .feed-card__text { color: #555 !important; }
+body.light-mode .feed-card__stats { color: #999 !important; }
+body.light-mode .feed-card__more { color: #999 !important; }
+
+/* ── Search & Clubs ─────────────────────────────────────────────────────────── */
+body.light-mode .sv2-overlay { background: rgba(0,0,0,0.3) !important; }
+body.light-mode .sv2-sheet { background: #f2f2f7 !important; }
+body.light-mode .sv2-handle { background: rgba(0,0,0,0.2) !important; }
+body.light-mode .sv2-header { background: #f2f2f7 !important; border-bottom-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .sv2-title { color: #1a1a1a !important; }
+body.light-mode .sv2-back { color: #00c46a !important; background: none !important; }
+body.light-mode .sv2-search-input { background: #fff !important; color: #1a1a1a !important; border-color: rgba(0,0,0,0.1) !important; }
+body.light-mode .sv2-search-input::placeholder { color: #bbb !important; }
+body.light-mode .sv2-tab-bar { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .sv2-tab { color: #999 !important; }
+body.light-mode .sv2-tab--active { color: #00c46a !important; border-color: #00c46a !important; }
+body.light-mode .sv2-user-card,
+body.light-mode .sv2-club-card { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .sv2-user-card__name,
+body.light-mode .sv2-club-card__name { color: #1a1a1a !important; }
+body.light-mode .sv2-user-card__sub,
+body.light-mode .sv2-club-card__sub { color: #999 !important; }
+body.light-mode .sv2-badge--gray { background: #e5e5ea !important; color: #555 !important; }
+body.light-mode .sv2-empty { color: #999 !important; }
+body.light-mode .sv2-more-menu { background: #fff !important; border-color: rgba(0,0,0,0.08) !important; box-shadow: 0 4px 16px rgba(0,0,0,0.1) !important; }
+
+/* ── Friends ────────────────────────────────────────────────────────────────── */
+body.light-mode .friends-header { background: #fff !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .friends-header__title { color: #1a1a1a !important; }
+body.light-mode .friends-header__btn { background: #fff !important; border-color: rgba(0,0,0,0.1) !important; color: #1a1a1a !important; }
+body.light-mode .friends-header__btn--share { background: #00c46a !important; color: #fff !important; }
+body.light-mode .friend-card { background: #fff !important; border-color: rgba(0,0,0,0.08) !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .friend-card__name { color: #1a1a1a !important; }
+body.light-mode .friend-card__meta { color: #999 !important; }
+body.light-mode .friend-card__btn { background: #f0f0f0 !important; color: #555 !important; }
+body.light-mode .friend-card__btn--watch { background: #00c46a !important; color: #fff !important; }
+body.light-mode .friends-empty { background: transparent !important; }
+body.light-mode .friends-empty p { background: #fff !important; color: #555 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .fls-panel { background: #fff !important; }
+body.light-mode .fls-header { background: #fff !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .fls-header__name { color: #1a1a1a !important; }
+body.light-mode .af-modal__sheet { background: #fff !important; }
+body.light-mode .af-modal__title { color: #1a1a1a !important; }
+body.light-mode .af-modal__hint { color: #999 !important; }
+body.light-mode .af-modal__input { background: #f2f2f7 !important; color: #1a1a1a !important; border-color: rgba(0,0,0,0.1) !important; }
+
+/* ── Stats ──────────────────────────────────────────────────────────────────── */
+body.light-mode .sv-header { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .sv-subtabs { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .sv-subtab { color: #999 !important; }
+body.light-mode .sv-subtab--active { color: #00c46a !important; }
+body.light-mode .sv-section__title { color: #999 !important; }
+body.light-mode .sv-week-goal { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-week-goal__header { color: #1a1a1a !important; }
+body.light-mode .sv-week-goal__bar { background: #e5e5ea !important; }
+body.light-mode .sv-week-label { color: #1a1a1a !important; }
+body.light-mode .sv-icon-btn { background: #fff !important; color: #555 !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-seg { background: #e5e5ea !important; }
+body.light-mode .sv-seg__btn { color: #888 !important; }
+body.light-mode .sv-seg__btn--active { background: #fff !important; color: #1a1a1a !important; box-shadow: 0 1px 4px rgba(0,0,0,0.12) !important; }
+body.light-mode .sv-records { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-record { border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-record__label { color: #1a1a1a !important; }
+body.light-mode .sv-record__date { color: #999 !important; }
+body.light-mode .sv-goal-editor { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-goal-row { border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-goal-row span { color: #1a1a1a !important; }
+body.light-mode .sv-goal-input { background: #f2f2f7 !important; color: #1a1a1a !important; border-color: rgba(0,0,0,0.1) !important; }
+body.light-mode .sv-filter { background: #fff !important; color: #555 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .sv-filter--active { background: #00c46a !important; color: #fff !important; border-color: #00c46a !important; }
+body.light-mode .sv-sort { background: #fff !important; color: #555 !important; }
+body.light-mode .sv-item { background: #fff !important; border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-item__name { color: #1a1a1a !important; }
+body.light-mode .sv-item__date { color: #999 !important; }
+body.light-mode .sv-empty-history__text { color: #999 !important; }
+body.light-mode .sv-empty-history__sub { color: #bbb !important; }
+body.light-mode .sv-detail-panel { background: #f2f2f7 !important; }
+body.light-mode .sv-detail-header { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-detail-header__name { color: #1a1a1a !important; }
+body.light-mode .sv-detail-header__date { color: #999 !important; }
+body.light-mode .sv-detail-close { background: #e5e5ea !important; color: #555 !important; }
+body.light-mode .sv-detail-stats { background: #fff !important; }
+body.light-mode .sv-detail-stat { border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-detail-stat__val { color: #1a1a1a !important; }
+body.light-mode .sv-detail-stat__lbl { color: #999 !important; }
+body.light-mode .sv-chart-wrap { background: #fff !important; }
+
+/* ── Map search ─────────────────────────────────────────────────────────────── */
 body.light-mode .map-search-bar,
 body.light-mode .map-search-bar__inner,
 body.light-mode .map-search-bar__row,
 body.light-mode .poi-search,
-body.light-mode .poi-search__bar {
-  background: transparent !important;
-  backdrop-filter: none !important;
-  -webkit-backdrop-filter: none !important;
-  box-shadow: none !important;
-  border: none !important;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}
-/* Search input i container — transparent w light mode */
-body.light-mode .poi-search__input {
-  background: rgba(255,255,255,0.92) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  color: #1a1a1a !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
-}
+body.light-mode .poi-search__bar { background: transparent !important; box-shadow: none !important; border: none !important; backdrop-filter: none !important; }
+body.light-mode .poi-search__input { background: rgba(255,255,255,0.92) !important; color: #1a1a1a !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; backdrop-filter: blur(12px) !important; }
 body.light-mode .poi-search__input::placeholder { color: #aaa !important; }
-body.light-mode .btn-settings-gear {
-  background: rgba(255,255,255,0.92) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  border-color: rgba(0,0,0,0.08) !important;
-  color: #555 !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
-}
-/* poi-results — transparent background, floating cards */
+body.light-mode .btn-settings-gear { background: rgba(255,255,255,0.92) !important; border-color: rgba(0,0,0,0.08) !important; color: #555 !important; backdrop-filter: blur(12px) !important; }
 body.light-mode .poi-results { background: transparent !important; }
-body.light-mode .poi-result-item {
-  background: rgba(255,255,255,0.92) !important;
-  backdrop-filter: blur(12px) !important;
-  -webkit-backdrop-filter: blur(12px) !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
-}
+body.light-mode .poi-result-item { background: rgba(255,255,255,0.92) !important; backdrop-filter: blur(12px) !important; box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important; }
 body.light-mode .poi-result-item span,
 body.light-mode .poi-result-item p { color: #1a1a1a !important; }
+body.light-mode .map-filter-chip { background: #fff !important; color: #555 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .map-filter-chip--active { background: #00c46a !important; color: #fff !important; }
+body.light-mode .route-info { background: rgba(255,255,255,0.97) !important; border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .route-info__step { color: #555 !important; }
+body.light-mode .route-mini-pill { background: rgba(255,255,255,0.95) !important; color: #1a1a1a !important; }
+body.light-mode .tab-header__city { color: #555 !important; }
+body.light-mode .tab-header__desc { color: #666 !important; }
+body.light-mode .tab-header__temp { color: #1a1a1a !important; }
+body.light-mode .tab-header__weather { color: #555 !important; }
+body.light-mode #tabMap .tab-header { background: #f2f2f7 !important; border-radius: 12px !important; padding: 8px 12px !important; }
 
-/* ── Stats rings — hardcoded SVG fill colors ────────────────────────────────── */
-body.light-mode .sv-ring-wrap text[fill="#ececec"],
-body.light-mode .sv-ring-wrap text[fill="#aaa"] {
-  fill: #1a1a1a !important;
-}
-/* CSS fallback — SVG text inherits currentColor gdy fill nie jest ustawiony */
-body.light-mode .sv-ring-wrap svg { color: #1a1a1a; }
+/* ── Settings ───────────────────────────────────────────────────────────────── */
+body.light-mode .settings-panel { background: #fff !important; }
+body.light-mode .settings-header { color: #1a1a1a !important; border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .settings-item { color: #1a1a1a !important; border-color: rgba(0,0,0,0.07) !important; }
+body.light-mode .settings-item__icon { background: #f0f0f0 !important; }
+body.light-mode .settings-item__sub { color: #999 !important; }
+body.light-mode .settings-item__chevron { color: #ccc !important; }
+body.light-mode .sidebar { background: #f2f2f7 !important; }
+body.light-mode .workout { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .workout__title { color: #1a1a1a !important; }
+body.light-mode .workout__details { color: #555 !important; }
+
+/* ── Modals: SaveActivity, Post, UserProfile ────────────────────────────────── */
+body.light-mode .sam-overlay,
+body.light-mode .pm-overlay,
+body.light-mode .up-overlay { background: rgba(0,0,0,0.3) !important; }
+body.light-mode .sam-sheet,
+body.light-mode .pm-sheet,
+body.light-mode .up-sheet { background: #ffffff !important; }
+body.light-mode .sam-handle,
+body.light-mode .pm-handle,
+body.light-mode .up-handle { background: rgba(0,0,0,0.2) !important; }
+body.light-mode .sam-header,
+body.light-mode .pm-header,
+body.light-mode .up-header { background: #ffffff !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .sam-title,
+body.light-mode .pm-title,
+body.light-mode .up-header__title { color: #1a1a1a !important; }
+body.light-mode .sam-close,
+body.light-mode .pm-close,
+body.light-mode .up-close { background: #f0f0f0 !important; color: #555 !important; }
+body.light-mode .sam-label,
+body.light-mode .pm-label,
+body.light-mode .up-label { color: #888 !important; }
+body.light-mode .sam-input,
+body.light-mode .sam-textarea,
+body.light-mode .sam-select,
+body.light-mode .pm-input,
+body.light-mode .pm-textarea,
+body.light-mode .up-input,
+body.light-mode .up-textarea,
+body.light-mode .up-select { background: #f2f2f7 !important; color: #1a1a1a !important; border-color: rgba(0,0,0,0.1) !important; }
+body.light-mode .sam-input::placeholder,
+body.light-mode .sam-textarea::placeholder,
+body.light-mode .pm-input::placeholder,
+body.light-mode .pm-textarea::placeholder,
+body.light-mode .up-input::placeholder { color: #bbb !important; }
+body.light-mode .sam-sport-btn { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.1) !important; color: #555 !important; }
+body.light-mode .sam-intensity-track { background: #e5e5ea !important; }
+body.light-mode .sam-photo-zone { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.1) !important; color: #999 !important; }
+body.light-mode .sam-media-hint { color: #bbb !important; }
+body.light-mode .pm-footer,
+body.light-mode .up-footer { background: #fff !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .pm-btn--cancel { color: #555 !important; border-color: rgba(0,0,0,0.1) !important; background: #f2f2f7 !important; }
+body.light-mode .pm-share-clubs label,
+body.light-mode #pmAddToHomeWrap label { color: #555 !important; }
+body.light-mode .up-save-btn { background: #00c46a !important; color: #fff !important; }
+body.light-mode .up-char-count { color: #bbb !important; }
+body.light-mode #samSportPickerOverlay > div { background: #fff !important; }
+body.light-mode #samSportPickerOverlay [data-pick] { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.1) !important; }
+
+/* ── Name/recovery modal ────────────────────────────────────────────────────── */
+body.light-mode .name-modal { background: rgba(0,0,0,0.3) !important; }
+body.light-mode .name-modal__card { background: #fff !important; }
+body.light-mode .name-modal__title { color: #1a1a1a !important; }
+body.light-mode .name-modal__sub { color: #999 !important; }
+body.light-mode .name-modal__input { background: #f2f2f7 !important; color: #1a1a1a !important; border-color: rgba(0,0,0,0.1) !important; }
+body.light-mode .recovery-code__display { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.1) !important; }
+body.light-mode .recovery-code__digits { color: #1a1a1a !important; }
+
+/* ── Stats rings SVG ────────────────────────────────────────────────────────── */
 body.light-mode .sv-ring-wrap circle[stroke="#3a4147"] { stroke: #e0e0e0 !important; }
 
-/* ── Stats Progress/History tabs — sv-seg ───────────────────────────────────── */
-body.light-mode .sv-seg {
-  background: #e5e5ea !important;
-}
-body.light-mode .sv-seg__btn {
-  color: #888 !important;
-}
-body.light-mode .sv-seg__btn--active {
-  background: #ffffff !important;
-  color: #1a1a1a !important;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.12) !important;
-}
+/* ── Zoom controls — ukryj ──────────────────────────────────────────────────── */
+.leaflet-control-zoom { display: none !important; }
+
+/* ── Global inline-style fallback ───────────────────────────────────────────── */
+body.light-mode [style*="background:#1a1f23"],
+body.light-mode [style*="background: #1a1f23"],
+body.light-mode [style*="background:#141417"],
+body.light-mode [style*="background: #141417"],
+body.light-mode [style*="background:#0f1114"],
+body.light-mode [style*="background: #0f1114"],
+body.light-mode [style*="background:#252830"],
+body.light-mode [style*="background: #252830"] { background: #fff !important; }
+
+body.light-mode [style*="color:#fff"]:not([style*="background:#00c46a"]):not([style*="background: #00c46a"]):not(.pm-btn--post):not(.up-save-btn):not(.friends-header__btn--share):not(.pv-header__btn--follow),
+body.light-mode [style*="color: #fff"]:not([style*="background:#00c46a"]):not([style*="background: #00c46a"]) { color: #1a1a1a !important; }
+
+body.light-mode [style*="color:rgba(255,255,255,0.5)"],
+body.light-mode [style*="color:rgba(255,255,255,0.4)"],
+body.light-mode [style*="color:rgba(255,255,255,0.3)"] { color: #999 !important; }
+
+body.light-mode [style*="color:rgba(255,255,255,0.7)"],
+body.light-mode [style*="color:rgba(255,255,255,0.8)"] { color: #555 !important; }
+
+body.light-mode [style*="border-bottom:1px solid rgba(255,255,255"],
+body.light-mode [style*="border: 1px solid rgba(255,255,255"],
+body.light-mode [style*="border:1px solid rgba(255,255,255"] { border-color: rgba(0,0,0,0.08) !important; }
+
+/* Buttons with white text stay white */
+body.light-mode .pm-btn--post,
+body.light-mode .up-save-btn,
+body.light-mode .friends-header__btn--share,
+body.light-mode .pv-header__btn--follow,
+body.light-mode .friend-card__btn--watch,
+body.light-mode .sv-filter--active,
+body.light-mode .map-filter-chip--active { color: #fff !important; }

@@ -172,8 +172,9 @@ class App {
         document.getElementById('nightToggle')?.classList.toggle('active', __classPrivateFieldGet(this, _App_nightMode, "f"));
         // Listen for system theme changes (live — no restart needed)
         window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-            // Only follow system if user hasn't set a manual override
-            if (localStorage.getItem('nightMode') === null) {
+            // Only follow system if user hasn't set ANY manual override (null = no override)
+            const manual = localStorage.getItem('nightMode');
+            if (manual === null) {
                 __classPrivateFieldSet(this, _App_nightMode, e.matches, "f");
                 this._applyTheme();
             }
