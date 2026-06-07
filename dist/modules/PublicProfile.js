@@ -90,7 +90,7 @@ export async function openPublicProfile(targetUserId) {
         const [profileRes, feedRes, reelRes] = await Promise.all([
             fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
             fetch(`${BACKEND_URL}/users/${encodeURIComponent(targetUserId)}/feed`, { cache: 'no-store' }),
-            fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
+            fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(targetUserId)}`, { cache: 'no-store' }),
         ]);
         const profile = profileRes.ok
             ? (await profileRes.json()).data
@@ -103,7 +103,7 @@ export async function openPublicProfile(targetUserId) {
             : [];
         const targetReelGroup = reelGroups.find(g => g.userId === targetUserId);
         const hasReels = !!targetReelGroup && targetReelGroup.reels.length > 0;
-        const hasUnseen = hasReels && targetReelGroup.hasUnseen;
+        const hasUnseen = hasReels && targetReelGroup.reels.some(r => !r.views.includes(myUserId));
         // Inject avatar and name into all items
         feedData.forEach(f => {
             f.data.authorAvatarUrl = profile.avatarB64 ?? null;

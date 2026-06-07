@@ -21,9 +21,6 @@ self.addEventListener('push', event => {
         if (data.url && data.url.includes('#live=')) {
           client.postMessage({ type: 'OPEN_LIVE', url: data.url, silent: true });
         }
-        if (data.url && data.url.includes('#club_open=')) {
-          client.postMessage({ type: 'OPEN_CLUB', url: data.url, silent: true });
-        }
       }
     });
 
@@ -59,7 +56,7 @@ self.addEventListener('notificationclick', event => {
 
       if (appClient) {
         await appClient.focus();
-        const msgType = targetUrl.includes('#club_open=') ? 'OPEN_CLUB' : 'OPEN_LIVE';
+        const msgType = targetUrl.includes('reels=') ? 'OPEN_REELS' : 'OPEN_LIVE';
         appClient.postMessage({ type: msgType, url: targetUrl });
       } else {
         const fullUrl = targetUrl.startsWith('http')
@@ -67,7 +64,8 @@ self.addEventListener('notificationclick', event => {
           : self.registration.scope.replace(/\/$/, '') + '/' + targetUrl.replace(/^\//, '');
         const newClient = await clients.openWindow(fullUrl);
         if (newClient) {
-          setTimeout(() => newClient.postMessage({ type: 'OPEN_LIVE', url: targetUrl }), 2500);
+          const msgType = targetUrl.includes('reels=') ? 'OPEN_REELS' : 'OPEN_LIVE';
+          setTimeout(() => newClient.postMessage({ type: msgType, url: targetUrl }), 2500);
         }
       }
     })

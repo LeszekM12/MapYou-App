@@ -2478,6 +2478,11 @@
   -webkit-user-select: none;
   user-select: none;
 }
+.home-reel-viewer__media[src$=".mp4"],
+.home-reel-viewer__media[src*="video"],
+video.home-reel-viewer__media {
+  object-fit: cover;
+}
 .home-reel-viewer__caption {
   position: absolute;
   transform: translate(-50%, -50%);

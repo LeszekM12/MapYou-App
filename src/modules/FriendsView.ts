@@ -52,30 +52,6 @@ export class FriendsView {
     }
 
     // Sprawdź czy URL zawiera #live= (oglądanie trasy)
-    // Check for club invite link #club=CODE
-    if (window.location.hash.startsWith('#club=')) {
-      const code     = window.location.hash.replace('#club=', '');
-      const myUserId = getUserId();
-      if (code && myUserId) {
-        void (async () => {
-          try {
-            const res  = await fetch(`${BACKEND_URL}/clubs/invite/${encodeURIComponent(code)}`);
-            const data = await res.json() as { status: string; clubId: string };
-            if (data.status === 'ok' && data.clubId) {
-              // Auto-join the club
-              await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(data.clubId)}/join`, {
-                method: 'POST', headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: myUserId }),
-              });
-              this._showToast('You joined the club! 🎉');
-              // Clean hash
-              history.replaceState(null, '', window.location.pathname);
-            }
-          } catch { /* ignoruj */ }
-        })();
-      }
-    }
-
     const hash = window.location.hash;
     if (hash.startsWith('#live=')) {
       const token = hash.replace('#live=', '');
@@ -100,9 +76,6 @@ export class FriendsView {
     // Napraw znajomych bez friendUserId
     void this._fixMissingFriendUserIds();
 
-    // Auto-dodaj znajomych którzy nas dodali gdy byliśmy offline
-    void this._checkPendingFriends();
-
     // Renderuj listę
     void this.render();
 
@@ -121,17 +94,20 @@ export class FriendsView {
           void this._handleLivePushUrl(e.data.url as string);
         }
       }
-      if (e.data?.type === 'OPEN_CLUB') {
-        // Kliknięcie powiadomienia o poście w klubie — otwórz klub
-        const url   = e.data.url as string;
-        const match = url.match(/#club_open=([^&]+)/);
-        if (match) {
-          const clubId = decodeURIComponent(match[1]);
-          import('./SearchView.js').then(m => {
-            // Otwórz SearchView na zakładce Clubs i kliknij w ten klub
-            const sv = new m.SearchView();
-            sv.open('clubs', clubId);
-          });
+      if (e.data?.type === 'OPEN_REELS') {
+        const url    = e.data.url as string;
+        const match  = url.match(/reels=([^&]+)/);
+        const userId = match ? decodeURIComponent(match[1]) : null;
+        if (userId) {
+          void (async () => {
+            const { openReelViewer } = await import('./HomeView.js') as unknown as { openReelViewer?: (g: unknown, cb: () => void) => void };
+            if (!openReelViewer) return;
+            const BACKEND_URL = (await import('../config.js')).BACKEND_URL;
+            const res   = await fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+            const d     = await res.json() as { data: { userId: string; authorName: string; avatarB64: string | null; reels: unknown[]; hasUnseen: boolean }[] };
+            const group = d.data?.find(g => g.userId === userId);
+            if (group) openReelViewer(group, () => {});
+          })();
         }
       }
     });
@@ -143,7 +119,7 @@ export class FriendsView {
     for (const f of friends) {
       let friendUserId = f.friendUserId;
 
-      // Znajdź friendUserId jeśli brakuje (tylko dla prawdziwych push endpoints)
+      // Znajdź friendUserId jeśli brakuje
       if (!friendUserId && f.subscriptionId && !f.subscriptionId.startsWith('local:')) {
         try {
           const res = await fetch(`${BACKEND_URL}/users/lookup-by-endpoint`, {
@@ -163,57 +139,11 @@ export class FriendsView {
       }
 
       // Zarejestruj znajomego w Atlas jeśli mamy jego userId
-      // Uwaga: nie pomijamy local: endpointów — friendUserId może być znany z linku
       if (friendUserId) {
         void fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(friendUserId)}`, {
           method: 'POST',
         }).catch(() => {});
       }
-    }
-  }
-
-  private async _checkPendingFriends(): Promise<void> {
-    const myUserId = getUserId();
-    if (!myUserId) return;
-    try {
-      const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/pending-friends`);
-      if (!res.ok) return;
-      const data = await res.json() as { status: string; data: { userId: string; name: string }[] };
-      if (!data.data?.length) return;
-
-      for (const pending of data.data) {
-        if (!pending.userId) continue;
-        // Add to local IndexedDB (use userId as subscriptionId fallback for local: friends)
-        const existing = await (await import('./FriendsDB.js')).getAllFriends();
-        const alreadyLocal = existing.some(f => f.friendUserId === pending.userId);
-        if (!alreadyLocal) {
-          await (await import('./FriendsDB.js')).addFriend({
-            name:           pending.name,
-            friendUserId:   pending.userId,
-            subscriptionId: `local:${pending.userId}`,
-            pushSub: { endpoint: `local:${pending.userId}`, expirationTime: null, keys: { p256dh: '', auth: '' } },
-            liveToken:  null,
-            lastSeen:   null,
-            addedAt:    Date.now(),
-          });
-          console.log(`[Friends] Auto-added pending friend: ${pending.name} (${pending.userId})`);
-        }
-
-        // Register mutual friendship in Atlas
-        void fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(pending.userId)}`, {
-          method: 'POST',
-        });
-      }
-
-      // Refresh UI if any were added
-      void this.render();
-      if (data.data.length === 1) {
-        this._showToast(`${data.data[0].name} added you as a friend! 🎉`);
-      } else {
-        this._showToast(`${data.data.length} new friends added you! 🎉`);
-      }
-    } catch (e) {
-      console.warn('[Friends] checkPendingFriends error:', e);
     }
   }
 
@@ -250,29 +180,7 @@ export class FriendsView {
         btn.addEventListener('click', async () => {
           const id = Number(btn.dataset.delete);
           if (confirm('Remove this friend?')) {
-            // Get friend data before deleting locally
-            const friends    = await getAllFriends();
-            const friend     = friends.find(f => f.id === id);
-            const friendId   = friend?.friendUserId;
-            const myUserId   = getUserId();
-
-            // 1. Remove from local IndexedDB
             await deleteFriend(id);
-
-            // 2. Remove from Atlas — both sides simultaneously
-            if (friendId && myUserId) {
-              await Promise.allSettled([
-                // My feed won't see their activities
-                fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(friendId)}`, {
-                  method: 'DELETE',
-                }),
-                // Their feed won't see my activities
-                fetch(`${BACKEND_URL}/users/${encodeURIComponent(friendId)}/friends/${encodeURIComponent(myUserId)}`, {
-                  method: 'DELETE',
-                }),
-              ]);
-            }
-
             void this.render();
           }
         });
@@ -530,18 +438,16 @@ export class FriendsView {
     // 3. Backend niedostępny lub brak push sub
     const base = window.location.href.split('#')[0];
     if (sub) {
-      // Mamy push sub — base64 z pełnymi danymi + userId (działa bez backendu)
+      // Mamy push sub — base64 z pełnymi danymi (działa bez backendu)
       this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
         name,
-        pushSub:      sub.toJSON(),
-        friendUserId: getUserId(),
+        pushSub: sub.toJSON(),
       }))}`;
     } else {
-      // Brak push sub — link z imieniem i userId (znajomy może dodać ale bez push)
+      // Brak push sub — link tylko z imieniem (znajomy może dodać ale bez push)
       this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
         name,
-        pushSub:      null,
-        friendUserId: getUserId(),
+        pushSub: null,
       }))}`;
     }
 
@@ -774,22 +680,16 @@ export class FriendsView {
       ? Math.floor((Date.now() - data.startedAt) / 60000)
       : 0;
 
-    const sportIcons: Record<string,string> = { running:'🏃', cycling:'🚴', walking:'🚶' };
-    const sportLabel: Record<string,string>  = { running:'Running', cycling:'Cycling', walking:'Walking' };
-    const sport = (data as unknown as Record<string,unknown>).sport as string ?? 'running';
-    const icon  = sportIcons[sport] ?? '🏅';
-    const label = sportLabel[sport] ?? sport;
-
-    const sessionMap: Record<string, string> = {
-      running:   `🟢 ${label}`,
-      paused:    `⏸ ${label} (paused)`,
+    const statusMap: Record<string, string> = {
+      running:   '🟢 Running',
+      paused:    '⏸ Paused',
       finished:  '✅ Finished',
       not_found: '❌ Session not found',
     };
 
     const speed = data.current?.speed ?? 0;
     statusEl.innerHTML = `
-      <span class="fls-status">${sessionMap[data.session] ?? data.session}</span>
+      <span class="fls-status">${statusMap[data.session] ?? data.session}</span>
       <span class="fls-meta">${elapsed} min · ${speed} km/h</span>
     `;
   }
@@ -797,10 +697,7 @@ export class FriendsView {
   // ── Poll friends status ───────────────────────────────────────────────────
 
   private async _pollFriendsStatus(): Promise<void> {
-    const allFriends = await getAllFriends();
-    const myUserId   = getUserId();
-    // Skip self — own endpoint should never be polled
-    const friends = allFriends.filter(f => f.friendUserId !== myUserId);
+    const friends = await getAllFriends();
     let changed   = false;
 
     for (const f of friends) {
@@ -818,22 +715,13 @@ export class FriendsView {
         }
 
         // Brak tokenu — sprawdź czy znajomy właśnie zaczął trening przez /live/active/:endpoint
-        // Dla iPhone bez push sub (local: prefix) używamy friendUserId jako lookup key
-        const lookupKey = f.subscriptionId.startsWith('local:') && f.friendUserId
-          ? f.friendUserId
-          : f.subscriptionId;
-        const ep   = encodeURIComponent(lookupKey);
+        const ep   = encodeURIComponent(f.subscriptionId);
         const res  = await fetch(`${BACKEND_URL}/live/active/${ep}`);
         const data = await res.json() as { active: boolean; token: string | null };
 
         if (data.active && data.token) {
-          // Verify token belongs to THIS friend by checking session owner
-          const ownerUserId = (data as Record<string,unknown>).userId as string | undefined;
-          if (!ownerUserId || ownerUserId === f.friendUserId) {
-            await updateFriendLiveToken(f.subscriptionId, data.token);
-            changed = true;
-          }
-          // If ownerUserId doesn't match this friend — skip, another friend's session
+          await updateFriendLiveToken(f.subscriptionId, data.token);
+          changed = true;
         }
       } catch { /* ignoruj */ }
     }
@@ -856,26 +744,11 @@ export class FriendsView {
     const friends = await getAllFriends();
     let friend = friends.find(f => f.liveToken === token);
     if (!friend) {
-      // Ask backend who owns this token — match by friendUserId
-      try {
-        const res  = await fetch(`${BACKEND_URL}/live/status/${token}`);
-        const data = await res.json() as { session?: string; userName?: string; userId?: string };
-        if (data.session && data.session !== 'finished') {
-          // Find friend by userId from session
-          const ownerUserId = (data as Record<string,unknown>).userId as string | undefined;
-          if (ownerUserId) {
-            friend = friends.find(f => f.friendUserId === ownerUserId);
-          }
-          // Fallback: match by userName
-          if (!friend && data.userName) {
-            friend = friends.find(f => f.name === data.userName);
-          }
-          if (friend) {
-            await updateFriendLiveToken(friend.subscriptionId, token);
-            void this.render();
-          }
-        }
-      } catch { /* ignoruj */ }
+      friend = friends[0];
+      if (friend) {
+        await updateFriendLiveToken(friend.subscriptionId, token);
+        void this.render();
+      }
     }
   }
 
@@ -894,20 +767,13 @@ export class FriendsView {
     let friend = friends.find(f => f.liveToken === token);
 
     if (!friend) {
-      // Ask backend who owns this token — match by friendUserId
-      try {
-        const res  = await fetch(`${BACKEND_URL}/live/status/${token}`);
-        const data = await res.json() as { session?: string; userId?: string; userName?: string };
-        if (data.session && data.session !== 'finished') {
-          const ownerUserId = data.userId;
-          if (ownerUserId) friend = friends.find(f => f.friendUserId === ownerUserId);
-          if (!friend && data.userName) friend = friends.find(f => f.name === data.userName);
-          if (friend) {
-            await updateFriendLiveToken(friend.subscriptionId, token);
-            void this.render();
-          }
-        }
-      } catch { /* ignoruj */ }
+      // Zaktualizuj znajomego który zaczął trening (heurystyka: ostatnio dodany)
+      // lub zapisz token tymczasowo przy pierwszym znajomym
+      friend = friends[0];
+      if (friend) {
+        await updateFriendLiveToken(friend.subscriptionId, token);
+        void this.render();
+      }
     }
 
     const name = friend?.name ?? 'Friend';
