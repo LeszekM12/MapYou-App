@@ -407,6 +407,8 @@ body.light-mode #samSportPickerOverlay > div { background: #fff !important; }
 body.light-mode #samSportPickerOverlay [data-pick] { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.1) !important; }
 
 /* ── Name/recovery modal ────────────────────────────────────────────────────── */
+/* map skeleton */
+body.light-mode .map-skeleton__bg { background: #f2f2f7 !important; }
 body.light-mode .name-modal { background: rgba(0,0,0,0.3) !important; }
 body.light-mode .name-modal__card { background: #fff !important; }
 body.light-mode .name-modal__title { color: #1a1a1a !important; }

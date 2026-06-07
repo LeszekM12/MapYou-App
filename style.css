@@ -1810,9 +1810,9 @@ body {
 .map-skeleton__track { stroke: rgba(0,196,106,0.18); }
 .map-skeleton__arc { stroke: var(--color-brand--2); }
 .map-skeleton__label { color: var(--color-light--1); font-size: 1.35rem; font-weight: 600; font-family: 'Manrope',sans-serif; letter-spacing: 0.04em; }
-.map-skeleton__msg { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; padding: 2rem 2.6rem; background: rgba(42,48,53,0.96); border: 1px solid rgba(0,196,106,0.2); border-radius: 14px; pointer-events: all; }
+.map-skeleton__msg { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 1.2rem; padding: 2rem 2.6rem; background: var(--app-bg-card, rgba(42,48,53,0.96)); border: 1px solid rgba(0,196,106,0.2); border-radius: 14px; pointer-events: all; }
 .map-skeleton__msg.hidden { display: none; }
-.map-skeleton__text { color: var(--color-light--2); font-size: 1.4rem; font-weight: 600; font-family: 'Manrope',sans-serif; text-align: center; }
+.map-skeleton__text { color: var(--app-text-primary, var(--color-light--2)); font-size: 1.4rem; font-weight: 600; font-family: 'Manrope',sans-serif; text-align: center; }
 .map-skeleton__btn { background: var(--color-brand--2); color: var(--app-text-primary); border: none; border-radius: 8px; padding: 0.85rem 2rem; font-family: 'Manrope',sans-serif; font-size: 1.35rem; font-weight: 700; cursor: pointer; }
 
 /* ── Offline badge + toast ── */
@@ -2194,7 +2194,7 @@ body {
     flex: 0 0 auto; padding: 1.6rem;
     border: none; border-radius: 99px;
     background: var(--app-surface-2);
-    font-size: 1.4rem; font-weight: 600; color: rgba(255,255,255,0.6);
+    font-size: 1.4rem; font-weight: 600; color: var(--app-text-tertiary, rgba(255,255,255,0.6));
     cursor: pointer;
 }
 
@@ -2773,7 +2773,7 @@ body {
 .name-modal__recover-link {
   background:    none;
   border:        none;
-  color:         rgba(255,255,255,0.45);
+  color: var(--app-text-tertiary, rgba(255,255,255,0.45));
   font-size:     13px;
   cursor:        pointer;
   padding:       10px 16px;
@@ -2787,7 +2787,7 @@ body {
 
 .name-modal__recover-link:hover,
 .name-modal__recover-link:active {
-  color:       rgba(255,255,255,0.75);
+  color: var(--app-text-secondary, rgba(255,255,255,0.75));
   background: var(--app-surface-1);
 }
 
