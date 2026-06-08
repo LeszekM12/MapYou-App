@@ -253,9 +253,9 @@ export class StatsView {
             stroke-linecap="round" transform="rotate(-90 45 45)"
             style="transition:stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1)"/>
           <text x="45" y="25" text-anchor="middle" font-size="13">${icon}</text>
-          <text x="45" y="42" text-anchor="middle" fill="#ececec" font-size="12" font-weight="800"
+          <text x="45" y="42" text-anchor="middle" class="sv-ring-val" font-size="12" font-weight="800"
             font-family="Manrope,sans-serif" id="${id}Val">—</text>
-          <text x="45" y="53" text-anchor="middle" fill="#aaa" font-size="8"
+          <text x="45" y="53" text-anchor="middle" class="sv-ring-lbl" font-size="8"
             font-family="Manrope,sans-serif">${lbl}</text>
         </svg>
       </div>`).join('');

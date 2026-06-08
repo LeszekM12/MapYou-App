@@ -303,7 +303,7 @@ body.light-mode .sv-week-summary__val { color: #1a1a1a !important; }
 body.light-mode .sv-week-summary__unit,
 body.light-mode .sv-week-summary__acts { color: #999 !important; }
 body.light-mode .sv-subtab { color: #999 !important; }
-body.light-mode .sv-subtab--active { color: #00c46a !important; }
+body.light-mode .sv-subtab--active { background: #00c46a !important; color: #fff !important; }
 body.light-mode .sv-section__title { color: #999 !important; }
 body.light-mode .sv-week-goal { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
 body.light-mode .sv-week-goal__header { color: #1a1a1a !important; }

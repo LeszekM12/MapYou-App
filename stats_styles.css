@@ -22,7 +22,7 @@
   padding: 10px 0;
   border: none;
   background: none;
-  color: var(--color-light--2, #6c7175);
+  color: var(--app-text-tertiary, #6c7175);
   font-size: 1.35rem;
   font-weight: 600;
   font-family: inherit;
@@ -32,7 +32,7 @@
 }
 .sv-subtab--active {
   background: var(--color-brand--2, #00c46a);
-  color: var(--app-text-primary);
+  color: #fff;
 }
 
 /* ── Sections ── */
@@ -150,7 +150,7 @@
 }
 .sv-seg__btn--active {
   background: var(--color-brand--2, #00c46a);
-  color: var(--app-text-primary);
+  color: #fff;
 }
 
 /* ── Records ── */
@@ -270,7 +270,7 @@
 .sv-filter--active {
   background: var(--color-brand--2, #00c46a);
   border-color: var(--color-brand--2, #00c46a);
-  color: var(--app-text-primary);
+  color: #fff;
 }
 
 /* Sort select */
@@ -612,3 +612,9 @@
   font-size: 1.2rem;
   color: var(--app-text-tertiary, rgba(255,255,255,0.4));
 }
+
+/* ── Ring text colors ───────────────────────────────────────────────────────── */
+.sv-ring-val { fill: #ececec; }
+.sv-ring-lbl { fill: #aaa; }
+body.light-mode .sv-ring-val { fill: #1a1a1a; }
+body.light-mode .sv-ring-lbl { fill: #6b6b6b; }
