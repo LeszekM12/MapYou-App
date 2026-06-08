@@ -421,74 +421,169 @@ function _bestEffortsFromFeed(activities) {
     });
 }
 // ── Helpers ───────────────────────────────────────────────────────────────────
-function _heatmap(activities) {
-    const grid = Array.from({ length: 7 }, () => Array(24).fill(0));
-    activities.forEach(a => {
-        const d = new Date(a.date);
-        grid[d.getDay()][d.getHours()]++;
-    });
-    return grid;
-}
 let _ppPieChart = null;
+let _ppStatsChart = null;
+let _ppWeekOffset = 0;
+let _ppActiveSport = 'all';
 function _renderStatsTab(el, activities) {
-    const heatmap = _heatmap(activities);
-    const maxHeat = Math.max(...heatmap.flat(), 1);
-    // Show every 3rd hour for readability: 00,03,06,09,12,15,18,21
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const typeCounts = {};
-    activities.forEach(a => {
-        const t = (a.data.sport ?? 'running');
-        typeCounts[t] = (typeCounts[t] ?? 0) + 1;
-    });
+    const Chart = window.Chart;
+    const sportSet = new Set(activities.map(a => (a.data.sport ?? 'running')));
+    const sports = ['all', ...Array.from(sportSet)];
+    const pillsHtml = sports.map(s => {
+        const icon = s === 'all' ? '🏅' : _getIcon(s);
+        const label = s === 'all' ? 'All' : _getSportLabel(s);
+        return `<button class="pv-stats-sport-pill${s === _ppActiveSport ? ' pv-stats-sport-pill--active' : ''}" data-sport="${s}">${icon} ${label}</button>`;
+    }).join('');
     el.style.padding = '0 0 32px';
     el.innerHTML = `
-    <div class="pv-section-title" style="padding:16px 16px 8px">Activity Heatmap</div>
-    <div class="pv-heatmap-wrap">
-      <div class="pv-heatmap">
-        <div class="pv-heatmap__hour-labels">
-          <span></span>
-          ${Array.from({ length: 24 }, (_, i) => `<span>${i % 3 === 0 ? String(i).padStart(2, '0') : ''}</span>`).join('')}
-        </div>
-        ${heatmap.map((row, di) => `
-          <div class="pv-heatmap__row">
-            <span class="pv-heatmap__day">${days[di]}</span>
-            ${row.map(v => `<div class="pv-heatmap__cell" style="background:rgba(0,196,106,${v > 0 ? 0.2 + (v / maxHeat) * 0.8 : 0})"></div>`).join('')}
-          </div>`).join('')}
+    <div class="pv-stats-pills">${pillsHtml}</div>
+    <div class="pv-stats-summary">
+      <div class="pv-stats-summary__item">
+        <span class="pv-stats-summary__val" id="ppStatsKm">0.0</span>
+        <span class="pv-stats-summary__unit">km</span>
+      </div>
+      <div class="pv-stats-summary__item">
+        <span class="pv-stats-summary__val" id="ppStatsTime">0m</span>
+        <span class="pv-stats-summary__unit">time</span>
+      </div>
+      <div class="pv-stats-summary__item">
+        <span class="pv-stats-summary__val" id="ppStatsActs">0</span>
+        <span class="pv-stats-summary__unit">activities</span>
       </div>
     </div>
-
+    <div class="pv-stats-week-nav">
+      <button class="pv-stats-nav-btn" id="ppStatsPrev">‹</button>
+      <span class="pv-stats-week-label" id="ppStatsWeekLabel">This week</span>
+      <button class="pv-stats-nav-btn" id="ppStatsNext" disabled>›</button>
+    </div>
+    <div class="pv-stats-chart-wrap">
+      <canvas id="ppStatsChart" role="img" aria-label="Weekly activity chart"></canvas>
+    </div>
     <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
     <div class="pv-pie-wrap">
-      ${Object.keys(typeCounts).length === 0
+      ${sportSet.size === 0
         ? '<p class="pv-empty-sub" style="padding:0 16px">No data yet</p>'
         : `<div class="pv-pie-container"><canvas id="ppPieChart" width="160" height="160"></canvas></div>
            <div class="pv-pie-legend">
-             ${Object.entries(typeCounts).map(([type, cnt]) => `
-               <div class="pv-pie-legend__item">
+             ${[...sportSet].map(type => {
+            const cnt = activities.filter(a => (a.data.sport ?? 'running') === type).length;
+            return `<div class="pv-pie-legend__item">
                  <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
                  <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
-               </div>`).join('')}
+               </div>`;
+        }).join('')}
            </div>`}
     </div>`;
-    // Render pie chart
-    if (Object.keys(typeCounts).length > 0) {
+    // Pie
+    if (sportSet.size > 0) {
         setTimeout(() => {
             const canvas = document.getElementById('ppPieChart');
-            if (!canvas || typeof window.Chart === 'undefined')
+            if (!canvas || !Chart)
                 return;
-            const Chart = window.Chart;
             if (_ppPieChart)
                 _ppPieChart.destroy?.();
+            const tc = {};
+            activities.forEach(a => { const t = (a.data.sport ?? 'running'); tc[t] = (tc[t] ?? 0) + 1; });
             _ppPieChart = new Chart(canvas, {
                 type: 'doughnut',
-                data: {
-                    labels: Object.keys(typeCounts),
-                    datasets: [{ data: Object.values(typeCounts), backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }],
-                },
+                data: { labels: Object.keys(tc), datasets: [{ data: Object.values(tc), backgroundColor: Object.keys(tc).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }] },
                 options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
             });
         }, 100);
     }
+    const renderWeek = () => {
+        const now = new Date();
+        const mon = new Date(now);
+        const dow = mon.getDay() || 7;
+        mon.setHours(0, 0, 0, 0);
+        mon.setDate(mon.getDate() - dow + 1 + _ppWeekOffset * 7);
+        const sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+        sun.setHours(23, 59, 59, 999);
+        const todayIdx = _ppWeekOffset === 0 ? ((now.getDay() + 6) % 7) : 6;
+        const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const week = activities.filter(a => {
+            const d = new Date(a.date);
+            return d >= mon && d <= sun &&
+                (_ppActiveSport === 'all' || (a.data.sport ?? 'running') === _ppActiveSport);
+        });
+        const wKm = week.reduce((s, a) => s + (a.data.distanceKm ?? 0), 0);
+        const wSec = week.reduce((s, a) => s + (a.data.durationSec ?? 0), 0);
+        const wCnt = week.length;
+        const kmEl = document.getElementById('ppStatsKm');
+        const timeEl = document.getElementById('ppStatsTime');
+        const actsEl = document.getElementById('ppStatsActs');
+        if (kmEl)
+            kmEl.textContent = wKm.toFixed(1);
+        if (timeEl)
+            timeEl.textContent = wSec >= 3600 ? `${Math.floor(wSec / 3600)}h ${Math.floor((wSec % 3600) / 60)}m` : `${Math.floor(wSec / 60)}m`;
+        if (actsEl)
+            actsEl.textContent = String(wCnt);
+        const lbl = document.getElementById('ppStatsWeekLabel');
+        if (lbl)
+            lbl.textContent = _ppWeekOffset === 0 ? 'This week'
+                : `${mon.toLocaleDateString('en', { month: 'short', day: 'numeric' })} – ${sun.toLocaleDateString('en', { month: 'short', day: 'numeric' })}`;
+        document.getElementById('ppStatsNext')?.[_ppWeekOffset < 0 ? 'removeAttribute' : 'setAttribute']('disabled', '');
+        const sportColor = _ppActiveSport === 'all' ? '#00c46a' : _getColor(_ppActiveSport);
+        const dayKm = Array(7).fill(0);
+        const dayColors = Array(7).fill('rgba(0,196,106,0.12)');
+        week.forEach(a => {
+            const i = Math.floor((new Date(a.date).getTime() - mon.getTime()) / 86400000);
+            if (i >= 0 && i < 7) {
+                dayKm[i] += (a.data.distanceKm ?? 0);
+                dayColors[i] = i <= todayIdx ? sportColor : sportColor + '55';
+            }
+        });
+        const isDark = document.body.classList.contains('night-mode');
+        const gridClr = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+        const tickClr = isDark ? '#6c7175' : '#999';
+        const lblClr = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+        const canvas = document.getElementById('ppStatsChart');
+        if (!canvas || !Chart)
+            return;
+        if (_ppStatsChart)
+            _ppStatsChart.destroy?.();
+        _ppStatsChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: DAYS.map((d, i) => { const dd = new Date(mon); dd.setDate(mon.getDate() + i); return `${d} ${dd.getDate()}`; }),
+                datasets: [{ data: dayKm, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { grid: { color: gridClr }, ticks: { color: tickClr, font: { size: 10 } } },
+                    y: { display: false, beginAtZero: true },
+                },
+                animation: { onComplete: function () {
+                        const ch = this;
+                        const ctx = ch.ctx;
+                        const meta = ch.getDatasetMeta(0);
+                        ctx.save();
+                        ctx.fillStyle = lblClr;
+                        ctx.font = '10px Manrope,sans-serif';
+                        ctx.textAlign = 'center';
+                        meta.data.forEach((bar, i) => { if (dayKm[i] > 0)
+                            ctx.fillText(dayKm[i].toFixed(1), bar.x, bar.y - 4); });
+                        ctx.restore();
+                    } },
+            },
+        });
+    };
+    setTimeout(renderWeek, 50);
+    // Events
+    el.querySelectorAll('.pv-stats-sport-pill').forEach(pill => {
+        pill.addEventListener('click', () => {
+            el.querySelectorAll('.pv-stats-sport-pill').forEach(p => p.classList.remove('pv-stats-sport-pill--active'));
+            pill.classList.add('pv-stats-sport-pill--active');
+            _ppActiveSport = pill.dataset.sport ?? 'all';
+            renderWeek();
+        });
+    });
+    document.getElementById('ppStatsPrev')?.addEventListener('click', () => { _ppWeekOffset--; renderWeek(); });
+    document.getElementById('ppStatsNext')?.addEventListener('click', () => { if (_ppWeekOffset >= 0)
+        return; _ppWeekOffset++; renderWeek(); });
 }
 function _renderEffortsTab(el, activities) {
     const efforts = _bestEffortsFromFeed(activities);
