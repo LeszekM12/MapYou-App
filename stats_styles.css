@@ -530,3 +530,85 @@
 .sv-chart-wrap canvas {
   display: block;
 }
+
+/* ── Sport pills ────────────────────────────────────────────────────────────── */
+.sv-sport-pills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 0 0 12px;
+  -webkit-overflow-scrolling: touch;
+}
+.sv-sport-pills::-webkit-scrollbar { display: none; }
+.sv-sport-pill {
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--app-border, rgba(255,255,255,0.1));
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: var(--app-text-tertiary, rgba(255,255,255,0.5));
+  background: var(--app-surface-1, rgba(255,255,255,0.04));
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.sv-sport-pill--active {
+  background: #00c46a !important;
+  border-color: #00c46a !important;
+  color: #fff !important;
+}
+
+/* ── Metric selector (Distance / Time / Workouts) ───────────────────────────── */
+.sv-week-metric-seg {
+  display: flex;
+  background: var(--app-surface-1, rgba(255,255,255,0.04));
+  border-radius: 10px;
+  padding: 3px;
+  margin-bottom: 14px;
+  gap: 2px;
+}
+.sv-week-metric-seg .sv-seg__btn {
+  flex: 1;
+  padding: 7px;
+  border: none;
+  background: none;
+  color: var(--app-text-tertiary, rgba(255,255,255,0.4));
+  font-size: 1.2rem;
+  font-weight: 600;
+  font-family: inherit;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.sv-week-metric-seg .sv-seg__btn--active {
+  background: #00c46a !important;
+  color: #fff !important;
+}
+
+/* ── Week summary (big number) ──────────────────────────────────────────────── */
+.sv-week-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 0 12px;
+}
+.sv-week-summary__val {
+  font-size: 3.2rem;
+  font-weight: 800;
+  color: var(--app-text-primary, #fff);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+.sv-week-summary__unit {
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: var(--app-text-tertiary, rgba(255,255,255,0.4));
+}
+.sv-week-summary__acts {
+  margin-left: auto;
+  font-size: 1.2rem;
+  color: var(--app-text-tertiary, rgba(255,255,255,0.4));
+}

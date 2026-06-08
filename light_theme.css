@@ -199,6 +199,17 @@ body.light-mode .pv-subtab { color: #999 !important; }
 body.light-mode .pv-subtab--active { color: #00c46a !important; border-color: #00c46a !important; }
 body.light-mode .pv-content { background: #f2f2f7 !important; }
 body.light-mode .pv-section-title { color: #999 !important; }
+body.light-mode .pv-stats-sport-pill { background: #fff !important; border-color: rgba(0,0,0,0.1) !important; color: #888 !important; }
+body.light-mode .pv-stats-sport-pill--active { background: #00c46a !important; color: #fff !important; border-color: #00c46a !important; }
+body.light-mode .pv-stats-metric-seg { background: #e5e5ea !important; }
+body.light-mode .pv-stats-seg-btn { color: #888 !important; }
+body.light-mode .pv-stats-seg-btn--active { background: #00c46a !important; color: #fff !important; }
+body.light-mode .pv-stats-summary__val { color: #1a1a1a !important; }
+body.light-mode .pv-stats-summary__unit,
+body.light-mode .pv-stats-summary__acts { color: #999 !important; }
+body.light-mode .pv-stats-week-label { color: #1a1a1a !important; }
+body.light-mode .pv-stats-nav-btn { background: #f0f0f0 !important; border-color: rgba(0,0,0,0.1) !important; color: #1a1a1a !important; }
+body.light-mode .pv-stats-chart-wrap { background: #f8f8f8 !important; }
 body.light-mode .pv-act-list { background: #fff !important; border-radius: 16px !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
 body.light-mode .pv-act-item { background: #fff !important; border-color: rgba(0,0,0,0.07) !important; }
 body.light-mode .pv-act-item__name { color: #1a1a1a !important; }
@@ -283,6 +294,14 @@ body.light-mode .af-modal__input { background: #f2f2f7 !important; color: #1a1a1
 /* ── Stats ──────────────────────────────────────────────────────────────────── */
 body.light-mode .sv-header { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.08) !important; }
 body.light-mode .sv-subtabs { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.08) !important; }
+body.light-mode .sv-sport-pill { background: #fff !important; border-color: rgba(0,0,0,0.1) !important; color: #888 !important; }
+body.light-mode .sv-sport-pill--active { background: #00c46a !important; color: #fff !important; border-color: #00c46a !important; }
+body.light-mode .sv-week-metric-seg { background: #e5e5ea !important; }
+body.light-mode .sv-week-metric-seg .sv-seg__btn { color: #888 !important; }
+body.light-mode .sv-week-metric-seg .sv-seg__btn--active { background: #00c46a !important; color: #fff !important; }
+body.light-mode .sv-week-summary__val { color: #1a1a1a !important; }
+body.light-mode .sv-week-summary__unit,
+body.light-mode .sv-week-summary__acts { color: #999 !important; }
 body.light-mode .sv-subtab { color: #999 !important; }
 body.light-mode .sv-subtab--active { color: #00c46a !important; }
 body.light-mode .sv-section__title { color: #999 !important; }

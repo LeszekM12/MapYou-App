@@ -261,6 +261,31 @@ export class ProfileView {
             writable: true,
             value: 'activities'
         });
+        // ── Stats ───────────────────────────────────────────────────────────────────
+        Object.defineProperty(this, "_statsWeekOffset", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 0
+        });
+        Object.defineProperty(this, "_statsActiveSport", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 'all'
+        });
+        Object.defineProperty(this, "_statsMetric", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 'dist'
+        });
+        Object.defineProperty(this, "_statsChart", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
     }
     async open() {
         document.getElementById('profileViewOverlay')?.remove();
@@ -505,75 +530,208 @@ export class ProfileView {
         </div>
       </div>`).join('')}</div>`;
     }
-    // ── Stats ───────────────────────────────────────────────────────────────────
     _renderStats(el) {
-        const heatmap = _heatmapData(this._workouts);
-        const maxHeat = Math.max(...heatmap.flat(), 1);
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}`);
-        // Pie data
-        const typeCounts = {};
-        this._workouts.forEach(w => { typeCounts[w.type] = (typeCounts[w.type] ?? 0) + 1; });
+        // Sport pills — only sports user has trained
+        const sportSet = new Set(this._workouts.map(w => w.type));
+        const sports = ['all', ...Array.from(sportSet)];
+        const pillsHtml = sports.map(s => {
+            const icon = s === 'all' ? '🏅' : (_getIcon(s));
+            const label = s === 'all' ? 'All' : _getSportLabel(s);
+            return `<button class="pv-stats-sport-pill${s === this._statsActiveSport ? ' pv-stats-sport-pill--active' : ''}" data-sport="${s}">${icon} ${label}</button>`;
+        }).join('');
+        el.style.padding = '0 0 32px';
         el.innerHTML = `
-      <!-- Heatmap -->
-      <div class="pv-section-title">Activity Heatmap</div>
-      <div class="pv-heatmap-wrap">
-        <div class="pv-heatmap">
-          <div class="pv-heatmap__hour-labels">
-            ${[0, 6, 12, 18, 23].map(h => `<span style="grid-column:${h + 2}">${String(h).padStart(2, '0')}</span>`).join('')}
-          </div>
-          ${days.map((day, di) => `
-            <div class="pv-heatmap__row">
-              <span class="pv-heatmap__day">${day}</span>
-              ${hours.map((_, hi) => {
-            const v = heatmap[di][hi];
-            const a = v > 0 ? Math.max(0.15, v / maxHeat) : 0;
-            return `<div class="pv-heatmap__cell" style="opacity:${a};background:${v > 0 ? '#00c46a' : 'rgba(255,255,255,0.05)'}"
-                  title="${v} workout${v !== 1 ? 's' : ''} at ${String(hi).padStart(2, '0')}:00 on ${day}"></div>`;
-        }).join('')}
-            </div>`).join('')}
+      <!-- Sport pills -->
+      <div class="pv-stats-pills">${pillsHtml}</div>
+
+      <!-- Summary — 3 values always visible -->
+      <div class="pv-stats-summary">
+        <div class="pv-stats-summary__item">
+          <span class="pv-stats-summary__val" id="pvStatsKm">0.0</span>
+          <span class="pv-stats-summary__unit">km</span>
+        </div>
+        <div class="pv-stats-summary__item">
+          <span class="pv-stats-summary__val" id="pvStatsTime">0m</span>
+          <span class="pv-stats-summary__unit">time</span>
+        </div>
+        <div class="pv-stats-summary__item">
+          <span class="pv-stats-summary__val" id="pvStatsActs">0</span>
+          <span class="pv-stats-summary__unit">activities</span>
         </div>
       </div>
 
-      <!-- Pie chart -->
-      <div class="pv-section-title" style="margin-top:20px">Activity Types</div>
+      <!-- Week nav -->
+      <div class="pv-stats-week-nav">
+        <button class="pv-stats-nav-btn" id="pvStatsPrev">‹</button>
+        <span class="pv-stats-week-label" id="pvStatsWeekLabel">This week</span>
+        <button class="pv-stats-nav-btn" id="pvStatsNext" disabled>›</button>
+      </div>
+
+      <!-- Bar chart -->
+      <div class="pv-stats-chart-wrap">
+        <canvas id="pvStatsChart" role="img" aria-label="Weekly activity chart"></canvas>
+      </div>
+
+      <!-- Activity Types pie -->
+      <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
       <div class="pv-pie-wrap">
-        ${Object.keys(typeCounts).length === 0
+        ${sportSet.size === 0
             ? '<p class="pv-empty-sub">No data yet</p>'
-            : `<div class="pv-pie-container"><canvas id="pvPieChart" width="180" height="180"></canvas></div>
+            : `<div class="pv-pie-container"><canvas id="pvPieChart" width="160" height="160"></canvas></div>
              <div class="pv-pie-legend">
-               ${Object.entries(typeCounts).map(([type, cnt]) => `
-                 <div class="pv-pie-legend__item">
+               ${[...sportSet].map(type => {
+                const cnt = this._workouts.filter(w => w.type === type).length;
+                return `<div class="pv-pie-legend__item">
                    <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
                    <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
-                 </div>`).join('')}
+                 </div>`;
+            }).join('')}
              </div>`}
       </div>`;
-        // Render pie
-        if (Object.keys(typeCounts).length > 0) {
+        this._renderStatsWeek(el);
+        this._bindStatsEvents(el);
+        // Pie chart
+        if (sportSet.size > 0) {
             setTimeout(() => {
                 const canvas = document.getElementById('pvPieChart');
                 if (!canvas || typeof Chart === 'undefined')
                     return;
+                if (_pieChart)
+                    _pieChart.destroy?.();
+                const typeCounts = {};
+                this._workouts.forEach(w => { typeCounts[w.type] = (typeCounts[w.type] ?? 0) + 1; });
                 _pieChart = new Chart(canvas, {
                     type: 'doughnut',
                     data: {
                         labels: Object.keys(typeCounts),
-                        datasets: [{
-                                data: Object.values(typeCounts),
-                                backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)),
-                                borderWidth: 0,
-                                hoverOffset: 6,
-                            }],
+                        datasets: [{ data: Object.values(typeCounts), backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }],
                     },
-                    options: {
-                        responsive: false,
-                        cutout: '65%',
-                        plugins: { legend: { display: false } },
-                    },
+                    options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
                 });
-            }, 100);
+            }, 150);
         }
+    }
+    _renderStatsWeek(el) {
+        const now = new Date();
+        const mon = new Date(now);
+        const dow = mon.getDay() || 7;
+        mon.setHours(0, 0, 0, 0);
+        mon.setDate(mon.getDate() - dow + 1);
+        mon.setDate(mon.getDate() + this._statsWeekOffset * 7);
+        const sun = new Date(mon);
+        sun.setDate(mon.getDate() + 6);
+        sun.setHours(23, 59, 59, 999);
+        const todayIdx = this._statsWeekOffset === 0 ? ((now.getDay() + 6) % 7) : 6;
+        const week = this._workouts.filter(w => {
+            const d = new Date(w.date);
+            return d >= mon && d <= sun &&
+                (this._statsActiveSport === 'all' || w.type === this._statsActiveSport);
+        });
+        const wKm = week.reduce((s, w) => s + w.distanceKm, 0);
+        const wSec = week.reduce((s, w) => s + w.durationSec, 0);
+        const wCnt = week.length;
+        // Summary — always show all 3
+        const kmEl = document.getElementById('pvStatsKm');
+        const timeEl = document.getElementById('pvStatsTime');
+        const actsEl = document.getElementById('pvStatsActs');
+        if (kmEl)
+            kmEl.textContent = wKm.toFixed(1);
+        if (timeEl)
+            timeEl.textContent = wSec >= 3600 ? `${Math.floor(wSec / 3600)}h ${Math.floor((wSec % 3600) / 60)}m` : `${Math.floor(wSec / 60)}m`;
+        if (actsEl)
+            actsEl.textContent = String(wCnt);
+        // Week label
+        const labelEl = document.getElementById('pvStatsWeekLabel');
+        if (labelEl) {
+            if (this._statsWeekOffset === 0) {
+                labelEl.textContent = 'This week';
+            }
+            else {
+                const fmt = (d) => d.toLocaleDateString('en', { month: 'short', day: 'numeric' });
+                labelEl.textContent = `${fmt(mon)} – ${fmt(sun)}`;
+            }
+        }
+        document.getElementById('pvStatsNext')?.[this._statsWeekOffset < 0 ? 'removeAttribute' : 'setAttribute']('disabled', '');
+        // Bar chart
+        const sportColor = this._statsActiveSport === 'all' ? '#00c46a'
+            : (_getColor(this._statsActiveSport));
+        const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        // Always show km per day
+        const dayKm = Array(7).fill(0);
+        const dayColors = Array(7).fill('rgba(0,196,106,0.12)');
+        week.forEach(w => {
+            const i = Math.floor((new Date(w.date).getTime() - mon.getTime()) / 86400000);
+            if (i >= 0 && i < 7) {
+                dayKm[i] += w.distanceKm;
+                dayColors[i] = i <= todayIdx ? sportColor : sportColor + '55';
+            }
+        });
+        const isDark = document.body.classList.contains('night-mode');
+        const gridClr = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+        const tickClr = isDark ? '#6c7175' : '#999';
+        const lblClr = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
+        const canvas = document.getElementById('pvStatsChart');
+        if (!canvas || typeof Chart === 'undefined')
+            return;
+        if (this._statsChart)
+            this._statsChart.destroy?.();
+        this._statsChart = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: DAYS.map((d, i) => {
+                    const dd = new Date(mon);
+                    dd.setDate(mon.getDate() + i);
+                    return `${d} ${dd.getDate()}`;
+                }),
+                datasets: [{ data: dayKm, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    datalabels: { display: false },
+                },
+                scales: {
+                    x: { grid: { color: gridClr }, ticks: { color: tickClr, font: { size: 10 } } },
+                    y: { display: false, beginAtZero: true },
+                },
+                animation: { onComplete: function () {
+                        const chart = this;
+                        const ctx = chart.ctx;
+                        const meta = chart.getDatasetMeta(0);
+                        ctx.save();
+                        ctx.fillStyle = lblClr;
+                        ctx.font = '10px Manrope, sans-serif';
+                        ctx.textAlign = 'center';
+                        meta.data.forEach((bar, i) => {
+                            const v = dayKm[i];
+                            if (v > 0)
+                                ctx.fillText(v.toFixed(1), bar.x, bar.y - 4);
+                        });
+                        ctx.restore();
+                    } },
+            },
+        });
+    }
+    _bindStatsEvents(el) {
+        el.querySelectorAll('.pv-stats-sport-pill').forEach(pill => {
+            pill.addEventListener('click', () => {
+                el.querySelectorAll('.pv-stats-sport-pill').forEach(p => p.classList.remove('pv-stats-sport-pill--active'));
+                pill.classList.add('pv-stats-sport-pill--active');
+                this._statsActiveSport = pill.dataset.sport ?? 'all';
+                this._renderStatsWeek(el);
+            });
+        });
+        document.getElementById('pvStatsPrev')?.addEventListener('click', () => {
+            this._statsWeekOffset--;
+            this._renderStatsWeek(el);
+        });
+        document.getElementById('pvStatsNext')?.addEventListener('click', () => {
+            if (this._statsWeekOffset >= 0)
+                return;
+            this._statsWeekOffset++;
+            this._renderStatsWeek(el);
+        });
     }
     // ── Best efforts ────────────────────────────────────────────────────────────
     _renderEfforts(el) {
