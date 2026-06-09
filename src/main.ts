@@ -97,32 +97,13 @@ const routeTime        = document.getElementById('routeTime')!;
 const routeLoading     = document.getElementById('routeLoading')!;
 const btnTrack         = document.getElementById('btnTrack')!;
 
-// ── Map styles ───────────────────────────────────────────────────────────────
-const MAP_STYLES: Record<string, { url: string; attr: string; label: string; thumb: string; dark?: boolean }> = {
-  standard:  { url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',       attr: '&copy; OpenStreetMap &copy; CARTO',  label: 'Standard',  thumb: '🗺️' },
-  satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri', label: 'Satellite', thumb: '🛰️' },
-  terrain:   { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',                               attr: '&copy; OpenStreetMap &copy; OpenTopoMap', label: 'Terrain', thumb: '⛰️' },
-  dark:      { url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',                  attr: '&copy; OpenStreetMap &copy; CARTO',  label: 'Dark',      thumb: '🌑', dark: true },
-  light:     { url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',                 attr: '&copy; OpenStreetMap &copy; CARTO',  label: 'Light',     thumb: '☀️' },
-  streets:   { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',                             attr: '&copy; OpenStreetMap',               label: 'Streets',   thumb: '🏙️' },
-};
-const DEFAULT_DAY_STYLE   = 'standard';
-const DEFAULT_NIGHT_STYLE = 'dark';
-
-function _getActiveMapStyle(isDark: boolean): string {
-  const saved = localStorage.getItem('mapStyle');
-  if (saved && MAP_STYLES[saved]) return saved;
-  return isDark ? DEFAULT_NIGHT_STYLE : DEFAULT_DAY_STYLE;
-}
-
-// Legacy aliases used by _applyTheme tile switching
 const TILES = {
-  day:   MAP_STYLES.standard.url,
-  night: MAP_STYLES.dark.url,
+  day:   'https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png',
+  night: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
 };
 const TILE_ATTR = {
-  day:   MAP_STYLES.standard.attr,
-  night: MAP_STYLES.dark.attr,
+  day:   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  night: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>',
 };
 
 // ─── App class ────────────────────────────────────────────────────────────────
@@ -223,30 +204,11 @@ class App {
     this._initIOSBanner();
     this._initCustomFilters();
 
-    // ── Theme init — manual override OR system preference ──────────────────
-    const _manualTheme = localStorage.getItem('nightMode');
-    const _systemDark  = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    if (_manualTheme === 'true') {
-      this.#nightMode = true;   // user forced dark
-    } else {
-      // null or 'false' — follow system
-      this.#nightMode = _systemDark;
-      if (_manualTheme === 'false') localStorage.removeItem('nightMode');
+    if (localStorage.getItem('nightMode') === 'true') {
+      this.#nightMode = true;
+      document.body.classList.add('night-mode');
+      document.getElementById('nightToggle')?.classList.add('active');
     }
-    this._applyTheme();
-
-    // Update toggle button to reflect current state
-    document.getElementById('nightToggle')?.classList.toggle('active', this.#nightMode);
-
-    // Listen for system theme changes (live — no restart needed)
-    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-      // Only follow system if user hasn't set ANY manual override (null = no override)
-      const manual = localStorage.getItem('nightMode');
-      if (manual === null) {
-        this.#nightMode = e.matches;
-        this._applyTheme();
-      }
-    });
     if (localStorage.getItem('voiceStats') === 'true') {
       this.#voiceEnabled = true;
       document.getElementById('voiceToggle')?.classList.add('active');
@@ -314,9 +276,8 @@ class App {
     const pane = this.#map.getPane('progressPane');
     if (pane) pane.style.zIndex = '650';
 
-    const _initStyleKey = _getActiveMapStyle(this.#nightMode);
-    const _initStyle    = MAP_STYLES[_initStyleKey];
-    this.#tileLayer = L.tileLayer(_initStyle.url, { attribution: _initStyle.attr }).addTo(this.#map);
+    const tileKey = this.#nightMode ? 'night' : 'day';
+    this.#tileLayer = L.tileLayer(TILES[tileKey], { attribution: TILE_ATTR[tileKey] }).addTo(this.#map);
 
     this.#map.on('click', this._handleMapClick.bind(this));
 
@@ -340,6 +301,17 @@ class App {
         },
       });
       this.#map.addLayer(this.#clusterGroup);
+
+      // Load unified markers after map is ready
+      setTimeout(() => void this._refreshClusterMarkers(), 800);
+
+      // Refresh on map move (lazy loading by viewport)
+      this.#map.on('moveend zoomend', () => {
+        clearTimeout((this as unknown as Record<string,unknown>)._refreshTimer as number);
+        (this as unknown as Record<string,unknown>)._refreshTimer = setTimeout(
+          () => void this._refreshClusterMarkers(), 400
+        );
+      });
     }
     this.#workouts.forEach(w => this._renderWorkoutMarker(w));
 
@@ -429,33 +401,13 @@ class App {
 
   _toggleNightMode(): void {
     this.#nightMode = !this.#nightMode;
-    if (this.#nightMode) {
-      // User turned ON — force dark
-      localStorage.setItem('nightMode', 'true');
-    } else {
-      // User turned OFF — remove override so system can decide again
-      localStorage.removeItem('nightMode');
-      // Re-read system to apply correct state
-      this.#nightMode = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    this._applyTheme();
-  }
-
-  _applyTheme(): void {
-    const isDark = this.#nightMode;
-    document.body.classList.toggle('night-mode', isDark);
-    document.body.classList.toggle('light-mode', !isDark);
-    document.getElementById('nightToggle')?.classList.toggle('active', isDark);
-    // Update theme-color meta tags (status bar color on iOS/Android)
-    document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]').forEach(m => {
-      m.content = isDark ? '#141417' : '#ffffff';
-    });
-    // Update map tiles
+    document.body.classList.toggle('night-mode', this.#nightMode);
+    document.getElementById('nightToggle')?.classList.toggle('active', this.#nightMode);
+    localStorage.setItem('nightMode', String(this.#nightMode));
     if (this.#map && this.#tileLayer) {
       this.#map.removeLayer(this.#tileLayer);
-      const styleKey = _getActiveMapStyle(isDark);
-      const style    = MAP_STYLES[styleKey];
-      this.#tileLayer = L.tileLayer(style.url, { attribution: style.attr }).addTo(this.#map);
+      const key = this.#nightMode ? 'night' : 'day';
+      this.#tileLayer = L.tileLayer(TILES[key], { attribution: TILE_ATTR[key] }).addTo(this.#map);
     }
   }
 
@@ -987,6 +939,91 @@ class App {
     }
   }
 
+  // ── Unified workout markers + routes ───────────────────────────────────────
+  #activeRoute: L.Polyline | null = null;
+  #unifiedMarkers: L.Marker[] = [];
+
+  async _refreshClusterMarkers(): Promise<void> {
+    if (!this.#clusterEnabled || !this.#clusterGroup) return;
+
+    // Clear existing unified markers
+    this.#unifiedMarkers.forEach(m => this.#clusterGroup!.removeLayer(m));
+    this.#unifiedMarkers = [];
+    if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
+
+    // Load all unified workouts from IndexedDB
+    const { loadUnifiedWorkouts } = await import('./modules/db.js');
+    const workouts = await loadUnifiedWorkouts();
+    if (!workouts.length) return;
+
+    const bounds = this.#map.getBounds().pad(0.5); // viewport + 50% padding
+
+    // Max 50 markers, only in viewport
+    const visible = workouts
+      .filter(w => w.coords?.length > 0)
+      .filter(w => {
+        const [lat, lng] = w.coords[Math.floor(w.coords.length / 2)];
+        return bounds.contains([lat, lng] as L.LatLngExpression);
+      })
+      .slice(0, 50);
+
+    visible.forEach(w => {
+      // Use midpoint of route as marker position
+      const mid   = w.coords[Math.floor(w.coords.length / 2)];
+      const sport = w.type;
+      const icon  = sport === 'running' ? '🏃' : sport === 'cycling' ? '🚴' : sport === 'walking' ? '🚶' : '🏋️';
+      const dist  = w.distanceKm > 0 ? `${w.distanceKm.toFixed(2)} km` : '';
+      const dur   = w.durationSec > 0
+        ? w.durationSec >= 3600
+          ? `${Math.floor(w.durationSec/3600)}h ${Math.floor((w.durationSec%3600)/60)}m`
+          : `${Math.floor(w.durationSec/60)}m`
+        : '';
+      const pace  = w.paceMinKm > 0 ? `${Math.floor(w.paceMinKm)}:${String(Math.round((w.paceMinKm%1)*60)).padStart(2,'0')} /km` : '';
+      const date  = new Date(w.date).toLocaleDateString('en', { day:'numeric', month:'short', year:'numeric' });
+
+      const popupHtml = `
+        <div class="wu-popup">
+          <div class="wu-popup__header">${icon} <strong>${w.name || w.type}</strong></div>
+          <div class="wu-popup__date">${date}</div>
+          ${dist  ? `<div class="wu-popup__stat">📏 ${dist}</div>` : ''}
+          ${dur   ? `<div class="wu-popup__stat">⏱ ${dur}</div>` : ''}
+          ${pace  ? `<div class="wu-popup__stat">⚡ ${pace}</div>` : ''}
+        </div>`;
+
+      const marker = L.marker(mid as L.LatLngExpression, {
+        icon: L.divIcon({
+          className: '',
+          html: `<div class="wu-marker wu-marker--${sport}">${icon}</div>`,
+          iconSize:   [36, 36],
+          iconAnchor: [18, 18],
+        }),
+      }).bindPopup(popupHtml, { maxWidth: 220 });
+
+      // On click — show route (simplified by zoom level) and popup
+      marker.on('click', () => {
+        if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
+        if (w.coords.length > 1) {
+          // Simplify: keep every Nth point based on zoom
+          const zoom    = this.#map.getZoom();
+          const step    = zoom >= 15 ? 1 : zoom >= 12 ? 3 : zoom >= 10 ? 8 : 15;
+          const pts     = w.coords.filter((_, i) => i === 0 || i === w.coords.length-1 || i % step === 0);
+          const color   = sport === 'running' ? '#00c46a' : sport === 'cycling' ? '#f97316' : sport === 'walking' ? '#3b82f6' : '#8b5cf6';
+          this.#activeRoute = L.polyline(pts as L.LatLngExpression[], {
+            color, weight: 4, opacity: 0.85, lineJoin: 'round', lineCap: 'round',
+          }).addTo(this.#map);
+        }
+      });
+
+      // Clear route on popup close
+      marker.on('popupclose', () => {
+        if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
+      });
+
+      this.#clusterGroup!.addLayer(marker);
+      this.#unifiedMarkers.push(marker);
+    });
+  }
+
   // ── WORKOUT CARD ──────────────────────────────────────────────────────────
 
   _buildRouteThumbnail(routeCoords: Coords[] | null | undefined): string {
@@ -1210,58 +1247,6 @@ class App {
     }
 
     // History toggle
-    // ── Map style picker ───────────────────────────────────────────────────────
-    const _initMapPicker = () => {
-      const panel   = document.getElementById('mapStylePanel')!;
-      const grid    = document.getElementById('mapStyleGrid')!;
-
-      // Build grid
-      grid.innerHTML = Object.entries(MAP_STYLES).map(([key, style]) => `
-        <div class="map-style-card ${_getActiveMapStyle(this.#nightMode) === key ? 'map-style-card--active' : ''}"
-             data-style="${key}">
-          <div class="map-style-card__thumb">${style.thumb}</div>
-          <div class="map-style-card__label">${style.label}</div>
-        </div>`).join('');
-
-      const openPanel = () => {
-        // Refresh active state
-        grid.querySelectorAll<HTMLElement>('.map-style-card').forEach(c => {
-          c.classList.toggle('map-style-card--active', c.dataset.style === _getActiveMapStyle(this.#nightMode));
-        });
-        panel.classList.remove('hidden');
-        requestAnimationFrame(() => panel.classList.add('visible'));
-      };
-
-      const closePanel = () => {
-        panel.classList.remove('visible');
-        setTimeout(() => panel.classList.add('hidden'), 300);
-      };
-
-      document.getElementById('trkMapStyleBtn')?.addEventListener('click', openPanel);
-      document.getElementById('mapTabStyleBtn')?.addEventListener('click', openPanel);
-
-      // Close on backdrop click
-      panel.addEventListener('click', e => { if (e.target === panel) closePanel(); });
-
-      // Style selection
-      grid.addEventListener('click', e => {
-        const card = (e.target as HTMLElement).closest<HTMLElement>('.map-style-card');
-        if (!card?.dataset.style) return;
-        const key = card.dataset.style;
-        localStorage.setItem('mapStyle', key);
-        grid.querySelectorAll('.map-style-card').forEach(c => c.classList.remove('map-style-card--active'));
-        card.classList.add('map-style-card--active');
-        // Apply new tile layer
-        if (this.#map && this.#tileLayer) {
-          this.#map.removeLayer(this.#tileLayer);
-          const style = MAP_STYLES[key];
-          this.#tileLayer = L.tileLayer(style.url, { attribution: style.attr }).addTo(this.#map);
-        }
-        setTimeout(closePanel, 400);
-      });
-    };
-    _initMapPicker();
-
     document.getElementById('trkHistoryToggle')?.addEventListener('click', () => {
       document.getElementById('trkHistoryPanel')?.classList.toggle('hidden');
     });
