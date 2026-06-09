@@ -838,8 +838,8 @@ class App {
         coords:      Array.isArray(_wm.routeCoords) && (_wm.routeCoords as unknown[]).length > 0
           ? (_wm.routeCoords as import('./types/index.js').Coords[])
           : (Array.isArray(_wm.coords) && (_wm.coords as unknown[]).length === 2
-              ? [_wm.coords as import('./types/index.js').Coords]  // single point [lat,lng] → wrap in array
-              : []),
+            ? [_wm.coords as import('./types/index.js').Coords]  // single point [lat,lng] → wrap in array
+            : []),
       };
       void CS.saveEnrichedActivity(_wmEnriched);
       void CS.saveUnifiedWorkout({
@@ -927,8 +927,8 @@ class App {
       coords:      Array.isArray(_w.routeCoords) && (_w.routeCoords as unknown[]).length > 0
         ? (_w.routeCoords as import('./types/index.js').Coords[])
         : (Array.isArray(_w.coords) && (_w.coords as unknown[]).length === 2
-            ? [_w.coords as import('./types/index.js').Coords]
-            : []),
+          ? [_w.coords as import('./types/index.js').Coords]
+          : []),
     };
     void CS.saveEnrichedActivity(_enriched);
     void CS.saveUnifiedWorkout({
@@ -1983,7 +1983,7 @@ class App {
     const [bLat, bLng] = this.#routePointB!;
     const profile =
       this.#routeActivityMode === 'cycling' ? 'cycling' :
-      this.#routeActivityMode === 'walking' ? 'walking' : 'walking';
+        this.#routeActivityMode === 'walking' ? 'walking' : 'walking';
 
     const url = `${BACKEND_URL}/directions/${profile}/${aLng},${aLat};${bLng},${bLat}`;
 

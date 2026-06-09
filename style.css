@@ -3048,3 +3048,28 @@ body {
   color: var(--app-text-primary, #fff);
   text-align: center;
 }
+
+/* ── Unified workout markers ─────────────────────────────────────────────────── */
+.wu-marker {
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: var(--app-bg-card, #1a1f23);
+  border: 2px solid #00c46a;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.6rem; line-height: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.wu-marker:hover { transform: scale(1.1); }
+.wu-marker--running  { border-color: #00c46a; }
+.wu-marker--cycling  { border-color: #f97316; }
+.wu-marker--walking  { border-color: #3b82f6; }
+.wu-marker--gym,
+.wu-marker--other    { border-color: #8b5cf6; }
+
+/* ── Unified workout popup ───────────────────────────────────────────────────── */
+.wu-popup { min-width: 140px; }
+.wu-popup__header { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; color: var(--app-text-primary, #fff); }
+.wu-popup__date   { font-size: 1.1rem; color: var(--app-text-tertiary, rgba(255,255,255,0.4)); margin-bottom: 6px; }
+.wu-popup__stat   { font-size: 1.2rem; color: var(--app-text-secondary, rgba(255,255,255,0.7)); margin: 2px 0; }

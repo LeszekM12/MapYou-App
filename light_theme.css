@@ -524,3 +524,9 @@ body.light-mode .map-style-card--active {
   background: rgba(0,196,106,0.08) !important;
 }
 body.light-mode .map-style-card__label { color: #1a1a1a !important; }
+
+/* ── Workout cluster markers light mode ────────────────────────────────────── */
+body.light-mode .wu-marker { background: #fff !important; box-shadow: 0 2px 8px rgba(0,0,0,0.15) !important; }
+body.light-mode .wu-popup__header { color: #1a1a1a !important; }
+body.light-mode .wu-popup__date   { color: #999 !important; }
+body.light-mode .wu-popup__stat   { color: #555 !important; }
