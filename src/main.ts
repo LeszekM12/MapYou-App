@@ -177,6 +177,8 @@ class App {
   #markers      = new Map<string, L.Marker>();
   #clusterGroup: MarkerClusterGroup | null = null;
   #clusterEnabled = localStorage.getItem('clusterEnabled') === 'true';
+  #activeRoute: L.Polyline | null = null;
+  #unifiedMarkers: L.Marker[] = [];
   #poiMarkers:  L.Marker[] = [];
   #userCoords:  Coords | null = null;
   #autocompleteTimer: ReturnType<typeof setTimeout> | null = null;
@@ -340,6 +342,13 @@ class App {
         },
       });
       this.#map.addLayer(this.#clusterGroup);
+      setTimeout(() => void this._refreshClusterMarkers(), 800);
+      this.#map.on('moveend zoomend', () => {
+        clearTimeout((this as unknown as Record<string,unknown>)._refreshTimer as number);
+        (this as unknown as Record<string,unknown>)._refreshTimer = setTimeout(
+          () => void this._refreshClusterMarkers(), 400
+        );
+      });
     }
     this.#workouts.forEach(w => this._renderWorkoutMarker(w));
 
@@ -964,6 +973,78 @@ class App {
       if (m._icon)   m._icon.style.pointerEvents   = 'none';
       if (m._shadow) m._shadow.style.pointerEvents = 'none';
     }, 0);
+  }
+
+  async _refreshClusterMarkers(): Promise<void> {
+    if (!this.#clusterEnabled || !this.#clusterGroup) return;
+    this.#unifiedMarkers.forEach(m => this.#clusterGroup!.removeLayer(m));
+    this.#unifiedMarkers = [];
+    if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
+
+    const { loadUnifiedWorkouts } = await import('./modules/db.js');
+    const workouts = await loadUnifiedWorkouts();
+    if (!workouts.length) return;
+
+    const bounds = this.#map.getBounds().pad(0.5);
+    const visible = workouts
+      .filter(w => w.coords?.length > 0)
+      .filter(w => {
+        const [lat, lng] = w.coords[Math.floor(w.coords.length / 2)];
+        return bounds.contains([lat, lng] as L.LatLngExpression);
+      })
+      .slice(0, 50);
+
+    visible.forEach(w => {
+      const mid   = w.coords[Math.floor(w.coords.length / 2)];
+      const sport = w.type;
+      const icon  = sport === 'running' ? '🏃' : sport === 'cycling' ? '🚴' : sport === 'walking' ? '🚶' : '🏋️';
+      const dist  = w.distanceKm > 0 ? `${w.distanceKm.toFixed(2)} km` : '';
+      const dur   = w.durationSec > 0
+        ? w.durationSec >= 3600
+          ? `${Math.floor(w.durationSec/3600)}h ${Math.floor((w.durationSec%3600)/60)}m`
+          : `${Math.floor(w.durationSec/60)}m`
+        : '';
+      const pace  = w.paceMinKm > 0
+        ? `${Math.floor(w.paceMinKm)}:${String(Math.round((w.paceMinKm%1)*60)).padStart(2,'0')} /km`
+        : '';
+      const date  = new Date(w.date).toLocaleDateString('en', { day:'numeric', month:'short', year:'numeric' });
+
+      const popupHtml = `
+        <div class="wu-popup">
+          <div class="wu-popup__header">${icon} <strong>${w.name || w.type}</strong></div>
+          <div class="wu-popup__date">${date}</div>
+          ${dist ? `<div class="wu-popup__stat">📏 ${dist}</div>` : ''}
+          ${dur  ? `<div class="wu-popup__stat">⏱ ${dur}</div>`  : ''}
+          ${pace ? `<div class="wu-popup__stat">⚡ ${pace}</div>` : ''}
+        </div>`;
+
+      const marker = L.marker(mid as L.LatLngExpression, {
+        icon: L.divIcon({
+          className: '',
+          html: `<div class="wu-marker wu-marker--${sport}">${icon}</div>`,
+          iconSize: [36, 36], iconAnchor: [18, 18],
+        }),
+      }).bindPopup(popupHtml, { maxWidth: 220 });
+
+      marker.on('click', () => {
+        if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
+        if (w.coords.length > 1) {
+          const zoom  = this.#map.getZoom();
+          const step  = zoom >= 15 ? 1 : zoom >= 12 ? 3 : zoom >= 10 ? 8 : 15;
+          const pts   = w.coords.filter((_, i) => i === 0 || i === w.coords.length-1 || i % step === 0);
+          const color = sport === 'running' ? '#00c46a' : sport === 'cycling' ? '#f97316' : sport === 'walking' ? '#3b82f6' : '#8b5cf6';
+          this.#activeRoute = L.polyline(pts as L.LatLngExpression[], {
+            color, weight: 4, opacity: 0.85, lineJoin: 'round', lineCap: 'round',
+          }).addTo(this.#map);
+        }
+      });
+      marker.on('popupclose', () => {
+        if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
+      });
+
+      this.#clusterGroup!.addLayer(marker);
+      this.#unifiedMarkers.push(marker);
+    });
   }
 
   _renderWorkoutMarker(workout: Workout): void {
