@@ -59,11 +59,9 @@ body.light-mode #tabStats .tab-scroll { background: #f2f2f7 !important; }
 
 /* ── Bottom nav ─────────────────────────────────────────────────────────────── */
 body.light-mode .bottom-nav {
-  background: rgba(255,255,255,0.92) !important;
+  background: #ffffff !important;
   border-top: 1px solid rgba(0,0,0,0.1) !important;
   box-shadow: 0 -1px 8px rgba(0,0,0,0.06) !important;
-  backdrop-filter: blur(16px) !important;
-  -webkit-backdrop-filter: blur(16px) !important;
 }
 body.light-mode .bottom-nav__item { color: #999 !important; }
 body.light-mode .bottom-nav__item--active { color: #00c46a !important; }
