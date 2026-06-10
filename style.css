@@ -1633,7 +1633,7 @@ body {
 /* ── Scrollable panel ── */
 .tab-scroll {
     width: 100%;
-    max-height: calc(88dvh - env(safe-area-inset-top, 0px));
+    max-height: 88dvh;
     background: var(--color-dark--1);
     border-radius: 2rem 2rem 0 0;
     box-shadow: 0 -6px 40px rgba(0,0,0,0.55);
@@ -1700,11 +1700,13 @@ body {
 .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
     z-index: 200;
-    height: 5.8rem;
+    height: calc(5.8rem + env(safe-area-inset-bottom, 0px));
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
     display: flex; align-items: stretch;
     box-shadow: 0 -2px 20px rgba(0,0,0,0.4);
+    padding-top: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .bottom-nav__item {
     flex: 1; display: flex; flex-direction: column;
@@ -1720,7 +1722,7 @@ body {
 
 /* ── Floating search bar ── */
 .map-search-bar {
-    position: fixed; top: max(1.2rem, env(safe-area-inset-top, 1.2rem)); left: 1.2rem; right: 1.2rem;
+    position: fixed; top: 1.2rem; left: 1.2rem; right: 1.2rem;
     z-index: 150;
     transition: opacity 0.25s ease, transform 0.25s ease;
 }
@@ -2991,7 +2993,7 @@ body {
 /* ── Map style picker panel ─────────────────────────────────────────────────── */
 .map-style-panel {
   position: fixed;
-  bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
+  bottom: 5.8rem;
   left: 0; right: 0;
   z-index: 9000;
   pointer-events: none;
