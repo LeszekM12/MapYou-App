@@ -287,7 +287,9 @@ class App {
                 this._refreshTimer = setTimeout(() => void this._refreshClusterMarkers(), 400);
             });
         }
-        __classPrivateFieldGet(this, _App_workouts, "f").forEach(w => this._renderWorkoutMarker(w));
+        if (!__classPrivateFieldGet(this, _App_clusterEnabled, "f")) {
+            __classPrivateFieldGet(this, _App_workouts, "f").forEach(w => this._renderWorkoutMarker(w));
+        }
         __classPrivateFieldGet(this, _App_map, "f").on('mousedown touchstart', () => {
             __classPrivateFieldSet(this, _App_userTouchingMap, true, "f");
             if (__classPrivateFieldGet(this, _App_recenterTimer, "f"))
@@ -804,7 +806,8 @@ class App {
             if (__classPrivateFieldGet(this, _App_routeCoords, "f")?.length > 1)
                 workout.routeCoords = [...__classPrivateFieldGet(this, _App_routeCoords, "f")];
             __classPrivateFieldSet(this, _App_activeWorkoutId, '__pending__', "f");
-            this._renderWorkoutMarker(workout);
+            if (!__classPrivateFieldGet(this, _App_clusterEnabled, "f"))
+                this._renderWorkoutMarker(workout);
             this._renderWorkout(workout);
             this._setLocalStorage();
             this._renderStats(true);
@@ -893,7 +896,8 @@ class App {
         if (__classPrivateFieldGet(this, _App_routeCoords, "f")?.length > 1)
             workout.routeCoords = [...__classPrivateFieldGet(this, _App_routeCoords, "f")];
         __classPrivateFieldSet(this, _App_activeWorkoutId, '__pending__', "f");
-        this._renderWorkoutMarker(workout);
+        if (!__classPrivateFieldGet(this, _App_clusterEnabled, "f"))
+            this._renderWorkoutMarker(workout);
         this._renderWorkout(workout);
         this._hideForm();
         this._setLocalStorage();
@@ -1027,8 +1031,9 @@ class App {
                     }),
                 }).bindPopup(popupHtml, {
                     maxWidth: 220,
-                    autoPan: false,
-                    offset: L.point(0, -20),
+                    autoPan: true,
+                    autoPanPadding: L.point(20, 80),
+                    offset: L.point(0, -36),
                 });
                 marker.on('click', () => {
                     if (__classPrivateFieldGet(this, _App_activeRoute, "f")) {

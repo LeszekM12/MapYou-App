@@ -351,7 +351,9 @@ class App {
         );
       });
     }
-    this.#workouts.forEach(w => this._renderWorkoutMarker(w));
+    if (!this.#clusterEnabled) {
+      this.#workouts.forEach(w => this._renderWorkoutMarker(w));
+    }
 
     this.#map.on('mousedown touchstart', () => {
       this.#userTouchingMap = true;
@@ -816,7 +818,7 @@ class App {
       this.#workouts.push(workout);
       if (this.#routeCoords?.length > 1) workout.routeCoords = [...this.#routeCoords];
       this.#activeWorkoutId = '__pending__';
-      this._renderWorkoutMarker(workout);
+      if (!this.#clusterEnabled) this._renderWorkoutMarker(workout);
       this._renderWorkout(workout);
       this._setLocalStorage();
       this._renderStats(true);
@@ -905,7 +907,7 @@ class App {
     this.#workouts.push(workout);
     if (this.#routeCoords?.length > 1) workout.routeCoords = [...this.#routeCoords];
     this.#activeWorkoutId = '__pending__';
-    this._renderWorkoutMarker(workout);
+    if (!this.#clusterEnabled) this._renderWorkoutMarker(workout);
     this._renderWorkout(workout);
     this._hideForm();
     this._setLocalStorage();
@@ -1035,8 +1037,9 @@ class App {
           }),
         }).bindPopup(popupHtml, {
           maxWidth: 220,
-          autoPan: false,
-          offset: L.point(0, -20),
+          autoPan: true,
+          autoPanPadding: L.point(20, 80),
+          offset: L.point(0, -36),
         });
 
         marker.on('click', () => {

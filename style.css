@@ -3069,7 +3069,7 @@ body {
 .wu-marker--other    { border-color: #8b5cf6; }
 
 /* ── Unified workout popup ───────────────────────────────────────────────────── */
-.wu-popup { min-width: 140px; }
-.wu-popup__header { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; color: var(--app-text-primary, #fff); }
+.wu-popup { min-width: 160px; max-width: 210px; padding: 2px 0; }
+.wu-popup__header { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; color: var(--app-text-primary, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wu-popup__date   { font-size: 1.1rem; color: var(--app-text-tertiary, rgba(255,255,255,0.4)); margin-bottom: 6px; }
 .wu-popup__stat   { font-size: 1.2rem; color: var(--app-text-secondary, rgba(255,255,255,0.7)); margin: 2px 0; }
