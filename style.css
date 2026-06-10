@@ -1633,7 +1633,7 @@ body {
 /* ── Scrollable panel ── */
 .tab-scroll {
     width: 100%;
-    max-height: 88dvh;
+    max-height: calc(88dvh - env(safe-area-inset-top, 0px));
     background: var(--color-dark--1);
     border-radius: 2rem 2rem 0 0;
     box-shadow: 0 -6px 40px rgba(0,0,0,0.55);
@@ -1721,7 +1721,7 @@ body {
 
 /* ── Floating search bar ── */
 .map-search-bar {
-    position: fixed; top: calc(1.2rem + env(safe-area-inset-top, 0px)); left: 1.2rem; right: 1.2rem;
+    position: fixed; top: max(1.2rem, env(safe-area-inset-top, 1.2rem)); left: 1.2rem; right: 1.2rem;
     z-index: 150;
     transition: opacity 0.25s ease, transform 0.25s ease;
 }

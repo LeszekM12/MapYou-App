@@ -983,7 +983,7 @@ class App {
     if (this.#refreshing) return;
     this.#refreshing = true;
     try {
-      this.#unifiedMarkers.forEach(m => this.#clusterGroup!.removeLayer(m));
+      this.#clusterGroup.clearLayers();
       this.#unifiedMarkers = [];
       if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
 

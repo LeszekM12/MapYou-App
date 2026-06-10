@@ -977,7 +977,7 @@ class App {
             return;
         __classPrivateFieldSet(this, _App_refreshing, true, "f");
         try {
-            __classPrivateFieldGet(this, _App_unifiedMarkers, "f").forEach(m => __classPrivateFieldGet(this, _App_clusterGroup, "f").removeLayer(m));
+            __classPrivateFieldGet(this, _App_clusterGroup, "f").clearLayers();
             __classPrivateFieldSet(this, _App_unifiedMarkers, [], "f");
             if (__classPrivateFieldGet(this, _App_activeRoute, "f")) {
                 __classPrivateFieldGet(this, _App_map, "f").removeLayer(__classPrivateFieldGet(this, _App_activeRoute, "f"));
