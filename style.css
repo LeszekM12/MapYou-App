@@ -1613,7 +1613,7 @@ body {
 
 /* ── Tab panels ── */
 .tab-panel {
-    position: fixed; inset: 0; bottom: 5.8rem;
+    position: fixed; inset: 0; bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
     z-index: 50; display: none;
     flex-direction: column; justify-content: flex-end;
     pointer-events: none;   /* always pass-through except tab-scroll */
@@ -1641,6 +1641,7 @@ body {
     scrollbar-width: none;
     -webkit-overflow-scrolling: touch;
     padding: 0 2rem 1.5rem;
+    padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     transition: max-height 0.3s cubic-bezier(0.4,0,0.2,1);
 }
 .tab-scroll::-webkit-scrollbar { display: none; }
@@ -1698,12 +1699,13 @@ body {
 /* ── Bottom nav ── */
 .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
-    z-index: 200; height: 5.8rem;
+    z-index: 200;
+    height: calc(5.8rem + env(safe-area-inset-bottom, 0px));
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
     display: flex; align-items: stretch;
     box-shadow: 0 -2px 20px rgba(0,0,0,0.4);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
 .bottom-nav__item {
     flex: 1; display: flex; flex-direction: column;
@@ -1719,7 +1721,7 @@ body {
 
 /* ── Floating search bar ── */
 .map-search-bar {
-    position: fixed; top: 1.2rem; left: 1.2rem; right: 1.2rem;
+    position: fixed; top: calc(1.2rem + env(safe-area-inset-top, 0px)); left: 1.2rem; right: 1.2rem;
     z-index: 150;
     transition: opacity 0.25s ease, transform 0.25s ease;
 }
@@ -1995,7 +1997,7 @@ body {
 .tab-panel--tracker {
     position: fixed !important;
     inset: 0 !important;
-    bottom: 5.8rem !important;
+    bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px)) !important;
     z-index: 2 !important;          /* ponad mapą (1) ale pod resztą UI */
     background: transparent !important;
     display: none;
@@ -2051,7 +2053,7 @@ body {
     pointer-events: all;            /* klikalne */
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
-    padding: 1.4rem 2rem 2.4rem;
+    padding: 1.4rem 2rem calc(2.4rem + env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     gap: 1.4rem;
@@ -2990,7 +2992,7 @@ body {
 /* ── Map style picker panel ─────────────────────────────────────────────────── */
 .map-style-panel {
   position: fixed;
-  bottom: 5.8rem;
+  bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
   left: 0; right: 0;
   z-index: 9000;
   pointer-events: none;
