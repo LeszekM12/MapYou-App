@@ -103,15 +103,28 @@ export async function hasGPSPermission() {
     if (localStorage.getItem(LS_GPS_GRANTED) === '1')
         return true;
     try {
+        // First try permissions API (works in Chrome/Firefox but NOT in Safari iOS)
         const r = await navigator.permissions.query({ name: 'geolocation' });
-        const granted = r.state === 'granted';
-        if (granted)
+        if (r.state === 'granted') {
             localStorage.setItem(LS_GPS_GRANTED, '1');
-        return granted;
+            return true;
+        }
+        if (r.state === 'denied')
+            return false;
+        // state === 'prompt' — could be Safari bug, fall through to silent probe
     }
-    catch {
-        return false;
-    }
+    catch { /* permissions API not supported */ }
+    // Safari iOS always returns 'prompt' even when permission was already granted.
+    // Do a silent probe with maximumAge:Infinity and short timeout — if it resolves
+    // without a user dialog it means permission is already granted.
+    return new Promise(resolve => {
+        navigator.geolocation.getCurrentPosition(pos => {
+            const coords = [pos.coords.latitude, pos.coords.longitude];
+            localStorage.setItem(LS_LAST_COORDS, JSON.stringify(coords));
+            localStorage.setItem(LS_GPS_GRANTED, '1');
+            resolve(true);
+        }, () => resolve(false), { enableHighAccuracy: false, timeout: 500, maximumAge: Infinity });
+    });
 }
 export function getGPSLocation() {
     return new Promise((resolve, reject) => {
