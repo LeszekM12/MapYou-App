@@ -351,9 +351,7 @@ class App {
         );
       });
     }
-    if (!this.#clusterEnabled) {
-      this.#workouts.forEach(w => this._renderWorkoutMarker(w));
-    }
+    this.#workouts.forEach(w => this._renderWorkoutMarker(w));
 
     this.#map.on('mousedown touchstart', () => {
       this.#userTouchingMap = true;
@@ -600,6 +598,15 @@ class App {
 
   _startTracking(): void {
     if (!navigator.geolocation) return;
+    void this._startTrackingWithPermission();
+  }
+
+  async _startTrackingWithPermission(): Promise<void> {
+    const already = await hasGPSPermission();
+    if (!already) {
+      const coords = await requestGPSPermission();
+      if (!coords) return; // user denied
+    }
     this.#trackingActive = true;
     btnTrack.textContent = '⏹ Stop tracking';
     btnTrack.classList.add('tracking--active');
@@ -818,7 +825,7 @@ class App {
       this.#workouts.push(workout);
       if (this.#routeCoords?.length > 1) workout.routeCoords = [...this.#routeCoords];
       this.#activeWorkoutId = '__pending__';
-      if (!this.#clusterEnabled) this._renderWorkoutMarker(workout);
+      this._renderWorkoutMarker(workout);
       this._renderWorkout(workout);
       this._setLocalStorage();
       this._renderStats(true);
@@ -907,7 +914,7 @@ class App {
     this.#workouts.push(workout);
     if (this.#routeCoords?.length > 1) workout.routeCoords = [...this.#routeCoords];
     this.#activeWorkoutId = '__pending__';
-    if (!this.#clusterEnabled) this._renderWorkoutMarker(workout);
+    this._renderWorkoutMarker(workout);
     this._renderWorkout(workout);
     this._hideForm();
     this._setLocalStorage();
@@ -983,7 +990,7 @@ class App {
     if (this.#refreshing) return;
     this.#refreshing = true;
     try {
-      this.#clusterGroup.clearLayers();
+      this.#unifiedMarkers.forEach(m => this.#clusterGroup!.removeLayer(m));
       this.#unifiedMarkers = [];
       if (this.#activeRoute) { this.#map.removeLayer(this.#activeRoute); this.#activeRoute = null; }
 
@@ -1037,9 +1044,8 @@ class App {
           }),
         }).bindPopup(popupHtml, {
           maxWidth: 220,
-          autoPan: true,
-          autoPanPadding: L.point(20, 80),
-          offset: L.point(0, -36),
+          autoPan: false,
+          offset: L.point(0, -20),
         });
 
         marker.on('click', () => {

@@ -287,9 +287,7 @@ class App {
                 this._refreshTimer = setTimeout(() => void this._refreshClusterMarkers(), 400);
             });
         }
-        if (!__classPrivateFieldGet(this, _App_clusterEnabled, "f")) {
-            __classPrivateFieldGet(this, _App_workouts, "f").forEach(w => this._renderWorkoutMarker(w));
-        }
+        __classPrivateFieldGet(this, _App_workouts, "f").forEach(w => this._renderWorkoutMarker(w));
         __classPrivateFieldGet(this, _App_map, "f").on('mousedown touchstart', () => {
             __classPrivateFieldSet(this, _App_userTouchingMap, true, "f");
             if (__classPrivateFieldGet(this, _App_recenterTimer, "f"))
@@ -554,6 +552,15 @@ class App {
     _startTracking() {
         if (!navigator.geolocation)
             return;
+        void this._startTrackingWithPermission();
+    }
+    async _startTrackingWithPermission() {
+        const already = await hasGPSPermission();
+        if (!already) {
+            const coords = await requestGPSPermission();
+            if (!coords)
+                return; // user denied
+        }
         __classPrivateFieldSet(this, _App_trackingActive, true, "f");
         btnTrack.textContent = '⏹ Stop tracking';
         btnTrack.classList.add('tracking--active');
@@ -806,8 +813,7 @@ class App {
             if (__classPrivateFieldGet(this, _App_routeCoords, "f")?.length > 1)
                 workout.routeCoords = [...__classPrivateFieldGet(this, _App_routeCoords, "f")];
             __classPrivateFieldSet(this, _App_activeWorkoutId, '__pending__', "f");
-            if (!__classPrivateFieldGet(this, _App_clusterEnabled, "f"))
-                this._renderWorkoutMarker(workout);
+            this._renderWorkoutMarker(workout);
             this._renderWorkout(workout);
             this._setLocalStorage();
             this._renderStats(true);
@@ -896,8 +902,7 @@ class App {
         if (__classPrivateFieldGet(this, _App_routeCoords, "f")?.length > 1)
             workout.routeCoords = [...__classPrivateFieldGet(this, _App_routeCoords, "f")];
         __classPrivateFieldSet(this, _App_activeWorkoutId, '__pending__', "f");
-        if (!__classPrivateFieldGet(this, _App_clusterEnabled, "f"))
-            this._renderWorkoutMarker(workout);
+        this._renderWorkoutMarker(workout);
         this._renderWorkout(workout);
         this._hideForm();
         this._setLocalStorage();
@@ -977,7 +982,7 @@ class App {
             return;
         __classPrivateFieldSet(this, _App_refreshing, true, "f");
         try {
-            __classPrivateFieldGet(this, _App_clusterGroup, "f").clearLayers();
+            __classPrivateFieldGet(this, _App_unifiedMarkers, "f").forEach(m => __classPrivateFieldGet(this, _App_clusterGroup, "f").removeLayer(m));
             __classPrivateFieldSet(this, _App_unifiedMarkers, [], "f");
             if (__classPrivateFieldGet(this, _App_activeRoute, "f")) {
                 __classPrivateFieldGet(this, _App_map, "f").removeLayer(__classPrivateFieldGet(this, _App_activeRoute, "f"));
@@ -1031,9 +1036,8 @@ class App {
                     }),
                 }).bindPopup(popupHtml, {
                     maxWidth: 220,
-                    autoPan: true,
-                    autoPanPadding: L.point(20, 80),
-                    offset: L.point(0, -36),
+                    autoPan: false,
+                    offset: L.point(0, -20),
                 });
                 marker.on('click', () => {
                     if (__classPrivateFieldGet(this, _App_activeRoute, "f")) {
