@@ -11,15 +11,18 @@
   /* When inactive: pass-through (same as other panels) */
   pointer-events: none !important;
 }
+/* Home extends under the status bar so content scrolls beneath it (Strava-style) */
 #tabHome.tab-panel--active {
   display: flex;
   /* When active: BLOCK all pointer events — prevent clicks reaching Leaflet map */
   pointer-events: all !important;
+  top: 0 !important;
+  justify-content: flex-start !important;
 }
 #tabHome .home-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 0 0 100px;
+  padding: env(safe-area-inset-top, 0px) 0 100px;
   -webkit-overflow-scrolling: touch;
   pointer-events: all !important;
   touch-action: pan-y;
@@ -28,7 +31,7 @@
 
 /* ── Greeting ── */
 .home-greeting {
-  padding: calc(24px + env(safe-area-inset-top, 0px)) 20px 8px;
+  padding: 24px 20px 8px;
 }
 .home-greeting__text {
   font-size: 1.6rem;
@@ -1036,7 +1039,7 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .home-greeting {
-  padding: calc(20px + env(safe-area-inset-top, 0px)) 16px 8px;
+  padding: 20px 16px 8px;
 }
 .home-greeting__row {
   display: flex;

@@ -1701,7 +1701,7 @@ body {
 /* ── Bottom nav ── */
 .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
-    z-index: 200; height: 5.8rem;
+    z-index: 200; height: calc(5.8rem + env(safe-area-inset-bottom, 0px));
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
     display: flex; align-items: stretch;
