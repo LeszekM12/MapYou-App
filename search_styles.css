@@ -44,7 +44,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 20px 8px;
+  padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 8px;
   flex-shrink: 0;
 }
 .sv2-back {
@@ -317,9 +317,10 @@
   display: flex;
   align-items: flex-end;
   padding: 16px;
+  padding-top: calc(16px + env(safe-area-inset-top, 0px));
 }
 .sv2-club-detail__back {
-  position: absolute; top: 16px; left: 16px;
+  position: absolute; top: calc(16px + env(safe-area-inset-top, 0px)); left: 16px;
   background: rgba(0,0,0,0.45); border: none; color: var(--app-text-primary);
   width: 38px; height: 38px; border-radius: 50%;
   font-size: 1.6rem; cursor: pointer;
