@@ -2717,22 +2717,23 @@ setTimeout(() => {
 }, 3000);
 // ─── Hydratacja — pobierz dane z Atlas do IndexedDB jeśli puste ──────────────
 void CS.hydrate();
-// ─── iOS viewport height fix — prevents layout shift during phone unlock ─────
-// On iPhone, iOS temporarily changes the layout viewport during the unlock
-// animation, causing 100dvh to fluctuate and the bottom nav to shift up.
-// visualViewport.height is stable — we debounce by 300ms to skip animation frames.
+// ─── iOS PWA viewport fix — prevents layout shift during phone unlock ────────
+// ONLY runs in standalone (home screen) mode — in Safari browser,
+// visualViewport.height excludes the Safari toolbar, making the body too small.
 (function fixIOSViewportHeight() {
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (!isIOS || !window.visualViewport)
+    const isStandalone = ('standalone' in navigator && navigator.standalone === true)
+        || window.matchMedia('(display-mode: standalone)').matches;
+    if (!isIOS || !isStandalone || !window.visualViewport)
         return;
     const apply = () => {
         document.documentElement.style.setProperty('--app-height', `${window.visualViewport.height}px`);
     };
-    let debounceTimer;
+    let t;
     window.visualViewport.addEventListener('resize', () => {
-        clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(apply, 300);
+        clearTimeout(t);
+        t = setTimeout(apply, 300); // debounce — skip iOS unlock animation frames
     });
-    apply(); // set immediately on load
+    apply();
 })();
 //# sourceMappingURL=main.js.map
