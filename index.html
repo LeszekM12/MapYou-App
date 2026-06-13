@@ -37,6 +37,28 @@
     <script src="https://unpkg.com/dexie@3/dist/dexie.min.js"></script>
     <script type="module" src="./dist/main.js"></script>
     <title>MapYou - Workouts App</title>
+    <script>
+      // Fix iOS standalone PWA viewport-height bug: on first load iOS reports a
+      // wrong height (app appears raised with a gap at the bottom) until a resize
+      // or rotation forces recalculation. We set a real --app-height ourselves and
+      // refresh it on every relevant event so the app always fills the full screen.
+      (function () {
+        function setAppHeight() {
+          document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
+        }
+        setAppHeight();
+        window.addEventListener('resize', setAppHeight);
+        window.addEventListener('orientationchange', setAppHeight);
+        window.addEventListener('pageshow', setAppHeight);
+        window.addEventListener('load', function () {
+          setAppHeight();
+          // iOS often reports the correct value only a tick after load
+          requestAnimationFrame(setAppHeight);
+          setTimeout(setAppHeight, 120);
+          setTimeout(setAppHeight, 400);
+        });
+      })();
+    </script>
 </head>
 <body>
 
