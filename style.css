@@ -1600,7 +1600,7 @@ body.night-mode .route-mode-btn { background-color: #1a2a3a; }
 body {
     padding: 0 !important;
     flex-direction: column !important;
-    height: 100% !important;
+    height: 100dvh !important;
     overflow: hidden !important;
     background: var(--color-dark--1) !important;
 }
@@ -1609,7 +1609,7 @@ body {
     top: 0 !important;
     left: 0 !important; right: 0 !important; bottom: 0 !important;
     width: 100% !important;
-    height: 100% !important;
+    height: 100dvh !important;
     z-index: 1 !important;
     flex: none !important;
 }
@@ -1701,13 +1701,15 @@ body {
 /* ── Bottom nav ── */
 .bottom-nav {
     position: fixed; bottom: 0; left: 0; right: 0;
-    z-index: 200; height: calc(5.8rem + env(safe-area-inset-bottom, 0px));
+    z-index: 200;
+    height: calc(5.8rem + env(safe-area-inset-bottom, 0px));
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
-    display: flex; align-items: stretch;
+    display: flex; align-items: flex-start;
     box-shadow: 0 -2px 20px rgba(0,0,0,0.4);
-    padding-bottom: env(safe-area-inset-bottom, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
 }
+.bottom-nav__item { height: 5.8rem; }
 .bottom-nav__item {
     flex: 1; display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 0.25rem;

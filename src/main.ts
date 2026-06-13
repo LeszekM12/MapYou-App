@@ -262,18 +262,19 @@ class App {
   async _loadMapFromIP(): Promise<void> {
     const DEFAULT_COORDS: Coords = [52.237, 21.017]; // Warsaw fallback
 
-    // If GPS already granted from a previous session → use precise coords immediately
-    // (hasGPSPermission reads localStorage only — no browser prompt)
+    // If GPS was granted before, use the LAST SAVED coords (no GPS call → no prompt).
+    // Safari iOS re-prompts on every getCurrentPosition even when already granted,
+    // so we must NOT call GPS on startup. GPS is only triggered by Start tracking.
     if (await hasGPSPermission()) {
-      try {
-        const { getGPSLocation } = await import('./modules/LocationService.js');
-        const gpsCoords = await getGPSLocation();
-        this._loadMap(gpsCoords, this.#mapZoomLevel); // precise zoom for GPS
-        console.info('[Map] Loaded with GPS (previously granted)');
-        subscribeToPermissionChanges((c) => this._recenterMapToGPS(c));
-        return;
-      } catch {
-        console.warn('[Map] GPS failed despite permission — falling back to IP');
+      const saved = localStorage.getItem('mapty_last_coords');
+      if (saved) {
+        try {
+          const coords = JSON.parse(saved) as Coords;
+          this._loadMap(coords, this.#mapZoomLevel);
+          console.info('[Map] Loaded with last saved GPS coords (no prompt)');
+          subscribeToPermissionChanges((c) => this._recenterMapToGPS(c));
+          return;
+        } catch { /* fall through to IP */ }
       }
     }
 
@@ -2487,29 +2488,3 @@ setTimeout(() => {
 
 // ─── Hydratacja — pobierz dane z Atlas do IndexedDB jeśli puste ──────────────
 void CS.hydrate();
-
-// ─── iOS PWA viewport fix — prevents layout shift during phone unlock ────────
-// ONLY runs in standalone (home screen) mode — in Safari browser,
-// visualViewport.height excludes the Safari toolbar, making the body too small.
-(function fixIOSViewportHeight() {
-    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    const isStandalone = ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone === true)
-        || window.matchMedia('(display-mode: standalone)').matches;
-
-    if (!isIOS || !isStandalone || !window.visualViewport) return;
-
-    const apply = () => {
-        document.documentElement.style.setProperty(
-            '--app-height',
-            `${window.visualViewport!.height}px`
-        );
-    };
-
-    let t: ReturnType<typeof setTimeout>;
-    window.visualViewport.addEventListener('resize', () => {
-        clearTimeout(t);
-        t = setTimeout(apply, 300); // debounce — skip iOS unlock animation frames
-    });
-
-    apply();
-})();
