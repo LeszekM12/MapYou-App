@@ -2,14 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8"/>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
     <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
     <meta name="theme-color" content="#141417" media="(prefers-color-scheme: dark)"/>
     <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)"/>
     <meta name="description" content="Mapty — track your workouts on the map"/>
     <meta name="color-scheme" content="dark light"/>
-    <meta name="apple-mobile-web-app-capable" content="yes"/>
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
     <meta name="apple-mobile-web-app-title" content="Mapty"/>
     <link rel="apple-touch-icon" href="public/icon-192.png"/>
     <link rel="shortcut icon" type="image/png" href="public/icon-192.png"/>
@@ -37,32 +35,6 @@
     <script src="https://unpkg.com/dexie@3/dist/dexie.min.js"></script>
     <script type="module" src="./dist/main.js"></script>
     <title>MapYou - Workouts App</title>
-    <script>
-      // Fix iOS standalone PWA viewport-height bug: on first load iOS reports a
-      // wrong height (app appears raised with a gap at the bottom) until a resize
-      // or rotation forces recalculation. We set a real --app-height ourselves and
-      // refresh it aggressively at startup + on every relevant event.
-      (function () {
-        function setAppHeight() {
-          document.documentElement.style.setProperty('--app-height', window.innerHeight + 'px');
-        }
-        window.setAppHeight = setAppHeight;
-        setAppHeight();
-        ['resize', 'orientationchange', 'pageshow', 'focus', 'visibilitychange'].forEach(function (ev) {
-          window.addEventListener(ev, setAppHeight);
-        });
-        document.addEventListener('visibilitychange', setAppHeight);
-        window.addEventListener('load', function () {
-          setAppHeight();
-          requestAnimationFrame(setAppHeight);
-          // iOS frequently reports the correct value only some ms after load —
-          // poll briefly to catch whenever it stabilises.
-          [60, 150, 300, 500, 800, 1200].forEach(function (ms) {
-            setTimeout(setAppHeight, ms);
-          });
-        });
-      })();
-    </script>
 </head>
 <body>
 

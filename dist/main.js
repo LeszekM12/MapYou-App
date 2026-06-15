@@ -269,10 +269,6 @@ class App {
                 clearTimeout(NetState.timeoutId);
             document.getElementById('mapSkeleton')?.classList.add('hidden');
             document.getElementById('skeletonMsg')?.classList.add('hidden');
-            // Map layout forces a reflow → reliable moment to fix iOS viewport height
-            const _sah = window.setAppHeight;
-            if (_sah)
-                _sah();
         });
         if (__classPrivateFieldGet(this, _App_clusterEnabled, "f")) {
             __classPrivateFieldSet(this, _App_clusterGroup, L.markerClusterGroup({

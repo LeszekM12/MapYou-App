@@ -201,7 +201,6 @@
 .fls-panel {
   position:       fixed;
   inset:          0;
-  top:            env(safe-area-inset-top, 0px);
   bottom:         5.8rem;
   z-index:        250;          /* above tab-panel (50) and bottom-nav (200) */
   background:     var(--f-bg);

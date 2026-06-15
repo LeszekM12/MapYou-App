@@ -44,7 +44,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: calc(12px + env(safe-area-inset-top, 0px)) 20px 8px;
+  padding: 12px 20px 8px;
   flex-shrink: 0;
 }
 .sv2-back {
@@ -303,7 +303,6 @@
 /* ── Club Detail ── */
 .sv2-club-detail-overlay {
   position: fixed; inset: 0; z-index: 7000;
-  padding-top: env(safe-area-inset-top, 0px);
   background: var(--app-bg-card);
   opacity: 0; pointer-events: none;
   transition: opacity 0.28s;

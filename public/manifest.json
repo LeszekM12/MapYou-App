@@ -2,11 +2,11 @@
   "name": "MapYou - Workouts App",
   "short_name": "MapYou",
   "description": "Track your workouts on the map",
-  "start_url": "/MapYou-App/",
-  "scope": "/MapYou-App/",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#2d3439",
-  "theme_color": "#2d3439",
+  "background_color": "#141417",
+  "theme_color": "#141417",
   "orientation": "portrait-primary",
   "icons": [
     {

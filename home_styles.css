@@ -16,13 +16,12 @@
   display: flex;
   /* When active: BLOCK all pointer events — prevent clicks reaching Leaflet map */
   pointer-events: all !important;
-  top: 0 !important;
   justify-content: flex-start !important;
 }
 #tabHome .home-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: env(safe-area-inset-top, 0px) 0 100px;
+  padding: 0 0 100px;
   -webkit-overflow-scrolling: touch;
   pointer-events: all !important;
   touch-action: pan-y;

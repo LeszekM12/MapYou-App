@@ -1,4 +1,4 @@
-const CACHE = 'MapYou-v7.1';
+const CACHE = 'MapYou-v8';
 
 const PRECACHE = [
   './',
@@ -9,26 +9,21 @@ const PRECACHE = [
   'icon-512.png',
   'logo.png',
 
-  // TS build
+  // TS build — app shell entry (other modules are cached on-demand by fetch handler)
   'dist/main.js',
-  'dist/models/Workout.js',
-  'dist/modules/BottomNav.js',
-  'dist/modules/MapView.js',
-  'dist/modules/OfflineDetector.js',
-  'dist/modules/RoutePlanner.js',
-  'dist/modules/StatsPanel.js',
-  'dist/modules/WeatherWidget.js',
-  'dist/types/index.js',
-  'dist/utils/dom.js',
-  'dist/utils/geo.js',
-  'dist/utils/db.js',
 ];
 
 // INSTALL — pre-cache + AUTO-UPDATE
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE)
-      .then(c => c.addAll(PRECACHE))
+      // Fault-tolerant precache: cache each file independently so a single
+      // missing/renamed file can't abort the whole Service Worker install.
+      .then(c => Promise.all(
+        PRECACHE.map(url =>
+          c.add(url).catch(err => console.warn('[SW] precache skipped:', url, err))
+        )
+      ))
       .then(() => self.skipWaiting())
   );
 });
