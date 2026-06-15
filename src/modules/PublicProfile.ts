@@ -117,7 +117,7 @@ export async function openPublicProfile(targetUserId: string): Promise<void> {
   try {
     const [profileRes, feedRes, reelRes] = await Promise.all([
       fetch(`${BACKEND_URL}/users/public/${encodeURIComponent(targetUserId)}?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
-      fetch(`${BACKEND_URL}/users/${encodeURIComponent(targetUserId)}/feed`, { cache: 'no-store' }),
+      fetch(`${BACKEND_URL}/users/${encodeURIComponent(targetUserId)}/feed?viewerId=${encodeURIComponent(myUserId)}`, { cache: 'no-store' }),
       fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(targetUserId)}`, { cache: 'no-store' }),
     ]);
 

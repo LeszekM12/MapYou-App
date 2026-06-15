@@ -540,6 +540,61 @@
   color: var(--sb-color, #00c46a);
 }
 
+/* Visibility buttons */
+.sam-vis-btns {
+  display: flex;
+  gap: 8px;
+}
+.sam-vis-btn {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.04);
+  color: var(--color-light--1, #aaa);
+  font-size: 1.25rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.sam-vis-btn--active {
+  background: color-mix(in srgb, #00c46a 15%, transparent);
+  border-color: #00c46a;
+  color: #00c46a;
+}
+
+/* Mute checkbox row */
+.sam-mute-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  padding: 4px 0;
+}
+.sam-mute-check {
+  width: 20px; height: 20px;
+  margin-top: 2px;
+  flex-shrink: 0;
+  accent-color: #00c46a;
+  cursor: pointer;
+}
+.sam-mute-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sam-mute-title {
+  font-size: 1.35rem;
+  font-weight: 600;
+  color: var(--app-text-primary, #fff);
+}
+.sam-mute-sub {
+  font-size: 1.15rem;
+  color: var(--app-text-tertiary, rgba(255,255,255,0.5));
+  line-height: 1.4;
+}
+
 /* Intensity slider */
 .sam-intensity-track {
   position: relative;

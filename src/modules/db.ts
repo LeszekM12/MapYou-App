@@ -43,6 +43,8 @@ export interface EnrichedActivity {
   speedKmH:    number;
   intensity:   number;          // 1–5
   notes:       string;          // private notes
+  visibility?: 'everyone' | 'friends' | 'only_me'; // who can see this activity
+  muted?:      boolean;         // if true: not published to main/club feeds (still in stats & history)
   coords:      Array<[number, number]>;
 }
 

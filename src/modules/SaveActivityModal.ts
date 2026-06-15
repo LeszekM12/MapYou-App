@@ -112,6 +112,20 @@ function buildModalHtml(activity: ActivityRecord, isManual: boolean): string {
           <span class="sam-media-hint">Max 10 MB for photos · 500 MB for videos</span>
         </div>
 
+        <!-- Activity type -->
+        <div class="sam-field">
+          <label class="sam-label">Activity Type</label>
+          <div class="sam-sport-btns" id="samSportBtns">
+            ${(['running', 'walking', 'cycling'] as SportType[]).map(s => `
+              <button class="sam-sport-btn${s === activity.sport ? ' sam-sport-btn--active' : ''}"
+                data-sport="${s}"
+                style="${s === activity.sport ? `--sb-color:${SPORT_COLORS[s]}` : ''}">
+                ${SPORT_ICONS[s]} ${s.charAt(0).toUpperCase() + s.slice(1)}
+              </button>`).join('')}
+            <button class="sam-sport-btn sam-sport-btn--more" id="samSportMore">••• More</button>
+          </div>
+        </div>
+
         <!-- Activity Stats — only for manual (no GPS data) -->
         ${isManual ? `
         <div class="sam-field">
@@ -150,20 +164,6 @@ function buildModalHtml(activity: ActivityRecord, isManual: boolean): string {
           </div>
         </div>` : ''}
 
-        <!-- Activity type -->
-        <div class="sam-field">
-          <label class="sam-label">Activity Type</label>
-          <div class="sam-sport-btns" id="samSportBtns">
-            ${(['running', 'walking', 'cycling'] as SportType[]).map(s => `
-              <button class="sam-sport-btn${s === activity.sport ? ' sam-sport-btn--active' : ''}"
-                data-sport="${s}"
-                style="${s === activity.sport ? `--sb-color:${SPORT_COLORS[s]}` : ''}">
-                ${SPORT_ICONS[s]} ${s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>`).join('')}
-            <button class="sam-sport-btn sam-sport-btn--more" id="samSportMore">••• More</button>
-          </div>
-        </div>
-
         <!-- Intensity -->
         <div class="sam-field">
           <label class="sam-label">Intensity <span class="sam-intensity-label" id="samIntensityLabel">Moderate</span></label>
@@ -178,13 +178,37 @@ function buildModalHtml(activity: ActivityRecord, isManual: boolean): string {
           </div>
         </div>
 
+        <!-- Visibility -->
+        <div class="sam-field">
+          <label class="sam-label">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Visibility
+          </label>
+          <div class="sam-vis-btns" id="samVisBtns">
+            <button class="sam-vis-btn sam-vis-btn--active" data-vis="everyone">🌐 Everyone</button>
+            <button class="sam-vis-btn" data-vis="friends">👥 Friends</button>
+            <button class="sam-vis-btn" data-vis="only_me">🔒 Only you</button>
+          </div>
+        </div>
+
+        <!-- Mute activity -->
+        <div class="sam-field">
+          <label class="sam-mute-row" for="samMute">
+            <input type="checkbox" id="samMute" class="sam-mute-check"/>
+            <span class="sam-mute-text">
+              <span class="sam-mute-title">🔕 Mute activity</span>
+              <span class="sam-mute-sub">Don't publish in the main feed or club feeds (still saved to your stats &amp; history)</span>
+            </span>
+          </label>
+        </div>
+
         <!-- Private notes -->
         <div class="sam-field">
           <label class="sam-label" for="samNotes">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
             Private Notes
           </label>
-          <textarea class="sam-textarea sam-textarea--sm" id="samNotes" placeholder="Personal thoughts, pain, weather notes..." rows="2" maxlength="500"></textarea>
+          <textarea class="sam-textarea sam-textarea--sm" id="samNotes" placeholder="Personal thoughts, pain, weather notes... (only you can see this)" rows="2" maxlength="500"></textarea>
         </div>
 
         <!-- Mini map preview -->
@@ -444,6 +468,14 @@ export class SaveActivityModal {
       btn.addEventListener('click', () => updateSportBtn(btn.dataset.sport!));
     });
 
+    // Visibility buttons — single select
+    el.querySelectorAll<HTMLElement>('.sam-vis-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.querySelectorAll('.sam-vis-btn').forEach(b => b.classList.remove('sam-vis-btn--active'));
+        btn.classList.add('sam-vis-btn--active');
+      });
+    });
+
     el.querySelector('#samSportMore')?.addEventListener('click', () => {
       this._openSportPicker(sport => updateSportBtn(sport));
     });
@@ -580,6 +612,11 @@ export class SaveActivityModal {
     const notes       = notesInput?.value.trim() || '';
     const intensity   = Number(slider?.value ?? 3);
 
+    // Visibility + mute
+    const visBtn = el.querySelector<HTMLElement>('.sam-vis-btn--active');
+    const visibility = (visBtn?.dataset.vis as 'everyone' | 'friends' | 'only_me') || 'everyone';
+    const muted = el.querySelector<HTMLInputElement>('#samMute')?.checked ?? false;
+
     // Manual activity stats
     const isManual = this._activity.coords.length === 0;
     let manualDate     = this._activity.date;
@@ -649,6 +686,8 @@ export class SaveActivityModal {
       speedKmH:    manualDurSec > 0 ? manualDistKm / (manualDurSec / 3600) : 0,
       intensity,
       notes,
+      visibility,
+      muted,
       // Use picked map point for manual, GPS coords for tracked
       coords:      this._pickedCoords
         ? [this._pickedCoords]
