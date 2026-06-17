@@ -9,6 +9,15 @@ import { db } from './db.js';
 // We re-export from db.ts to keep ONE instance of Dexie('mapty').
 export { saveUnifiedWorkout, loadUnifiedWorkouts, deleteUnifiedWorkout, } from './db.js';
 // ── Converters ────────────────────────────────────────────────────────────────
+// Sanitize stored text: strips literal "undefined"/"null" and stray
+// "undefined " prefixes that crept into legacy records.
+function _cleanStr(v) {
+    let s = (v == null ? '' : String(v)).trim();
+    if (s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null')
+        return '';
+    s = s.replace(/^(undefined|null)\s+/i, '').trim();
+    return s;
+}
 function _typeFromString(s) {
     if (s === 'cycling')
         return 'cycling';
@@ -39,8 +48,8 @@ function _fromManual(w) {
             : (Array.isArray(w.coords) && w.coords.length === 2 && typeof w.coords[0] === 'number'
                 ? [w.coords] // wrap single point [lat,lng] → [[lat,lng]]
                 : []),
-        name: String(w.description ?? ''),
-        description: String(w.description ?? ''),
+        name: _cleanStr(w.name) || _cleanStr(w.description),
+        description: _cleanStr(w.description),
         notes: '',
         intensity: 0,
         photoUrl: null,
@@ -59,8 +68,8 @@ function _fromEnriched(e) {
         speedKmH: Number(e.speedKmH) || 0,
         elevGain: 0,
         coords: Array.isArray(e.coords) ? e.coords : [],
-        name: String(e.name || e.description || ''),
-        description: String(e.description || ''),
+        name: _cleanStr(e.name) || _cleanStr(e.description),
+        description: _cleanStr(e.description),
         notes: String(e.notes || ''),
         intensity: Number(e.intensity) || 0,
         photoUrl: e.photoUrl ?? null,
@@ -79,8 +88,8 @@ function _fromActivity(a) {
         speedKmH: Number(a.speedKmH) || 0,
         elevGain: 0,
         coords: Array.isArray(a.coords) ? a.coords : [],
-        name: String(a.description || ''),
-        description: String(a.description || ''),
+        name: _cleanStr(a.name) || _cleanStr(a.description),
+        description: _cleanStr(a.description),
         notes: '',
         intensity: 0,
         photoUrl: null,

@@ -126,8 +126,15 @@ export const SPORT_COLORS = {
     walking: '#5badea',
     cycling: '#ffb545',
 };
+// 3 base sports keep their brand colors. Everything else uses one neutral
+// color that flips with the theme: black on light bg, white on dark bg.
+// Returns a concrete color (not a CSS var) so it also works inside <canvas>.
 export function getColor(sport) {
-    return SPORT_COLORS[sport] ?? '#ffffff';
+    if (SPORT_COLORS[sport])
+        return SPORT_COLORS[sport];
+    const isDark = typeof document !== 'undefined'
+        && document.body.classList.contains('night-mode');
+    return isDark ? '#ffffff' : '#1a1a1a';
 }
 export class Tracker {
     constructor(map, onUpdate) {

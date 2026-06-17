@@ -6,7 +6,7 @@
 // - Sub-tabs: Activities, Stats, Best Efforts, Posts
 // - Trophies: activity milestones + weekly goal cups
 // - Heatmap (day × hour) + activity type pie chart
-import { loadUnifiedWorkouts, formatDurSec } from './UnifiedWorkout.js';
+import { loadUnifiedWorkouts, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
 import { getIcon as _getIcon, getColor as _getColor, getSportLabel as _getSportLabel } from './Tracker.js';
 import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId } from './UserProfile.js';
@@ -572,44 +572,28 @@ export class ProfileView {
         <canvas id="pvStatsChart" role="img" aria-label="Weekly activity chart"></canvas>
       </div>
 
-      <!-- Activity Types pie -->
+      <!-- Activity Types ranking -->
       <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
-      <div class="pv-pie-wrap">
+      <div class="pv-types-wrap">
         ${sportSet.size === 0
             ? '<p class="pv-empty-sub">No data yet</p>'
-            : `<div class="pv-pie-container"><canvas id="pvPieChart" width="160" height="160"></canvas></div>
-             <div class="pv-pie-legend">
-               ${[...sportSet].map(type => {
-                const cnt = this._workouts.filter(w => w.type === type).length;
-                return `<div class="pv-pie-legend__item">
-                   <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
-                   <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
-                 </div>`;
-            }).join('')}
-             </div>`}
+            : (() => {
+                const counts = [...sportSet]
+                    .map(type => ({ type, cnt: this._workouts.filter(w => w.type === type).length }))
+                    .sort((a, b) => b.cnt - a.cnt);
+                const max = Math.max(...counts.map(c => c.cnt), 1);
+                return counts.map(({ type, cnt }) => `
+                <div class="pv-type-row">
+                  <span class="pv-type-row__label">${_getIcon(type)} ${_getSportLabel(type)}</span>
+                  <div class="pv-type-row__track">
+                    <div class="pv-type-row__bar" style="width:${Math.round((cnt / max) * 100)}%"></div>
+                  </div>
+                  <span class="pv-type-row__count">${cnt}</span>
+                </div>`).join('');
+            })()}
       </div>`;
         this._renderStatsWeek(el);
         this._bindStatsEvents(el);
-        // Pie chart
-        if (sportSet.size > 0) {
-            setTimeout(() => {
-                const canvas = document.getElementById('pvPieChart');
-                if (!canvas || typeof Chart === 'undefined')
-                    return;
-                if (_pieChart)
-                    _pieChart.destroy?.();
-                const typeCounts = {};
-                this._workouts.forEach(w => { typeCounts[w.type] = (typeCounts[w.type] ?? 0) + 1; });
-                _pieChart = new Chart(canvas, {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(typeCounts),
-                        datasets: [{ data: Object.values(typeCounts), backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }],
-                    },
-                    options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
-                });
-            }, 150);
-        }
     }
     _renderStatsWeek(el) {
         const now = new Date();
@@ -653,20 +637,21 @@ export class ProfileView {
         }
         document.getElementById('pvStatsNext')?.[this._statsWeekOffset < 0 ? 'removeAttribute' : 'setAttribute']('disabled', '');
         // Bar chart
+        const isDark = document.body.classList.contains('night-mode');
+        const otherClr = isDark ? '#ffffff' : '#1a1a1a';
         const sportColor = this._statsActiveSport === 'all' ? '#00c46a'
-            : (_getColor(this._statsActiveSport));
+            : (SPORT_COLORS_U[this._statsActiveSport] ?? otherClr);
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        // Always show km per day
-        const dayKm = Array(7).fill(0);
+        // Sum DURATION (seconds) per day — bars show time, not distance
+        const daySec = Array(7).fill(0);
         const dayColors = Array(7).fill('rgba(0,196,106,0.12)');
         week.forEach(w => {
             const i = Math.floor((new Date(w.date).getTime() - mon.getTime()) / 86400000);
             if (i >= 0 && i < 7) {
-                dayKm[i] += w.distanceKm;
+                daySec[i] += w.durationSec;
                 dayColors[i] = i <= todayIdx ? sportColor : sportColor + '55';
             }
         });
-        const isDark = document.body.classList.contains('night-mode');
         const gridClr = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
         const tickClr = isDark ? '#6c7175' : '#999';
         const lblClr = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
@@ -683,7 +668,7 @@ export class ProfileView {
                     dd.setDate(mon.getDate() + i);
                     return `${d} ${dd.getDate()}`;
                 }),
-                datasets: [{ data: dayKm, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
+                datasets: [{ data: daySec, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
@@ -704,9 +689,13 @@ export class ProfileView {
                         ctx.font = '10px Manrope, sans-serif';
                         ctx.textAlign = 'center';
                         meta.data.forEach((bar, i) => {
-                            const v = dayKm[i];
-                            if (v > 0)
-                                ctx.fillText(v.toFixed(1), bar.x, bar.y - 4);
+                            const sec = daySec[i];
+                            if (sec > 0) {
+                                const h = Math.floor(sec / 3600);
+                                const m = Math.round((sec % 3600) / 60);
+                                const lbl = h > 0 ? `${h}h ${m}min` : `${m}min`;
+                                ctx.fillText(lbl, bar.x, bar.y - 4);
+                            }
                         });
                         ctx.restore();
                     } },

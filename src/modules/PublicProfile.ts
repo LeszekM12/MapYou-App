@@ -501,36 +501,24 @@ function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
       <canvas id="ppStatsChart" role="img" aria-label="Weekly activity chart"></canvas>
     </div>
     <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
-    <div class="pv-pie-wrap">
+    <div class="pv-types-wrap">
       ${sportSet.size === 0
         ? '<p class="pv-empty-sub" style="padding:0 16px">No data yet</p>'
-        : `<div class="pv-pie-container"><canvas id="ppPieChart" width="160" height="160"></canvas></div>
-           <div class="pv-pie-legend">
-             ${[...sportSet].map(type => {
-               const cnt = activities.filter(a => (a.data.sport ?? 'running') === type).length;
-               return `<div class="pv-pie-legend__item">
-                 <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
-                 <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
-               </div>`;
-             }).join('')}
-           </div>`}
+        : (() => {
+            const counts = [...sportSet]
+              .map(type => ({ type, cnt: activities.filter(a => (a.data.sport ?? 'running') === type).length }))
+              .sort((a, b) => b.cnt - a.cnt);
+            const max = Math.max(...counts.map(c => c.cnt), 1);
+            return counts.map(({ type, cnt }) => `
+              <div class="pv-type-row">
+                <span class="pv-type-row__label">${_getIcon(type)} ${_getSportLabel(type)}</span>
+                <div class="pv-type-row__track">
+                  <div class="pv-type-row__bar" style="width:${Math.round((cnt / max) * 100)}%"></div>
+                </div>
+                <span class="pv-type-row__count">${cnt}</span>
+              </div>`).join('');
+          })()}
     </div>`;
-
-  // Pie
-  if (sportSet.size > 0) {
-    setTimeout(() => {
-      const canvas = document.getElementById('ppPieChart') as HTMLCanvasElement | null;
-      if (!canvas || !Chart) return;
-      if (_ppPieChart) (_ppPieChart as Record<string,()=>void>).destroy?.();
-      const tc: Record<string,number> = {};
-      activities.forEach(a => { const t = (a.data.sport ?? 'running') as string; tc[t] = (tc[t] ?? 0) + 1; });
-      _ppPieChart = new Chart(canvas, {
-        type: 'doughnut',
-        data: { labels: Object.keys(tc), datasets: [{ data: Object.values(tc), backgroundColor: Object.keys(tc).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }] },
-        options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
-      });
-    }, 100);
-  }
 
   const renderWeek = () => {
     const now = new Date();
@@ -565,15 +553,15 @@ function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
     (document.getElementById('ppStatsNext') as HTMLButtonElement|null)
       ?.[_ppWeekOffset < 0 ? 'removeAttribute' : 'setAttribute']('disabled','');
 
+    const isDark = document.body.classList.contains('night-mode');
     const sportColor = _ppActiveSport === 'all' ? '#00c46a' : _getColor(_ppActiveSport);
-    const dayKm: number[]     = Array(7).fill(0);
+    const daySec: number[]    = Array(7).fill(0);
     const dayColors: string[] = Array(7).fill('rgba(0,196,106,0.12)');
     week.forEach(a => {
       const i = Math.floor((new Date(a.date).getTime() - mon.getTime()) / 86_400_000);
-      if (i >= 0 && i < 7) { dayKm[i] += (a.data.distanceKm ?? 0) as number; dayColors[i] = i <= todayIdx ? sportColor : sportColor + '55'; }
+      if (i >= 0 && i < 7) { daySec[i] += (a.data.durationSec ?? 0) as number; dayColors[i] = i <= todayIdx ? sportColor : sportColor + '55'; }
     });
 
-    const isDark = document.body.classList.contains('night-mode');
     const gridClr = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
     const tickClr = isDark ? '#6c7175' : '#999';
     const lblClr  = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
@@ -584,7 +572,7 @@ function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
       type: 'bar',
       data: {
         labels: DAYS.map((d,i) => { const dd = new Date(mon); dd.setDate(mon.getDate()+i); return `${d} ${dd.getDate()}`; }),
-        datasets: [{ data: dayKm, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
+        datasets: [{ data: daySec, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -598,7 +586,14 @@ function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
           const ctx = ch.ctx as CanvasRenderingContext2D;
           const meta = (ch.getDatasetMeta as (i:number)=>{data:{x:number;y:number}[]})(0);
           ctx.save(); ctx.fillStyle = lblClr; ctx.font = '10px Manrope,sans-serif'; ctx.textAlign = 'center';
-          meta.data.forEach((bar,i) => { if (dayKm[i] > 0) ctx.fillText(dayKm[i].toFixed(1), bar.x, bar.y - 4); });
+          meta.data.forEach((bar,i) => {
+            const sec = daySec[i];
+            if (sec > 0) {
+              const h = Math.floor(sec / 3600);
+              const m = Math.round((sec % 3600) / 60);
+              ctx.fillText(h > 0 ? `${h}h ${m}min` : `${m}min`, bar.x, bar.y - 4);
+            }
+          });
           ctx.restore();
         }},
       },
