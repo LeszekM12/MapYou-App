@@ -13,6 +13,7 @@
   --app-surface-1:      rgba(255,255,255,0.05);
   --app-surface-2:      rgba(255,255,255,0.1);
   --app-border:         rgba(255,255,255,0.08);
+  --app-toggle-off:     rgba(255,255,255,0.28);
 }
 
 body.light-mode {
@@ -26,6 +27,7 @@ body.light-mode {
   --app-surface-1:      rgba(0,0,0,0.03);
   --app-surface-2:      rgba(0,0,0,0.06);
   --app-border:         rgba(0,0,0,0.09);
+  --app-toggle-off:     #c2c8d0;
 
   --color-dark--1:  #f2f2f7 !important;
   --color-dark--2:  #ffffff !important;
@@ -56,6 +58,9 @@ body.light-mode .tab-panel--map .tab-scroll {
 }
 body.light-mode #tabTrack .tab-scroll { background: rgba(255,255,255,0.97) !important; }
 body.light-mode #tabStats .tab-scroll { background: #f2f2f7 !important; }
+
+/* ── html background matches nav so home indicator area is covered ── */
+html:has(body.light-mode) { background: #ffffff; }
 
 /* ── Bottom nav ─────────────────────────────────────────────────────────────── */
 body.light-mode .bottom-nav {
