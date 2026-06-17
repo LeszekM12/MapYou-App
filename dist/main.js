@@ -22,7 +22,7 @@ import { NetState, showSkeleton, startMapTimeout, initOnlineDetector, initRetryB
 import { initWeatherComponents, switchToGPSWeather } from './modules/initWeatherComponents.js';
 import { getIPLocation, requestGPSPermission, subscribeToPermissionChanges, hasGPSPermission } from './modules/LocationService.js';
 import { loadWorkoutsFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
-import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, } from './modules/PushNotifications.js';
+import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, syncLocationToBackend, } from './modules/PushNotifications.js';
 import { Tracker, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
 import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { homeView } from './modules/HomeView.js';
@@ -300,6 +300,8 @@ class App {
         // Przy każdym starcie wyślij subskrypcję do backendu (naprawia reset MemoryDB)
         void resubscribeIfNeeded();
         void initPushNotifications().then(async () => {
+            // Persist location for server-side scheduled weather pushes
+            void syncLocationToBackend();
             // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
             const longBreakSent = await sendLongBreakPush();
             if (!longBreakSent)

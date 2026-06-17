@@ -200,13 +200,13 @@ export async function resubscribeIfNeeded() {
 //
 // Każda funkcja wysyła powiadomienie TYLKO na urządzenia userId z localStorage.
 // Backend dostaje userId i wysyła TYLKO do jego subskrypcji.
-async function sendPushToSelf(title, body, url = '/') {
+async function sendPushToSelf(title, body, url = '/', silent = false) {
     const userId = getUserId();
     try {
         await fetch(`${BACKEND_URL}/push/notify/${encodeURIComponent(userId)}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title, body, url }),
+            body: JSON.stringify({ title, body, url, silent }),
         });
     }
     catch (err) {
@@ -240,7 +240,7 @@ export async function sendWelcomeBackPush() {
     if (last > 0 && (now - last) < 24 * 60 * 60 * 1000)
         return;
     localStorage.setItem(KEY, String(now));
-    await sendPushToSelf('Witaj ponownie! 👋', 'Gotowy na kolejny trening?');
+    await sendPushToSelf('Witaj ponownie! 👋', 'Gotowy na kolejny trening?', '/', true);
 }
 export async function sendLongBreakPush() {
     if (!_isPushEnabled('break_reminder'))
@@ -259,12 +259,12 @@ export async function sendLongBreakPush() {
     if (hoursSinceSent < 3)
         return false;
     if (hoursAway >= 24) {
-        await sendPushToSelf('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!');
+        await sendPushToSelf('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!', '/', true);
         localStorage.setItem(KEY_SENT, String(now));
         return true;
     }
     if (hoursAway >= 3) {
-        await sendPushToSelf('Gotowy na kolejny trening? 💪', 'Dawno Cię nie było — czas na aktywność!');
+        await sendPushToSelf('Gotowy na kolejny trening? 💪', 'Dawno Cię nie było — czas na aktywność!', '/', true);
         localStorage.setItem(KEY_SENT, String(now));
         return true;
     }
@@ -273,7 +273,42 @@ export async function sendLongBreakPush() {
 export async function sendArrivedAtDestinationPush() {
     await sendPushToSelf('Dotarłeś na miejsce! 🎯', 'Chcesz zapisać trasę? Wróć do aplikacji.');
 }
+// Persist user location on the backend so it can send scheduled weather pushes
+// (12:00 / 18:00) even when the app is closed. Uses GPS if already granted,
+// otherwise IP — never prompts.
+export async function syncLocationToBackend() {
+    try {
+        let lat, lon;
+        if (await hasGPSPermission()) {
+            try {
+                const gps = await getGPSLocation();
+                [lat, lon] = gps;
+            }
+            catch {
+                const ip = await getIPLocation();
+                if (!ip)
+                    return;
+                [lat, lon] = ip.coords;
+            }
+        }
+        else {
+            const ip = await getIPLocation();
+            if (!ip)
+                return;
+            [lat, lon] = ip.coords;
+        }
+        const userId = getUserId();
+        await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat, lon }),
+        });
+    }
+    catch { /* non-critical */ }
+}
 export async function sendWeatherPush() {
+    if (!_isPushEnabled('weather'))
+        return;
     const KEY = 'mapty_last_weather_push';
     const now = Date.now();
     if ((now - Number(localStorage.getItem(KEY) ?? 0)) / (1000 * 60 * 60) < 6)
@@ -304,7 +339,7 @@ export async function sendWeatherPush() {
         const { temperature_2m: temp, weathercode: code, windspeed_10m: wind } = data.current;
         if (code > 3 || temp < 8 || temp > 30 || wind >= 30)
             return;
-        await sendPushToSelf('Idealna pogoda na trening! 🌤️', `${code === 0 ? '☀️' : '🌤️'} ${Math.round(temp)}°C — wychodź!`);
+        await sendPushToSelf('Idealna pogoda na trening! 🌤️', `${code === 0 ? '☀️' : '🌤️'} ${Math.round(temp)}°C — wychodź!`, '/', true);
         localStorage.setItem(KEY, String(now));
     }
     catch { /* ignoruj */ }

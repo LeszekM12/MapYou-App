@@ -864,6 +864,7 @@ const PUSH_TOGGLES = [
     { key: 'friend_activity', label: 'Friend activity', desc: 'When someone you follow saves an activity' },
     { key: 'friend_post', label: 'Friend post', desc: 'When someone you follow adds a post' },
     { key: 'club_post', label: 'Club post', desc: 'When someone posts in your club' },
+    { key: 'weather', label: 'Weather', desc: 'Good-weather reminders at 12:00 & 18:00 (silent)' },
     { key: 'activity_saved', label: 'Workout saved', desc: 'Confirmation after saving a workout' },
     { key: 'break_reminder', label: 'Training reminder', desc: 'After 3h and 24h away from the app' },
 ];

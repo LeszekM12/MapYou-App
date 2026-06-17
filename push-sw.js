@@ -32,7 +32,8 @@ self.addEventListener('push', event => {
         icon:    data.icon  ?? './public/icon-192.png',
         badge:   data.badge ?? './public/icon-192.png',
         data:    { url: data.url ?? '/' },
-        vibrate: [200, 100, 200],
+        silent:  data.silent === true,
+        vibrate: data.silent === true ? [] : [200, 100, 200],
         requireInteraction: false,
       }),
     ])

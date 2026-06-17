@@ -30,6 +30,7 @@ import {
   sendLongBreakPush,
   sendArrivedAtDestinationPush,
   sendWeatherPush,
+  syncLocationToBackend,
 } from './modules/PushNotifications.js';
 import { Tracker, type SportType, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
@@ -364,6 +365,8 @@ class App {
     // Przy każdym starcie wyślij subskrypcję do backendu (naprawia reset MemoryDB)
     void resubscribeIfNeeded();
     void initPushNotifications().then(async () => {
+      // Persist location for server-side scheduled weather pushes
+      void syncLocationToBackend();
       // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
       const longBreakSent = await sendLongBreakPush();
       if (!longBreakSent) void sendWelcomeBackPush();
