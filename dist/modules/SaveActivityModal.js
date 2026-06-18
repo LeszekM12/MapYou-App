@@ -122,26 +122,26 @@ function buildModalHtml(activity, isManual) {
             <div class="sam-stats-row">
               <label class="sam-stats-label">📅 Date</label>
               <input class="sam-stats-input" id="samStatDate" type="date"
-                value="${new Date().toISOString().slice(0, 10)}"/>
+                value="${new Date(activity.date || Date.now()).toISOString().slice(0, 10)}"/>
             </div>
             <div class="sam-stats-row">
               <label class="sam-stats-label">🕐 Start time</label>
               <input class="sam-stats-input" id="samStatTime" type="time"
-                value="${new Date().toTimeString().slice(0, 5)}"/>
+                value="${new Date(activity.date || Date.now()).toTimeString().slice(0, 5)}"/>
             </div>
             <div class="sam-stats-row">
               <label class="sam-stats-label">⏱ Duration</label>
               <div class="sam-stats-duration">
-                <input class="sam-stats-input sam-stats-input--sm" id="samStatDurH" type="number" min="0" max="23" placeholder="0" value="0"/>
+                <input class="sam-stats-input sam-stats-input--sm" id="samStatDurH" type="number" min="0" max="23" placeholder="0" value="${Math.floor((activity.durationSec || 0) / 3600)}"/>
                 <span class="sam-stats-sep">h</span>
-                <input class="sam-stats-input sam-stats-input--sm" id="samStatDurM" type="number" min="0" max="59" placeholder="0" value="0"/>
+                <input class="sam-stats-input sam-stats-input--sm" id="samStatDurM" type="number" min="0" max="59" placeholder="0" value="${Math.round(((activity.durationSec || 0) % 3600) / 60)}"/>
                 <span class="sam-stats-sep">min</span>
               </div>
             </div>
             <div class="sam-stats-row">
               <label class="sam-stats-label">📏 Distance</label>
               <div class="sam-stats-dist">
-                <input class="sam-stats-input sam-stats-input--md" id="samStatDist" type="number" min="0" step="0.01" placeholder="0.00"/>
+                <input class="sam-stats-input sam-stats-input--md" id="samStatDist" type="number" min="0" step="0.01" placeholder="0.00"${activity.distanceKm ? ` value="${activity.distanceKm}"` : ''}/>
                 <span class="sam-stats-sep">km</span>
               </div>
             </div>

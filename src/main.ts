@@ -32,7 +32,7 @@ import {
   sendWeatherPush,
   syncLocationToBackend,
 } from './modules/PushNotifications.js';
-import { Tracker, type SportType, formatDuration, formatPace, formatDistance, SPORT_COLORS } from './modules/Tracker.js';
+import { Tracker, type SportType, formatDuration, formatPace, formatDistance, SPORT_COLORS, isTrackable, getAllSports, getCustomSports, saveCustomSport, deleteCustomSport, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
 import { homeView } from './modules/HomeView.js';
@@ -169,6 +169,11 @@ class App {
   #recenterTimer: ReturnType<typeof setTimeout> | null = null;
 
   #tracker:      Tracker | null = null;
+  #trackSport    = 'running';
+  #timerActive   = false;
+  #timerStartMs  = 0;
+  #timerInterval: ReturnType<typeof setInterval> | null = null;
+  #clockInterval: ReturnType<typeof setInterval> | null = null;
   #historyPanel: ActivityHistoryPanel | null = null;
 
   #nightMode = false;
@@ -374,6 +379,7 @@ class App {
       void sendWeatherPush();
     });
     this._initTracker();
+    this._setTrackSport(this.#trackSport);
   }
 
   // ── SETTINGS ──────────────────────────────────────────────────────────────
@@ -1423,25 +1429,27 @@ class App {
     // "Not now" — dismiss panel, app works with IP location
     skipBtn?.addEventListener('click', _showMain);
 
-    // ── Sport selector ────────────────────────────────────────────────────
-    document.getElementById('trackerSportSelector')?.addEventListener('click', e => {
-      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.trk-sport-tab');
-      if (!btn?.dataset.sport || this.#tracker?.isActive) return;
-      document.querySelectorAll('.trk-sport-tab').forEach(b => b.classList.remove('trk-sport-tab--active'));
-      btn.classList.add('trk-sport-tab--active');
-      this.#tracker?.setSport(btn.dataset.sport as SportType);
-      const color = SPORT_COLORS[btn.dataset.sport as SportType];
-      const sb = document.getElementById('trkBtnStart') as HTMLElement | null;
-      if (sb) { sb.style.background = color; sb.style.boxShadow = `0 6px 28px ${color}80`; }
+    // ── Sport selector button → opens categorized picker ──────────────────
+    document.getElementById('trkSportBtn')?.addEventListener('click', () => {
+      if (this.#tracker?.isActive || this.#timerActive) return;
+      this._openTrackSportPicker(sport => this._setTrackSport(sport));
     });
 
     // ── START ─────────────────────────────────────────────────────────────
     document.getElementById('trkBtnStart')?.addEventListener('click', () => {
-      if (!this.#tracker) return;
-      this.#tracker.start();
-      void liveTracker.start();   // ← rozpocznij live tracking
-      void this._requestWakeLock();
-      this._enterTrackingView();
+      const sport = this.#trackSport;
+      if (isTrackable(sport)) {
+        // GPS-tracked sports → map + live tracking (unchanged flow)
+        if (!this.#tracker) return;
+        this.#tracker.start();
+        void liveTracker.start();
+        void this._requestWakeLock();
+        this._enterTrackingView();
+      } else {
+        // Timer-only sports → stopwatch, no map / GPS
+        if (this.#timerActive) this._stopTimerOnly();
+        else this._startTimerOnly();
+      }
     });
 
     // ── PAUSE / RESUME ────────────────────────────────────────────────────
@@ -1476,7 +1484,8 @@ class App {
             // Save to unified for Stats → Progress
             await CS.saveUnifiedWorkout({
               id:          enriched.id,
-              type:        enriched.sport as import('./modules/UnifiedWorkout.js').WorkoutType,
+              type:        (enriched.sport === 'walking' || enriched.sport === 'cycling') ? enriched.sport : 'running',
+              sport:       enriched.sport,
               source:      'tracking',
               date:        new Date(enriched.date).toISOString(),
               distanceKm:  enriched.distanceKm,
@@ -1514,6 +1523,210 @@ class App {
       void this._releaseWakeLock();
       this._exitTrackingView();
     });
+  }
+
+  // ── Track sport selection + timer-only mode ───────────────────────────────
+  _setTrackSport(sport: string): void {
+    this.#trackSport = sport;
+    const emojiEl = document.getElementById('trkSportBtnEmoji');
+    const labelEl = document.getElementById('trkSportBtnLabel');
+    if (emojiEl) emojiEl.textContent = getIcon(sport);
+    if (labelEl) labelEl.textContent = getSportLabel(sport);
+
+    const trackable = isTrackable(sport);
+    if (this.#tracker && trackable) this.#tracker.setSport(sport);
+
+    // Toggle map vs timer screen
+    const timerScreen = document.getElementById('trkTimerScreen');
+    const styleBtn    = document.getElementById('trkMapStyleBtn');
+    if (trackable) {
+      timerScreen?.classList.add('hidden');
+      styleBtn?.classList.remove('hidden');
+    } else {
+      timerScreen?.classList.remove('hidden');
+      styleBtn?.classList.add('hidden');
+      this._startClock();
+    }
+
+    // Start button color
+    const color = getColor(sport);
+    const sb = document.getElementById('trkBtnStart') as HTMLElement | null;
+    if (sb) { sb.style.background = color; sb.style.boxShadow = `0 6px 28px ${color}80`; }
+  }
+
+  _startClock(): void {
+    const clockEl = document.getElementById('trkTimerClock');
+    const labelEl = document.getElementById('trkTimerScreen')?.querySelector('.trk-timer-screen__label');
+    const tick = () => {
+      if (this.#timerActive) return; // elapsed handled by timer loop
+      const now = new Date();
+      if (clockEl) clockEl.textContent = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+      if (labelEl) labelEl.textContent = 'Time of day';
+    };
+    tick();
+    if (this.#clockInterval) clearInterval(this.#clockInterval);
+    this.#clockInterval = setInterval(tick, 1000);
+  }
+
+  _startTimerOnly(): void {
+    this.#timerActive  = true;
+    this.#timerStartMs = Date.now();
+    void this._requestWakeLock();
+    // Hide bottom nav; turn start button into a stop button
+    const nav = document.querySelector<HTMLElement>('.bottom-nav');
+    if (nav) nav.style.display = 'none';
+    const sb = document.getElementById('trkBtnStart');
+    if (sb) sb.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="30" height="30"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
+
+    const clockEl = document.getElementById('trkTimerClock');
+    const labelEl = document.getElementById('trkTimerScreen')?.querySelector('.trk-timer-screen__label');
+    if (labelEl) labelEl.textContent = 'Elapsed';
+    const loop = () => {
+      const sec = Math.floor((Date.now() - this.#timerStartMs) / 1000);
+      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+      if (clockEl) clockEl.textContent = h > 0
+        ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+        : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    };
+    loop();
+    if (this.#timerInterval) clearInterval(this.#timerInterval);
+    this.#timerInterval = setInterval(loop, 1000);
+  }
+
+  _stopTimerOnly(): void {
+    if (!this.#timerActive) return;
+    const durationSec = Math.floor((Date.now() - this.#timerStartMs) / 1000);
+    this.#timerActive = false;
+    if (this.#timerInterval) { clearInterval(this.#timerInterval); this.#timerInterval = null; }
+    void this._releaseWakeLock();
+    // Restore UI
+    const nav = document.querySelector<HTMLElement>('.bottom-nav');
+    if (nav) nav.style.display = '';
+    const sb = document.getElementById('trkBtnStart');
+    if (sb) sb.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><polygon points="6,3 20,12 6,21"/></svg>';
+    this._startClock();
+
+    const activity: import('./modules/Tracker.js').ActivityRecord = {
+      id:          `act_${Date.now()}`,
+      sport:       this.#trackSport as SportType,
+      date:        new Date().toISOString(),
+      distanceKm:  0,
+      durationSec,
+      paceMinKm:   0,
+      speedKmH:    0,
+      coords:      [],
+      description: '',
+    };
+
+    showGoodJobSplash(() => {
+      openSaveActivityModal(activity,
+        async (enriched) => {
+          await CS.saveActivity(activity);
+          await CS.saveUnifiedWorkout({
+            id:          enriched.id,
+            type:        (enriched.sport === 'walking' || enriched.sport === 'cycling') ? enriched.sport : 'running',
+            sport:       enriched.sport,
+            source:      'tracking',
+            date:        new Date(enriched.date).toISOString(),
+            distanceKm:  0,
+            durationSec: enriched.durationSec,
+            paceMinKm:   0,
+            speedKmH:    0,
+            elevGain:    0,
+            coords:      [],
+            name:        enriched.name,
+            description: enriched.description,
+            notes:       enriched.notes,
+            intensity:   enriched.intensity,
+            photoUrl:    enriched.photoUrl,
+          } as import('./modules/UnifiedWorkout.js').UnifiedWorkout);
+          notifyActivityAdded(enriched.name || enriched.description, 0, enriched.sport);
+        },
+        () => { /* onDiscard — nothing to clean up */ },
+      );
+    });
+  }
+
+  _openTrackSportPicker(onSelect: (sport: string) => void): void {
+    document.getElementById('trkSportPickerOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'trkSportPickerOverlay';
+    overlay.className = 'trk-picker-overlay';
+
+    const render = (filter = '') => {
+      const customs = getCustomSports();
+      const all = getAllSports();
+      const f = filter.trim().toLowerCase();
+      const match = (label: string) => !f || label.toLowerCase().includes(f);
+
+      // Group built-ins by category
+      const cats: Record<string, { key: string; icon: string; label: string }[]> = {};
+      all.forEach(s => {
+        const cat = (s as { category?: string }).category ?? 'Custom';
+        if (!match(s.label)) return;
+        (cats[cat] ??= []).push(s);
+      });
+
+      let body = '';
+      for (const [cat, sports] of Object.entries(cats)) {
+        if (!sports.length) continue;
+        body += `<div class="trk-picker__cat">${cat}</div>`;
+        sports.forEach(s => {
+          const isCustom = customs.find(c => c.key === s.key);
+          body += `<button class="trk-picker__item" data-pick="${s.key}">
+            <span class="trk-picker__item-icon">${s.icon}</span>
+            <span class="trk-picker__item-label">${s.label}</span>
+            ${isTrackable(s.key) ? '<span class="trk-picker__item-tag">📍</span>' : '<span class="trk-picker__item-tag">⏱</span>'}
+            ${isCustom ? `<span class="trk-picker__item-del" data-del="${s.key}">×</span>` : ''}
+          </button>`;
+        });
+      }
+      if (!body) body = '<p class="trk-picker__empty">No sports found</p>';
+
+      overlay.innerHTML = `<div class="trk-picker">
+        <div class="trk-picker__head">
+          <span class="trk-picker__title">Choose sport</span>
+          <button class="trk-picker__close" id="trkPickClose">✕</button>
+        </div>
+        <div class="trk-picker__search-wrap">
+          <input class="trk-picker__search" id="trkPickSearch" placeholder="🔍  Search" value="${filter}"/>
+        </div>
+        <div class="trk-picker__list">
+          ${body}
+          <button class="trk-picker__add" id="trkPickAdd">➕ Add custom sport</button>
+        </div>
+      </div>`;
+
+      overlay.querySelector('#trkPickClose')?.addEventListener('click', () => overlay.remove());
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      const search = overlay.querySelector<HTMLInputElement>('#trkPickSearch');
+      search?.addEventListener('input', () => { const v = search.value; render(v); overlay.querySelector<HTMLInputElement>('#trkPickSearch')?.focus(); });
+
+      overlay.querySelectorAll<HTMLElement>('.trk-picker__item').forEach(btn => {
+        btn.addEventListener('click', e => {
+          if ((e.target as HTMLElement).hasAttribute('data-del')) return;
+          overlay.remove();
+          onSelect(btn.dataset.pick!);
+        });
+      });
+      overlay.querySelectorAll<HTMLElement>('[data-del]').forEach(del => {
+        del.addEventListener('click', e => {
+          e.stopPropagation();
+          deleteCustomSport(del.dataset.del!);
+          render(filter);
+        });
+      });
+      overlay.querySelector('#trkPickAdd')?.addEventListener('click', () => {
+        const name = prompt('Sport name:')?.trim();
+        if (!name) return;
+        const sport = saveCustomSport(name);
+        overlay.remove();
+        onSelect(sport.key);
+      });
+    };
+
+    render();
+    document.body.appendChild(overlay);
   }
 
   _enterTrackingView(): void {

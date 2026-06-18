@@ -52,6 +52,7 @@ export interface EnrichedActivity {
 export interface UnifiedWorkout {
   id:          string;
   type:        'running' | 'walking' | 'cycling';
+  sport?:      string;        // original sport (gym, tennis...) — type is a 3-value fallback
   source:      'manual' | 'tracking';
   date:        string;
   distanceKm:  number;

@@ -140,7 +140,9 @@ export async function generateShareImageFromEnriched(act) {
     const color = SPORT_COLORS[act.sport] ?? '#00c46a';
     const icon = SPORT_ICONS[act.sport] ?? '🏅';
     const hasPhoto = !!act.photoUrl;
-    const canvasH = hasPhoto ? 1200 : 1000;
+    const hasRoute = act.coords.length > 1;
+    const MAP_BLOCK = 444; // map height (420) + gap (24)
+    const canvasH = (hasPhoto ? 1200 : 1000) - (hasRoute ? 0 : MAP_BLOCK);
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = canvasH;
@@ -182,13 +184,14 @@ export async function generateShareImageFromEnriched(act) {
     ctx.font = '15px Manrope, system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.fillText(`${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} · ${act.sport}`, 116, 92);
-    // ── Map area ─────────────────────────────────────────────────────────────────
+    // ── Map area (only when a GPS route exists) ─────────────────────────────────
     const mapX = 24, mapY = 108, mapW = 752, mapH = 420;
-    // Map background
-    roundRect(ctx, mapX, mapY, mapW, mapH, 20);
-    ctx.fillStyle = '#242a30';
-    ctx.fill();
-    if (act.coords.length > 1) {
+    let nextY = mapY;
+    if (hasRoute) {
+        // Map background
+        roundRect(ctx, mapX, mapY, mapW, mapH, 20);
+        ctx.fillStyle = '#242a30';
+        ctx.fill();
         const transform = await _drawMapTiles(ctx, act.coords, mapX, mapY, mapW, mapH);
         if (transform) {
             const { toCanvasX, toCanvasY } = transform;
@@ -235,15 +238,8 @@ export async function generateShareImageFromEnriched(act) {
         else {
             _drawRouteFallback(ctx, act.coords, color, mapX, mapY, mapW, mapH);
         }
+        nextY = mapY + mapH + 24;
     }
-    else {
-        ctx.font = '20px Manrope, system-ui, sans-serif';
-        ctx.fillStyle = 'rgba(255,255,255,0.25)';
-        ctx.textAlign = 'center';
-        ctx.fillText('No GPS route recorded', 400, mapY + mapH / 2);
-        ctx.textAlign = 'left';
-    }
-    let nextY = mapY + mapH + 24;
     // ── Photo (if any) ───────────────────────────────────────────────────────────
     if (hasPhoto && act.photoUrl) {
         const photoImg = await _loadImage(act.photoUrl);

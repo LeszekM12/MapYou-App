@@ -14,6 +14,7 @@ import {
 import {
   deleteEnrichedActivity, deleteActivity, deleteWorkoutFromDB,
 } from './db.js';
+import { getColor as _svColor, getIcon as _svIcon, getSportLabel as _svLabel } from './Tracker.js';
 import { CS } from './cloudSync.js';
 import { recordWeeklyGoalWin, getBestStreak } from './ProfileView.js';
 import { notifyWeeklyGoal } from './NotificationsService.js';
@@ -553,7 +554,8 @@ export class StatsView {
     }
 
     el.innerHTML = ws.map(w => {
-      const color = SPORT_COLORS_U[w.type];
+      const sportKey = w.sport ?? w.type;
+      const color = _svColor(sportKey);
       const third = w.type === 'cycling'
         ? `${w.speedKmH.toFixed(1)} km/h`
         : formatPaceSec(w.paceMinKm) + '/km';
@@ -563,8 +565,8 @@ export class StatsView {
           <div class="sv-item__color-bar" style="background:${color}"></div>
           <div class="sv-item__body">
             <div class="sv-item__top">
-              <span class="sv-item__icon">${SPORT_ICONS_U[w.type]}</span>
-              <span class="sv-item__name">${w.name || w.description || w.type}</span>
+              <span class="sv-item__icon">${_svIcon(sportKey)}</span>
+              <span class="sv-item__name">${w.name || w.description || _svLabel(sportKey)}</span>
               <span class="sv-item__date">${relDate(w.date)}</span>
             </div>
             <div class="sv-item__stats">
@@ -633,7 +635,8 @@ export class StatsView {
   private _openDetail(w: UnifiedWorkout): void {
     document.getElementById('svDetailSheet')?.remove();
 
-    const color = SPORT_COLORS_U[w.type];
+    const sportKey = w.sport ?? w.type;
+    const color = _svColor(sportKey);
     const third = w.type === 'cycling'
       ? `${w.speedKmH.toFixed(1)}<span class="sv-detail__unit">km/h</span>`
       : `${formatPaceSec(w.paceMinKm)}<span class="sv-detail__unit">/km</span>`;
@@ -646,9 +649,9 @@ export class StatsView {
       <div class="sv-detail-panel" id="svDetailPanel">
         <div class="sv-detail-handle"></div>
         <div class="sv-detail-header" style="--wcolor:${color}">
-          <span class="sv-detail-header__icon">${SPORT_ICONS_U[w.type]}</span>
+          <span class="sv-detail-header__icon">${_svIcon(sportKey)}</span>
           <div>
-            <div class="sv-detail-header__name">${w.name || w.description || w.type}</div>
+            <div class="sv-detail-header__name">${w.name || w.description || _svLabel(sportKey)}</div>
             <div class="sv-detail-header__date">${new Date(w.date).toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</div>
           </div>
           <button class="sv-detail-close" id="svDetailClose">✕</button>

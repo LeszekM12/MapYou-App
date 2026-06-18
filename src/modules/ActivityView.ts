@@ -117,7 +117,7 @@ export function showActivitySummary(
     }, 150);
   } else {
     const c = document.getElementById('actSumMap');
-    if (c) c.innerHTML = '<div class="act-sum__no-map">No GPS data</div>';
+    if (c) c.style.display = 'none';
   }
 
   requestAnimationFrame(() => modal.classList.add('act-sum--visible'));

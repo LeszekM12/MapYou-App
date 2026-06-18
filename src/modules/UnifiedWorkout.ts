@@ -51,6 +51,7 @@ function _fromManual(w: Record<string, any>): UnifiedWorkout {
   return {
     id:          String(w.id),
     type,
+    sport:       String(w.type ?? w.sport ?? 'running'),
     source:      'manual',
     date:        w.date ? new Date(w.date).toISOString() : new Date().toISOString(),
     distanceKm:  distKm,
@@ -78,6 +79,7 @@ function _fromEnriched(e: Record<string, any>): UnifiedWorkout {
   return {
     id:          String(e.id),
     type,
+    sport:       String(e.sport ?? 'running'),
     source:      'tracking',
     date:        typeof e.date === 'number' ? new Date(e.date).toISOString() : String(e.date),
     distanceKm:  Number(e.distanceKm) || 0,
@@ -99,6 +101,7 @@ function _fromActivity(a: Record<string, any>): UnifiedWorkout {
   return {
     id:          String(a.id),
     type,
+    sport:       String(a.sport ?? 'running'),
     source:      'tracking',
     date:        String(a.date),
     distanceKm:  Number(a.distanceKm) || 0,

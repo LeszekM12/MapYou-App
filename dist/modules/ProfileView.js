@@ -519,20 +519,20 @@ export class ProfileView {
         }
         el.innerHTML = `<div class="pv-act-list">${this._workouts.slice(0, 20).map(w => `
       <div class="pv-act-item">
-        <span class="pv-act-item__icon">${_getIcon(w.type)}</span>
+        <span class="pv-act-item__icon">${_getIcon(w.sport ?? w.type)}</span>
         <div class="pv-act-item__info">
-          <span class="pv-act-item__name">${w.name || w.description || w.type}</span>
+          <span class="pv-act-item__name">${w.name || w.description || _getSportLabel(w.sport ?? w.type)}</span>
           <span class="pv-act-item__date">${_relDate(w.date)}</span>
         </div>
         <div class="pv-act-item__stats">
-          <span style="color:${_getColor(w.type)}">${w.distanceKm.toFixed(2)} km</span>
+          <span style="color:${_getColor(w.sport ?? w.type)}">${w.distanceKm.toFixed(2)} km</span>
           <span class="pv-act-item__time">${formatDurSec(w.durationSec)}</span>
         </div>
       </div>`).join('')}</div>`;
     }
     _renderStats(el) {
         // Sport pills — only sports user has trained
-        const sportSet = new Set(this._workouts.map(w => w.type));
+        const sportSet = new Set(this._workouts.map(w => w.sport ?? w.type));
         const sports = ['all', ...Array.from(sportSet)];
         const pillsHtml = sports.map(s => {
             const icon = s === 'all' ? '🏅' : (_getIcon(s));
@@ -579,7 +579,7 @@ export class ProfileView {
             ? '<p class="pv-empty-sub">No data yet</p>'
             : (() => {
                 const counts = [...sportSet]
-                    .map(type => ({ type, cnt: this._workouts.filter(w => w.type === type).length }))
+                    .map(type => ({ type, cnt: this._workouts.filter(w => (w.sport ?? w.type) === type).length }))
                     .sort((a, b) => b.cnt - a.cnt);
                 const max = Math.max(...counts.map(c => c.cnt), 1);
                 return counts.map(({ type, cnt }) => `
@@ -609,7 +609,7 @@ export class ProfileView {
         const week = this._workouts.filter(w => {
             const d = new Date(w.date);
             return d >= mon && d <= sun &&
-                (this._statsActiveSport === 'all' || w.type === this._statsActiveSport);
+                (this._statsActiveSport === "all" || (w.sport ?? w.type) === this._statsActiveSport);
         });
         const wKm = week.reduce((s, w) => s + w.distanceKm, 0);
         const wSec = week.reduce((s, w) => s + w.durationSec, 0);

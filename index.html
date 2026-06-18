@@ -329,22 +329,19 @@
     </div>
   </div>
 
+  <!-- Timer-only screen — shown for non-trackable sports (gym, tennis...) -->
+  <div class="trk-timer-screen hidden" id="trkTimerScreen">
+    <div class="trk-timer-screen__clock" id="trkTimerClock">20:13</div>
+    <div class="trk-timer-screen__label">Time of day</div>
+  </div>
+
   <!-- Bottom bar — sport selector + start button -->
   <div class="trk-bottom" id="trkBottom">
-    <div class="trk-sport-tabs" id="trackerSportSelector">
-      <button class="trk-sport-tab trk-sport-tab--active" data-sport="running">
-        <span class="trk-sport-tab__emoji">🏃</span>
-        <span class="trk-sport-tab__label">Running</span>
-      </button>
-      <button class="trk-sport-tab" data-sport="walking">
-        <span class="trk-sport-tab__emoji">🚶</span>
-        <span class="trk-sport-tab__label">Walking</span>
-      </button>
-      <button class="trk-sport-tab" data-sport="cycling">
-        <span class="trk-sport-tab__emoji">🚴</span>
-        <span class="trk-sport-tab__label">Cycling</span>
-      </button>
-    </div>
+    <button class="trk-sport-btn" id="trkSportBtn" data-sport="running">
+      <span class="trk-sport-btn__emoji" id="trkSportBtnEmoji">🏃</span>
+      <span class="trk-sport-btn__label" id="trkSportBtnLabel">Running</span>
+      <svg class="trk-sport-btn__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>
+    </button>
     <button class="trk-start-btn" id="trkBtnStart">
       <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36">
         <polygon points="6,3 20,12 6,21"/>

@@ -7,28 +7,35 @@ export type SportType = string;
 
 export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'] as const;
 
-export const ALL_SPORTS: { key: string; icon: string; label: string }[] = [
-  { key: 'running',      icon: '🏃',  label: 'Running'      },
-  { key: 'walking',      icon: '🚶',  label: 'Walking'      },
-  { key: 'cycling',      icon: '🚴',  label: 'Cycling'      },
-  { key: 'swimming',     icon: '🏊',  label: 'Swimming'     },
-  { key: 'hiking',       icon: '🥾',  label: 'Hiking'       },
-  { key: 'skiing',       icon: '⛷️',   label: 'Skiing'       },
-  { key: 'tennis',       icon: '🎾',  label: 'Tennis'       },
-  { key: 'football',     icon: '⚽',  label: 'Football'     },
-  { key: 'basketball',   icon: '🏀',  label: 'Basketball'   },
-  { key: 'volleyball',   icon: '🏐',  label: 'Volleyball'   },
-  { key: 'yoga',         icon: '🧘',  label: 'Yoga'         },
-  { key: 'gym',          icon: '🏋️',   label: 'Gym'          },
-  { key: 'boxing',       icon: '🥊',  label: 'Boxing'       },
-  { key: 'rowing',       icon: '🚣',  label: 'Rowing'       },
-  { key: 'climbing',     icon: '🧗',  label: 'Climbing'     },
-  { key: 'skateboard',   icon: '🛹',  label: 'Skateboard'   },
-  { key: 'martial_arts', icon: '🥋',  label: 'Martial Arts' },
-  { key: 'dance',        icon: '💃',  label: 'Dance'        },
-  { key: 'crossfit',     icon: '💪',  label: 'CrossFit'     },
-  { key: 'pilates',      icon: '🤸',  label: 'Pilates'      },
+export const ALL_SPORTS: { key: string; icon: string; label: string; trackable: boolean; category: string }[] = [
+  { key: 'running',      icon: '🏃',  label: 'Running',      trackable: true,  category: 'Foot Sports'    },
+  { key: 'walking',      icon: '🚶',  label: 'Walking',      trackable: true,  category: 'Foot Sports'    },
+  { key: 'hiking',       icon: '🥾',  label: 'Hiking',       trackable: true,  category: 'Foot Sports'    },
+  { key: 'cycling',      icon: '🚴',  label: 'Cycling',      trackable: true,  category: 'Cycle Sports'   },
+  { key: 'skateboard',   icon: '🛹',  label: 'Skateboard',   trackable: true,  category: 'Wheel Sports'   },
+  { key: 'skiing',       icon: '⛷️',   label: 'Skiing',       trackable: true,  category: 'Winter Sports'  },
+  { key: 'rowing',       icon: '🚣',  label: 'Rowing',       trackable: true,  category: 'Water Sports'   },
+  { key: 'swimming',     icon: '🏊',  label: 'Swimming',     trackable: false, category: 'Water Sports'   },
+  { key: 'tennis',       icon: '🎾',  label: 'Tennis',       trackable: false, category: 'Racket Sports'  },
+  { key: 'football',     icon: '⚽',  label: 'Football',     trackable: false, category: 'Ball Sports'    },
+  { key: 'basketball',   icon: '🏀',  label: 'Basketball',   trackable: false, category: 'Ball Sports'    },
+  { key: 'volleyball',   icon: '🏐',  label: 'Volleyball',   trackable: false, category: 'Ball Sports'    },
+  { key: 'gym',          icon: '🏋️',   label: 'Gym',          trackable: false, category: 'Gym & Fitness'  },
+  { key: 'crossfit',     icon: '💪',  label: 'CrossFit',     trackable: false, category: 'Gym & Fitness'  },
+  { key: 'yoga',         icon: '🧘',  label: 'Yoga',         trackable: false, category: 'Gym & Fitness'  },
+  { key: 'pilates',      icon: '🤸',  label: 'Pilates',      trackable: false, category: 'Gym & Fitness'  },
+  { key: 'boxing',       icon: '🥊',  label: 'Boxing',       trackable: false, category: 'Gym & Fitness'  },
+  { key: 'martial_arts', icon: '🥋',  label: 'Martial Arts', trackable: false, category: 'Gym & Fitness'  },
+  { key: 'climbing',     icon: '🧗',  label: 'Climbing',     trackable: false, category: 'Gym & Fitness'  },
+  { key: 'dance',        icon: '💃',  label: 'Dance',        trackable: false, category: 'Gym & Fitness'  },
 ];
+
+// Whether a sport is GPS-trackable (shows map) or timer-only (stopwatch).
+// Built-in sports use their flag; custom sports default to timer-only.
+export function isTrackable(sport: string): boolean {
+  const found = ALL_SPORTS.find(s => s.key === sport);
+  return found ? found.trackable : false;
+}
 
 export function getSportIcon(sport: string): string {
   const found = ALL_SPORTS.find(s => s.key === sport);

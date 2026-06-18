@@ -97,7 +97,7 @@ export function showActivitySummary(activity, map, onDiscard, onSave) {
     else {
         const c = document.getElementById('actSumMap');
         if (c)
-            c.innerHTML = '<div class="act-sum__no-map">No GPS data</div>';
+            c.style.display = 'none';
     }
     requestAnimationFrame(() => modal.classList.add('act-sum--visible'));
     modal.querySelector('#actSumDiscard')?.addEventListener('click', () => {
