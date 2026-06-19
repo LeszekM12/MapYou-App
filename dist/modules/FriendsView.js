@@ -8,6 +8,7 @@
 //   - polling statusu znajomych co 30s
 import { getAllFriends, addFriend, deleteFriend, updateFriendLiveToken, updateFriendUserId, generateInviteLink, fetchInviteByCode, parseInviteLink, checkInviteInUrl, } from './FriendsDB.js';
 import { LiveMap } from './LiveMap.js';
+import { getIcon as _ffIcon, getSportLabel as _ffLabel } from './Tracker.js';
 import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
 import { getUserId } from './UserProfile.js';
@@ -280,7 +281,7 @@ export class FriendsView {
       <div class="ff-card__stats">
         <span>${(+(data.distanceKm ?? 0)).toFixed(2)} km</span>
         <span>${Math.floor((+(data.durationSec ?? 0)) / 60)} min</span>
-        <span>${(data.sport ?? '')}</span>
+        <span>${data.sport ? `${_ffIcon(data.sport)} ${_ffLabel(data.sport)}` : ''}</span>
       </div>` : '';
         card.innerHTML = `
       <div class="ff-card__header">

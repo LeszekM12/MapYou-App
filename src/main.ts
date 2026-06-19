@@ -1544,6 +1544,7 @@ class App {
 
     const trackable = isTrackable(sport);
     if (this.#tracker && trackable) this.#tracker.setSport(sport);
+    liveTracker.setSport(sport);
 
     // Toggle map vs timer screen
     const timerScreen = document.getElementById('trkTimerScreen');

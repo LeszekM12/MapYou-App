@@ -1596,6 +1596,7 @@ class App {
         const trackable = isTrackable(sport);
         if (__classPrivateFieldGet(this, _App_tracker, "f") && trackable)
             __classPrivateFieldGet(this, _App_tracker, "f").setSport(sport);
+        liveTracker.setSport(sport);
         // Toggle map vs timer screen
         const timerScreen = document.getElementById('trkTimerScreen');
         const styleBtn = document.getElementById('trkMapStyleBtn');
