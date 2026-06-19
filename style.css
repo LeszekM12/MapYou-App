@@ -2057,15 +2057,67 @@ body {
     pointer-events: all;            /* klikalne */
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
-    padding: 1.4rem 2rem 2.4rem;
+    padding: 0.6rem 2rem 2.4rem;
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 2.4rem;
+    flex-direction: column;
+    align-items: stretch;
     border-radius: 2rem 2rem 0 0;
     box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
 }
+.trk-bottom__handle { display: flex; justify-content: center; padding: 0.8rem 0 1.2rem; cursor: grab; touch-action: none; }
+.trk-bottom__handle span { width: 4rem; height: 0.5rem; border-radius: 1rem; background: var(--app-text-tertiary, rgba(255,255,255,0.3)); }
+.trk-bottom__row { display: flex; flex-direction: row; align-items: center; justify-content: center; gap: 2.4rem; }
+
+/* Round routes button (right of Start) — placeholder for now */
+.trk-routes-btn {
+  width: 5.6rem; height: 5.6rem; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 2.5px solid var(--app-border, rgba(255,255,255,0.15));
+  background: var(--app-surface-1, rgba(255,255,255,0.06));
+  color: var(--app-text-secondary, #bbb);
+  cursor: pointer;
+  transition: transform 0.15s;
+}
+.trk-routes-btn:active { transform: scale(0.92); }
+
+/* Slide-up panel */
+.trk-bottom__panel {
+  overflow: hidden;
+  max-height: 0; opacity: 0; margin-top: 0;
+  transition: max-height 0.3s ease, opacity 0.25s ease, margin-top 0.3s ease;
+}
+.trk-bottom.trk-bottom--expanded .trk-bottom__panel {
+  max-height: 26rem; opacity: 1; margin-top: 1.4rem;
+}
+.trk-panel-row {
+  display: flex; align-items: center; gap: 1.4rem;
+  padding: 1.5rem 0.4rem;
+  width: 100%;
+  border: none; border-top: 1px solid var(--app-border, rgba(255,255,255,0.08));
+  background: none; font-family: inherit; text-align: left;
+}
+.trk-panel-row--btn { cursor: pointer; }
+.trk-panel-row__icon { color: var(--app-text-secondary, #bbb); display: flex; flex: 0 0 auto; }
+.trk-panel-row__text { flex: 1; display: flex; flex-direction: column; gap: 0.2rem; }
+.trk-panel-row__label { font-size: 1.5rem; font-weight: 600; color: var(--app-text-primary, #fff); }
+.trk-panel-row__sub { font-size: 1.2rem; color: var(--app-text-tertiary, rgba(255,255,255,0.45)); }
+.trk-panel-row__chevron { color: var(--app-text-tertiary); flex: 0 0 auto; }
+
+/* Toggle */
+.trk-toggle {
+  width: 4.6rem; height: 2.6rem; flex: 0 0 auto;
+  border-radius: 1.3rem; border: none; cursor: pointer; padding: 0;
+  background: var(--app-toggle-off, rgba(255,255,255,0.28));
+  position: relative; transition: background 0.2s;
+}
+.trk-toggle[aria-checked="true"] { background: #00c46a; }
+.trk-toggle__knob {
+  position: absolute; top: 0.3rem; left: 0.3rem;
+  width: 2rem; height: 2rem; border-radius: 50%;
+  background: #fff; transition: transform 0.2s;
+}
+.trk-toggle[aria-checked="true"] .trk-toggle__knob { transform: translateX(2rem); }
 
 /* Sport tabs */
 .trk-sport-tabs {

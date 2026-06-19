@@ -1438,6 +1438,38 @@ class App {
       this._openTrackSportPicker(sport => this._setTrackSport(sport));
     });
 
+    // ── Expandable panel (drag/tap the handle) ─────────────────────────────
+    const trkBottom = document.getElementById('trkBottom');
+    const handle    = document.getElementById('trkBottomHandle');
+    handle?.addEventListener('click', () => trkBottom?.classList.toggle('trk-bottom--expanded'));
+    // Basic swipe: up = expand, down = collapse
+    let touchStartY = 0;
+    handle?.addEventListener('touchstart', e => { touchStartY = e.touches[0].clientY; }, { passive: true });
+    handle?.addEventListener('touchend', e => {
+      const dy = e.changedTouches[0].clientY - touchStartY;
+      if (dy < -20) trkBottom?.classList.add('trk-bottom--expanded');
+      else if (dy > 20) trkBottom?.classList.remove('trk-bottom--expanded');
+    }, { passive: true });
+
+    // ── Share-location toggle (persisted, default ON) ──────────────────────
+    const shareToggle = document.getElementById('trkShareLocToggle');
+    const shareSub    = document.getElementById('trkShareLocSub');
+    const applyShareUI = () => {
+      const on = this._isLiveShareEnabled();
+      shareToggle?.setAttribute('aria-checked', on ? 'true' : 'false');
+      if (shareSub) shareSub.textContent = on ? 'Friends can watch you live' : "Friends won't see your location";
+    };
+    applyShareUI();
+    shareToggle?.addEventListener('click', () => {
+      const next = !this._isLiveShareEnabled();
+      localStorage.setItem('mapyou_share_live_location', next ? 'true' : 'false');
+      applyShareUI();
+    });
+
+    // ── Routes + Settings (placeholders for now) ───────────────────────────
+    document.getElementById('trkRoutesBtn')?.addEventListener('click', () => { /* TODO: routes */ });
+    document.getElementById('trkSettingsBtn')?.addEventListener('click', () => { /* TODO: settings */ });
+
     // ── START ─────────────────────────────────────────────────────────────
     document.getElementById('trkBtnStart')?.addEventListener('click', () => {
       const sport = this.#trackSport;
@@ -1445,7 +1477,8 @@ class App {
         // GPS-tracked sports → map + live tracking (unchanged flow)
         if (!this.#tracker) return;
         this.#tracker.start();
-        void liveTracker.start();
+        // Only share live with friends if the user allows it
+        if (this._isLiveShareEnabled()) void liveTracker.start();
         void this._requestWakeLock();
         this._enterTrackingView();
       } else {
@@ -1532,6 +1565,11 @@ class App {
       void this._releaseWakeLock();
       this._exitTrackingView();
     });
+  }
+
+  // Whether to share live location with friends (default ON, persisted)
+  _isLiveShareEnabled(): boolean {
+    return localStorage.getItem('mapyou_share_live_location') !== 'false';
   }
 
   // ── Track sport selection + timer-only mode ───────────────────────────────

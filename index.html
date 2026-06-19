@@ -335,18 +335,51 @@
     <div class="trk-timer-screen__label">Time of day</div>
   </div>
 
-  <!-- Bottom bar — sport selector + start button -->
+  <!-- Bottom bar — drag up to reveal panel -->
   <div class="trk-bottom" id="trkBottom">
-    <button class="trk-sport-btn" id="trkSportBtn" data-sport="running">
-      <span class="trk-sport-btn__emoji" id="trkSportBtnEmoji">🏃</span>
-      <span class="trk-sport-btn__label" id="trkSportBtnLabel">Running</span>
-      <svg class="trk-sport-btn__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>
-    </button>
-    <button class="trk-start-btn" id="trkBtnStart">
-      <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36">
-        <polygon points="6,3 20,12 6,21"/>
-      </svg>
-    </button>
+    <div class="trk-bottom__handle" id="trkBottomHandle"><span></span></div>
+
+    <div class="trk-bottom__row">
+      <button class="trk-sport-btn" id="trkSportBtn" data-sport="running">
+        <span class="trk-sport-btn__emoji" id="trkSportBtnEmoji">🏃</span>
+        <span class="trk-sport-btn__label" id="trkSportBtnLabel">Running</span>
+        <svg class="trk-sport-btn__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <button class="trk-start-btn" id="trkBtnStart">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36">
+          <polygon points="6,3 20,12 6,21"/>
+        </svg>
+      </button>
+      <button class="trk-routes-btn" id="trkRoutesBtn" title="Routes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+          <circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/>
+          <path d="M9 19h6a3 3 0 0 0 3-3V8M6 16V8a3 3 0 0 1 3-3h6"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Slide-up panel -->
+    <div class="trk-bottom__panel" id="trkPanel">
+      <div class="trk-panel-row">
+        <span class="trk-panel-row__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M5 12a7 7 0 0 1 7-7M5 16a11 11 0 0 1 11-11"/><circle cx="5" cy="19" r="1.5" fill="currentColor"/></svg>
+        </span>
+        <div class="trk-panel-row__text">
+          <span class="trk-panel-row__label">Share my location with friends</span>
+          <span class="trk-panel-row__sub" id="trkShareLocSub">Friends can watch you live</span>
+        </div>
+        <button class="trk-toggle" id="trkShareLocToggle" role="switch" aria-checked="true"><span class="trk-toggle__knob"></span></button>
+      </div>
+      <button class="trk-panel-row trk-panel-row--btn" id="trkSettingsBtn">
+        <span class="trk-panel-row__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </span>
+        <div class="trk-panel-row__text">
+          <span class="trk-panel-row__label">Settings</span>
+        </div>
+        <svg class="trk-panel-row__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
   </div>
 
   <!-- Map style picker button — right side -->
