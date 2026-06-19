@@ -146,14 +146,13 @@ export const SPORT_COLORS: Record<string, string> = {
   cycling: '#ffb545',
 };
 
-// 3 base sports keep their brand colors. Everything else uses one neutral
-// color that flips with the theme: black on light bg, white on dark bg.
+// 3 base sports keep their brand colors. Everything else uses one distinct
+// turquoise so non-base sports stand out without a rainbow of colors.
 // Returns a concrete color (not a CSS var) so it also works inside <canvas>.
+export const SPORT_OTHER_COLOR = '#14c4b0';
 export function getColor(sport: string): string {
   if (SPORT_COLORS[sport]) return SPORT_COLORS[sport];
-  const isDark = typeof document !== 'undefined'
-    && document.body.classList.contains('night-mode');
-  return isDark ? '#ffffff' : '#1a1a1a';
+  return SPORT_OTHER_COLOR;
 }
 
 export class Tracker {
@@ -194,7 +193,7 @@ export class Tracker {
     this.pausedTime = 0;
     this.startTime = Date.now();
 
-    const color = SPORT_COLORS[this.sport];
+    const color = getColor(this.sport);
     this.polyline = L.polyline([], {
       color, weight: 5, opacity: 0.95,
     }).addTo(this.map);
@@ -272,7 +271,7 @@ export class Tracker {
 
   drawActivity(activity: ActivityRecord): L.Polyline | null {
     if (!activity.coords.length) return null;
-    const color = SPORT_COLORS[activity.sport];
+    const color = getColor(activity.sport);
     const line  = L.polyline(
       activity.coords.map(c => L.latLng(c[0], c[1])),
       { color, weight: 5, opacity: 0.95 },

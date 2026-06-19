@@ -2052,13 +2052,17 @@ body {
 
 /* ── Bottom bar ──────────────────────────────────────────── */
 .trk-bottom {
+    position: relative;
+    z-index: 3;                    /* above timer screen (1) */
     pointer-events: all;            /* klikalne */
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
     padding: 1.4rem 2rem 2.4rem;
     display: flex;
-    flex-direction: column;
-    gap: 1.4rem;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 2.4rem;
     border-radius: 2rem 2rem 0 0;
     box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
 }
@@ -2095,27 +2099,29 @@ body {
 }
 .trk-start-btn:active { transform: scale(0.93); }
 
-/* ── Sport selector button (replaces 3 tabs) ── */
+/* ── Sport selector button (round, Strava-style, left of Start) ── */
 .trk-sport-btn {
-  flex: 1;
-  display: flex; align-items: center; gap: 8px;
-  padding: 12px 16px;
-  border-radius: 16px;
-  border: 1.5px solid var(--app-border, rgba(255,255,255,0.12));
-  background: var(--app-bg-card, rgba(255,255,255,0.06));
+  width: 5.6rem; height: 5.6rem;
+  flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 2.5px solid var(--trk-sport-color, #00c46a);
+  background: color-mix(in srgb, var(--trk-sport-color, #00c46a) 16%, transparent);
   color: var(--app-text-primary, #fff);
-  font-family: inherit; font-size: 1.5rem; font-weight: 700;
+  font-family: inherit;
   cursor: pointer;
+  transition: transform 0.15s, background 0.2s, border-color 0.2s;
 }
-.trk-sport-btn__emoji { font-size: 2rem; }
-.trk-sport-btn__label { flex: 1; text-align: left; }
-.trk-sport-btn__chevron { opacity: 0.5; }
+.trk-sport-btn:active { transform: scale(0.92); }
+.trk-sport-btn__emoji { font-size: 2.6rem; line-height: 1; }
+.trk-sport-btn__label,
+.trk-sport-btn__chevron { display: none; }   /* round icon-only button */
 
 /* ── Timer-only screen ── */
 .trk-timer-screen {
   position: fixed;
-  top: 0; left: 0; right: 0; bottom: 12rem;
-  z-index: 5;
+  inset: 0;
+  z-index: 1;            /* above map, BELOW the control bar (.trk-bottom) */
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
   background: var(--app-bg-base, #141417);

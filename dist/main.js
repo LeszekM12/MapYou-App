@@ -1593,13 +1593,16 @@ class App {
             styleBtn?.classList.add('hidden');
             this._startClock();
         }
-        // Start button color
+        // Start button color + round sport button color (route color)
         const color = getColor(sport);
         const sb = document.getElementById('trkBtnStart');
         if (sb) {
             sb.style.background = color;
             sb.style.boxShadow = `0 6px 28px ${color}80`;
         }
+        const spBtn = document.getElementById('trkSportBtn');
+        if (spBtn)
+            spBtn.style.setProperty('--trk-sport-color', color);
     }
     _startClock() {
         const clockEl = document.getElementById('trkTimerClock');
