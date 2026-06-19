@@ -722,8 +722,13 @@ export class FriendsView {
           continue;
         }
 
-        // Brak tokenu — sprawdź czy znajomy właśnie zaczął trening przez /live/active/:endpoint
-        const ep   = encodeURIComponent(f.subscriptionId);
+        // Brak tokenu — sprawdź czy znajomy właśnie zaczął trening.
+        // Pytamy po TOŻSAMOŚCI WŁAŚCICIELA (userId, a w razie braku jego endpoint),
+        // nie po naszym/obserwującego endpoincie — inaczej sesja jednego znajomego
+        // pokazywała się pod innym.
+        const ownerKey = f.friendUserId ?? f.subscriptionId;
+        if (!ownerKey) continue;
+        const ep   = encodeURIComponent(ownerKey);
         const res  = await fetch(`${BACKEND_URL}/live/active/${ep}`);
         const data = await res.json() as { active: boolean; token: string | null };
 
@@ -752,11 +757,23 @@ export class FriendsView {
     const friends = await getAllFriends();
     let friend = friends.find(f => f.liveToken === token);
     if (!friend) {
-      friend = friends[0];
+      // Resolve the session OWNER so we attach the token to the RIGHT friend
+      // (never blindly to friends[0] — that cross-wired sessions).
+      let ownerId: string | null = null;
+      try {
+        const res  = await fetch(`${BACKEND_URL}/live/status/${token}`);
+        const data = await res.json() as { userId?: string | null; session?: string };
+        if (res.ok && data.session !== 'finished' && data.session !== 'not_found') {
+          ownerId = data.userId ?? null;
+        }
+      } catch { /* offline */ }
+
+      if (ownerId) friend = friends.find(f => f.friendUserId === ownerId);
       if (friend) {
         await updateFriendLiveToken(friend.subscriptionId, token);
         void this.render();
       }
+      // If we can't identify the owner, do NOT guess — the poller will pick it up.
     }
   }
 
@@ -770,14 +787,20 @@ export class FriendsView {
     }
     if (!token) return;
 
-    // Znajdź znajomego po tokenie lub zaktualizuj pierwszego bez tokenu
+    // Znajdź znajomego po tokenie lub po WŁAŚCICIELU sesji
     const friends = await getAllFriends();
     let friend = friends.find(f => f.liveToken === token);
 
     if (!friend) {
-      // Zaktualizuj znajomego który zaczął trening (heurystyka: ostatnio dodany)
-      // lub zapisz token tymczasowo przy pierwszym znajomym
-      friend = friends[0];
+      let ownerId: string | null = null;
+      try {
+        const res  = await fetch(`${BACKEND_URL}/live/status/${token}`);
+        const data = await res.json() as { userId?: string | null; session?: string };
+        if (res.ok && data.session !== 'finished' && data.session !== 'not_found') {
+          ownerId = data.userId ?? null;
+        }
+      } catch { /* offline */ }
+      if (ownerId) friend = friends.find(f => f.friendUserId === ownerId);
       if (friend) {
         await updateFriendLiveToken(friend.subscriptionId, token);
         void this.render();

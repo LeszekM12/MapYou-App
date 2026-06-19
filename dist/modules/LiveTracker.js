@@ -8,6 +8,7 @@
 //   - integruje z push notifications do znajomych
 import { BACKEND_URL } from '../config.js';
 import { getAllFriends, updateFriendLiveToken } from './FriendsDB.js';
+import { getUserId } from './PushNotifications.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const INTERVAL_MS = 5000; // wysyłaj pozycję co 5 sekund
 const LS_TOKEN_KEY = 'mapyou_live_token';
@@ -114,12 +115,21 @@ export class LiveTracker {
         const friendSubs = freshSubs.length > 0
             ? freshSubs
             : friends.filter(f => f.pushSub?.endpoint).map(f => f.pushSub);
+        // Owner identity — so viewers match THIS session to the right friend
+        const myUserId = getUserId();
+        let ownerEndpoint = null;
+        try {
+            const reg = await navigator.serviceWorker.ready;
+            const sub = await reg.pushManager.getSubscription();
+            ownerEndpoint = sub?.endpoint ?? null;
+        }
+        catch { /* no push */ }
         // Zarejestruj sesję na backendzie + wyślij push do znajomych
         try {
             await fetch(`${BACKEND_URL}/live/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running' }),
+                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running', myUserId, ownerEndpoint }),
             });
         }
         catch (err) {

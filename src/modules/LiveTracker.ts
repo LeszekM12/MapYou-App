@@ -93,12 +93,21 @@ export class LiveTracker {
       ? freshSubs
       : friends.filter(f => f.pushSub?.endpoint).map(f => f.pushSub);
 
+    // Owner identity — so viewers match THIS session to the right friend
+    const myUserId = getUserId();
+    let ownerEndpoint: string | null = null;
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const sub = await reg.pushManager.getSubscription();
+      ownerEndpoint = sub?.endpoint ?? null;
+    } catch { /* no push */ }
+
     // Zarejestruj sesję na backendzie + wyślij push do znajomych
     try {
       await fetch(`${BACKEND_URL}/live/start`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running' }),
+        body:    JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running', myUserId, ownerEndpoint }),
       });
     } catch (err) {
       console.warn('[LiveTracker] start failed:', err);
