@@ -473,10 +473,18 @@ export function buildCard(act) {
         ? `<p class="home-card__notes">🔒 ${act.notes}</p>`
         : '';
     const profile = loadProfileFromLocal();
-    const avatarSrc = act.avatarB64 ?? profile.avatarB64;
+    const _actRec = act;
+    const avatarSrc = _actRec.avatarB64
+        ?? _actRec.authorAvatarUrl
+        ?? profile.avatarB64;
     const userAvatarHtml = avatarSrc
         ? `<img src="${avatarSrc}" class="home-card__avatar-img" alt="avatar"/>`
         : `<span>${icon}</span>`;
+    const _cleanName = (s) => (s || '')
+        .replace(/^(undefined|null)\s+/i, '')
+        .replace(/^undefined$/i, '')
+        .trim();
+    const _displayName = _cleanName(act.name) || _cleanName(act.description) || getSportLabel(act.sport);
     card.innerHTML = `
     <div class="home-card__header">
       <div class="home-card__avatar home-card__avatar--user" style="border-color:${color}40;background:${color}20">
@@ -484,7 +492,7 @@ export function buildCard(act) {
       </div>
       <div class="home-card__meta">
         ${act.authorName ? `<span class="home-card__author-name" style="font-size:1.2rem;font-weight:700;color:#fff;display:block;line-height:1.2">${act.authorName}</span>` : ''}
-        <h3 class="home-card__name">${act.name || act.description}</h3>
+        <h3 class="home-card__name">${_displayName}</h3>
         <span class="home-card__time">${relativeDate(act.date)}</span>
       </div>
       <div class="home-card__badges">

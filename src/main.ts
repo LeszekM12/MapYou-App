@@ -39,6 +39,7 @@ import { homeView } from './modules/HomeView.js';
 import { statsView } from './modules/StatsView.js';
 import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified, saveUnifiedWorkout } from './modules/UnifiedWorkout.js';
+import { openSportPicker } from './modules/SportPicker.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
@@ -171,7 +172,9 @@ class App {
   #tracker:      Tracker | null = null;
   #trackSport    = 'running';
   #timerActive   = false;
+  #timerPaused   = false;
   #timerStartMs  = 0;
+  #timerAccumSec = 0;
   #timerInterval: ReturnType<typeof setInterval> | null = null;
   #clockInterval: ReturnType<typeof setInterval> | null = null;
   #historyPanel: ActivityHistoryPanel | null = null;
@@ -1446,14 +1449,18 @@ class App {
         void this._requestWakeLock();
         this._enterTrackingView();
       } else {
-        // Timer-only sports → stopwatch, no map / GPS
-        if (this.#timerActive) this._stopTimerOnly();
-        else this._startTimerOnly();
+        // Timer-only sports → stopwatch with Pause/Finish/Discard bar
+        this._startTimerOnly();
       }
     });
 
     // ── PAUSE / RESUME ────────────────────────────────────────────────────
     document.getElementById('trkBtnPause')?.addEventListener('click', () => {
+      if (this.#timerActive) {
+        if (this.#timerPaused) this._resumeTimerOnly();
+        else this._pauseTimerOnly();
+        return;
+      }
       if (!this.#tracker?.isActive) return;
       if (this.#tracker.isPaused) {
         this.#tracker.resume();
@@ -1468,6 +1475,7 @@ class App {
 
     // ── STOP ──────────────────────────────────────────────────────────────
     document.getElementById('trkBtnStop')?.addEventListener('click', () => {
+      if (this.#timerActive) { this._finishTimerOnly(); return; }
       if (!this.#tracker) return;
       const activity = this.#tracker.stop();
       void liveTracker.finish();   // ← zakończ live tracking
@@ -1517,6 +1525,7 @@ class App {
 
     // ── DISCARD ───────────────────────────────────────────────────────────
     document.getElementById('trkBtnDiscard')?.addEventListener('click', () => {
+      if (this.#timerActive) { this._discardTimerOnly(); return; }
       if (!confirm('Discard activity?')) return;
       void liveTracker.finish();   // ← zakończ live tracking (jak przy Stop)
       this.#tracker?.reset();
@@ -1570,43 +1579,87 @@ class App {
     this.#clockInterval = setInterval(tick, 1000);
   }
 
-  _startTimerOnly(): void {
-    this.#timerActive  = true;
-    this.#timerStartMs = Date.now();
-    void this._requestWakeLock();
-    // Hide bottom nav; turn start button into a stop button
-    const nav = document.querySelector<HTMLElement>('.bottom-nav');
-    if (nav) nav.style.display = 'none';
-    const sb = document.getElementById('trkBtnStart');
-    if (sb) sb.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="30" height="30"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-
-    const clockEl = document.getElementById('trkTimerClock');
-    const labelEl = document.getElementById('trkTimerScreen')?.querySelector('.trk-timer-screen__label');
-    if (labelEl) labelEl.textContent = 'Elapsed';
-    const loop = () => {
-      const sec = Math.floor((Date.now() - this.#timerStartMs) / 1000);
-      const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-      if (clockEl) clockEl.textContent = h > 0
-        ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
-        : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
-    };
-    loop();
-    if (this.#timerInterval) clearInterval(this.#timerInterval);
-    this.#timerInterval = setInterval(loop, 1000);
+  _timerElapsedSec(): number {
+    const running = this.#timerActive && !this.#timerPaused
+      ? (Date.now() - this.#timerStartMs) / 1000 : 0;
+    return Math.floor(this.#timerAccumSec + running);
   }
 
-  _stopTimerOnly(): void {
-    if (!this.#timerActive) return;
-    const durationSec = Math.floor((Date.now() - this.#timerStartMs) / 1000);
+  _renderTimerElapsed(): void {
+    const sec = this._timerElapsedSec();
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    const big = h > 0
+      ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+      : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    const clockEl = document.getElementById('trkTimerClock');
+    if (clockEl) clockEl.textContent = big;
+    const timeEl = document.getElementById('trkTime');
+    if (timeEl) timeEl.textContent = big;
+  }
+
+  _startTimerOnly(): void {
+    this.#timerActive  = true;
+    this.#timerPaused  = false;
+    this.#timerStartMs = Date.now();
+    this.#timerAccumSec = 0;
+    void this._requestWakeLock();
+
+    // Reuse the GPS control bar (Pause / Finish / Discard) over the timer screen
+    const nav = document.querySelector<HTMLElement>('.bottom-nav');
+    if (nav) nav.style.display = 'none';
+    document.getElementById('trkBottom')?.style.setProperty('display', 'none');
+    document.getElementById('trkHistoryToggle')?.style.setProperty('display', 'none');
+    document.getElementById('trackerOverlay')?.classList.remove('hidden');
+    // Hide GPS-only stats (distance + pace) — keep just the elapsed time
+    document.getElementById('trkPace')?.closest('.tracker-overlay__stat')?.classList.add('hidden');
+    document.getElementById('trkDist')?.closest('.tracker-overlay__stat')?.classList.add('hidden');
+    const lbl = document.getElementById('trkTimerScreen')?.querySelector('.trk-timer-screen__label');
+    if (lbl) lbl.textContent = 'Elapsed';
+
+    this._setTrackingState('active');
+    this._renderTimerElapsed();
+    if (this.#timerInterval) clearInterval(this.#timerInterval);
+    this.#timerInterval = setInterval(() => this._renderTimerElapsed(), 1000);
+  }
+
+  _pauseTimerOnly(): void {
+    if (!this.#timerActive || this.#timerPaused) return;
+    this.#timerAccumSec += (Date.now() - this.#timerStartMs) / 1000;
+    this.#timerPaused = true;
+    this._setTrackingState('paused');
+  }
+
+  _resumeTimerOnly(): void {
+    if (!this.#timerActive || !this.#timerPaused) return;
+    this.#timerStartMs = Date.now();
+    this.#timerPaused = false;
+    this._setTrackingState('active');
+  }
+
+  _exitTimerView(): void {
     this.#timerActive = false;
+    this.#timerPaused = false;
     if (this.#timerInterval) { clearInterval(this.#timerInterval); this.#timerInterval = null; }
     void this._releaseWakeLock();
-    // Restore UI
+    document.getElementById('trackerOverlay')?.classList.add('hidden');
+    document.getElementById('trkPace')?.closest('.tracker-overlay__stat')?.classList.remove('hidden');
+    document.getElementById('trkDist')?.closest('.tracker-overlay__stat')?.classList.remove('hidden');
     const nav = document.querySelector<HTMLElement>('.bottom-nav');
     if (nav) nav.style.display = '';
-    const sb = document.getElementById('trkBtnStart');
-    if (sb) sb.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36"><polygon points="6,3 20,12 6,21"/></svg>';
+    document.getElementById('trkBottom')?.style.setProperty('display', '');
+    document.getElementById('trkHistoryToggle')?.style.setProperty('display', '');
     this._startClock();
+  }
+
+  _discardTimerOnly(): void {
+    if (!confirm('Discard activity?')) return;
+    this._exitTimerView();
+  }
+
+  _finishTimerOnly(): void {
+    if (!this.#timerActive) return;
+    const durationSec = this._timerElapsedSec();
+    this._exitTimerView();
 
     const activity: import('./modules/Tracker.js').ActivityRecord = {
       id:          `act_${Date.now()}`,
@@ -1643,92 +1696,18 @@ class App {
             photoUrl:    enriched.photoUrl,
           } as import('./modules/UnifiedWorkout.js').UnifiedWorkout);
           notifyActivityAdded(enriched.name || enriched.description, 0, enriched.sport);
+          await this.#historyPanel?.render();
+          await statsView.render();
+          await homeView.render();
+          homeView.switchToHome();
         },
-        () => { /* onDiscard — nothing to clean up */ },
+        () => { /* onDiscard */ },
       );
     });
   }
 
   _openTrackSportPicker(onSelect: (sport: string) => void): void {
-    document.getElementById('trkSportPickerOverlay')?.remove();
-    const overlay = document.createElement('div');
-    overlay.id = 'trkSportPickerOverlay';
-    overlay.className = 'trk-picker-overlay';
-
-    const render = (filter = '') => {
-      const customs = getCustomSports();
-      const all = getAllSports();
-      const f = filter.trim().toLowerCase();
-      const match = (label: string) => !f || label.toLowerCase().includes(f);
-
-      // Group built-ins by category
-      const cats: Record<string, { key: string; icon: string; label: string }[]> = {};
-      all.forEach(s => {
-        const cat = (s as { category?: string }).category ?? 'Custom';
-        if (!match(s.label)) return;
-        (cats[cat] ??= []).push(s);
-      });
-
-      let body = '';
-      for (const [cat, sports] of Object.entries(cats)) {
-        if (!sports.length) continue;
-        body += `<div class="trk-picker__cat">${cat}</div>`;
-        sports.forEach(s => {
-          const isCustom = customs.find(c => c.key === s.key);
-          body += `<button class="trk-picker__item" data-pick="${s.key}">
-            <span class="trk-picker__item-icon">${s.icon}</span>
-            <span class="trk-picker__item-label">${s.label}</span>
-            ${isTrackable(s.key) ? '<span class="trk-picker__item-tag">📍</span>' : '<span class="trk-picker__item-tag">⏱</span>'}
-            ${isCustom ? `<span class="trk-picker__item-del" data-del="${s.key}">×</span>` : ''}
-          </button>`;
-        });
-      }
-      if (!body) body = '<p class="trk-picker__empty">No sports found</p>';
-
-      overlay.innerHTML = `<div class="trk-picker">
-        <div class="trk-picker__head">
-          <span class="trk-picker__title">Choose sport</span>
-          <button class="trk-picker__close" id="trkPickClose">✕</button>
-        </div>
-        <div class="trk-picker__search-wrap">
-          <input class="trk-picker__search" id="trkPickSearch" placeholder="🔍  Search" value="${filter}"/>
-        </div>
-        <div class="trk-picker__list">
-          ${body}
-          <button class="trk-picker__add" id="trkPickAdd">➕ Add custom sport</button>
-        </div>
-      </div>`;
-
-      overlay.querySelector('#trkPickClose')?.addEventListener('click', () => overlay.remove());
-      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-      const search = overlay.querySelector<HTMLInputElement>('#trkPickSearch');
-      search?.addEventListener('input', () => { const v = search.value; render(v); overlay.querySelector<HTMLInputElement>('#trkPickSearch')?.focus(); });
-
-      overlay.querySelectorAll<HTMLElement>('.trk-picker__item').forEach(btn => {
-        btn.addEventListener('click', e => {
-          if ((e.target as HTMLElement).hasAttribute('data-del')) return;
-          overlay.remove();
-          onSelect(btn.dataset.pick!);
-        });
-      });
-      overlay.querySelectorAll<HTMLElement>('[data-del]').forEach(del => {
-        del.addEventListener('click', e => {
-          e.stopPropagation();
-          deleteCustomSport(del.dataset.del!);
-          render(filter);
-        });
-      });
-      overlay.querySelector('#trkPickAdd')?.addEventListener('click', () => {
-        const name = prompt('Sport name:')?.trim();
-        if (!name) return;
-        const sport = saveCustomSport(name);
-        overlay.remove();
-        onSelect(sport.key);
-      });
-    };
-
-    render();
-    document.body.appendChild(overlay);
+    openSportPicker(onSelect);
   }
 
   _enterTrackingView(): void {
@@ -1762,8 +1741,8 @@ class App {
   }
 
   _setTrackingState(state: 'idle' | 'active' | 'paused'): void {
-    const sport = this.#tracker?.currentSport ?? 'running';
-    const color = SPORT_COLORS[sport];
+    const sport = this.#timerActive ? this.#trackSport : (this.#tracker?.currentSport ?? 'running');
+    const color = getColor(sport);
     const pauseBtn   = document.getElementById('trkBtnPause') as HTMLElement | null;
     const stopBtn    = document.getElementById('trkBtnStop');
     const discardBtn = document.getElementById('trkBtnDiscard');

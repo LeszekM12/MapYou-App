@@ -7,6 +7,7 @@
 import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, getAllSports, saveCustomSport, deleteCustomSport, getCustomSports } from './Tracker.js';
 import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs } from './SearchView.js';
+import { openSportPicker } from './SportPicker.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function blobToDataUrl(blob) {
     return new Promise((res, rej) => {
@@ -103,15 +104,11 @@ function buildModalHtml(activity, isManual) {
         <!-- Activity type -->
         <div class="sam-field">
           <label class="sam-label">Activity Type</label>
-          <div class="sam-sport-btns" id="samSportBtns">
-            ${['running', 'walking', 'cycling'].map(s => `
-              <button class="sam-sport-btn${s === activity.sport ? ' sam-sport-btn--active' : ''}"
-                data-sport="${s}"
-                style="${s === activity.sport ? `--sb-color:${SPORT_COLORS[s]}` : ''}">
-                ${SPORT_ICONS[s]} ${s.charAt(0).toUpperCase() + s.slice(1)}
-              </button>`).join('')}
-            <button class="sam-sport-btn sam-sport-btn--more" id="samSportMore">••• More</button>
-          </div>
+          <button class="sam-sport-select" id="samSportSelect" type="button" style="--sb-color:${getColor(activity.sport)}">
+            <span class="sam-sport-select__icon" id="samSportSelectIcon">${getIcon(activity.sport)}</span>
+            <span class="sam-sport-select__label" id="samSportSelectLabel">${getSportLabel(activity.sport)}</span>
+            <svg class="sam-sport-select__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="6 9 12 15 18 9"/></svg>
+          </button>
         </div>
 
         <!-- Activity Stats — only for manual (no GPS data) -->
@@ -467,30 +464,21 @@ export class SaveActivityModal {
             this.close(); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape')
             this.close(); }, { once: true });
-        // Sport buttons
+        // Sport selector — single button opens the categorized picker
         const updateSportBtn = (sport) => {
-            el.querySelectorAll('.sam-sport-btn').forEach(b => {
-                b.classList.remove('sam-sport-btn--active');
-                b.style.removeProperty('--sb-color');
-            });
             this._selectedSport = sport;
-            // Find existing btn or update "More" btn
-            const existing = el.querySelector(`[data-sport="${sport}"]`);
-            if (existing) {
-                existing.classList.add('sam-sport-btn--active');
-                existing.style.setProperty('--sb-color', getColor(sport));
-            }
-            else {
-                const moreBtn = el.querySelector('#samSportMore');
-                if (moreBtn) {
-                    moreBtn.classList.add('sam-sport-btn--active');
-                    moreBtn.style.setProperty('--sb-color', '#ffffff');
-                    moreBtn.textContent = getIcon(sport) + ' ' + getSportLabel(sport);
-                }
-            }
+            const iconEl = el.querySelector('#samSportSelectIcon');
+            const labelEl = el.querySelector('#samSportSelectLabel');
+            const btnEl = el.querySelector('#samSportSelect');
+            if (iconEl)
+                iconEl.textContent = getIcon(sport);
+            if (labelEl)
+                labelEl.textContent = getSportLabel(sport);
+            if (btnEl)
+                btnEl.style.setProperty('--sb-color', getColor(sport));
         };
-        el.querySelectorAll('.sam-sport-btn:not(#samSportMore)').forEach(btn => {
-            btn.addEventListener('click', () => updateSportBtn(btn.dataset.sport));
+        el.querySelector('#samSportSelect')?.addEventListener('click', () => {
+            openSportPicker(sport => updateSportBtn(sport));
         });
         // Visibility buttons — single select
         el.querySelectorAll('.sam-vis-btn').forEach(btn => {
@@ -498,9 +486,6 @@ export class SaveActivityModal {
                 el.querySelectorAll('.sam-vis-btn').forEach(b => b.classList.remove('sam-vis-btn--active'));
                 btn.classList.add('sam-vis-btn--active');
             });
-        });
-        el.querySelector('#samSportMore')?.addEventListener('click', () => {
-            this._openSportPicker(sport => updateSportBtn(sport));
         });
         // Intensity slider
         const slider = el.querySelector('#samIntensity');

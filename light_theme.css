@@ -425,6 +425,7 @@ body.light-mode .sam-stats-input:focus { border-color: #00c46a !important; }
 body.light-mode .sam-stats-sep { color: #6b6b6b !important; }
 body.light-mode .sam-stats-pace { color: #3a3a3c !important; }
 body.light-mode .sam-sport-btn { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.1) !important; color: #555 !important; }
+body.light-mode .sam-sport-select { color: #1a1a1a !important; }
 body.light-mode .sam-intensity-track { background: #e5e5ea !important; }
 body.light-mode .sam-photo-zone { background: #f2f2f7 !important; border-color: rgba(0,0,0,0.1) !important; color: #999 !important; }
 body.light-mode .sam-media-hint { color: #bbb !important; }

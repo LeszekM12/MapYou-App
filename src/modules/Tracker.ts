@@ -250,7 +250,7 @@ export class Tracker {
       paceMinKm:   stats.paceMinKm,
       speedKmH:    stats.speedKmH,
       coords:      [...this.coords],
-      description: `${SPORT_ICONS[this.sport]} ${this.sport.charAt(0).toUpperCase() + this.sport.slice(1)} on ${months[d.getMonth()]} ${d.getDate()}`,
+      description: `${getIcon(this.sport)} ${getSportLabel(this.sport)} on ${months[d.getMonth()]} ${d.getDate()}`,
     };
   }
 

@@ -523,10 +523,18 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
     : '';
 
   const profile = loadProfileFromLocal();
-  const avatarSrc = (act as unknown as Record<string,unknown>).avatarB64 as string | null ?? profile.avatarB64;
+  const _actRec = act as unknown as Record<string, unknown>;
+  const avatarSrc = (_actRec.avatarB64 as string | null)
+    ?? (_actRec.authorAvatarUrl as string | null)
+    ?? profile.avatarB64;
   const userAvatarHtml = avatarSrc
     ? `<img src="${avatarSrc}" class="home-card__avatar-img" alt="avatar"/>`
     : `<span>${icon}</span>`;
+  const _cleanName = (s: string): string => (s || '')
+    .replace(/^(undefined|null)\s+/i, '')
+    .replace(/^undefined$/i, '')
+    .trim();
+  const _displayName = _cleanName(act.name) || _cleanName(act.description) || getSportLabel(act.sport);
 
   card.innerHTML = `
     <div class="home-card__header">
@@ -535,7 +543,7 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
       </div>
       <div class="home-card__meta">
         ${(act as unknown as Record<string,unknown>).authorName ? `<span class="home-card__author-name" style="font-size:1.2rem;font-weight:700;color:#fff;display:block;line-height:1.2">${(act as unknown as Record<string,unknown>).authorName as string}</span>` : ''}
-        <h3 class="home-card__name">${act.name || act.description}</h3>
+        <h3 class="home-card__name">${_displayName}</h3>
         <span class="home-card__time">${relativeDate(act.date)}</span>
       </div>
       <div class="home-card__badges">
