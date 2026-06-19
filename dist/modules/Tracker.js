@@ -361,7 +361,7 @@ export class Tracker {
         }
         else {
             this.dotMarker = L.circleMarker([lat, lng], {
-                radius: 9, color: '#fff', fillColor: SPORT_COLORS[this.sport],
+                radius: 9, color: '#fff', fillColor: getColor(this.sport),
                 fillOpacity: 1, weight: 2.5,
             }).addTo(this.map);
         }
