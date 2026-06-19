@@ -673,15 +673,22 @@ export class FriendsView {
         const elapsed = data.startedAt
             ? Math.floor((Date.now() - data.startedAt) / 60000)
             : 0;
-        const statusMap = {
-            running: '🟢 Running',
-            paused: '⏸ Paused',
-            finished: '✅ Finished',
-            not_found: '❌ Session not found',
+        const stateDot = {
+            running: '🟢',
+            paused: '⏸',
+            finished: '✅',
+            not_found: '❌',
         };
+        const sportTxt = data.sport
+            ? `${_ffIcon(data.sport)} ${_ffLabel(data.sport)}`
+            : '';
+        const stateTxt = data.session === 'paused' ? ' (paused)'
+            : data.session === 'finished' ? ' (finished)'
+                : data.session === 'not_found' ? 'Session not found'
+                    : '';
         const speed = data.current?.speed ?? 0;
         statusEl.innerHTML = `
-      <span class="fls-status">${statusMap[data.session] ?? data.session}</span>
+      <span class="fls-status">${stateDot[data.session] ?? ''} ${sportTxt || 'Live'}${stateTxt}</span>
       <span class="fls-meta">${elapsed} min · ${speed} km/h</span>
     `;
     }

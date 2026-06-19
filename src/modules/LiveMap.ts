@@ -14,6 +14,7 @@ export interface LiveData {
   token:     string;
   userName:  string;
   session:   SessionStatus;
+  sport?:    string;
   startedAt: number;
   updatedAt: number;
   current:   { lat: number; lng: number; speed: number; timestamp: number } | null;
