@@ -318,6 +318,13 @@
 <!-- TAB: TRACKER -->
 <div id="tabTracker" class="tab-panel tab-panel--tracker">
 
+  <!-- Following-route pill (ghost overlay loaded) -->
+  <div class="trk-ghost-pill hidden" id="trkGhostPill">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3 3 0 0 0 3-3V7.5M6 16.5V8a3 3 0 0 1 3-3h6.5"/></svg>
+    <span class="trk-ghost-pill__txt" id="trkGhostPillTxt">Following route</span>
+    <button class="trk-ghost-pill__x" id="trkGhostPillClear" aria-label="Stop following">✕</button>
+  </div>
+
   <!-- Permission overlay — widoczny gdy brak uprawnień GPS -->
   <div class="trk-permission hidden" id="trkPermission">
     <div class="trk-permission__sheet">

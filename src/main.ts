@@ -131,6 +131,7 @@ const TILE_ATTR = {
 
 class App {
   #map!: L.Map;
+  #ghostRoute: L.Polyline | null = null;
   #tileLayer: L.TileLayer | null = null;
   #mapZoomLevel = 13;
   #mapEvent!: L.LeafletMouseEvent;
@@ -1504,8 +1505,9 @@ class App {
     });
 
     // ── Routes + Settings (placeholders for now) ───────────────────────────
-    document.getElementById('trkRoutesBtn')?.addEventListener('click', () => { /* TODO: routes */ });
+    document.getElementById('trkRoutesBtn')?.addEventListener('click', () => void this._openRoutesScreen());
     document.getElementById('trkSettingsBtn')?.addEventListener('click', () => this._openTrackSettings());
+    document.getElementById('trkGhostPillClear')?.addEventListener('click', () => this._clearGhostRoute());
 
     // ── START ─────────────────────────────────────────────────────────────
     document.getElementById('trkBtnStart')?.addEventListener('click', () => {
@@ -1642,16 +1644,6 @@ class App {
     } catch { /* denied or unsupported */ }
   }
 
-  _speak(text: string): void {
-    try {
-      if (!('speechSynthesis' in window)) return;
-      const u = new SpeechSynthesisUtterance(text);
-      u.lang = 'en-US';
-      u.rate = 1;
-      window.speechSynthesis.speak(u);
-    } catch { /* TTS unavailable */ }
-  }
-
   _announceKm(km: number, paceMinKm: number, durationSec: number): void {
     const pm = Math.floor(paceMinKm);
     const ps = Math.round((paceMinKm - pm) * 60);
@@ -1707,6 +1699,98 @@ class App {
     };
     render();
     document.body.appendChild(overlay);
+  }
+
+  // ── Routes screen (Saved routes + ghost overlay) ───────────────────────────
+  async _openRoutesScreen(): Promise<void> {
+    document.getElementById('trkRoutesOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'trkRoutesOverlay';
+    overlay.className = 'trk-picker-overlay';
+    overlay.innerHTML = `<div class="trk-picker">
+      <div class="trk-picker__head">
+        <span class="trk-picker__title">Routes</span>
+        <button class="trk-picker__close" id="trkRoutesClose">✕</button>
+      </div>
+      <div class="trk-routes-tabs">
+        <button class="trk-routes-tab trk-routes-tab--active" data-tab="saved">Saved</button>
+        <button class="trk-routes-tab" disabled title="Coming soon">Community</button>
+        <button class="trk-routes-tab" disabled title="Coming soon">Create</button>
+      </div>
+      <input class="trk-routes-search" id="trkRoutesSearch" placeholder="Search saved routes" />
+      <div class="trk-routes-list" id="trkRoutesList"><div class="trk-routes-empty">Loading…</div></div>
+    </div>`;
+    overlay.querySelector('#trkRoutesClose')?.addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+
+    // Load the user's completed routes that have GPS coords
+    const { loadUnifiedWorkouts } = await import('./modules/db.js');
+    const all = await loadUnifiedWorkouts();
+    const routes = all.filter(w => Array.isArray(w.coords) && w.coords.length > 1);
+
+    const listEl = overlay.querySelector('#trkRoutesList') as HTMLElement;
+    const renderList = (filter = '') => {
+      const q = filter.trim().toLowerCase();
+      const shown = routes.filter(w => {
+        if (!q) return true;
+        const sp = (w.sport ?? w.type).toLowerCase();
+        return getSportLabel(w.sport ?? w.type).toLowerCase().includes(q)
+            || sp.includes(q) || (w.date ?? '').toLowerCase().includes(q);
+      });
+      if (shown.length === 0) {
+        listEl.innerHTML = `<div class="trk-routes-empty">${routes.length === 0
+          ? 'No saved routes yet. Complete a GPS activity to see it here.'
+          : 'No routes match your search.'}</div>`;
+        return;
+      }
+      listEl.innerHTML = shown.map(w => {
+        const sport = w.sport ?? w.type;
+        const d = new Date(w.date);
+        const dateTxt = isNaN(d.getTime()) ? '' : d.toLocaleDateString();
+        return `<button class="trk-route-card" data-id="${w.id}">
+          <span class="trk-route-card__icon">${getIcon(sport)}</span>
+          <span class="trk-route-card__main">
+            <span class="trk-route-card__title">${getSportLabel(sport)}</span>
+            <span class="trk-route-card__meta">${dateTxt} · ${formatDuration(w.durationSec)}</span>
+          </span>
+          <span class="trk-route-card__dist">${formatDistance(w.distanceKm)}<span style="font-size:1.1rem;font-weight:600;opacity:.6"> km</span></span>
+        </button>`;
+      }).join('');
+      listEl.querySelectorAll<HTMLElement>('.trk-route-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const w = routes.find(r => r.id === card.dataset.id);
+          if (!w) return;
+          this._loadGhostRoute(w.coords as Array<[number, number]>, getSportLabel(w.sport ?? w.type));
+          overlay.remove();
+        });
+      });
+    };
+    renderList();
+    overlay.querySelector('#trkRoutesSearch')?.addEventListener('input', e => {
+      renderList((e.target as HTMLInputElement).value);
+    });
+  }
+
+  _loadGhostRoute(coords: Array<[number, number]>, label: string): void {
+    this._clearGhostRoute();
+    if (!this.#map || !Array.isArray(coords) || coords.length < 2) return;
+    // Faint dashed grey line — clearly distinct from the bright live route
+    this.#ghostRoute = L.polyline(coords, {
+      color: '#9aa0a6', weight: 5, opacity: 0.55,
+      dashArray: '1 12', lineCap: 'round', lineJoin: 'round',
+    }).addTo(this.#map);
+    try { this.#map.fitBounds(this.#ghostRoute.getBounds(), { padding: [50, 50] }); } catch { /* ignore */ }
+
+    const pill = document.getElementById('trkGhostPill');
+    const txt  = document.getElementById('trkGhostPillTxt');
+    if (txt)  txt.textContent = `Following: ${label}`;
+    pill?.classList.remove('hidden');
+  }
+
+  _clearGhostRoute(): void {
+    if (this.#ghostRoute) { try { this.#map?.removeLayer(this.#ghostRoute); } catch { /* ignore */ } this.#ghostRoute = null; }
+    document.getElementById('trkGhostPill')?.classList.add('hidden');
   }
 
   // ── Track sport selection + timer-only mode ───────────────────────────────
