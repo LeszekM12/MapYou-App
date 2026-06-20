@@ -227,6 +227,56 @@ export class Tracker {
             writable: true,
             value: false
         });
+        // Auto-pause: freeze time/distance when (nearly) stationary, keep GPS running
+        Object.defineProperty(this, "_autoPauseOn", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        }); // feature enabled (setting)
+        Object.defineProperty(this, "_autoPaused", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        }); // currently auto-paused
+        Object.defineProperty(this, "_autoPauseStart", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 0
+        }); // ms when current auto-pause began
+        Object.defineProperty(this, "_belowSince", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        }); // ms since speed dropped below threshold (GPS path)
+        // Motion (accelerometer) path — used for foot sports (run/walk/hike)
+        Object.defineProperty(this, "_useMotionAP", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
+        Object.defineProperty(this, "_motionMag", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: []
+        });
+        Object.defineProperty(this, "_motionRestSince", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
+        Object.defineProperty(this, "_motionHandler", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
         this.map = map;
         this.onUpdate = onUpdate;
     }
@@ -234,6 +284,17 @@ export class Tracker {
     get isPaused() { return this._paused; }
     get currentSport() { return this.sport; }
     setSport(sport) { this.sport = sport; }
+    setAutoPause(on) {
+        this._autoPauseOn = on;
+        // Foot sports → accelerometer (like Strava running); others → GPS speed (like Strava cycling)
+        this._useMotionAP = on && Tracker.MOTION_SPORTS.includes(this.sport);
+        if (this._active && this._useMotionAP)
+            this._startMotion();
+        else
+            this._stopMotion();
+        if (!on && this._autoPaused)
+            this._exitAutoPause();
+    }
     // ── Start ───────────────────────────────────────────────────────────────────
     start() {
         if (this._active)
@@ -244,11 +305,15 @@ export class Tracker {
         this.distanceM = 0;
         this.pausedTime = 0;
         this.startTime = Date.now();
+        this._autoPaused = false;
+        this._belowSince = null;
         const color = getColor(this.sport);
         this.polyline = L.polyline([], {
             color, weight: 5, opacity: 0.95,
         }).addTo(this.map);
         this._startGPS();
+        if (this._autoPauseOn && this._useMotionAP)
+            this._startMotion();
         this.timerInterval = setInterval(() => {
             if (!this._paused)
                 this.onUpdate(this._buildStats());
@@ -261,6 +326,10 @@ export class Tracker {
         this._paused = true;
         this.pauseStart = Date.now();
         this._stopGPS();
+        this._stopMotion();
+        // Clear any in-progress auto-pause (manual pause takes over)
+        this._autoPaused = false;
+        this._belowSince = null;
     }
     // ── Resume ──────────────────────────────────────────────────────────────────
     resume() {
@@ -269,6 +338,8 @@ export class Tracker {
         this._paused = false;
         this.pausedTime += Date.now() - this.pauseStart;
         this._startGPS();
+        if (this._autoPauseOn && this._useMotionAP)
+            this._startMotion();
         this.onUpdate(this._buildStats());
     }
     // ── Stop ────────────────────────────────────────────────────────────────────
@@ -278,6 +349,7 @@ export class Tracker {
         this._active = false;
         this._paused = false;
         this._stopGPS();
+        this._stopMotion();
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;
@@ -306,6 +378,7 @@ export class Tracker {
     // ── Reset ───────────────────────────────────────────────────────────────────
     reset() {
         this._stopGPS();
+        this._stopMotion();
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;
@@ -322,6 +395,8 @@ export class Tracker {
         this.distanceM = 0;
         this._active = false;
         this._paused = false;
+        this._autoPaused = false;
+        this._belowSince = null;
     }
     // ── Draw saved activity ─────────────────────────────────────────────────────
     drawActivity(activity) {
@@ -347,6 +422,35 @@ export class Tracker {
             return;
         const { latitude: lat, longitude: lng } = pos.coords;
         const newCoord = [lat, lng];
+        // ── Auto-pause (GPS path): for cycling/other sports, like Strava cycling ──
+        if (this._autoPauseOn && !this._useMotionAP) {
+            const THRESH_MS = 0.28; // 1 km/h in m/s — "completely stopped"
+            let spd = pos.coords.speed != null && !Number.isNaN(pos.coords.speed)
+                ? pos.coords.speed : NaN;
+            if (Number.isNaN(spd) && this.coords.length > 0) {
+                const prev = this.coords[this.coords.length - 1];
+                spd = L.latLng(prev[0], prev[1]).distanceTo(L.latLng(lat, lng)) / 2; // ~per 2s
+            }
+            const now = Date.now();
+            if (spd < THRESH_MS) {
+                if (this._belowSince == null)
+                    this._belowSince = now;
+                if (!this._autoPaused && now - this._belowSince > 5000)
+                    this._enterAutoPause();
+            }
+            else {
+                this._belowSince = null;
+                if (this._autoPaused)
+                    this._exitAutoPause();
+            }
+        }
+        // While auto-paused: keep marker fresh but don't accumulate distance/route
+        if (this._autoPaused) {
+            if (this.dotMarker)
+                this.dotMarker.setLatLng([lat, lng]);
+            this.onUpdate(this._buildStats());
+            return;
+        }
         if (this.coords.length > 0) {
             const prev = this.coords[this.coords.length - 1];
             const dist = L.latLng(prev[0], prev[1]).distanceTo(L.latLng(lat, lng));
@@ -368,16 +472,84 @@ export class Tracker {
         this.map.panTo([lat, lng], { animate: true, duration: 0.8 });
         this.onUpdate(this._buildStats());
     }
+    // ── Auto-pause shared logic (freeze time/distance, keep sensors running) ──
+    _enterAutoPause() {
+        if (this._autoPaused)
+            return;
+        this._autoPaused = true;
+        this._autoPauseStart = Date.now();
+        this.onUpdate(this._buildStats());
+    }
+    _exitAutoPause() {
+        if (!this._autoPaused)
+            return;
+        this.pausedTime += Date.now() - this._autoPauseStart; // freeze elapsed
+        this._autoPaused = false;
+        this.onUpdate(this._buildStats());
+    }
+    // ── Accelerometer-based rest detection (foot sports, like Strava running) ──
+    _startMotion() {
+        if (this._motionHandler)
+            return;
+        const REST_MS = 3000; // sustained stillness before pausing
+        const REST_SD = 0.45; // m/s² stddev of accel magnitude → "at rest"
+        this._motionMag = [];
+        this._motionRestSince = null;
+        this._motionHandler = (e) => {
+            if (!this._active || this._paused)
+                return;
+            const g = e.accelerationIncludingGravity || e.acceleration;
+            if (!g || (g.x == null && g.y == null && g.z == null))
+                return;
+            const mag = Math.sqrt((g.x || 0) ** 2 + (g.y || 0) ** 2 + (g.z || 0) ** 2);
+            this._motionMag.push(mag);
+            if (this._motionMag.length > 50)
+                this._motionMag.shift();
+            if (this._motionMag.length < 10)
+                return; // need a small window first
+            const n = this._motionMag.length;
+            const mean = this._motionMag.reduce((s, v) => s + v, 0) / n;
+            const sd = Math.sqrt(this._motionMag.reduce((s, v) => s + (v - mean) ** 2, 0) / n);
+            const now = Date.now();
+            if (sd < REST_SD) {
+                if (this._motionRestSince == null)
+                    this._motionRestSince = now;
+                if (!this._autoPaused && now - this._motionRestSince > REST_MS)
+                    this._enterAutoPause();
+            }
+            else {
+                this._motionRestSince = null;
+                if (this._autoPaused)
+                    this._exitAutoPause();
+            }
+        };
+        window.addEventListener('devicemotion', this._motionHandler);
+    }
+    _stopMotion() {
+        if (this._motionHandler) {
+            window.removeEventListener('devicemotion', this._motionHandler);
+            this._motionHandler = null;
+        }
+        this._motionMag = [];
+        this._motionRestSince = null;
+    }
     _buildStats() {
-        const elapsed = (Date.now() - this.startTime - this.pausedTime);
+        const autoPauseLive = this._autoPaused ? (Date.now() - this._autoPauseStart) : 0;
+        const elapsed = (Date.now() - this.startTime - this.pausedTime - autoPauseLive);
         const durationSec = Math.floor(elapsed / 1000);
         const distanceKm = this.distanceM / 1000;
         const durationMin = durationSec / 60;
         const paceMinKm = distanceKm > 0.01 ? durationMin / distanceKm : 0;
         const speedKmH = durationMin > 0 ? distanceKm / (durationMin / 60) : 0;
-        return { distanceKm, durationSec, paceMinKm, speedKmH, coords: this.coords };
+        return { distanceKm, durationSec, paceMinKm, speedKmH, coords: this.coords, autoPaused: this._autoPaused };
     }
 }
+Object.defineProperty(Tracker, "MOTION_SPORTS", {
+    enumerable: true,
+    configurable: true,
+    writable: true,
+    value: ['running', 'walking', 'hiking']
+});
 // ── Formattery ────────────────────────────────────────────────────────────────
 export function formatDuration(sec) {
     const h = Math.floor(sec / 3600);

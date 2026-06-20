@@ -176,6 +176,8 @@ class App {
   #timerStartMs  = 0;
   #timerAccumSec = 0;
   #timerInterval: ReturnType<typeof setInterval> | null = null;
+  #lastAnnouncedKm = 0;
+  #wasAutoPaused   = false;
   #clockInterval: ReturnType<typeof setInterval> | null = null;
   #historyPanel: ActivityHistoryPanel | null = null;
 
@@ -575,6 +577,7 @@ class App {
   // ── WAKE LOCK ─────────────────────────────────────────────────────────────
 
   async _requestWakeLock(): Promise<void> {
+    if (!this._isScreenLockOn()) return;   // respect Screen lock setting
     if (!('wakeLock' in navigator)) return;
     try {
       this.#wakeLock = await navigator.wakeLock.request('screen');
@@ -1319,6 +1322,40 @@ class App {
         if (p) p.textContent = formatPace(stats.paceMinKm);
         if (l) l.textContent = 'min/km';
       }
+
+      // Voice cue every completed kilometer
+      if (this._isVoiceCuesOn()) {
+        const km = Math.floor(stats.distanceKm);
+        if (km >= 1 && km > this.#lastAnnouncedKm) {
+          this.#lastAnnouncedKm = km;
+          this._announceKm(km, stats.paceMinKm, stats.durationSec);
+        }
+      }
+
+      // Mirror to fullscreen expanded view
+      const isCycling = sport === 'cycling';
+      const exTime = document.getElementById('trkExpTime');
+      const exDist = document.getElementById('trkExpDist');
+      const exPace = document.getElementById('trkExpPace');
+      const exPaceLbl = document.getElementById('trkExpPaceLbl');
+      if (exTime) exTime.textContent = formatDuration(stats.durationSec);
+      if (exDist) exDist.textContent = formatDistance(stats.distanceKm);
+      if (exPace) exPace.textContent = isCycling ? stats.speedKmH.toFixed(1) : formatPace(stats.paceMinKm);
+      if (exPaceLbl) exPaceLbl.textContent = isCycling ? 'Avg speed (km/h)' : 'Avg pace (/km)';
+
+      // Auto-pause status indicator (overlay label + yellow bar + expanded header)
+      if (stats.autoPaused !== this.#wasAutoPaused) {
+        this.#wasAutoPaused = !!stats.autoPaused;
+        const st = document.getElementById('trkStatus');
+        if (st) st.textContent = stats.autoPaused ? 'AUTO-PAUSED' : 'RECORDING...';
+        const bar = document.getElementById('trkPausedBar');
+        if (bar) { bar.textContent = 'Auto-pause'; bar.classList.toggle('hidden', !stats.autoPaused); }
+        const exHdr = document.getElementById('trkExpHeader');
+        const exSt  = document.getElementById('trkExpStatus');
+        exHdr?.classList.toggle('trk-expanded__header--paused', !!stats.autoPaused);
+        if (exSt) exSt.textContent = stats.autoPaused ? 'Auto-paused' : 'Recording';
+        if (stats.autoPaused && this._isVoiceCuesOn()) this._speak('Auto paused');
+      }
     });
 
     // Historia
@@ -1468,7 +1505,7 @@ class App {
 
     // ── Routes + Settings (placeholders for now) ───────────────────────────
     document.getElementById('trkRoutesBtn')?.addEventListener('click', () => { /* TODO: routes */ });
-    document.getElementById('trkSettingsBtn')?.addEventListener('click', () => { /* TODO: settings */ });
+    document.getElementById('trkSettingsBtn')?.addEventListener('click', () => this._openTrackSettings());
 
     // ── START ─────────────────────────────────────────────────────────────
     document.getElementById('trkBtnStart')?.addEventListener('click', () => {
@@ -1476,6 +1513,10 @@ class App {
       if (isTrackable(sport)) {
         // GPS-tracked sports → map + live tracking (unchanged flow)
         if (!this.#tracker) return;
+        this.#lastAnnouncedKm = 0;
+        this.#wasAutoPaused = false;
+        if (this._isAutoPauseOn()) void this._requestMotionPermission();
+        this.#tracker.setAutoPause(this._isAutoPauseOn());
         this.#tracker.start();
         // Only share live with friends if the user allows it
         if (this._isLiveShareEnabled()) void liveTracker.start();
@@ -1565,11 +1606,107 @@ class App {
       void this._releaseWakeLock();
       this._exitTrackingView();
     });
+
+    // ── Expanded fullscreen stats (tap the stats card) ─────────────────────
+    document.getElementById('trkStatsCard')?.addEventListener('click', () => {
+      document.getElementById('trkExpanded')?.classList.remove('hidden');
+    });
+    document.getElementById('trkExpCollapse')?.addEventListener('click', () => {
+      document.getElementById('trkExpanded')?.classList.add('hidden');
+    });
+    // Expanded controls forward to the real overlay buttons
+    document.getElementById('trkExpPause')?.addEventListener('click', () => {
+      document.getElementById('trkBtnPause')?.dispatchEvent(new Event('click'));
+    });
+    document.getElementById('trkExpStop')?.addEventListener('click', () => {
+      document.getElementById('trkExpanded')?.classList.add('hidden');
+      document.getElementById('trkBtnStop')?.dispatchEvent(new Event('click'));
+    });
   }
 
   // Whether to share live location with friends (default ON, persisted)
   _isLiveShareEnabled(): boolean {
     return localStorage.getItem('mapyou_share_live_location') !== 'false';
+  }
+
+  // ── Track settings (persisted) ─────────────────────────────────────────────
+  _isScreenLockOn(): boolean { return localStorage.getItem('mapyou_screen_lock') !== 'false'; } // default ON
+  _isVoiceCuesOn():  boolean { return localStorage.getItem('mapyou_voice_cues')  === 'true'; }  // default OFF
+  _isAutoPauseOn():  boolean { return localStorage.getItem('mapyou_auto_pause')  === 'true'; }  // default OFF
+
+  // Request accelerometer permission (iOS Safari needs a gesture; Capacitor native is automatic)
+  async _requestMotionPermission(): Promise<void> {
+    try {
+      const DME = (window as unknown as { DeviceMotionEvent?: { requestPermission?: () => Promise<string> } }).DeviceMotionEvent;
+      if (DME && typeof DME.requestPermission === 'function') await DME.requestPermission();
+    } catch { /* denied or unsupported */ }
+  }
+
+  _speak(text: string): void {
+    try {
+      if (!('speechSynthesis' in window)) return;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'en-US';
+      u.rate = 1;
+      window.speechSynthesis.speak(u);
+    } catch { /* TTS unavailable */ }
+  }
+
+  _announceKm(km: number, paceMinKm: number, durationSec: number): void {
+    const pm = Math.floor(paceMinKm);
+    const ps = Math.round((paceMinKm - pm) * 60);
+    const dm = Math.round(durationSec / 60);
+    const paceTxt = paceMinKm > 0 && paceMinKm < 99
+      ? `Pace ${pm} ${ps === 0 ? '' : ps + ' '}per kilometer. ` : '';
+    this._speak(`Kilometer ${km}. ${paceTxt}Time ${dm} minute${dm === 1 ? '' : 's'}.`);
+  }
+
+  _openTrackSettings(): void {
+    document.getElementById('trkSettingsOverlay')?.remove();
+    const overlay = document.createElement('div');
+    overlay.id = 'trkSettingsOverlay';
+    overlay.className = 'trk-picker-overlay';
+
+    const tile = (id: string, icon: string, label: string, sub: string, on: boolean) => `
+      <button class="trk-set-tile${on ? ' trk-set-tile--on' : ''}" data-set="${id}">
+        <span class="trk-set-tile__icon">${icon}</span>
+        <span class="trk-set-tile__label">${label}</span>
+        <span class="trk-set-tile__sub">${sub}</span>
+      </button>`;
+
+    const render = () => {
+      overlay.innerHTML = `<div class="trk-picker">
+        <div class="trk-picker__head">
+          <span class="trk-picker__title">Settings</span>
+          <button class="trk-picker__close" id="trkSetClose">✕</button>
+        </div>
+        <div class="trk-set-grid">
+          ${tile('screen_lock', '🔒', 'Screen lock', this._isScreenLockOn() ? 'Keep screen on' : 'Normal', this._isScreenLockOn())}
+          ${tile('voice', '🔊', 'Voice cues', this._isVoiceCuesOn() ? 'On · every km' : 'Off', this._isVoiceCuesOn())}
+          ${tile('auto_pause', '⏸️', 'Auto-pause', this._isAutoPauseOn() ? 'On' : 'Off', this._isAutoPauseOn())}
+        </div>
+      </div>`;
+
+      overlay.querySelector('#trkSetClose')?.addEventListener('click', () => overlay.remove());
+      overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+      overlay.querySelectorAll<HTMLElement>('[data-set]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id  = btn.dataset.set!;
+          const key = id === 'screen_lock' ? 'mapyou_screen_lock'
+                    : id === 'voice'       ? 'mapyou_voice_cues'
+                    :                        'mapyou_auto_pause';
+          const cur = id === 'screen_lock' ? this._isScreenLockOn()
+                    : id === 'voice'       ? this._isVoiceCuesOn()
+                    :                        this._isAutoPauseOn();
+          localStorage.setItem(key, !cur ? 'true' : 'false');
+          if (id === 'auto_pause' && this.#tracker) this.#tracker.setAutoPause(!cur);
+          if (id === 'voice' && !cur) this._speak('Voice cues on');
+          render();
+        });
+      });
+    };
+    render();
+    document.body.appendChild(overlay);
   }
 
   // ── Track sport selection + timer-only mode ───────────────────────────────
@@ -1767,6 +1904,9 @@ class App {
 
   _exitTrackingView(): void {
     document.getElementById('trackerOverlay')?.classList.add('hidden');
+    document.getElementById('trkExpanded')?.classList.add('hidden');
+    document.getElementById('trkPausedBar')?.classList.add('hidden');
+    document.getElementById('trkExpHeader')?.classList.remove('trk-expanded__header--paused');
     document.getElementById('routeMiniPill')?.classList.remove('pill--above-tracker');
     document.getElementById('tabMap')?.classList.remove('tab-panel--active');
     const nav = document.querySelector<HTMLElement>('.bottom-nav');
@@ -1795,6 +1935,18 @@ class App {
       if (pauseBtn)  { pauseBtn.textContent = '▶ Resume'; pauseBtn.style.background = '#555'; }
       stopBtn?.classList.remove('hidden');
       discardBtn?.classList.remove('hidden');
+    }
+
+    // Reflect manual pause in the yellow bar + fullscreen expanded view
+    if (state !== 'idle') {
+      const paused = state === 'paused';
+      const bar = document.getElementById('trkPausedBar');
+      if (bar) { bar.textContent = 'Paused'; bar.classList.toggle('hidden', !paused); }
+      document.getElementById('trkExpHeader')?.classList.toggle('trk-expanded__header--paused', paused);
+      const exSt = document.getElementById('trkExpStatus');
+      if (exSt) exSt.textContent = paused ? 'Paused' : 'Recording';
+      const exPause = document.getElementById('trkExpPause');
+      if (exPause) exPause.textContent = paused ? '▶ Resume' : '⏸ Pause';
     }
   }
 

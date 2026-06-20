@@ -2256,6 +2256,30 @@ body {
   color: var(--app-text-secondary, rgba(255,255,255,0.6));
 }
 
+/* ── Track settings grid ── */
+.trk-set-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 14px;
+  padding: 8px 16px 28px;
+}
+.trk-set-tile {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 22px 12px;
+  border-radius: 16px;
+  border: 1.5px solid var(--app-border, rgba(255,255,255,0.1));
+  background: var(--app-surface-1, rgba(255,255,255,0.04));
+  color: var(--app-text-primary, #fff);
+  font-family: inherit; cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+}
+.trk-set-tile--on {
+  border-color: #00c46a;
+  background: color-mix(in srgb, #00c46a 12%, transparent);
+}
+.trk-set-tile__icon  { font-size: 2.6rem; line-height: 1; }
+.trk-set-tile__label { font-size: 1.5rem; font-weight: 700; }
+.trk-set-tile__sub   { font-size: 1.2rem; color: var(--app-text-tertiary, rgba(255,255,255,0.45)); }
+.trk-set-tile--on .trk-set-tile__sub { color: #00c46a; }
+
 /* History toggle */
 .trk-history-toggle {
     pointer-events: all;
@@ -2308,6 +2332,73 @@ body {
     pointer-events: none;
 }
 .tracker-overlay.hidden { display: none !important; }
+
+/* Auto-pause / paused bar (yellow, prominent) */
+.tracker-overlay__paused {
+    pointer-events: all;
+    align-self: stretch;
+    margin: 0 1.2rem 0.8rem;
+    background: #ffce1f;
+    color: #1a1a1a;
+    font-weight: 800;
+    font-size: 1.6rem;
+    text-align: center;
+    padding: 1.2rem;
+    border-radius: 1.4rem;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 20px rgba(255,206,31,0.4);
+}
+.tracker-overlay__paused.hidden { display: none !important; }
+.tracker-overlay__expand {
+    position: absolute; top: 1rem; right: 1.2rem;
+    color: var(--app-text-tertiary, rgba(255,255,255,0.4));
+}
+.tracker-overlay__stats { position: relative; cursor: pointer; }
+
+/* Fullscreen expanded stats — covers the map */
+.trk-expanded {
+    position: fixed; inset: 0; z-index: 3500;
+    background: var(--app-bg-base, #fff);
+    display: flex; flex-direction: column;
+}
+.trk-expanded.hidden { display: none !important; }
+.trk-expanded__header {
+    background: var(--app-bg-elevated, #f2f2f7);
+    color: var(--app-text-primary, #1a1a1a);
+    padding: 2.4rem 2rem 2rem;
+    text-align: center; position: relative;
+    transition: background 0.25s;
+}
+.trk-expanded__header.trk-expanded__header--paused { background: #ffce1f; color: #1a1a1a; }
+.trk-expanded__status { display: block; font-size: 1.6rem; font-weight: 700; opacity: 0.85; }
+.trk-expanded__time   { display: block; font-size: 5.6rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.trk-expanded__collapse {
+    position: absolute; top: 2rem; right: 2rem;
+    background: none; border: none; cursor: pointer;
+    color: currentColor;
+}
+.trk-expanded__body {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 5rem;
+}
+.trk-expanded__metric { text-align: center; }
+.trk-expanded__val {
+    display: block; font-size: 5.4rem; font-weight: 800; line-height: 1;
+    color: var(--app-text-primary, #1a1a1a); font-variant-numeric: tabular-nums;
+}
+.trk-expanded__val--big { font-size: 8rem; }
+.trk-expanded__lbl { display: block; margin-top: 0.8rem; font-size: 1.6rem; font-weight: 600; color: var(--app-text-tertiary, #888); }
+.trk-expanded__controls {
+    display: flex; gap: 1.2rem; padding: 1.6rem 2rem 3.2rem;
+}
+.trk-expanded__btn {
+    flex: 1; padding: 1.8rem; border-radius: 4rem; border: none;
+    font-family: inherit; font-size: 1.7rem; font-weight: 700; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+}
+.trk-expanded__btn--resume { background: #ff5a1f; color: #fff; }
+.trk-expanded__btn--finish { background: #1a1a1a; color: #fff; }
 
 /* Stats bar na dole */
 .tracker-overlay__stats {
