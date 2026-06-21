@@ -1356,7 +1356,7 @@ class App {
           } else {
             lapsWrap.removeAttribute('hidden');
             const fastest = Math.min(...laps.map(l => l.paceMinKm).filter(p => p > 0));
-            lapsList.innerHTML = laps.map(l => {
+            lapsList.innerHTML = [...laps].reverse().map(l => {
               const pct = l.paceMinKm > 0 && fastest > 0 ? Math.max(8, (fastest / l.paceMinKm) * 100) : 100;
               return `<div class="trk-lap">
                 <span class="trk-lap__num">${l.km}</span>
