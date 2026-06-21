@@ -1,6 +1,7 @@
 // ─── ACTIVITY VIEW ───────────────────────────────────────────────────────────
 // src/modules/ActivityView.ts
 import { formatDuration, formatPace, formatDistance, SPORT_ICONS, SPORT_COLORS } from './Tracker.js';
+import { isRouteSaved, saveRoute, unsaveRoute, routeEligible } from './SavedRoutes.js';
 import { loadActivities } from './db.js';
 import { CS } from './cloudSync.js';
 import { sendActivityFinishedPush } from './PushNotifications.js';
@@ -51,6 +52,9 @@ export function showActivitySummary(activity, map, onDiscard, onSave) {
           <h2 class="act-sum__name">${activity.description}</h2>
           <p class="act-sum__date">${date}</p>
         </div>
+        ${routeEligible(activity.coords.length, activity.distanceKm, activity.durationSec)
+        ? `<button class="act-sum__route-star" id="actSumRouteStar" title="Save as route" aria-pressed="${isRouteSaved(activity.id)}">${isRouteSaved(activity.id) ? '★' : '☆'}</button>`
+        : ''}
       </div>
 
       <div class="act-sum__map" id="actSumMap"></div>
@@ -102,6 +106,27 @@ export function showActivitySummary(activity, map, onDiscard, onSave) {
     requestAnimationFrame(() => modal.classList.add('act-sum--visible'));
     modal.querySelector('#actSumDiscard')?.addEventListener('click', () => {
         _closeModal(modal, onDiscard);
+    });
+    const starBtn = modal.querySelector('#actSumRouteStar');
+    starBtn?.addEventListener('click', () => {
+        if (isRouteSaved(activity.id)) {
+            unsaveRoute(activity.id);
+            starBtn.textContent = '☆';
+            starBtn.setAttribute('aria-pressed', 'false');
+        }
+        else {
+            saveRoute({
+                id: activity.id,
+                name: activity.description,
+                sport: activity.sport,
+                distanceKm: activity.distanceKm,
+                durationSec: activity.durationSec,
+                date: activity.date,
+                coords: activity.coords,
+            });
+            starBtn.textContent = '★';
+            starBtn.setAttribute('aria-pressed', 'true');
+        }
     });
     modal.querySelector('#actSumShare')?.addEventListener('click', () => {
         void generateShareImage(activity);

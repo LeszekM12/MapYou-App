@@ -2332,6 +2332,23 @@ body {
 .trk-route-card__meta  { font-size: 1.25rem; color: var(--app-text-tertiary, rgba(255,255,255,0.5)); }
 .trk-route-card__dist  { font-size: 1.8rem; font-weight: 800; flex: 0 0 auto; }
 .trk-routes-empty { padding: 4rem 2rem; text-align: center; color: var(--app-text-tertiary, rgba(255,255,255,0.5)); font-size: 1.4rem; }
+.trk-route-card__del {
+  flex: 0 0 auto; width: 2.8rem; height: 2.8rem; border-radius: 50%;
+  border: none; cursor: pointer; font-size: 1.3rem; line-height: 1;
+  background: var(--app-surface-2, rgba(255,255,255,0.08));
+  color: var(--app-text-tertiary, rgba(255,255,255,0.5));
+}
+
+/* Save-as-route star in activity summary header */
+.act-sum__route-star {
+  margin-left: auto; flex: 0 0 auto;
+  width: 4rem; height: 4rem; border-radius: 50%;
+  border: none; cursor: pointer;
+  font-size: 2.2rem; line-height: 1;
+  background: rgba(255,206,31,0.16); color: #ffce1f;
+  display: flex; align-items: center; justify-content: center;
+}
+.act-sum__route-star[aria-pressed="true"] { background: #ffce1f; color: #1a1a1a; }
 
 /* History toggle */
 .trk-history-toggle {

@@ -24,6 +24,7 @@ import { getIPLocation, requestGPSPermission, subscribeToPermissionChanges, hasG
 import { loadWorkoutsFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, syncLocationToBackend, } from './modules/PushNotifications.js';
 import { Tracker, formatDuration, formatPace, formatDistance, isTrackable, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
+import { getSavedRoutes, unsaveRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { homeView } from './modules/HomeView.js';
 import { statsView } from './modules/StatsView.js';
@@ -1780,46 +1781,57 @@ class App {
         overlay.addEventListener('click', e => { if (e.target === overlay)
             overlay.remove(); });
         document.body.appendChild(overlay);
-        // Load the user's completed routes that have GPS coords
-        const { loadUnifiedWorkouts } = await import('./modules/db.js');
-        const all = await loadUnifiedWorkouts();
-        const routes = all.filter(w => Array.isArray(w.coords) && w.coords.length > 1);
+        // Saved routes = activities the user explicitly starred (anti-spam)
+        const routes = getSavedRoutes();
         const listEl = overlay.querySelector('#trkRoutesList');
         const renderList = (filter = '') => {
             const q = filter.trim().toLowerCase();
-            const shown = routes.filter(w => {
+            const shown = routes.filter(r => {
                 if (!q)
                     return true;
-                const sp = (w.sport ?? w.type).toLowerCase();
-                return getSportLabel(w.sport ?? w.type).toLowerCase().includes(q)
-                    || sp.includes(q) || (w.date ?? '').toLowerCase().includes(q);
+                return getSportLabel(r.sport).toLowerCase().includes(q)
+                    || r.sport.toLowerCase().includes(q)
+                    || (r.name ?? '').toLowerCase().includes(q)
+                    || (r.date ?? '').toLowerCase().includes(q);
             });
             if (shown.length === 0) {
                 listEl.innerHTML = `<div class="trk-routes-empty">${routes.length === 0
-                    ? 'No saved routes yet. Complete a GPS activity to see it here.'
+                    ? 'No saved routes yet. Finish a GPS activity, open it, and tap the ☆ to save it as a route.'
                     : 'No routes match your search.'}</div>`;
                 return;
             }
-            listEl.innerHTML = shown.map(w => {
-                const sport = w.sport ?? w.type;
-                const d = new Date(w.date);
+            listEl.innerHTML = shown.map(r => {
+                const d = new Date(r.date);
                 const dateTxt = isNaN(d.getTime()) ? '' : d.toLocaleDateString();
-                return `<button class="trk-route-card" data-id="${w.id}">
-          <span class="trk-route-card__icon">${getIcon(sport)}</span>
+                return `<div class="trk-route-card" data-id="${r.id}">
+          <span class="trk-route-card__icon">${getIcon(r.sport)}</span>
           <span class="trk-route-card__main">
-            <span class="trk-route-card__title">${getSportLabel(sport)}</span>
-            <span class="trk-route-card__meta">${dateTxt} · ${formatDuration(w.durationSec)}</span>
+            <span class="trk-route-card__title">${getSportLabel(r.sport)}</span>
+            <span class="trk-route-card__meta">${dateTxt} · ${formatDuration(r.durationSec)}</span>
           </span>
-          <span class="trk-route-card__dist">${formatDistance(w.distanceKm)}<span style="font-size:1.1rem;font-weight:600;opacity:.6"> km</span></span>
-        </button>`;
+          <span class="trk-route-card__dist">${formatDistance(r.distanceKm)}<span style="font-size:1.1rem;font-weight:600;opacity:.6"> km</span></span>
+          <button class="trk-route-card__del" data-del="${r.id}" aria-label="Remove">✕</button>
+        </div>`;
             }).join('');
+            // Tap card → load ghost; tap ✕ → remove from saved
             listEl.querySelectorAll('.trk-route-card').forEach(card => {
                 card.addEventListener('click', () => {
-                    const w = routes.find(r => r.id === card.dataset.id);
-                    if (!w)
+                    const r = routes.find(x => x.id === card.dataset.id);
+                    if (!r)
                         return;
-                    this._loadGhostRoute(w.coords, getSportLabel(w.sport ?? w.type));
+                    this._loadGhostRoute(r.coords, getSportLabel(r.sport));
                     overlay.remove();
+                });
+            });
+            listEl.querySelectorAll('[data-del]').forEach(btn => {
+                btn.addEventListener('click', e => {
+                    e.stopPropagation();
+                    const id = btn.dataset.del;
+                    unsaveRoute(id);
+                    const i = routes.findIndex(x => x.id === id);
+                    if (i >= 0)
+                        routes.splice(i, 1);
+                    renderList(overlay.querySelector('#trkRoutesSearch')?.value ?? '');
                 });
             });
         };
