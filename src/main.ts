@@ -179,6 +179,7 @@ class App {
   #timerInterval: ReturnType<typeof setInterval> | null = null;
   #lastAnnouncedKm = 0;
   #wasAutoPaused   = false;
+  #lastLapCount    = 0;
   #clockInterval: ReturnType<typeof setInterval> | null = null;
   #historyPanel: ActivityHistoryPanel | null = null;
 
@@ -1343,6 +1344,30 @@ class App {
       if (exPace) exPace.textContent = isCycling ? stats.speedKmH.toFixed(1) : formatPace(stats.paceMinKm);
       if (exPaceLbl) exPaceLbl.textContent = isCycling ? 'Avg speed (km/h)' : 'Avg pace (/km)';
 
+      // Laps / splits — render when a new km completes
+      const laps = stats.laps ?? [];
+      if (laps.length !== this.#lastLapCount) {
+        this.#lastLapCount = laps.length;
+        const lapsWrap = document.getElementById('trkExpLaps');
+        const lapsList = document.getElementById('trkExpLapsList');
+        if (lapsWrap && lapsList) {
+          if (laps.length === 0) {
+            lapsWrap.setAttribute('hidden', '');
+          } else {
+            lapsWrap.removeAttribute('hidden');
+            const fastest = Math.min(...laps.map(l => l.paceMinKm).filter(p => p > 0));
+            lapsList.innerHTML = laps.map(l => {
+              const pct = l.paceMinKm > 0 && fastest > 0 ? Math.max(8, (fastest / l.paceMinKm) * 100) : 100;
+              return `<div class="trk-lap">
+                <span class="trk-lap__num">${l.km}</span>
+                <span class="trk-lap__bar-wrap"><span class="trk-lap__bar" style="width:${pct}%"></span></span>
+                <span class="trk-lap__val">${formatPace(l.paceMinKm)}</span>
+              </div>`;
+            }).join('');
+          }
+        }
+      }
+
       // Auto-pause status indicator (overlay label + yellow bar + expanded header)
       if (stats.autoPaused !== this.#wasAutoPaused) {
         this.#wasAutoPaused = !!stats.autoPaused;
@@ -1516,6 +1541,7 @@ class App {
         if (!this.#tracker) return;
         this.#lastAnnouncedKm = 0;
         this.#wasAutoPaused = false;
+        this.#lastLapCount = 0;
         if (this._isAutoPauseOn()) void this._requestMotionPermission();
         this.#tracker.setAutoPause(this._isAutoPauseOn());
         this.#tracker.start();
@@ -2013,6 +2039,8 @@ class App {
     document.getElementById('trkExpanded')?.classList.add('hidden');
     document.getElementById('trkPausedBar')?.classList.add('hidden');
     document.getElementById('trkExpHeader')?.classList.remove('trk-expanded__header--paused');
+    document.getElementById('trkExpLaps')?.setAttribute('hidden', '');
+    this.#lastLapCount = 0;
     document.getElementById('routeMiniPill')?.classList.remove('pill--above-tracker');
     document.getElementById('tabMap')?.classList.remove('tab-panel--active');
     const nav = document.querySelector<HTMLElement>('.bottom-nav');

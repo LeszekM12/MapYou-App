@@ -252,6 +252,19 @@ export class Tracker {
             writable: true,
             value: null
         }); // ms since speed dropped below threshold (GPS path)
+        // Per-km splits (laps)
+        Object.defineProperty(this, "_laps", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: []
+        });
+        Object.defineProperty(this, "_lastLapSec", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 0
+        });
         // Motion (accelerometer) path — used for foot sports (run/walk/hike)
         Object.defineProperty(this, "_useMotionAP", {
             enumerable: true,
@@ -307,6 +320,8 @@ export class Tracker {
         this.startTime = Date.now();
         this._autoPaused = false;
         this._belowSince = null;
+        this._laps = [];
+        this._lastLapSec = 0;
         const color = getColor(this.sport);
         this.polyline = L.polyline([], {
             color, weight: 5, opacity: 0.95,
@@ -397,6 +412,8 @@ export class Tracker {
         this._paused = false;
         this._autoPaused = false;
         this._belowSince = null;
+        this._laps = [];
+        this._lastLapSec = 0;
     }
     // ── Draw saved activity ─────────────────────────────────────────────────────
     drawActivity(activity) {
@@ -457,6 +474,14 @@ export class Tracker {
             // Filtruj skoki GPS > 50m/s (błędy GPS)
             if (dist < 50)
                 this.distanceM += dist;
+        }
+        // Record per-km splits (laps) as each kilometre boundary is crossed
+        const kmFloor = Math.floor(this.distanceM / 1000);
+        while (this._laps.length < kmFloor) {
+            const cumSec = this._elapsedSec();
+            const lapSec = Math.max(0, cumSec - this._lastLapSec);
+            this._lastLapSec = cumSec;
+            this._laps.push({ km: this._laps.length + 1, durationSec: lapSec, paceMinKm: lapSec / 60 });
         }
         this.coords.push(newCoord);
         this.polyline?.addLatLng(L.latLng(lat, lng));
@@ -533,15 +558,17 @@ export class Tracker {
         this._motionMag = [];
         this._motionRestSince = null;
     }
-    _buildStats() {
+    _elapsedSec() {
         const autoPauseLive = this._autoPaused ? (Date.now() - this._autoPauseStart) : 0;
-        const elapsed = (Date.now() - this.startTime - this.pausedTime - autoPauseLive);
-        const durationSec = Math.floor(elapsed / 1000);
+        return Math.max(0, (Date.now() - this.startTime - this.pausedTime - autoPauseLive) / 1000);
+    }
+    _buildStats() {
+        const durationSec = Math.floor(this._elapsedSec());
         const distanceKm = this.distanceM / 1000;
         const durationMin = durationSec / 60;
         const paceMinKm = distanceKm > 0.01 ? durationMin / distanceKm : 0;
         const speedKmH = durationMin > 0 ? distanceKm / (durationMin / 60) : 0;
-        return { distanceKm, durationSec, paceMinKm, speedKmH, coords: this.coords, autoPaused: this._autoPaused };
+        return { distanceKm, durationSec, paceMinKm, speedKmH, coords: this.coords, autoPaused: this._autoPaused, laps: this._laps };
     }
 }
 Object.defineProperty(Tracker, "MOTION_SPORTS", {
