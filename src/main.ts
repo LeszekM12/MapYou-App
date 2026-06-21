@@ -157,7 +157,6 @@ class App {
   static readonly #ARRIVAL_CONSEC = 3;
   static readonly #ARRIVAL_DIST   = 20;
 
-  #voiceEnabled    = false;
   #voiceKmAnnounced= 0;
   #voiceStartTime: number | null = null;
   #voiceDistCovered= 0;
@@ -263,8 +262,11 @@ class App {
         this._applyTheme();
       }
     });
-    if (localStorage.getItem('voiceStats') === 'true') {
-      this.#voiceEnabled = true;
+    // Migrate legacy 'voiceStats' → unified 'mapyou_voice_cues', then sync UI
+    if (localStorage.getItem('mapyou_voice_cues') == null && localStorage.getItem('voiceStats') === 'true') {
+      localStorage.setItem('mapyou_voice_cues', 'true');
+    }
+    if (this._isVoiceCuesOn()) {
       document.getElementById('voiceToggle')?.classList.add('active');
     }
   }
@@ -489,10 +491,10 @@ class App {
   // ── VOICE ─────────────────────────────────────────────────────────────────
 
   _toggleVoice(): void {
-    this.#voiceEnabled = !this.#voiceEnabled;
-    document.getElementById('voiceToggle')?.classList.toggle('active', this.#voiceEnabled);
-    localStorage.setItem('voiceStats', String(this.#voiceEnabled));
-    if (this.#voiceEnabled) this._speak('Voice stats enabled.');
+    const next = !this._isVoiceCuesOn();
+    localStorage.setItem('mapyou_voice_cues', next ? 'true' : 'false');
+    document.getElementById('voiceToggle')?.classList.toggle('active', next);
+    if (next) this._speak('Komunikaty głosowe włączone.');
   }
 
   _speak(text: string): void {
@@ -504,7 +506,7 @@ class App {
   }
 
   _updateVoiceStats(lat: number, lng: number): void {
-    if (!this.#voiceEnabled || !this.#trackingActive) return;
+    if (!this._isVoiceCuesOn() || !this.#trackingActive) return;
     if (!this.#voiceStartTime) {
       this.#voiceStartTime = Date.now();
       this.#voiceDistCovered = 0; this.#voiceKmAnnounced = 0;
@@ -519,13 +521,9 @@ class App {
     const next = this.#voiceKmAnnounced + 1;
     if (km >= next) {
       this.#voiceKmAnnounced = next;
-      const elapsed = (Date.now() - this.#voiceStartTime!) / 60000;
-      const pace = elapsed / km;
-      const pm = Math.floor(pace), ps = Math.round((pace - pm) * 60);
-      this._speak(
-        `Pokonałeś ${next} ${next === 1 ? 'kilometr' : next < 5 ? 'kilometry' : 'kilometrów'}. ` +
-        `Średnie tempo: ${pm} minut ${ps < 10 ? '0' + ps : ps} sekund na kilometr.`,
-      );
+      const elapsedSec = (Date.now() - this.#voiceStartTime!) / 1000;
+      const pace = (elapsedSec / 60) / km;  // min/km
+      this._announceKm(next, pace, elapsedSec);
     }
   }
 
@@ -714,7 +712,7 @@ class App {
     else this.#nearDestCount = 0;
     if (this.#nearDestCount >= App.#ARRIVAL_CONSEC && !this.#arrivedShown) {
       this.#arrivedShown = true; this._showArrivalToast();
-      if (this.#voiceEnabled) this._speak('Dotarłeś na miejsce. Cel osiągnięty!');
+      if (this._isVoiceCuesOn()) this._speak('Dotarłeś na miejsce. Cel osiągnięty!');
       void sendArrivedAtDestinationPush();
     }
   }
@@ -1356,7 +1354,7 @@ class App {
         const exSt  = document.getElementById('trkExpStatus');
         exHdr?.classList.toggle('trk-expanded__header--paused', !!stats.autoPaused);
         if (exSt) exSt.textContent = stats.autoPaused ? 'Auto-paused' : 'Recording';
-        if (stats.autoPaused && this._isVoiceCuesOn()) this._speak('Auto paused');
+        if (stats.autoPaused && this._isVoiceCuesOn()) this._speak('Automatyczna pauza.');
       }
     });
 
@@ -1645,13 +1643,23 @@ class App {
     } catch { /* denied or unsupported */ }
   }
 
+  // Polish pluralization: 1 → one, 2-4 (not 12-14) → few, else → many
+  _plural(n: number, one: string, few: string, many: string): string {
+    const m10 = n % 10, m100 = n % 100;
+    if (n === 1) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+  }
+
   _announceKm(km: number, paceMinKm: number, durationSec: number): void {
     const pm = Math.floor(paceMinKm);
     const ps = Math.round((paceMinKm - pm) * 60);
     const dm = Math.round(durationSec / 60);
+    const kmWord  = this._plural(km, 'kilometr', 'kilometry', 'kilometrów');
+    const minWord = this._plural(dm, 'minuta', 'minuty', 'minut');
     const paceTxt = paceMinKm > 0 && paceMinKm < 99
-      ? `Pace ${pm} ${ps === 0 ? '' : ps + ' '}per kilometer. ` : '';
-    this._speak(`Kilometer ${km}. ${paceTxt}Time ${dm} minute${dm === 1 ? '' : 's'}.`);
+      ? `Średnie tempo ${pm} minut ${ps < 10 ? '0' + ps : ps} sekund na kilometr. ` : '';
+    this._speak(`Pokonałeś ${km} ${kmWord}. ${paceTxt}Czas ${dm} ${minWord}.`);
   }
 
   _openTrackSettings(): void {
@@ -1693,7 +1701,10 @@ class App {
                     :                        this._isAutoPauseOn();
           localStorage.setItem(key, !cur ? 'true' : 'false');
           if (id === 'auto_pause' && this.#tracker) this.#tracker.setAutoPause(!cur);
-          if (id === 'voice' && !cur) this._speak('Voice cues on');
+          if (id === 'voice') {
+            document.getElementById('voiceToggle')?.classList.toggle('active', !cur);
+            if (!cur) this._speak('Komunikaty głosowe włączone.');
+          }
           render();
         });
       });
