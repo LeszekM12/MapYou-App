@@ -45,9 +45,9 @@ import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
 import { showNameModalIfNeeded, openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal } from './modules/UserName.js';
-import { initUserProfile } from './modules/UserProfile.js';
+import { initUserProfile, loadProfileFromLocal } from './modules/UserProfile.js';
 import { syncToMongoIfNeeded } from './modules/syncToMongo.js';
-import { CS } from './modules/cloudSync.js';
+import { CS, encodePolyline, decodePolyline } from './modules/cloudSync.js';
 
 // ─── Synchronizacja userId — jeden klucz dla całej apki ──────────────────────
 // mapty_userId (PushNotifications) i mapyou_userId_profile (UserProfile)
@@ -78,6 +78,20 @@ interface LeafletWithCluster {
 interface BeforeInstallPromptEvent extends Event {
   prompt(): Promise<void>;
   userChoice: Promise<{ outcome: string }>;
+}
+
+interface CommunityRoute {
+  routeId:        string;
+  ownerUserId:    string;
+  ownerName:      string;
+  ownerAvatarB64: string | null;
+  sport:          string;
+  name:           string;
+  distanceKm:     number;
+  durationSec:    number;
+  coordsEnc:      string;
+  startLat:       number;
+  startLng:       number;
 }
 
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
@@ -1752,29 +1766,30 @@ class App {
       </div>
       <div class="trk-routes-tabs">
         <button class="trk-routes-tab trk-routes-tab--active" data-tab="saved">Saved</button>
-        <button class="trk-routes-tab" disabled title="Coming soon">Community</button>
+        <button class="trk-routes-tab" data-tab="community">Community</button>
         <button class="trk-routes-tab" disabled title="Coming soon">Create</button>
       </div>
       <input class="trk-routes-search" id="trkRoutesSearch" placeholder="Search saved routes" />
-      <div class="trk-routes-list" id="trkRoutesList"><div class="trk-routes-empty">Loading…</div></div>
+      <div class="trk-routes-list" id="trkRoutesList"></div>
     </div>`;
     overlay.querySelector('#trkRoutesClose')?.addEventListener('click', () => overlay.remove());
     overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
     document.body.appendChild(overlay);
 
-    // Saved routes = activities the user explicitly starred (anti-spam)
-    const routes: SavedRoute[] = getSavedRoutes();
+    const listEl   = overlay.querySelector('#trkRoutesList') as HTMLElement;
+    const searchEl = overlay.querySelector('#trkRoutesSearch') as HTMLInputElement;
+    let tab: 'saved' | 'community' = 'saved';
+    let community: CommunityRoute[] = [];
+    let communityLoaded = false;
 
-    const listEl = overlay.querySelector('#trkRoutesList') as HTMLElement;
-    const renderList = (filter = '') => {
+    // ── Saved tab ──
+    const renderSaved = (filter = '') => {
+      const routes = getSavedRoutes();
       const q = filter.trim().toLowerCase();
-      const shown = routes.filter(r => {
-        if (!q) return true;
-        return getSportLabel(r.sport).toLowerCase().includes(q)
-            || r.sport.toLowerCase().includes(q)
-            || (r.name ?? '').toLowerCase().includes(q)
-            || (r.date ?? '').toLowerCase().includes(q);
-      });
+      const shown = routes.filter(r => !q
+        || getSportLabel(r.sport).toLowerCase().includes(q)
+        || (r.name ?? '').toLowerCase().includes(q)
+        || (r.date ?? '').toLowerCase().includes(q));
       if (shown.length === 0) {
         listEl.innerHTML = `<div class="trk-routes-empty">${routes.length === 0
           ? 'No saved routes yet. Finish a GPS activity, open it, and tap the ☆ to save it as a route.'
@@ -1788,36 +1803,186 @@ class App {
           <span class="trk-route-card__icon">${getIcon(r.sport)}</span>
           <span class="trk-route-card__main">
             <span class="trk-route-card__title">${getSportLabel(r.sport)}</span>
-            <span class="trk-route-card__meta">${dateTxt} · ${formatDuration(r.durationSec)}</span>
+            <span class="trk-route-card__meta">${dateTxt} · ${formatDuration(r.durationSec)} · ${formatDistance(r.distanceKm)} km</span>
           </span>
-          <span class="trk-route-card__dist">${formatDistance(r.distanceKm)}<span style="font-size:1.1rem;font-weight:600;opacity:.6"> km</span></span>
+          <button class="trk-route-card__share" data-share="${r.id}" aria-label="Share to community" title="Share to community">⇪</button>
           <button class="trk-route-card__del" data-del="${r.id}" aria-label="Remove">✕</button>
         </div>`;
       }).join('');
-      // Tap card → load ghost; tap ✕ → remove from saved
       listEl.querySelectorAll<HTMLElement>('.trk-route-card').forEach(card => {
         card.addEventListener('click', () => {
-          const r = routes.find(x => x.id === card.dataset.id);
+          const r = getSavedRoutes().find(x => x.id === card.dataset.id);
           if (!r) return;
-          this._loadGhostRoute(r.coords, getSportLabel(r.sport));
+          this._loadGhostRoute(r.coords, r.name || getSportLabel(r.sport));
           overlay.remove();
+        });
+      });
+      listEl.querySelectorAll<HTMLElement>('[data-share]').forEach(btn => {
+        btn.addEventListener('click', e => {
+          e.stopPropagation();
+          const r = getSavedRoutes().find(x => x.id === btn.dataset.share);
+          if (r) this._openPublishDialog(r);
         });
       });
       listEl.querySelectorAll<HTMLElement>('[data-del]').forEach(btn => {
         btn.addEventListener('click', e => {
           e.stopPropagation();
-          const id = btn.dataset.del!;
-          unsaveRoute(id);
-          const i = routes.findIndex(x => x.id === id);
-          if (i >= 0) routes.splice(i, 1);
-          renderList((overlay.querySelector('#trkRoutesSearch') as HTMLInputElement)?.value ?? '');
+          unsaveRoute(btn.dataset.del!);
+          renderSaved(searchEl.value);
         });
       });
     };
-    renderList();
-    overlay.querySelector('#trkRoutesSearch')?.addEventListener('input', e => {
-      renderList((e.target as HTMLInputElement).value);
+
+    // ── Community tab ──
+    const renderCommunity = (filter = '') => {
+      const q = filter.trim().toLowerCase();
+      const shown = community.filter(r => !q
+        || getSportLabel(r.sport).toLowerCase().includes(q)
+        || (r.name ?? '').toLowerCase().includes(q)
+        || (r.ownerName ?? '').toLowerCase().includes(q));
+      if (shown.length === 0) {
+        listEl.innerHTML = `<div class="trk-routes-empty">${community.length === 0
+          ? 'No community routes near you yet. Be the first — share one from your Saved routes!'
+          : 'No routes match your search.'}</div>`;
+        return;
+      }
+      listEl.innerHTML = shown.map(r => {
+        const avatar = r.ownerAvatarB64
+          ? `<img class="trk-route-card__avatar" src="${r.ownerAvatarB64}" alt="" />`
+          : `<span class="trk-route-card__avatar trk-route-card__avatar--ph">${(r.ownerName || '?').charAt(0).toUpperCase()}</span>`;
+        return `<div class="trk-route-card" data-rid="${r.routeId}">
+          ${avatar}
+          <span class="trk-route-card__main">
+            <span class="trk-route-card__title">${getIcon(r.sport)} ${r.name || getSportLabel(r.sport)}</span>
+            <span class="trk-route-card__meta">${r.ownerName || 'MapYou User'} · ${formatDistance(r.distanceKm)} km</span>
+          </span>
+        </div>`;
+      }).join('');
+      listEl.querySelectorAll<HTMLElement>('.trk-route-card').forEach(card => {
+        card.addEventListener('click', () => {
+          const r = community.find(x => x.routeId === card.dataset.rid);
+          if (!r) return;
+          const coords = decodePolyline(r.coordsEnc) as Array<[number, number]>;
+          this._loadGhostRoute(coords, r.name || getSportLabel(r.sport));
+          overlay.remove();
+        });
+      });
+    };
+
+    const loadCommunity = async () => {
+      listEl.innerHTML = '<div class="trk-routes-empty">Loading…</div>';
+      try {
+        const qs = new URLSearchParams();
+        const c = this.#map?.getCenter?.();
+        if (c) { qs.set('lat', String(c.lat)); qs.set('lng', String(c.lng)); qs.set('radiusKm', '25'); }
+        const res  = await fetch(`${BACKEND_URL}/routes?${qs.toString()}`);
+        const json = await res.json();
+        community = (json.data ?? []) as CommunityRoute[];
+      } catch { community = []; }
+      communityLoaded = true;
+      renderCommunity(searchEl.value);
+    };
+
+    const switchTab = (t: 'saved' | 'community') => {
+      tab = t;
+      overlay.querySelectorAll<HTMLElement>('.trk-routes-tab').forEach(b =>
+        b.classList.toggle('trk-routes-tab--active', b.dataset.tab === t));
+      searchEl.placeholder = t === 'saved' ? 'Search saved routes' : 'Search community routes';
+      if (t === 'saved') renderSaved(searchEl.value);
+      else if (communityLoaded) renderCommunity(searchEl.value);
+      else void loadCommunity();
+    };
+
+    overlay.querySelectorAll<HTMLButtonElement>('.trk-routes-tab').forEach(b =>
+      b.addEventListener('click', () => { if (!b.disabled) switchTab(b.dataset.tab as 'saved' | 'community'); }));
+    searchEl.addEventListener('input', () => (tab === 'saved' ? renderSaved(searchEl.value) : renderCommunity(searchEl.value)));
+
+    switchTab('saved');
+  }
+
+  _getUserId(): string { return localStorage.getItem('mapyou_userId_profile') ?? ''; }
+
+  // Trim points within `meters` of the first/last point (privacy near home)
+  _trimRouteEnds(coords: Array<[number, number]>, meters = 200): Array<[number, number]> {
+    if (coords.length < 4) return coords;
+    const near = (a: [number, number], b: [number, number]) =>
+      L.latLng(a[0], a[1]).distanceTo(L.latLng(b[0], b[1])) < meters;
+    let s = 0, e = coords.length - 1;
+    while (s < e && near(coords[0], coords[s])) s++;
+    while (e > s && near(coords[coords.length - 1], coords[e])) e--;
+    const out = coords.slice(s, e + 1);
+    return out.length >= 2 ? out : coords;
+  }
+
+  _openPublishDialog(route: SavedRoute): void {
+    document.getElementById('trkPublishOverlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'trkPublishOverlay';
+    ov.className = 'trk-picker-overlay';
+    ov.innerHTML = `<div class="trk-picker trk-publish">
+      <div class="trk-picker__head">
+        <span class="trk-picker__title">Share to community</span>
+        <button class="trk-picker__close" id="trkPubClose">✕</button>
+      </div>
+      <div class="trk-publish__body">
+        <label class="trk-publish__label">Route name</label>
+        <input class="trk-routes-search" id="trkPubName" value="${(route.name || getSportLabel(route.sport)).replace(/"/g, '&quot;')}" />
+        <div class="trk-panel-row" style="border-top:none;padding-left:0;padding-right:0">
+          <div class="trk-panel-row__text">
+            <span class="trk-panel-row__label">Hide start &amp; end (~200 m)</span>
+            <span class="trk-panel-row__sub">Protects your home location</span>
+          </div>
+          <button class="trk-toggle" id="trkPubTrim" role="switch" aria-checked="true"><span class="trk-toggle__knob"></span></button>
+        </div>
+        <p class="trk-publish__note">Your name and this route (start location) will be public to other users.</p>
+        <button class="trk-publish__btn" id="trkPubGo">Publish</button>
+      </div>
+    </div>`;
+    ov.querySelector('#trkPubClose')?.addEventListener('click', () => ov.remove());
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    const trimBtn = ov.querySelector('#trkPubTrim') as HTMLButtonElement;
+    trimBtn.addEventListener('click', () =>
+      trimBtn.setAttribute('aria-checked', trimBtn.getAttribute('aria-checked') === 'true' ? 'false' : 'true'));
+    const goBtn = ov.querySelector('#trkPubGo') as HTMLButtonElement;
+    goBtn.addEventListener('click', async () => {
+      goBtn.disabled = true; goBtn.textContent = 'Publishing…';
+      const name = (ov.querySelector('#trkPubName') as HTMLInputElement).value.trim();
+      const trim = trimBtn.getAttribute('aria-checked') === 'true';
+      const ok = await this._publishRoute(route, trim, name);
+      goBtn.textContent = ok ? 'Published ✓' : 'Failed — retry';
+      goBtn.disabled = false;
+      if (ok) setTimeout(() => ov.remove(), 700);
     });
+    document.body.appendChild(ov);
+  }
+
+  async _publishRoute(route: SavedRoute, trim: boolean, name: string): Promise<boolean> {
+    let coords = route.coords;
+    if (trim) coords = this._trimRouteEnds(coords);
+    if (coords.length < 2) return false;
+    const profile = loadProfileFromLocal();
+    const body = {
+      routeId:     route.id,
+      ownerUserId: this._getUserId(),
+      ownerName:   profile.name,
+      sport:       route.sport,
+      name:        name || getSportLabel(route.sport),
+      distanceKm:  route.distanceKm,
+      durationSec: route.durationSec,
+      coordsEnc:   encodePolyline(coords),
+      startLat:    coords[0][0],
+      startLng:    coords[0][1],
+      trimmed:     trim,
+      source:      'recorded',
+    };
+    try {
+      const res  = await fetch(`${BACKEND_URL}/routes`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const json = await res.json();
+      return json.status === 'ok';
+    } catch { return false; }
   }
 
   _loadGhostRoute(coords: Array<[number, number]>, label: string): void {
