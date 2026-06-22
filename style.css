@@ -3491,3 +3491,54 @@ body {
 .wu-popup__header { font-size: 1.3rem; font-weight: 700; margin-bottom: 4px; color: var(--app-text-primary, #fff); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .wu-popup__date   { font-size: 1.1rem; color: var(--app-text-tertiary, rgba(255,255,255,0.4)); margin-bottom: 6px; }
 .wu-popup__stat   { font-size: 1.2rem; color: var(--app-text-secondary, rgba(255,255,255,0.7)); margin: 2px 0; }
+
+/* ── Activity detail screen (Strava-style) ── */
+.ad-overlay {
+  position: fixed; inset: 0; z-index: 4000;
+  background: var(--app-bg, #0c0f12);
+  display: flex; flex-direction: column;
+  animation: adIn 0.22s ease;
+}
+@keyframes adIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+.ad-hero { position: relative; height: 42vh; min-height: 26rem; background: var(--app-surface-1, #14181c); }
+.ad-hero-map { position: absolute; inset: 0; }
+.ad-hero-map canvas { width: 100% !important; height: 100% !important; }
+.ad-hero-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 6rem; }
+.ad-back {
+  position: absolute; top: calc(1.2rem + env(safe-area-inset-top, 0px)); left: 1.4rem; z-index: 10;
+  width: 4rem; height: 4rem; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(20,24,28,0.85); color: #fff; display: flex; align-items: center; justify-content: center;
+  backdrop-filter: blur(8px); box-shadow: 0 2px 10px rgba(0,0,0,0.35);
+}
+.ad-sheet {
+  flex: 1; margin-top: -2.2rem; position: relative; z-index: 5;
+  background: var(--app-bg, #0c0f12); border-radius: 2.2rem 2.2rem 0 0;
+  padding: 0 2rem calc(3rem + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+}
+.ad-grab { width: 4rem; height: 0.45rem; border-radius: 1rem; background: rgba(255,255,255,0.25); margin: 1.2rem auto 1.8rem; }
+.ad-author { display: flex; align-items: center; gap: 1.2rem; margin-bottom: 1.4rem; }
+.ad-avatar { width: 4.6rem; height: 4.6rem; border-radius: 50%; border: 2px solid; overflow: hidden; display: flex; align-items: center; justify-content: center; font-size: 2rem; flex-shrink: 0; }
+.ad-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.ad-author-text { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.ad-author-name { font-size: 1.55rem; font-weight: 800; color: var(--app-text-primary, #fff); }
+.ad-date { font-size: 1.2rem; color: var(--app-text-secondary, #9aa0a6); }
+.ad-sport { font-size: 1.3rem; font-weight: 700; }
+.ad-title { font-size: 2.4rem; font-weight: 800; color: var(--app-text-primary, #fff); margin: 0 0 0.6rem; line-height: 1.15; }
+.ad-desc { font-size: 1.45rem; color: var(--app-text-secondary, #c2c8ce); margin: 0 0 1.6rem; line-height: 1.45; }
+.ad-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin: 1.6rem 0; }
+.ad-stat { background: var(--app-surface-1, rgba(255,255,255,0.05)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 1.4rem; padding: 1.4rem; }
+.ad-stat-v { display: block; font-size: 2.4rem; font-weight: 800; color: var(--app-text-primary, #fff); font-variant-numeric: tabular-nums; }
+.ad-stat-l { display: block; font-size: 1.2rem; color: var(--app-text-tertiary, #8b9197); margin-top: 0.2rem; }
+.ad-photo { margin: 1.6rem 0; border-radius: 1.4rem; overflow: hidden; }
+.ad-photo img, .ad-photo video { width: 100%; display: block; }
+.ad-section { margin: 2rem 0 0.6rem; }
+.ad-section-title { font-size: 1.5rem; font-weight: 800; color: var(--app-text-primary, #fff); margin: 0 0 1rem; }
+.ad-split { display: flex; align-items: center; gap: 1rem; margin-bottom: 0.7rem; }
+.ad-split-km { width: 2.4rem; font-size: 1.3rem; font-weight: 700; color: var(--app-text-secondary, #9aa0a6); text-align: center; }
+.ad-split-bar { flex: 1; height: 1.4rem; background: rgba(255,255,255,0.06); border-radius: 0.8rem; overflow: hidden; }
+.ad-split-fill { height: 100%; border-radius: 0.8rem; }
+.ad-split-pace { width: 6rem; font-size: 1.3rem; font-weight: 700; color: var(--app-text-primary, #fff); text-align: right; font-variant-numeric: tabular-nums; }
+.ad-notes { font-size: 1.4rem; color: var(--app-text-secondary, #c2c8ce); line-height: 1.5; margin: 0; }
+.ad-actions { display: flex; gap: 1rem; margin-top: 2.4rem; }
+.ad-act { flex: 1; padding: 1.3rem; border-radius: 1.2rem; border: 1px solid var(--app-border, rgba(255,255,255,0.1)); background: var(--app-surface-1, rgba(255,255,255,0.05)); color: var(--app-text-primary, #fff); font-family: inherit; font-size: 1.5rem; font-weight: 700; cursor: pointer; }

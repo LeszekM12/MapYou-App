@@ -449,6 +449,178 @@ function _openEditPostModal(post, onSave) {
     });
 }
 // ── Card builder ──────────────────────────────────────────────────────────────
+// ── Activity detail screen (Strava-style) ─────────────────────────────────────
+function estimateCalories(sport, distanceKm, durationSec, weightKg) {
+    const hours = durationSec / 3600;
+    if (hours <= 0)
+        return 0;
+    const w = weightKg && weightKg > 0 ? weightKg : 70;
+    let met = 7;
+    if (sport === 'running')
+        met = 9.8;
+    else if (sport === 'cycling')
+        met = 7.5;
+    else if (sport === 'walking')
+        met = 3.8;
+    else if (sport === 'hiking')
+        met = 6.0;
+    return Math.round(met * w * hours);
+}
+let _adMap = null;
+export async function openActivityDetail(act, isOwn) {
+    document.getElementById('activityDetailOverlay')?.remove();
+    if (_adMap) {
+        try {
+            _adMap.remove();
+        }
+        catch { /* ignore */ }
+        _adMap = null;
+    }
+    // Own activities: reload full record (coords / laps / notes) from IndexedDB
+    let full = act;
+    if (isOwn) {
+        const fresh = (await loadEnrichedActivities()).find(a => a.id === act.id);
+        if (fresh)
+            full = fresh;
+    }
+    const rec = full;
+    const color = getColor(full.sport);
+    const icon = getIcon(full.sport);
+    const isCycle = full.sport === 'cycling';
+    const timeFmt = formatDuration(full.durationSec);
+    const paceFmt = isCycle ? full.speedKmH.toFixed(1) : formatPace(full.paceMinKm);
+    const paceLbl = isCycle ? 'km/h' : 'min/km';
+    const profile = loadProfileFromLocal();
+    const kcal = estimateCalories(full.sport, full.distanceKm, full.durationSec, profile.weightKg);
+    const ownCoords = isOwn && Array.isArray(full.coords) && full.coords.length > 0;
+    const encoded = rec.coordsEnc ?? null;
+    const friendCoords = !ownCoords && encoded ? decodePolyline(encoded) : null;
+    const authorName = rec.authorName || (isOwn ? (profile.name || 'You') : getSportLabel(full.sport));
+    const avatarSrc = rec.avatarB64 ?? rec.authorAvatarUrl ?? (isOwn ? profile.avatarB64 : null);
+    const avatarHtml = avatarSrc ? `<img src="${avatarSrc}" alt="avatar"/>` : `<span>${icon}</span>`;
+    const title = (full.name || '').replace(/^(undefined|null)\s*/i, '').trim() || getSportLabel(full.sport);
+    const dateStr = new Date(full.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
+        + ' · ' + new Date(full.date).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
+    const photoIsVideo = full.mediaType === 'video' || (full.photoUrl?.includes('/video/upload/') ?? false);
+    const photoHtml = full.photoUrl
+        ? photoIsVideo
+            ? `<div class="ad-photo"><video src="${full.photoUrl}" playsinline controls preload="metadata"></video></div>`
+            : `<div class="ad-photo"><img src="${full.photoUrl}" alt="Activity photo" loading="lazy"/></div>`
+        : '';
+    // Splits — author only, only when real laps exist
+    let splitsHtml = '';
+    const lapsArr = rec.laps;
+    if (isOwn && Array.isArray(lapsArr) && lapsArr.length > 0) {
+        const laps = lapsArr;
+        const slowest = Math.max(...laps.map(l => l.paceMinKm || 0)) || 1; // longest bar = slowest
+        const rows = laps.map(l => {
+            const w = Math.max(8, Math.round(((l.paceMinKm || 0) / slowest) * 100));
+            return `<div class="ad-split">
+        <span class="ad-split-km">${l.km}</span>
+        <div class="ad-split-bar"><div class="ad-split-fill" style="width:${w}%;background:${color}"></div></div>
+        <span class="ad-split-pace">${formatPace(l.paceMinKm)}</span>
+      </div>`;
+        }).join('');
+        splitsHtml = `<div class="ad-section"><h3 class="ad-section-title">Splity (per km)</h3>${rows}</div>`;
+    }
+    const notesHtml = (isOwn && full.notes)
+        ? `<div class="ad-section"><h3 class="ad-section-title">Notatki</h3><p class="ad-notes">🔒 ${full.notes}</p></div>`
+        : '';
+    const likeCount = rec._likeCount ?? 0;
+    const heroInner = (ownCoords || friendCoords)
+        ? `<div class="ad-hero-map" id="adHeroMap"></div>`
+        : `<div class="ad-hero-empty" style="background:linear-gradient(135deg, ${color}22, ${color}44)"><span>${icon}</span></div>`;
+    const ov = document.createElement('div');
+    ov.id = 'activityDetailOverlay';
+    ov.className = 'ad-overlay';
+    ov.innerHTML = `
+    <div class="ad-hero">
+      <button class="ad-back" id="adBack" aria-label="Back">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      ${heroInner}
+    </div>
+    <div class="ad-sheet">
+      <div class="ad-grab"></div>
+      <div class="ad-author">
+        <div class="ad-avatar" style="border-color:${color}55;background:${color}22">${avatarHtml}</div>
+        <div class="ad-author-text">
+          <span class="ad-author-name">${authorName}</span>
+          <span class="ad-date">${icon} ${dateStr}</span>
+        </div>
+        <span class="ad-sport" style="color:${color}">${getSportLabel(full.sport)}</span>
+      </div>
+
+      <h2 class="ad-title">${title}</h2>
+      ${full.description && full.description !== title ? `<p class="ad-desc">${full.description}</p>` : ''}
+
+      <div class="ad-stats">
+        <div class="ad-stat"><span class="ad-stat-v">${full.distanceKm.toFixed(2)}</span><span class="ad-stat-l">Dystans (km)</span></div>
+        <div class="ad-stat"><span class="ad-stat-v">${timeFmt}</span><span class="ad-stat-l">Czas</span></div>
+        <div class="ad-stat"><span class="ad-stat-v">${paceFmt}</span><span class="ad-stat-l">${isCycle ? 'Prędkość' : 'Tempo'} (${paceLbl})</span></div>
+        <div class="ad-stat"><span class="ad-stat-v">${kcal}</span><span class="ad-stat-l">Kalorie (szac.)</span></div>
+      </div>
+
+      ${photoHtml}
+      ${splitsHtml}
+      ${notesHtml}
+
+      <div class="ad-actions">
+        <button class="ad-act" id="adLike" data-like-count="${full.id}">👍 <span>${likeCount > 0 ? likeCount : ''}</span></button>
+        <button class="ad-act" id="adComment">💬</button>
+        <button class="ad-act" id="adShare">↗</button>
+      </div>
+    </div>`;
+    document.body.appendChild(ov);
+    const close = () => {
+        if (_adMap) {
+            try {
+                _adMap.remove();
+            }
+            catch { /* ignore */ }
+            _adMap = null;
+        }
+        ov.remove();
+    };
+    ov.querySelector('#adBack')?.addEventListener('click', close);
+    // Hero map / minimap (after layout so dimensions exist)
+    setTimeout(() => {
+        const mapEl = document.getElementById('adHeroMap');
+        if (!mapEl)
+            return;
+        if (ownCoords) {
+            _adMap = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: true });
+            L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(_adMap);
+            const pts = full.coords.map(c => L.latLng(c[0], c[1]));
+            if (pts.length === 1) {
+                _adMap.setView(pts[0], 15);
+                L.circleMarker(pts[0], { radius: 7, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(_adMap);
+            }
+            else {
+                const line = L.polyline(pts, { color, weight: 4, opacity: 0.95 }).addTo(_adMap);
+                _adMap.fitBounds(line.getBounds(), { padding: [28, 28] });
+                L.circleMarker(pts[0], { radius: 6, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(_adMap);
+                L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#e74c3c', fillOpacity: 1 }).addTo(_adMap);
+            }
+        }
+        else if (friendCoords && friendCoords.length > 0) {
+            renderMinimapCanvas(mapEl, friendCoords, full.sport);
+        }
+    }, 120);
+    // Footer — reuse feed like/comment/share
+    ov.querySelector('#adComment')?.addEventListener('click', () => openCommentPanel(ov.querySelector('.ad-sheet'), full.id));
+    ov.querySelector('#adShare')?.addEventListener('click', () => openSharePanel(ov.querySelector('.ad-sheet'), full));
+    ov.querySelector('#adLike')?.addEventListener('click', () => {
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        const span = ov.querySelector('#adLike span');
+        if (span)
+            span.textContent = String((Number(span.textContent) || 0) + 1);
+        void fetch(`${BACKEND_URL}/feed/like`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId, itemId: full.id, itemType: 'activity' }),
+        }).catch(() => { });
+    });
+}
 export function buildCard(act) {
     const card = document.createElement('article');
     card.className = 'home-card';
@@ -1583,6 +1755,14 @@ export class HomeView {
                     commentEl.textContent = String(cc);
             }
             card.style.animationDelay = `${idx * 60}ms`;
+            if (item.kind === 'activity') {
+                card.style.cursor = 'pointer';
+                card.addEventListener('click', e => {
+                    if (e.target.closest('button, a, video, input, [data-action], [data-pm], .home-card__photo, .home-card__avatar--user, .home-card__comment-panel, .hcs'))
+                        return;
+                    void openActivityDetail(item.data, isOwn);
+                });
+            }
             scroll.appendChild(card);
             const actId = (item.data.activityId ?? item.data.id);
             if (item.kind === 'activity') {
@@ -1694,8 +1874,15 @@ export class HomeView {
                                 el.textContent = String(lc);
                         }
                         card.style.animationDelay = String(idx * 60) + 'ms';
+                        if (item.kind === 'activity') {
+                            card.style.cursor = 'pointer';
+                            card.addEventListener('click', e => {
+                                if (e.target.closest('button, a, video, input, [data-action], [data-pm], .home-card__photo, .home-card__avatar--user, .home-card__comment-panel, .hcs'))
+                                    return;
+                                void openActivityDetail(item.data, isOwn);
+                            });
+                        }
                         scroll.appendChild(card);
-                        // Render canvas minimap
                         if (item.kind === 'activity' && resolvedEnc) {
                             requestAnimationFrame(() => {
                                 setTimeout(() => {
