@@ -2279,32 +2279,42 @@ class App {
   }
 
   // ── Auto-loop (Mode 2): generate an editable loop of a target distance ─────
-  _buildLoopWaypoints(start: [number, number], km: number): Array<[number, number]> {
-    const r    = (km * 1000) / (2 * Math.PI);                        // circle radius (m)
-    const dLat = r / 111320;
-    const dLng = r / (111320 * Math.cos(start[0] * Math.PI / 180));
-    const center: [number, number] = [start[0] + dLat, start[1]];    // center north of start
-    const N = 6;
+  _loopPoints(start: [number, number], radiusM: number, bearing: number, dir: number, N = 8): Array<[number, number]> {
+    const dLat = radiusM / 111320;
+    const dLng = radiusM / (111320 * Math.cos(start[0] * Math.PI / 180));
+    const center: [number, number] = [start[0] + dLat * Math.sin(bearing), start[1] + dLng * Math.cos(bearing)];
+    const a0 = bearing + Math.PI;                                   // start sits on the circle edge
     const pts: Array<[number, number]> = [];
     for (let i = 0; i <= N; i++) {
-      const ang = -Math.PI / 2 + (i / N) * 2 * Math.PI;              // begin/end at start (south of center)
+      const ang = a0 + dir * (i / N) * 2 * Math.PI;                 // begin & end at start → closed loop
       pts.push([center[0] + dLat * Math.sin(ang), center[1] + dLng * Math.cos(ang)]);
     }
     return pts;
   }
 
-  _autoLoop(km: number): void {
+  async _autoLoop(km: number): Promise<void> {
     if (!this.#map) return;
     const c = this.#userCoords ?? (this.#map.getCenter ? [this.#map.getCenter().lat, this.#map.getCenter().lng] as [number, number] : null);
     if (!c) return;
-    this._createClear();
-    const pts = this._buildLoopWaypoints([c[0], c[1]], km);
-    pts.forEach(p => {
-      this.#createWaypoints.push(p);
-      const m = L.circleMarker(p, { radius: 6, color: '#fff', weight: 2, fillColor: '#ff5a1f', fillOpacity: 1 }).addTo(this.#map!);
-      this.#createMarkers.push(m);
-    });
-    void this._createReroute();
+    const start: [number, number] = [c[0], c[1]];
+    const bearing = Math.random() * 2 * Math.PI;                    // random orientation → different each time
+    const dir     = Math.random() < 0.5 ? 1 : -1;                   // random rotation direction
+    let radiusM   = (km * 1000) / (2 * Math.PI) * 0.78;             // start a bit small (roads inflate distance)
+
+    document.getElementById('trkCreateHint')?.replaceChildren('Generating loop…');
+    for (let iter = 0; iter < 4; iter++) {
+      this._createClear();
+      const pts = this._loopPoints(start, radiusM, bearing, dir);
+      pts.forEach(p => {
+        this.#createWaypoints.push(p);
+        const m = L.circleMarker(p, { radius: 6, color: '#fff', weight: 2, fillColor: '#ff5a1f', fillOpacity: 1 }).addTo(this.#map!);
+        this.#createMarkers.push(m);
+      });
+      await this._createReroute();                                  // sets this.#createDistanceKm
+      const actual = this.#createDistanceKm;
+      if (!actual || Math.abs(actual - km) / km < 0.1) break;       // within 10% → good enough
+      radiusM *= km / actual;                                       // rescale toward target
+    }
   }
 
   _openAutoLoopDialog(): void {
@@ -2330,7 +2340,7 @@ class App {
     ov.querySelector('#trkLoopGo')?.addEventListener('click', () => {
       const km = Math.min(42, Math.max(1, Number((ov.querySelector('#trkLoopKm') as HTMLInputElement).value) || 5));
       ov.remove();
-      this._autoLoop(km);
+      void this._autoLoop(km);
     });
     document.body.appendChild(ov);
   }
