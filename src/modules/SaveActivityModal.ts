@@ -700,6 +700,7 @@ export class SaveActivityModal {
       coords:      this._pickedCoords
         ? [this._pickedCoords]
         : this._activity.coords,
+      laps:        this._activity.laps,
     };
 
     // Share to selected clubs — set clubIds BEFORE saving

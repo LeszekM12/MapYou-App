@@ -388,6 +388,7 @@ export class Tracker {
             speedKmH: stats.speedKmH,
             coords: [...this.coords],
             description: `${getIcon(this.sport)} ${getSportLabel(this.sport)} on ${months[d.getMonth()]} ${d.getDate()}`,
+            laps: [...this._laps],
         };
     }
     // ── Reset ───────────────────────────────────────────────────────────────────

@@ -134,6 +134,7 @@ export interface ActivityRecord {
   speedKmH:    number;
   coords:      Coords[];
   description: string;
+  laps?:       Lap[];
 }
 
 type OnUpdate = (stats: TrackerStats) => void;
@@ -293,6 +294,7 @@ export class Tracker {
       speedKmH:    stats.speedKmH,
       coords:      [...this.coords],
       description: `${getIcon(this.sport)} ${getSportLabel(this.sport)} on ${months[d.getMonth()]} ${d.getDate()}`,
+      laps:        [...this._laps],
     };
   }
 

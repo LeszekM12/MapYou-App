@@ -46,6 +46,7 @@ export interface EnrichedActivity {
   visibility?: 'everyone' | 'friends' | 'only_me'; // who can see this activity
   muted?:      boolean;         // if true: not published to main/club feeds (still in stats & history)
   coords:      Array<[number, number]>;
+  laps?:       Array<{ km: number; durationSec: number; paceMinKm: number }>; // per-km splits (tracked)
 }
 
 /** Unified workout — single model for manual + tracked workouts */
