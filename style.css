@@ -2057,7 +2057,8 @@ body {
     pointer-events: all;            /* klikalne */
     background: var(--color-dark--1);
     border: 1px solid var(--app-border);
-    padding: 0.6rem 2rem 2.4rem;
+    padding: 0.6rem 2rem calc(2.4rem + env(safe-area-inset-bottom, 0px));
+    margin-bottom: calc(-1 * env(safe-area-inset-bottom, 0px));
     display: flex;
     flex-direction: column;
     align-items: stretch;
@@ -2380,10 +2381,29 @@ body {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
   pointer-events: auto;
   background: var(--color-dark--1); border-top: 1px solid var(--app-border);
-  border-radius: 2rem 2rem 0 0; padding: 1.6rem 2rem 2.4rem;
+  border-radius: 2rem 2rem 0 0; padding: 1.6rem 2rem calc(2.4rem + env(safe-area-inset-bottom, 0px));
   box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
 }
 .trk-create-bar.hidden { display: none !important; }
+
+/* Confirm dialog (Clear / Cancel) */
+.trk-confirm-overlay { align-items: center; justify-content: center; }
+.trk-confirm {
+  width: min(86vw, 34rem);
+  background: var(--app-bg-elevated, #fff);
+  color: var(--app-text-primary, #1a1a1a);
+  border-radius: 1.8rem; padding: 2.4rem 2rem 1.8rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.45); text-align: center;
+}
+.trk-confirm__title { margin: 0 0 0.6rem; font-size: 1.9rem; font-weight: 800; }
+.trk-confirm__msg { margin: 0 0 1.8rem; font-size: 1.4rem; color: var(--app-text-secondary, #888); }
+.trk-confirm__actions { display: flex; gap: 1rem; }
+.trk-confirm__btn {
+  flex: 1; padding: 1.4rem; border-radius: 1.2rem; border: none; cursor: pointer;
+  font-family: inherit; font-size: 1.5rem; font-weight: 700;
+  background: var(--app-surface-2, rgba(0,0,0,0.07)); color: var(--app-text-primary, #1a1a1a);
+}
+.trk-confirm__btn--yes { background: #ff3b30; color: #fff; }
 .trk-create-bar__top { display: flex; align-items: center; justify-content: space-between; }
 .trk-create-sport {
   display: flex; align-items: center; gap: 0.6rem;

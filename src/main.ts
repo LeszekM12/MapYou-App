@@ -770,6 +770,8 @@ class App {
   // ── MAP CLICK ─────────────────────────────────────────────────────────────
 
   _handleMapClick(mapE: L.LeafletMouseEvent): void {
+    // In route-builder (Create) mode, map taps add waypoints — not workouts
+    if (this.#createActive) return;
     // Never open workout form when Home tab or Friends tab is active —
     // clicks there should not fall through to the map handler.
     const activeTab = document.querySelector('.tab-panel--active');
@@ -1558,8 +1560,14 @@ class App {
 
     // Route builder toolbar
     document.getElementById('trkCreateUndo')?.addEventListener('click', () => this._createUndo());
-    document.getElementById('trkCreateClear')?.addEventListener('click', () => this._createClear());
-    document.getElementById('trkCreateCancel')?.addEventListener('click', () => this._exitCreateMode());
+    document.getElementById('trkCreateClear')?.addEventListener('click', () => {
+      if (this.#createWaypoints.length === 0) return;
+      this._confirmDialog('Clear route?', 'All points will be removed.', 'Clear', () => this._createClear());
+    });
+    document.getElementById('trkCreateCancel')?.addEventListener('click', () => {
+      if (this.#createWaypoints.length === 0) { this._exitCreateMode(); return; }
+      this._confirmDialog('Discard route?', "You'll lose this drawn route.", 'Discard', () => this._exitCreateMode());
+    });
     document.getElementById('trkCreateSave')?.addEventListener('click', () => this._createSave());
     document.getElementById('trkCreateSport')?.addEventListener('click', () => {
       this._openTrackSportPicker(sport => { this.#createSport = sport; this._updateCreateSportBtn(); void this._createReroute(); });
@@ -2265,6 +2273,26 @@ class App {
       ov.remove();
       this._exitCreateMode();
     });
+    document.body.appendChild(ov);
+  }
+
+  // Small elegant confirm dialog (used by Clear / Cancel in the builder)
+  _confirmDialog(title: string, message: string, confirmLabel: string, onYes: () => void): void {
+    document.getElementById('trkConfirmOverlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'trkConfirmOverlay';
+    ov.className = 'trk-picker-overlay trk-confirm-overlay';
+    ov.innerHTML = `<div class="trk-confirm">
+      <h3 class="trk-confirm__title">${title}</h3>
+      <p class="trk-confirm__msg">${message}</p>
+      <div class="trk-confirm__actions">
+        <button class="trk-confirm__btn" id="trkConfirmNo">Keep</button>
+        <button class="trk-confirm__btn trk-confirm__btn--yes" id="trkConfirmYes">${confirmLabel}</button>
+      </div>
+    </div>`;
+    ov.querySelector('#trkConfirmNo')?.addEventListener('click', () => ov.remove());
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    ov.querySelector('#trkConfirmYes')?.addEventListener('click', () => { ov.remove(); onYes(); });
     document.body.appendChild(ov);
   }
 
