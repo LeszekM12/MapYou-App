@@ -2283,11 +2283,11 @@ body {
 /* ── Following-route pill ── */
 .trk-ghost-pill {
   position: absolute; top: 1.4rem; left: 50%; transform: translateX(-50%);
-  z-index: 1200;
+  z-index: 1200; pointer-events: auto;
   display: flex; align-items: center; gap: 0.8rem;
   padding: 0.9rem 1rem 0.9rem 1.4rem;
   border-radius: 3rem;
-  background: var(--trk-stats-bg, rgba(10,14,18,0.9));
+  background: rgba(20,24,28,0.92);
   color: #fff; backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 4px 18px rgba(0,0,0,0.35);
   max-width: 80vw;
@@ -2374,6 +2374,35 @@ body {
   background: #ff5a1f; color: #fff; font-family: inherit; font-size: 1.6rem; font-weight: 700; cursor: pointer;
 }
 .trk-publish__btn:disabled { opacity: 0.7; }
+
+/* ── Route builder (Create mode) ── */
+.trk-create-bar {
+  position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+  pointer-events: auto;
+  background: var(--color-dark--1); border-top: 1px solid var(--app-border);
+  border-radius: 2rem 2rem 0 0; padding: 1.6rem 2rem 2.4rem;
+  box-shadow: 0 -8px 32px rgba(0,0,0,0.5);
+}
+.trk-create-bar.hidden { display: none !important; }
+.trk-create-bar__top { display: flex; align-items: center; justify-content: space-between; }
+.trk-create-sport {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.9rem 1.4rem; border-radius: 3rem;
+  border: 1.5px solid var(--app-border, rgba(255,255,255,0.15));
+  background: var(--app-surface-1, rgba(255,255,255,0.06));
+  color: var(--app-text-primary, #fff); font-family: inherit; font-size: 1.4rem; font-weight: 700; cursor: pointer;
+}
+.trk-create-dist { font-size: 1.6rem; color: var(--app-text-secondary, #bbb); }
+.trk-create-dist strong { font-size: 2.4rem; color: var(--app-text-primary, #fff); font-variant-numeric: tabular-nums; }
+.trk-create-hint { margin: 0.8rem 0 1.2rem; font-size: 1.25rem; color: var(--app-text-tertiary, rgba(255,255,255,0.45)); }
+.trk-create-bar__actions { display: flex; gap: 0.8rem; }
+.trk-create-act {
+  flex: 1; padding: 1.3rem 0.6rem; border-radius: 1.2rem;
+  border: 1.5px solid var(--app-border, rgba(255,255,255,0.12));
+  background: var(--app-surface-1, rgba(255,255,255,0.05));
+  color: var(--app-text-primary, #fff); font-family: inherit; font-size: 1.35rem; font-weight: 700; cursor: pointer;
+}
+.trk-create-act--save { background: #ff5a1f; border-color: #ff5a1f; color: #fff; flex: 1.4; }
 
 /* History toggle */
 .trk-history-toggle {

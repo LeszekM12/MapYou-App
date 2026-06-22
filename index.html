@@ -389,8 +389,21 @@
     </div>
   </div>
 
-  <!-- Map style picker button — right side -->
-  <button class="trk-map-style-btn" id="trkMapStyleBtn" title="Change map style">
+  <!-- Route builder toolbar (Create mode) -->
+  <div class="trk-create-bar hidden" id="trkCreateBar">
+    <div class="trk-create-bar__top">
+      <button class="trk-create-sport" id="trkCreateSport"><span id="trkCreateSportIcon">🏃</span> <span id="trkCreateSportLabel">Running</span></button>
+      <span class="trk-create-dist"><strong id="trkCreateDist">0.00</strong> km</span>
+    </div>
+    <p class="trk-create-hint" id="trkCreateHint">Tap the map to add points</p>
+    <div class="trk-create-bar__actions">
+      <button class="trk-create-act" id="trkCreateUndo">↩︎ Undo</button>
+      <button class="trk-create-act" id="trkCreateClear">Clear</button>
+      <button class="trk-create-act" id="trkCreateCancel">Cancel</button>
+      <button class="trk-create-act trk-create-act--save" id="trkCreateSave">Save route</button>
+    </div>
+  </div>
+
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
       <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
       <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>

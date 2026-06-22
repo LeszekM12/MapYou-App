@@ -33,7 +33,7 @@ import {
   syncLocationToBackend,
 } from './modules/PushNotifications.js';
 import { Tracker, type SportType, type ActivityRecord, formatDuration, formatPace, formatDistance, SPORT_COLORS, isTrackable, getAllSports, getCustomSports, saveCustomSport, deleteCustomSport, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
-import { getSavedRoutes, unsaveRoute, type SavedRoute } from './modules/SavedRoutes.js';
+import { getSavedRoutes, saveRoute, unsaveRoute, type SavedRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
 import { homeView } from './modules/HomeView.js';
@@ -147,6 +147,15 @@ const TILE_ATTR = {
 class App {
   #map!: L.Map;
   #ghostRoute: L.Polyline | null = null;
+  // Route builder (Create mode)
+  #createActive = false;
+  #createWaypoints: Array<[number, number]> = [];
+  #createMarkers: L.CircleMarker[] = [];
+  #createLine: L.Polyline | null = null;
+  #createSport = 'running';
+  #createDistanceKm = 0;
+  #createCoords: Array<[number, number]> = [];
+  #createClickHandler: ((e: L.LeafletMouseEvent) => void) | null = null;
   #tileLayer: L.TileLayer | null = null;
   #mapZoomLevel = 13;
   #mapEvent!: L.LeafletMouseEvent;
@@ -1547,6 +1556,15 @@ class App {
     document.getElementById('trkSettingsBtn')?.addEventListener('click', () => this._openTrackSettings());
     document.getElementById('trkGhostPillClear')?.addEventListener('click', () => this._clearGhostRoute());
 
+    // Route builder toolbar
+    document.getElementById('trkCreateUndo')?.addEventListener('click', () => this._createUndo());
+    document.getElementById('trkCreateClear')?.addEventListener('click', () => this._createClear());
+    document.getElementById('trkCreateCancel')?.addEventListener('click', () => this._exitCreateMode());
+    document.getElementById('trkCreateSave')?.addEventListener('click', () => this._createSave());
+    document.getElementById('trkCreateSport')?.addEventListener('click', () => {
+      this._openTrackSportPicker(sport => { this.#createSport = sport; this._updateCreateSportBtn(); void this._createReroute(); });
+    });
+
     // ── START ─────────────────────────────────────────────────────────────
     document.getElementById('trkBtnStart')?.addEventListener('click', () => {
       const sport = this.#trackSport;
@@ -1743,7 +1761,7 @@ class App {
       <div class="trk-routes-tabs">
         <button class="trk-routes-tab trk-routes-tab--active" data-tab="saved">Saved</button>
         <button class="trk-routes-tab" data-tab="community">Community</button>
-        <button class="trk-routes-tab" disabled title="Coming soon">Create</button>
+        <button class="trk-routes-tab" data-tab="create">Create</button>
       </div>
       <input class="trk-routes-search" id="trkRoutesSearch" placeholder="Search saved routes" />
       <div class="trk-routes-list" id="trkRoutesList"></div>
@@ -1870,7 +1888,11 @@ class App {
     };
 
     overlay.querySelectorAll<HTMLButtonElement>('.trk-routes-tab').forEach(b =>
-      b.addEventListener('click', () => { if (!b.disabled) switchTab(b.dataset.tab as 'saved' | 'community'); }));
+      b.addEventListener('click', () => {
+        if (b.disabled) return;
+        if (b.dataset.tab === 'create') { overlay.remove(); this._enterCreateMode(); return; }
+        switchTab(b.dataset.tab as 'saved' | 'community');
+      }));
     searchEl.addEventListener('input', () => (tab === 'saved' ? renderSaved(searchEl.value) : renderCommunity(searchEl.value)));
 
     switchTab('saved');
@@ -2105,6 +2127,145 @@ class App {
   _clearGhostRoute(): void {
     if (this.#ghostRoute) { try { this.#map?.removeLayer(this.#ghostRoute); } catch { /* ignore */ } this.#ghostRoute = null; }
     document.getElementById('trkGhostPill')?.classList.add('hidden');
+  }
+
+  // ── Route builder (Create mode — manual drawing, Mapbox snap) ──────────────
+  _createProfile(): string { return this.#createSport === 'cycling' ? 'cycling' : 'walking'; }
+
+  _enterCreateMode(): void {
+    if (!this.#map) return;
+    this.#createActive = true;
+    this.#createWaypoints = [];
+    this.#createCoords = [];
+    this.#createDistanceKm = 0;
+    this.#createSport = this.#trackSport || 'running';
+    this._clearGhostRoute();
+    document.getElementById('trkBottom')?.classList.add('hidden');
+    document.getElementById('trkCreateBar')?.classList.remove('hidden');
+    this._updateCreateSportBtn();
+    this._updateCreateUI();
+    this.#createClickHandler = (e: L.LeafletMouseEvent) => this._createAddWaypoint(e.latlng.lat, e.latlng.lng);
+    this.#map.on('click', this.#createClickHandler);
+  }
+
+  _exitCreateMode(): void {
+    if (this.#map && this.#createClickHandler) this.#map.off('click', this.#createClickHandler);
+    this.#createClickHandler = null;
+    this._createClear();
+    this.#createActive = false;
+    document.getElementById('trkCreateBar')?.classList.add('hidden');
+    document.getElementById('trkBottom')?.classList.remove('hidden');
+  }
+
+  _createAddWaypoint(lat: number, lng: number): void {
+    if (!this.#map) return;
+    this.#createWaypoints.push([lat, lng]);
+    const m = L.circleMarker([lat, lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#ff5a1f', fillOpacity: 1 }).addTo(this.#map);
+    this.#createMarkers.push(m);
+    void this._createReroute();
+  }
+
+  async _createReroute(): Promise<void> {
+    if (!this.#map) return;
+    const wp = this.#createWaypoints;
+    if (this.#createLine) { this.#map.removeLayer(this.#createLine); this.#createLine = null; }
+    if (wp.length < 2) {
+      this.#createCoords = wp.slice();
+      this.#createDistanceKm = 0;
+      this._updateCreateUI();
+      return;
+    }
+    const coordsStr = wp.map(p => `${p[1]},${p[0]}`).join(';');
+    try {
+      const res  = await fetch(`${BACKEND_URL}/directions/${this._createProfile()}/${coordsStr}`);
+      const data = await res.json() as { routes?: Array<{ distance: number; geometry: { coordinates: number[][] } }> };
+      if (!data.routes?.length) throw new Error('no route');
+      const route  = data.routes[0];
+      const coords = route.geometry.coordinates.map(c => [c[1], c[0]] as [number, number]);
+      this.#createCoords    = coords;
+      this.#createDistanceKm = route.distance / 1000;
+      this.#createLine = L.polyline(coords, { color: '#ff5a1f', weight: 5, opacity: 0.95 }).addTo(this.#map);
+    } catch {
+      // Fallback: straight dashed lines between waypoints (offline / API issue)
+      this.#createCoords     = wp.slice();
+      this.#createDistanceKm = this._coordsDistanceKm(wp);
+      this.#createLine = L.polyline(wp, { color: '#ff5a1f', weight: 5, opacity: 0.95, dashArray: '6 8' }).addTo(this.#map);
+    }
+    this._updateCreateUI();
+  }
+
+  _createUndo(): void {
+    this.#createWaypoints.pop();
+    const m = this.#createMarkers.pop();
+    if (m && this.#map) this.#map.removeLayer(m);
+    void this._createReroute();
+  }
+
+  _createClear(): void {
+    this.#createMarkers.forEach(m => { try { this.#map?.removeLayer(m); } catch { /* ignore */ } });
+    this.#createMarkers = [];
+    this.#createWaypoints = [];
+    if (this.#createLine) { try { this.#map?.removeLayer(this.#createLine); } catch { /* ignore */ } this.#createLine = null; }
+    this.#createCoords = [];
+    this.#createDistanceKm = 0;
+    this._updateCreateUI();
+  }
+
+  _updateCreateUI(): void {
+    const d = document.getElementById('trkCreateDist');
+    if (d) d.textContent = this.#createDistanceKm.toFixed(2);
+    const hint = document.getElementById('trkCreateHint');
+    if (hint) hint.textContent = this.#createWaypoints.length === 0
+      ? 'Tap the map to add points'
+      : `${this.#createWaypoints.length} point${this.#createWaypoints.length === 1 ? '' : 's'} · tap to add more`;
+  }
+
+  _updateCreateSportBtn(): void {
+    const ic = document.getElementById('trkCreateSportIcon');
+    const lb = document.getElementById('trkCreateSportLabel');
+    if (ic) ic.textContent = getIcon(this.#createSport);
+    if (lb) lb.textContent = getSportLabel(this.#createSport);
+  }
+
+  _createSave(): void {
+    if (this.#createCoords.length < 2) {
+      const hint = document.getElementById('trkCreateHint');
+      if (hint) hint.textContent = 'Tap at least 2 points to draw a route first.';
+      return;
+    }
+    document.getElementById('trkCreateNameOverlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'trkCreateNameOverlay';
+    ov.className = 'trk-picker-overlay';
+    ov.innerHTML = `<div class="trk-picker trk-publish">
+      <div class="trk-picker__head">
+        <span class="trk-picker__title">Save route</span>
+        <button class="trk-picker__close" id="trkCNClose">✕</button>
+      </div>
+      <div class="trk-publish__body">
+        <label class="trk-publish__label">Route name</label>
+        <input class="trk-routes-search" id="trkCNName" value="${(getSportLabel(this.#createSport) + ' route').replace(/"/g, '&quot;')}" />
+        <p class="trk-publish__note">${this.#createDistanceKm.toFixed(2)} km · ${getSportLabel(this.#createSport)} · saved to your Saved routes.</p>
+        <button class="trk-publish__btn" id="trkCNGo">Save</button>
+      </div>
+    </div>`;
+    ov.querySelector('#trkCNClose')?.addEventListener('click', () => ov.remove());
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    ov.querySelector('#trkCNGo')?.addEventListener('click', () => {
+      const name = (ov.querySelector('#trkCNName') as HTMLInputElement).value.trim() || getSportLabel(this.#createSport);
+      saveRoute({
+        id:          'drawn_' + Date.now().toString(36),
+        name,
+        sport:       this.#createSport,
+        distanceKm:  this.#createDistanceKm,
+        durationSec: 0,
+        date:        new Date().toISOString(),
+        coords:      this.#createCoords,
+      });
+      ov.remove();
+      this._exitCreateMode();
+    });
+    document.body.appendChild(ov);
   }
 
   // ── Track sport selection + timer-only mode ───────────────────────────────

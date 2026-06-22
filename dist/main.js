@@ -14,7 +14,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _a, _App_map, _App_ghostRoute, _App_tileLayer, _App_mapZoomLevel, _App_mapEvent, _App_workouts, _App_routeMode, _App_routeStep, _App_routePointA, _App_routePointB, _App_routeLine, _App_routeMarkerA, _App_routeMarkerB, _App_routeActivityMode, _App_routeCoords, _App_routeTotalDist, _App_progressLine, _App_progressWatchId, _App_coveredUpToIndex, _App_arrivedShown, _App_nearDestCount, _App_ARRIVAL_CONSEC, _App_ARRIVAL_DIST, _App_voiceKmAnnounced, _App_voiceStartTime, _App_voiceDistCovered, _App_trackingActive, _App_watchId, _App_trackingMarker, _App_trackingCoords, _App_prevTrackingCoords, _App_userTouchingMap, _App_recenterTimer, _App_tracker, _App_trackSport, _App_timerActive, _App_timerPaused, _App_timerStartMs, _App_timerAccumSec, _App_timerInterval, _App_lastAnnouncedKm, _App_wasAutoPaused, _App_lastLapCount, _App_clockInterval, _App_historyPanel, _App_nightMode, _App_wakeLock, _App_deferredInstallPrompt, _App_markers, _App_clusterGroup, _App_clusterEnabled, _App_activeRoute, _App_unifiedMarkers, _App_refreshing, _App_poiMarkers, _App_userCoords, _App_autocompleteTimer, _App_filterDrag, _App_activitySpeeds, _App_activeWorkoutId, _App_workoutRouteLayer, _App_customFilters, _App_pinnedCoord, _App_goalKm, _App_goalTime, _App_goalCount, _App_statsExpanded, _App_statsWeekOffset, _App_statsSelectedDay, _App_statsPrevGoalReached;
+var _a, _App_map, _App_ghostRoute, _App_createActive, _App_createWaypoints, _App_createMarkers, _App_createLine, _App_createSport, _App_createDistanceKm, _App_createCoords, _App_createClickHandler, _App_tileLayer, _App_mapZoomLevel, _App_mapEvent, _App_workouts, _App_routeMode, _App_routeStep, _App_routePointA, _App_routePointB, _App_routeLine, _App_routeMarkerA, _App_routeMarkerB, _App_routeActivityMode, _App_routeCoords, _App_routeTotalDist, _App_progressLine, _App_progressWatchId, _App_coveredUpToIndex, _App_arrivedShown, _App_nearDestCount, _App_ARRIVAL_CONSEC, _App_ARRIVAL_DIST, _App_voiceKmAnnounced, _App_voiceStartTime, _App_voiceDistCovered, _App_trackingActive, _App_watchId, _App_trackingMarker, _App_trackingCoords, _App_prevTrackingCoords, _App_userTouchingMap, _App_recenterTimer, _App_tracker, _App_trackSport, _App_timerActive, _App_timerPaused, _App_timerStartMs, _App_timerAccumSec, _App_timerInterval, _App_lastAnnouncedKm, _App_wasAutoPaused, _App_lastLapCount, _App_clockInterval, _App_historyPanel, _App_nightMode, _App_wakeLock, _App_deferredInstallPrompt, _App_markers, _App_clusterGroup, _App_clusterEnabled, _App_activeRoute, _App_unifiedMarkers, _App_refreshing, _App_poiMarkers, _App_userCoords, _App_autocompleteTimer, _App_filterDrag, _App_activitySpeeds, _App_activeWorkoutId, _App_workoutRouteLayer, _App_customFilters, _App_pinnedCoord, _App_goalKm, _App_goalTime, _App_goalCount, _App_statsExpanded, _App_statsWeekOffset, _App_statsSelectedDay, _App_statsPrevGoalReached;
 import { BACKEND_URL } from './config.js';
 import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
@@ -24,7 +24,7 @@ import { getIPLocation, requestGPSPermission, subscribeToPermissionChanges, hasG
 import { loadWorkoutsFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, syncLocationToBackend, } from './modules/PushNotifications.js';
 import { Tracker, formatDuration, formatPace, formatDistance, isTrackable, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
-import { getSavedRoutes, unsaveRoute } from './modules/SavedRoutes.js';
+import { getSavedRoutes, saveRoute, unsaveRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { homeView } from './modules/HomeView.js';
 import { statsView } from './modules/StatsView.js';
@@ -104,6 +104,15 @@ class App {
     constructor() {
         _App_map.set(this, void 0);
         _App_ghostRoute.set(this, null);
+        // Route builder (Create mode)
+        _App_createActive.set(this, false);
+        _App_createWaypoints.set(this, []);
+        _App_createMarkers.set(this, []);
+        _App_createLine.set(this, null);
+        _App_createSport.set(this, 'running');
+        _App_createDistanceKm.set(this, 0);
+        _App_createCoords.set(this, []);
+        _App_createClickHandler.set(this, null);
         _App_tileLayer.set(this, null);
         _App_mapZoomLevel.set(this, 13);
         _App_mapEvent.set(this, void 0);
@@ -1584,6 +1593,14 @@ class App {
         document.getElementById('trkRoutesBtn')?.addEventListener('click', () => void this._openRoutesScreen());
         document.getElementById('trkSettingsBtn')?.addEventListener('click', () => this._openTrackSettings());
         document.getElementById('trkGhostPillClear')?.addEventListener('click', () => this._clearGhostRoute());
+        // Route builder toolbar
+        document.getElementById('trkCreateUndo')?.addEventListener('click', () => this._createUndo());
+        document.getElementById('trkCreateClear')?.addEventListener('click', () => this._createClear());
+        document.getElementById('trkCreateCancel')?.addEventListener('click', () => this._exitCreateMode());
+        document.getElementById('trkCreateSave')?.addEventListener('click', () => this._createSave());
+        document.getElementById('trkCreateSport')?.addEventListener('click', () => {
+            this._openTrackSportPicker(sport => { __classPrivateFieldSet(this, _App_createSport, sport, "f"); this._updateCreateSportBtn(); void this._createReroute(); });
+        });
         // ── START ─────────────────────────────────────────────────────────────
         document.getElementById('trkBtnStart')?.addEventListener('click', () => {
             const sport = __classPrivateFieldGet(this, _App_trackSport, "f");
@@ -1791,7 +1808,7 @@ class App {
       <div class="trk-routes-tabs">
         <button class="trk-routes-tab trk-routes-tab--active" data-tab="saved">Saved</button>
         <button class="trk-routes-tab" data-tab="community">Community</button>
-        <button class="trk-routes-tab" disabled title="Coming soon">Create</button>
+        <button class="trk-routes-tab" data-tab="create">Create</button>
       </div>
       <input class="trk-routes-search" id="trkRoutesSearch" placeholder="Search saved routes" />
       <div class="trk-routes-list" id="trkRoutesList"></div>
@@ -1924,8 +1941,16 @@ class App {
             else
                 void loadCommunity();
         };
-        overlay.querySelectorAll('.trk-routes-tab').forEach(b => b.addEventListener('click', () => { if (!b.disabled)
-            switchTab(b.dataset.tab); }));
+        overlay.querySelectorAll('.trk-routes-tab').forEach(b => b.addEventListener('click', () => {
+            if (b.disabled)
+                return;
+            if (b.dataset.tab === 'create') {
+                overlay.remove();
+                this._enterCreateMode();
+                return;
+            }
+            switchTab(b.dataset.tab);
+        }));
         searchEl.addEventListener('input', () => (tab === 'saved' ? renderSaved(searchEl.value) : renderCommunity(searchEl.value)));
         switchTab('saved');
     }
@@ -2165,6 +2190,160 @@ class App {
             __classPrivateFieldSet(this, _App_ghostRoute, null, "f");
         }
         document.getElementById('trkGhostPill')?.classList.add('hidden');
+    }
+    // ── Route builder (Create mode — manual drawing, Mapbox snap) ──────────────
+    _createProfile() { return __classPrivateFieldGet(this, _App_createSport, "f") === 'cycling' ? 'cycling' : 'walking'; }
+    _enterCreateMode() {
+        if (!__classPrivateFieldGet(this, _App_map, "f"))
+            return;
+        __classPrivateFieldSet(this, _App_createActive, true, "f");
+        __classPrivateFieldSet(this, _App_createWaypoints, [], "f");
+        __classPrivateFieldSet(this, _App_createCoords, [], "f");
+        __classPrivateFieldSet(this, _App_createDistanceKm, 0, "f");
+        __classPrivateFieldSet(this, _App_createSport, __classPrivateFieldGet(this, _App_trackSport, "f") || 'running', "f");
+        this._clearGhostRoute();
+        document.getElementById('trkBottom')?.classList.add('hidden');
+        document.getElementById('trkCreateBar')?.classList.remove('hidden');
+        this._updateCreateSportBtn();
+        this._updateCreateUI();
+        __classPrivateFieldSet(this, _App_createClickHandler, (e) => this._createAddWaypoint(e.latlng.lat, e.latlng.lng), "f");
+        __classPrivateFieldGet(this, _App_map, "f").on('click', __classPrivateFieldGet(this, _App_createClickHandler, "f"));
+    }
+    _exitCreateMode() {
+        if (__classPrivateFieldGet(this, _App_map, "f") && __classPrivateFieldGet(this, _App_createClickHandler, "f"))
+            __classPrivateFieldGet(this, _App_map, "f").off('click', __classPrivateFieldGet(this, _App_createClickHandler, "f"));
+        __classPrivateFieldSet(this, _App_createClickHandler, null, "f");
+        this._createClear();
+        __classPrivateFieldSet(this, _App_createActive, false, "f");
+        document.getElementById('trkCreateBar')?.classList.add('hidden');
+        document.getElementById('trkBottom')?.classList.remove('hidden');
+    }
+    _createAddWaypoint(lat, lng) {
+        if (!__classPrivateFieldGet(this, _App_map, "f"))
+            return;
+        __classPrivateFieldGet(this, _App_createWaypoints, "f").push([lat, lng]);
+        const m = L.circleMarker([lat, lng], { radius: 6, color: '#fff', weight: 2, fillColor: '#ff5a1f', fillOpacity: 1 }).addTo(__classPrivateFieldGet(this, _App_map, "f"));
+        __classPrivateFieldGet(this, _App_createMarkers, "f").push(m);
+        void this._createReroute();
+    }
+    async _createReroute() {
+        if (!__classPrivateFieldGet(this, _App_map, "f"))
+            return;
+        const wp = __classPrivateFieldGet(this, _App_createWaypoints, "f");
+        if (__classPrivateFieldGet(this, _App_createLine, "f")) {
+            __classPrivateFieldGet(this, _App_map, "f").removeLayer(__classPrivateFieldGet(this, _App_createLine, "f"));
+            __classPrivateFieldSet(this, _App_createLine, null, "f");
+        }
+        if (wp.length < 2) {
+            __classPrivateFieldSet(this, _App_createCoords, wp.slice(), "f");
+            __classPrivateFieldSet(this, _App_createDistanceKm, 0, "f");
+            this._updateCreateUI();
+            return;
+        }
+        const coordsStr = wp.map(p => `${p[1]},${p[0]}`).join(';');
+        try {
+            const res = await fetch(`${BACKEND_URL}/directions/${this._createProfile()}/${coordsStr}`);
+            const data = await res.json();
+            if (!data.routes?.length)
+                throw new Error('no route');
+            const route = data.routes[0];
+            const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+            __classPrivateFieldSet(this, _App_createCoords, coords, "f");
+            __classPrivateFieldSet(this, _App_createDistanceKm, route.distance / 1000, "f");
+            __classPrivateFieldSet(this, _App_createLine, L.polyline(coords, { color: '#ff5a1f', weight: 5, opacity: 0.95 }).addTo(__classPrivateFieldGet(this, _App_map, "f")), "f");
+        }
+        catch {
+            // Fallback: straight dashed lines between waypoints (offline / API issue)
+            __classPrivateFieldSet(this, _App_createCoords, wp.slice(), "f");
+            __classPrivateFieldSet(this, _App_createDistanceKm, this._coordsDistanceKm(wp), "f");
+            __classPrivateFieldSet(this, _App_createLine, L.polyline(wp, { color: '#ff5a1f', weight: 5, opacity: 0.95, dashArray: '6 8' }).addTo(__classPrivateFieldGet(this, _App_map, "f")), "f");
+        }
+        this._updateCreateUI();
+    }
+    _createUndo() {
+        __classPrivateFieldGet(this, _App_createWaypoints, "f").pop();
+        const m = __classPrivateFieldGet(this, _App_createMarkers, "f").pop();
+        if (m && __classPrivateFieldGet(this, _App_map, "f"))
+            __classPrivateFieldGet(this, _App_map, "f").removeLayer(m);
+        void this._createReroute();
+    }
+    _createClear() {
+        __classPrivateFieldGet(this, _App_createMarkers, "f").forEach(m => { try {
+            __classPrivateFieldGet(this, _App_map, "f")?.removeLayer(m);
+        }
+        catch { /* ignore */ } });
+        __classPrivateFieldSet(this, _App_createMarkers, [], "f");
+        __classPrivateFieldSet(this, _App_createWaypoints, [], "f");
+        if (__classPrivateFieldGet(this, _App_createLine, "f")) {
+            try {
+                __classPrivateFieldGet(this, _App_map, "f")?.removeLayer(__classPrivateFieldGet(this, _App_createLine, "f"));
+            }
+            catch { /* ignore */ }
+            __classPrivateFieldSet(this, _App_createLine, null, "f");
+        }
+        __classPrivateFieldSet(this, _App_createCoords, [], "f");
+        __classPrivateFieldSet(this, _App_createDistanceKm, 0, "f");
+        this._updateCreateUI();
+    }
+    _updateCreateUI() {
+        const d = document.getElementById('trkCreateDist');
+        if (d)
+            d.textContent = __classPrivateFieldGet(this, _App_createDistanceKm, "f").toFixed(2);
+        const hint = document.getElementById('trkCreateHint');
+        if (hint)
+            hint.textContent = __classPrivateFieldGet(this, _App_createWaypoints, "f").length === 0
+                ? 'Tap the map to add points'
+                : `${__classPrivateFieldGet(this, _App_createWaypoints, "f").length} point${__classPrivateFieldGet(this, _App_createWaypoints, "f").length === 1 ? '' : 's'} · tap to add more`;
+    }
+    _updateCreateSportBtn() {
+        const ic = document.getElementById('trkCreateSportIcon');
+        const lb = document.getElementById('trkCreateSportLabel');
+        if (ic)
+            ic.textContent = getIcon(__classPrivateFieldGet(this, _App_createSport, "f"));
+        if (lb)
+            lb.textContent = getSportLabel(__classPrivateFieldGet(this, _App_createSport, "f"));
+    }
+    _createSave() {
+        if (__classPrivateFieldGet(this, _App_createCoords, "f").length < 2) {
+            const hint = document.getElementById('trkCreateHint');
+            if (hint)
+                hint.textContent = 'Tap at least 2 points to draw a route first.';
+            return;
+        }
+        document.getElementById('trkCreateNameOverlay')?.remove();
+        const ov = document.createElement('div');
+        ov.id = 'trkCreateNameOverlay';
+        ov.className = 'trk-picker-overlay';
+        ov.innerHTML = `<div class="trk-picker trk-publish">
+      <div class="trk-picker__head">
+        <span class="trk-picker__title">Save route</span>
+        <button class="trk-picker__close" id="trkCNClose">✕</button>
+      </div>
+      <div class="trk-publish__body">
+        <label class="trk-publish__label">Route name</label>
+        <input class="trk-routes-search" id="trkCNName" value="${(getSportLabel(__classPrivateFieldGet(this, _App_createSport, "f")) + ' route').replace(/"/g, '&quot;')}" />
+        <p class="trk-publish__note">${__classPrivateFieldGet(this, _App_createDistanceKm, "f").toFixed(2)} km · ${getSportLabel(__classPrivateFieldGet(this, _App_createSport, "f"))} · saved to your Saved routes.</p>
+        <button class="trk-publish__btn" id="trkCNGo">Save</button>
+      </div>
+    </div>`;
+        ov.querySelector('#trkCNClose')?.addEventListener('click', () => ov.remove());
+        ov.addEventListener('click', e => { if (e.target === ov)
+            ov.remove(); });
+        ov.querySelector('#trkCNGo')?.addEventListener('click', () => {
+            const name = ov.querySelector('#trkCNName').value.trim() || getSportLabel(__classPrivateFieldGet(this, _App_createSport, "f"));
+            saveRoute({
+                id: 'drawn_' + Date.now().toString(36),
+                name,
+                sport: __classPrivateFieldGet(this, _App_createSport, "f"),
+                distanceKm: __classPrivateFieldGet(this, _App_createDistanceKm, "f"),
+                durationSec: 0,
+                date: new Date().toISOString(),
+                coords: __classPrivateFieldGet(this, _App_createCoords, "f"),
+            });
+            ov.remove();
+            this._exitCreateMode();
+        });
+        document.body.appendChild(ov);
     }
     // ── Track sport selection + timer-only mode ───────────────────────────────
     _setTrackSport(sport) {
@@ -3170,7 +3349,7 @@ class App {
         document.getElementById('map').style.cursor = '';
     }
 }
-_a = App, _App_map = new WeakMap(), _App_ghostRoute = new WeakMap(), _App_tileLayer = new WeakMap(), _App_mapZoomLevel = new WeakMap(), _App_mapEvent = new WeakMap(), _App_workouts = new WeakMap(), _App_routeMode = new WeakMap(), _App_routeStep = new WeakMap(), _App_routePointA = new WeakMap(), _App_routePointB = new WeakMap(), _App_routeLine = new WeakMap(), _App_routeMarkerA = new WeakMap(), _App_routeMarkerB = new WeakMap(), _App_routeActivityMode = new WeakMap(), _App_routeCoords = new WeakMap(), _App_routeTotalDist = new WeakMap(), _App_progressLine = new WeakMap(), _App_progressWatchId = new WeakMap(), _App_coveredUpToIndex = new WeakMap(), _App_arrivedShown = new WeakMap(), _App_nearDestCount = new WeakMap(), _App_voiceKmAnnounced = new WeakMap(), _App_voiceStartTime = new WeakMap(), _App_voiceDistCovered = new WeakMap(), _App_trackingActive = new WeakMap(), _App_watchId = new WeakMap(), _App_trackingMarker = new WeakMap(), _App_trackingCoords = new WeakMap(), _App_prevTrackingCoords = new WeakMap(), _App_userTouchingMap = new WeakMap(), _App_recenterTimer = new WeakMap(), _App_tracker = new WeakMap(), _App_trackSport = new WeakMap(), _App_timerActive = new WeakMap(), _App_timerPaused = new WeakMap(), _App_timerStartMs = new WeakMap(), _App_timerAccumSec = new WeakMap(), _App_timerInterval = new WeakMap(), _App_lastAnnouncedKm = new WeakMap(), _App_wasAutoPaused = new WeakMap(), _App_lastLapCount = new WeakMap(), _App_clockInterval = new WeakMap(), _App_historyPanel = new WeakMap(), _App_nightMode = new WeakMap(), _App_wakeLock = new WeakMap(), _App_deferredInstallPrompt = new WeakMap(), _App_markers = new WeakMap(), _App_clusterGroup = new WeakMap(), _App_clusterEnabled = new WeakMap(), _App_activeRoute = new WeakMap(), _App_unifiedMarkers = new WeakMap(), _App_refreshing = new WeakMap(), _App_poiMarkers = new WeakMap(), _App_userCoords = new WeakMap(), _App_autocompleteTimer = new WeakMap(), _App_filterDrag = new WeakMap(), _App_activitySpeeds = new WeakMap(), _App_activeWorkoutId = new WeakMap(), _App_workoutRouteLayer = new WeakMap(), _App_customFilters = new WeakMap(), _App_pinnedCoord = new WeakMap(), _App_goalKm = new WeakMap(), _App_goalTime = new WeakMap(), _App_goalCount = new WeakMap(), _App_statsExpanded = new WeakMap(), _App_statsWeekOffset = new WeakMap(), _App_statsSelectedDay = new WeakMap(), _App_statsPrevGoalReached = new WeakMap();
+_a = App, _App_map = new WeakMap(), _App_ghostRoute = new WeakMap(), _App_createActive = new WeakMap(), _App_createWaypoints = new WeakMap(), _App_createMarkers = new WeakMap(), _App_createLine = new WeakMap(), _App_createSport = new WeakMap(), _App_createDistanceKm = new WeakMap(), _App_createCoords = new WeakMap(), _App_createClickHandler = new WeakMap(), _App_tileLayer = new WeakMap(), _App_mapZoomLevel = new WeakMap(), _App_mapEvent = new WeakMap(), _App_workouts = new WeakMap(), _App_routeMode = new WeakMap(), _App_routeStep = new WeakMap(), _App_routePointA = new WeakMap(), _App_routePointB = new WeakMap(), _App_routeLine = new WeakMap(), _App_routeMarkerA = new WeakMap(), _App_routeMarkerB = new WeakMap(), _App_routeActivityMode = new WeakMap(), _App_routeCoords = new WeakMap(), _App_routeTotalDist = new WeakMap(), _App_progressLine = new WeakMap(), _App_progressWatchId = new WeakMap(), _App_coveredUpToIndex = new WeakMap(), _App_arrivedShown = new WeakMap(), _App_nearDestCount = new WeakMap(), _App_voiceKmAnnounced = new WeakMap(), _App_voiceStartTime = new WeakMap(), _App_voiceDistCovered = new WeakMap(), _App_trackingActive = new WeakMap(), _App_watchId = new WeakMap(), _App_trackingMarker = new WeakMap(), _App_trackingCoords = new WeakMap(), _App_prevTrackingCoords = new WeakMap(), _App_userTouchingMap = new WeakMap(), _App_recenterTimer = new WeakMap(), _App_tracker = new WeakMap(), _App_trackSport = new WeakMap(), _App_timerActive = new WeakMap(), _App_timerPaused = new WeakMap(), _App_timerStartMs = new WeakMap(), _App_timerAccumSec = new WeakMap(), _App_timerInterval = new WeakMap(), _App_lastAnnouncedKm = new WeakMap(), _App_wasAutoPaused = new WeakMap(), _App_lastLapCount = new WeakMap(), _App_clockInterval = new WeakMap(), _App_historyPanel = new WeakMap(), _App_nightMode = new WeakMap(), _App_wakeLock = new WeakMap(), _App_deferredInstallPrompt = new WeakMap(), _App_markers = new WeakMap(), _App_clusterGroup = new WeakMap(), _App_clusterEnabled = new WeakMap(), _App_activeRoute = new WeakMap(), _App_unifiedMarkers = new WeakMap(), _App_refreshing = new WeakMap(), _App_poiMarkers = new WeakMap(), _App_userCoords = new WeakMap(), _App_autocompleteTimer = new WeakMap(), _App_filterDrag = new WeakMap(), _App_activitySpeeds = new WeakMap(), _App_activeWorkoutId = new WeakMap(), _App_workoutRouteLayer = new WeakMap(), _App_customFilters = new WeakMap(), _App_pinnedCoord = new WeakMap(), _App_goalKm = new WeakMap(), _App_goalTime = new WeakMap(), _App_goalCount = new WeakMap(), _App_statsExpanded = new WeakMap(), _App_statsWeekOffset = new WeakMap(), _App_statsSelectedDay = new WeakMap(), _App_statsPrevGoalReached = new WeakMap();
 _App_ARRIVAL_CONSEC = { value: 3 };
 _App_ARRIVAL_DIST = { value: 20 };
 window.app = new App();
