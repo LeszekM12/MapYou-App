@@ -467,7 +467,7 @@ function estimateCalories(sport, distanceKm, durationSec, weightKg) {
     return Math.round(met * w * hours);
 }
 let _adMap = null;
-export async function openActivityDetail(act, isOwn) {
+export async function openActivityDetail(act, isOwn, actId) {
     document.getElementById('activityDetailOverlay')?.remove();
     if (_adMap) {
         try {
@@ -479,7 +479,8 @@ export async function openActivityDetail(act, isOwn) {
     // Own activities: reload full record (coords / laps / notes) from IndexedDB
     let full = act;
     if (isOwn) {
-        const fresh = (await loadEnrichedActivities()).find(a => a.id === act.id);
+        const realId = actId || act.activityId || act.id;
+        const fresh = (await loadEnrichedActivities()).find(a => a.id === realId);
         if (fresh)
             full = fresh;
     }
@@ -583,7 +584,7 @@ export async function openActivityDetail(act, isOwn) {
         ov.remove();
     };
     ov.querySelector('#adBack')?.addEventListener('click', close);
-    // Hero map / minimap (after layout so dimensions exist)
+    // Hero map / minimap (after layout + entry animation, so dimensions are final)
     setTimeout(() => {
         const mapEl = document.getElementById('adHeroMap');
         if (!mapEl)
@@ -602,11 +603,16 @@ export async function openActivityDetail(act, isOwn) {
                 L.circleMarker(pts[0], { radius: 6, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(_adMap);
                 L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#e74c3c', fillOpacity: 1 }).addTo(_adMap);
             }
+            // Leaflet renders blank if created before the container settled — force a resize pass
+            setTimeout(() => { try {
+                _adMap?.invalidateSize();
+            }
+            catch { /* ignore */ } }, 250);
         }
         else if (friendCoords && friendCoords.length > 0) {
             renderMinimapCanvas(mapEl, friendCoords, full.sport);
         }
-    }, 120);
+    }, 320);
     // Footer — reuse feed like/comment/share
     ov.querySelector('#adComment')?.addEventListener('click', () => openCommentPanel(ov.querySelector('.ad-sheet'), full.id));
     ov.querySelector('#adShare')?.addEventListener('click', () => openSharePanel(ov.querySelector('.ad-sheet'), full));
@@ -1760,7 +1766,7 @@ export class HomeView {
                 card.addEventListener('click', e => {
                     if (e.target.closest('button, a, video, input, [data-action], [data-pm], .home-card__photo, .home-card__avatar--user, .home-card__comment-panel, .hcs'))
                         return;
-                    void openActivityDetail(item.data, isOwn);
+                    void openActivityDetail(item.data, isOwn, (item.data.activityId ?? item.data.id));
                 });
             }
             scroll.appendChild(card);
@@ -1879,7 +1885,7 @@ export class HomeView {
                             card.addEventListener('click', e => {
                                 if (e.target.closest('button, a, video, input, [data-action], [data-pm], .home-card__photo, .home-card__avatar--user, .home-card__comment-panel, .hcs'))
                                     return;
-                                void openActivityDetail(item.data, isOwn);
+                                void openActivityDetail(item.data, isOwn, (item.data.activityId ?? item.data.id));
                             });
                         }
                         scroll.appendChild(card);
