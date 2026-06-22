@@ -5,6 +5,7 @@
 // User fills in name, description, photo, intensity, notes.
 // On save → writes EnrichedActivity to IndexedDB → triggers Home refresh.
 import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, getAllSports, saveCustomSport, deleteCustomSport, getCustomSports } from './Tracker.js';
+import { isRouteSaved, saveRoute, unsaveRoute, routeEligible } from './SavedRoutes.js';
 import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs } from './SearchView.js';
 import { openSportPicker } from './SportPicker.js';
@@ -63,6 +64,12 @@ function buildModalHtml(activity, isManual) {
         </div>
         <button class="sam-close" id="saveActivityClose" aria-label="Close">✕</button>
       </div>
+      ${routeEligible(activity.coords.length, activity.distanceKm, activity.durationSec)
+        ? `<button class="sam-route-star" id="samRouteStar" aria-pressed="${isRouteSaved(activity.id)}" title="Save as route">
+             <span class="sam-route-star__icon">${isRouteSaved(activity.id) ? '★' : '☆'}</span>
+             <span class="sam-route-star__txt">Save as route</span>
+           </button>`
+        : ''}
 
       <!-- Body -->
       <div class="sam-body">
@@ -464,6 +471,29 @@ export class SaveActivityModal {
             this.close(); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape')
             this.close(); }, { once: true });
+        // Save-as-route star (only present when the route is long enough)
+        const starBtn = el.querySelector('#samRouteStar');
+        starBtn?.addEventListener('click', () => {
+            const a = this._activity;
+            if (isRouteSaved(a.id)) {
+                unsaveRoute(a.id);
+                starBtn.setAttribute('aria-pressed', 'false');
+                const ic = starBtn.querySelector('.sam-route-star__icon');
+                if (ic)
+                    ic.textContent = '☆';
+            }
+            else {
+                saveRoute({
+                    id: a.id, name: a.description, sport: this._selectedSport,
+                    distanceKm: a.distanceKm, durationSec: a.durationSec,
+                    date: a.date, coords: a.coords,
+                });
+                starBtn.setAttribute('aria-pressed', 'true');
+                const ic = starBtn.querySelector('.sam-route-star__icon');
+                if (ic)
+                    ic.textContent = '★';
+            }
+        });
         // Sport selector — single button opens the categorized picker
         const updateSportBtn = (sport) => {
             this._selectedSport = sport;

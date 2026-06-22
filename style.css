@@ -2339,16 +2339,18 @@ body {
   color: var(--app-text-tertiary, rgba(255,255,255,0.5));
 }
 
-/* Save-as-route star in activity summary header */
-.act-sum__route-star {
-  margin-left: auto; flex: 0 0 auto;
-  width: 4rem; height: 4rem; border-radius: 50%;
-  border: none; cursor: pointer;
-  font-size: 2.2rem; line-height: 1;
-  background: rgba(255,206,31,0.16); color: #ffce1f;
-  display: flex; align-items: center; justify-content: center;
+/* Save-as-route star in the Finish modal */
+.sam-route-star {
+  display: flex; align-items: center; gap: 0.8rem;
+  margin: 0 2.4rem 0.4rem; padding: 1rem 1.4rem;
+  border-radius: 1.2rem; cursor: pointer;
+  border: 1.5px solid #ffce1f;
+  background: rgba(255,206,31,0.12); color: var(--app-text-primary, #fff);
+  font-family: inherit; font-size: 1.45rem; font-weight: 700;
 }
-.act-sum__route-star[aria-pressed="true"] { background: #ffce1f; color: #1a1a1a; }
+.sam-route-star__icon { font-size: 1.9rem; color: #ffce1f; }
+.sam-route-star[aria-pressed="true"] { background: #ffce1f; color: #1a1a1a; }
+.sam-route-star[aria-pressed="true"] .sam-route-star__icon { color: #1a1a1a; }
 
 /* Community routes — share button, author avatar, publish dialog */
 .trk-route-card__share {
