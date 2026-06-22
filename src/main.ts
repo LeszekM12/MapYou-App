@@ -1569,6 +1569,7 @@ class App {
       this._confirmDialog('Discard route?', "You'll lose this drawn route.", 'Discard', () => this._exitCreateMode());
     });
     document.getElementById('trkCreateSave')?.addEventListener('click', () => this._createSave());
+    document.getElementById('trkCreateLoop')?.addEventListener('click', () => this._openAutoLoopDialog());
     document.getElementById('trkCreateSport')?.addEventListener('click', () => {
       this._openTrackSportPicker(sport => { this.#createSport = sport; this._updateCreateSportBtn(); void this._createReroute(); });
     });
@@ -2222,6 +2223,7 @@ class App {
   _updateCreateUI(): void {
     const d = document.getElementById('trkCreateDist');
     if (d) d.textContent = this.#createDistanceKm.toFixed(2);
+    document.getElementById('trkCreateLoop')?.classList.toggle('hidden', this.#createWaypoints.length > 0);
     const hint = document.getElementById('trkCreateHint');
     if (hint) hint.textContent = this.#createWaypoints.length === 0
       ? 'Tap the map to add points'
@@ -2276,7 +2278,62 @@ class App {
     document.body.appendChild(ov);
   }
 
-  // Small elegant confirm dialog (used by Clear / Cancel in the builder)
+  // ── Auto-loop (Mode 2): generate an editable loop of a target distance ─────
+  _buildLoopWaypoints(start: [number, number], km: number): Array<[number, number]> {
+    const r    = (km * 1000) / (2 * Math.PI);                        // circle radius (m)
+    const dLat = r / 111320;
+    const dLng = r / (111320 * Math.cos(start[0] * Math.PI / 180));
+    const center: [number, number] = [start[0] + dLat, start[1]];    // center north of start
+    const N = 6;
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i <= N; i++) {
+      const ang = -Math.PI / 2 + (i / N) * 2 * Math.PI;              // begin/end at start (south of center)
+      pts.push([center[0] + dLat * Math.sin(ang), center[1] + dLng * Math.cos(ang)]);
+    }
+    return pts;
+  }
+
+  _autoLoop(km: number): void {
+    if (!this.#map) return;
+    const c = this.#userCoords ?? (this.#map.getCenter ? [this.#map.getCenter().lat, this.#map.getCenter().lng] as [number, number] : null);
+    if (!c) return;
+    this._createClear();
+    const pts = this._buildLoopWaypoints([c[0], c[1]], km);
+    pts.forEach(p => {
+      this.#createWaypoints.push(p);
+      const m = L.circleMarker(p, { radius: 6, color: '#fff', weight: 2, fillColor: '#ff5a1f', fillOpacity: 1 }).addTo(this.#map!);
+      this.#createMarkers.push(m);
+    });
+    void this._createReroute();
+  }
+
+  _openAutoLoopDialog(): void {
+    if (this.#createWaypoints.length > 0) return;                    // only when builder is empty
+    document.getElementById('trkLoopOverlay')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'trkLoopOverlay';
+    ov.className = 'trk-picker-overlay';
+    ov.innerHTML = `<div class="trk-picker trk-publish">
+      <div class="trk-picker__head">
+        <span class="trk-picker__title">🔄 Auto-generate a loop</span>
+        <button class="trk-picker__close" id="trkLoopClose">✕</button>
+      </div>
+      <div class="trk-publish__body">
+        <label class="trk-publish__label">Target distance (km)</label>
+        <input class="trk-routes-search" id="trkLoopKm" type="number" min="1" max="42" step="0.5" value="5" />
+        <p class="trk-publish__note">Generates a ${getSportLabel(this.#createSport)} loop from your location, snapped to roads. The actual distance may differ slightly — edit the points afterwards if needed.</p>
+        <button class="trk-publish__btn" id="trkLoopGo">Generate</button>
+      </div>
+    </div>`;
+    ov.querySelector('#trkLoopClose')?.addEventListener('click', () => ov.remove());
+    ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    ov.querySelector('#trkLoopGo')?.addEventListener('click', () => {
+      const km = Math.min(42, Math.max(1, Number((ov.querySelector('#trkLoopKm') as HTMLInputElement).value) || 5));
+      ov.remove();
+      this._autoLoop(km);
+    });
+    document.body.appendChild(ov);
+  }
   _confirmDialog(title: string, message: string, confirmLabel: string, onYes: () => void): void {
     document.getElementById('trkConfirmOverlay')?.remove();
     const ov = document.createElement('div');

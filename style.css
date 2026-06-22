@@ -2423,6 +2423,13 @@ body {
   color: var(--app-text-primary, #fff); font-family: inherit; font-size: 1.35rem; font-weight: 700; cursor: pointer;
 }
 .trk-create-act--save { background: #ff5a1f; border-color: #ff5a1f; color: #fff; flex: 1.4; }
+.trk-create-loop {
+  width: 100%; margin: 0 0 1.2rem; padding: 1.2rem;
+  border-radius: 1.2rem; border: 1.5px dashed #ff5a1f;
+  background: rgba(255,90,31,0.10); color: #ff5a1f;
+  font-family: inherit; font-size: 1.4rem; font-weight: 700; cursor: pointer;
+}
+.trk-create-loop.hidden { display: none !important; }
 
 /* History toggle */
 .trk-history-toggle {
