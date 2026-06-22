@@ -2380,10 +2380,48 @@ class App {
         if (!c)
             return;
         const start = [c[0], c[1]];
+        document.getElementById('trkCreateHint')?.replaceChildren('Generating loop…');
+        // 1) Try ORS round-trip — a real loop along roads, no forced waypoints
+        try {
+            const seed = Math.floor(Math.random() * 1e6);
+            const res = await fetch(`${BACKEND_URL}/loop?lat=${start[0]}&lng=${start[1]}&km=${km}&sport=${encodeURIComponent(__classPrivateFieldGet(this, _App_createSport, "f"))}&seed=${seed}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.status === 'success' && data.coords && data.coords.length > 1) {
+                    this._renderGeneratedLoop(data.coords, data.distanceKm ?? this._coordsDistanceKm(data.coords));
+                    return;
+                }
+            }
+        }
+        catch { /* fall through to Mapbox */ }
+        // 2) Fallback — Mapbox circle approximation
+        await this._autoLoopMapbox(start, km);
+    }
+    // Render a ready-made loop (from ORS) as an editable route in the builder
+    _renderGeneratedLoop(coords, km) {
+        if (!__classPrivateFieldGet(this, _App_map, "f"))
+            return;
+        this._createClear();
+        const N = Math.min(8, coords.length - 1);
+        for (let i = 0; i < N; i++) {
+            const p = coords[Math.floor(i * (coords.length - 1) / N)];
+            __classPrivateFieldGet(this, _App_createWaypoints, "f").push(p);
+            const m = L.circleMarker(p, { radius: 6, color: '#fff', weight: 2, fillColor: '#ff5a1f', fillOpacity: 1 }).addTo(__classPrivateFieldGet(this, _App_map, "f"));
+            __classPrivateFieldGet(this, _App_createMarkers, "f").push(m);
+        }
+        __classPrivateFieldSet(this, _App_createCoords, coords, "f");
+        __classPrivateFieldSet(this, _App_createDistanceKm, km, "f");
+        __classPrivateFieldSet(this, _App_createLine, L.polyline(coords, { color: '#ff5a1f', weight: 5, opacity: 0.95 }).addTo(__classPrivateFieldGet(this, _App_map, "f")), "f");
+        this._updateCreateUI();
+        try {
+            __classPrivateFieldGet(this, _App_map, "f").fitBounds(__classPrivateFieldGet(this, _App_createLine, "f").getBounds(), { padding: [40, 40] });
+        }
+        catch { /* ignore */ }
+    }
+    async _autoLoopMapbox(start, km) {
         const bearing = Math.random() * 2 * Math.PI; // random orientation → different each time
         const dir = Math.random() < 0.5 ? 1 : -1; // random rotation direction
         let radiusM = (km * 1000) / (2 * Math.PI) * 0.78; // start a bit small (roads inflate distance)
-        document.getElementById('trkCreateHint')?.replaceChildren('Generating loop…');
         for (let iter = 0; iter < 4; iter++) {
             this._createClear();
             const pts = this._loopPoints(start, radiusM, bearing, dir);
