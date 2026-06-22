@@ -1645,43 +1645,7 @@ class App {
             this._exitTrackingView();
             if (!activity)
                 return;
-            showGoodJobSplash(() => {
-                // Open save modal → user fills name, photo, intensity, notes
-                openSaveActivityModal(activity, 
-                // onSave
-                async (enriched) => {
-                    await CS.saveActivity(activity);
-                    // Save to unified for Stats → Progress
-                    await CS.saveUnifiedWorkout({
-                        id: enriched.id,
-                        type: (enriched.sport === 'walking' || enriched.sport === 'cycling') ? enriched.sport : 'running',
-                        sport: enriched.sport,
-                        source: 'tracking',
-                        date: new Date(enriched.date).toISOString(),
-                        distanceKm: enriched.distanceKm,
-                        durationSec: enriched.durationSec,
-                        paceMinKm: enriched.paceMinKm,
-                        speedKmH: enriched.speedKmH,
-                        elevGain: 0,
-                        coords: enriched.coords,
-                        name: enriched.name,
-                        description: enriched.description,
-                        notes: enriched.notes,
-                        intensity: enriched.intensity,
-                        photoUrl: enriched.photoUrl,
-                    });
-                    notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);
-                    __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
-                    await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
-                    await statsView.render();
-                    await homeView.render();
-                    homeView.switchToHome();
-                }, 
-                // onCancel — user dismissed modal without saving → clear the route from map
-                () => {
-                    __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
-                });
-            });
+            this._finishWithActivity(activity);
         });
         // ── DISCARD ───────────────────────────────────────────────────────────
         document.getElementById('trkBtnDiscard')?.addEventListener('click', () => {
@@ -1762,21 +1726,36 @@ class App {
         const render = () => {
             overlay.innerHTML = `<div class="trk-picker">
         <div class="trk-picker__head">
-          <span class="trk-picker__title">Settings</span>
+          <span class="trk-picker__title" id="trkSetTitle">Settings</span>
           <button class="trk-picker__close" id="trkSetClose">✕</button>
         </div>
         <div class="trk-set-grid">
           ${tile('screen_lock', '🔒', 'Screen lock', this._isScreenLockOn() ? 'Keep screen on' : 'Normal', this._isScreenLockOn())}
           ${tile('voice', '🔊', 'Voice cues', this._isVoiceCuesOn() ? 'On · every km' : 'Off', this._isVoiceCuesOn())}
           ${tile('auto_pause', '⏸️', 'Auto-pause', this._isAutoPauseOn() ? 'On' : 'Off', this._isAutoPauseOn())}
+          ${this._isDevMode() ? tile('simulate', '🧪', 'Simulate run', 'dev', false) : ''}
         </div>
       </div>`;
             overlay.querySelector('#trkSetClose')?.addEventListener('click', () => overlay.remove());
             overlay.addEventListener('click', e => { if (e.target === overlay)
                 overlay.remove(); });
+            // Hidden: tap the title 5× to toggle developer mode
+            let taps = 0;
+            overlay.querySelector('#trkSetTitle')?.addEventListener('click', () => {
+                if (++taps >= 5) {
+                    taps = 0;
+                    localStorage.setItem('mapyou_dev', this._isDevMode() ? 'false' : 'true');
+                    render();
+                }
+            });
             overlay.querySelectorAll('[data-set]').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const id = btn.dataset.set;
+                    if (id === 'simulate') {
+                        overlay.remove();
+                        this._openSimDialog();
+                        return;
+                    }
                     const key = id === 'screen_lock' ? 'mapyou_screen_lock'
                         : id === 'voice' ? 'mapyou_voice_cues'
                             : 'mapyou_auto_pause';
@@ -1949,6 +1928,124 @@ class App {
             switchTab(b.dataset.tab); }));
         searchEl.addEventListener('input', () => (tab === 'saved' ? renderSaved(searchEl.value) : renderCommunity(searchEl.value)));
         switchTab('saved');
+    }
+    // Shared finish pipeline (used by real Stop AND the dev simulator)
+    _finishWithActivity(activity) {
+        showGoodJobSplash(() => {
+            openSaveActivityModal(activity, async (enriched) => {
+                await CS.saveActivity(activity);
+                await CS.saveUnifiedWorkout({
+                    id: enriched.id,
+                    type: (enriched.sport === 'walking' || enriched.sport === 'cycling') ? enriched.sport : 'running',
+                    sport: enriched.sport,
+                    source: 'tracking',
+                    date: new Date(enriched.date).toISOString(),
+                    distanceKm: enriched.distanceKm,
+                    durationSec: enriched.durationSec,
+                    paceMinKm: enriched.paceMinKm,
+                    speedKmH: enriched.speedKmH,
+                    elevGain: 0,
+                    coords: enriched.coords,
+                    name: enriched.name,
+                    description: enriched.description,
+                    notes: enriched.notes,
+                    intensity: enriched.intensity,
+                    photoUrl: enriched.photoUrl,
+                });
+                notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);
+                __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
+                await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
+                await statsView.render();
+                await homeView.render();
+                homeView.switchToHome();
+            }, () => { __classPrivateFieldGet(this, _App_tracker, "f")?.reset(); });
+        });
+    }
+    // ── DEV: simulate a finished run (test without leaving home) ───────────────
+    _isDevMode() { return localStorage.getItem('mapyou_dev') === 'true'; }
+    _buildSyntheticLoop(center, km) {
+        const circumM = Math.max(200, km * 1000);
+        const radiusM = circumM / (2 * Math.PI);
+        const dLat = radiusM / 111320; // m → deg lat
+        const dLng = radiusM / (111320 * Math.cos(center[0] * Math.PI / 180));
+        const pts = Math.min(600, Math.max(20, Math.round(circumM / 10)));
+        const out = [];
+        for (let i = 0; i <= pts; i++) {
+            const t = (i / pts) * 2 * Math.PI;
+            out.push([center[0] + dLat * Math.sin(t), center[1] + dLng * Math.cos(t)]);
+        }
+        return out;
+    }
+    _makeFakeActivity(sport, coords, distanceKm, durationSec) {
+        const d = new Date();
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        const durMin = durationSec / 60;
+        return {
+            id: 'sim_' + Date.now().toString(36),
+            sport: sport,
+            date: d.toISOString(),
+            distanceKm,
+            durationSec,
+            paceMinKm: distanceKm > 0 ? durMin / distanceKm : 0,
+            speedKmH: durMin > 0 ? distanceKm / (durMin / 60) : 0,
+            coords,
+            description: `${getIcon(sport)} ${getSportLabel(sport)} on ${months[d.getMonth()]} ${d.getDate()}`,
+        };
+    }
+    _openSimDialog() {
+        document.getElementById('trkSimOverlay')?.remove();
+        const ov = document.createElement('div');
+        ov.id = 'trkSimOverlay';
+        ov.className = 'trk-picker-overlay';
+        const hasGhost = !!__classPrivateFieldGet(this, _App_ghostRoute, "f");
+        ov.innerHTML = `<div class="trk-picker trk-publish">
+      <div class="trk-picker__head">
+        <span class="trk-picker__title">🧪 Simulate run (dev)</span>
+        <button class="trk-picker__close" id="trkSimClose">✕</button>
+      </div>
+      <div class="trk-publish__body">
+        <label class="trk-publish__label">Source</label>
+        <select class="trk-routes-search" id="trkSimSource">
+          ${hasGhost ? '<option value="ghost">Loaded route (ghost)</option>' : ''}
+          <option value="loop">Synthetic loop</option>
+        </select>
+        <label class="trk-publish__label">Distance (km) — used for synthetic loop</label>
+        <input class="trk-routes-search" id="trkSimDist" type="number" min="0.5" step="0.1" value="5" />
+        <label class="trk-publish__label">Duration (minutes)</label>
+        <input class="trk-routes-search" id="trkSimDur" type="number" min="1" step="1" value="28" />
+        <p class="trk-publish__note">Creates a finished activity (sport: ${getSportLabel(__classPrivateFieldGet(this, _App_trackSport, "f"))}) and opens the Finish modal — exactly as if you'd just run it.</p>
+        <button class="trk-publish__btn" id="trkSimGo">Generate activity</button>
+      </div>
+    </div>`;
+        ov.querySelector('#trkSimClose')?.addEventListener('click', () => ov.remove());
+        ov.addEventListener('click', e => { if (e.target === ov)
+            ov.remove(); });
+        ov.querySelector('#trkSimGo')?.addEventListener('click', () => {
+            const source = ov.querySelector('#trkSimSource').value;
+            const durMin = Math.max(1, Number(ov.querySelector('#trkSimDur').value) || 28);
+            let coords;
+            let km;
+            if (source === 'ghost' && __classPrivateFieldGet(this, _App_ghostRoute, "f")) {
+                coords = __classPrivateFieldGet(this, _App_ghostRoute, "f").getLatLngs().map(p => [p.lat, p.lng]);
+                km = this._coordsDistanceKm(coords);
+            }
+            else {
+                km = Math.max(0.5, Number(ov.querySelector('#trkSimDist').value) || 5);
+                const c = __classPrivateFieldGet(this, _App_map, "f")?.getCenter?.();
+                coords = this._buildSyntheticLoop(c ? [c.lat, c.lng] : [52.2297, 21.0122], km);
+            }
+            ov.remove();
+            const activity = this._makeFakeActivity(__classPrivateFieldGet(this, _App_trackSport, "f"), coords, km, Math.round(durMin * 60));
+            this._finishWithActivity(activity);
+        });
+        document.body.appendChild(ov);
+    }
+    _coordsDistanceKm(coords) {
+        let m = 0;
+        for (let i = 1; i < coords.length; i++) {
+            m += L.latLng(coords[i - 1][0], coords[i - 1][1]).distanceTo(L.latLng(coords[i][0], coords[i][1]));
+        }
+        return m / 1000;
     }
     _getUserId() { return localStorage.getItem('mapyou_userId_profile') ?? ''; }
     // Trim points within `meters` of the first/last point (privacy near home)
