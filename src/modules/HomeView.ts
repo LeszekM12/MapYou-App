@@ -28,6 +28,21 @@ import { CS } from './cloudSync.js';
 
 
 
+// Tap-to-zoom for activity photos (Stats detail + activity detail). Delegated, bound once.
+if (typeof document !== 'undefined' && !(window as unknown as Record<string, unknown>).__photoZoomBound) {
+  (window as unknown as Record<string, unknown>).__photoZoomBound = true;
+  document.addEventListener('click', e => {
+    const img = (e.target as HTMLElement).closest('.sv-detail-photo img, .ad-photo img') as HTMLImageElement | null;
+    if (!img) return;
+    e.stopPropagation();
+    const ov = document.createElement('div');
+    ov.className = 'sv-lightbox';
+    ov.innerHTML = `<img src="${img.src}" alt=""/>`;
+    ov.addEventListener('click', () => ov.remove());
+    document.body.appendChild(ov);
+  });
+}
+
 function relativeDate(timestamp: number): string {
   const diff = Date.now() - timestamp;
   const mins  = Math.floor(diff / 60_000);

@@ -1836,6 +1836,7 @@ class App {
         let tab = 'saved';
         let community = [];
         let communityLoaded = false;
+        let communityMode = 'near';
         // ── Saved tab ──
         const renderSaved = (filter = '') => {
             const routes = getSavedRoutes();
@@ -1895,24 +1896,70 @@ class App {
                 || getSportLabel(r.sport).toLowerCase().includes(q)
                 || (r.name ?? '').toLowerCase().includes(q)
                 || (r.ownerName ?? '').toLowerCase().includes(q));
-            if (shown.length === 0) {
-                listEl.innerHTML = `<div class="trk-routes-empty">${community.length === 0
-                    ? 'No community routes near you yet. Be the first — share one from your Saved routes!'
-                    : 'No routes match your search.'}</div>`;
-                return;
-            }
-            listEl.innerHTML = shown.map(r => {
-                const avatar = r.ownerAvatarB64
-                    ? `<img class="trk-route-card__avatar" src="${r.ownerAvatarB64}" alt="" />`
-                    : `<span class="trk-route-card__avatar trk-route-card__avatar--ph">${(r.ownerName || '?').charAt(0).toUpperCase()}</span>`;
-                return `<div class="trk-route-card" data-rid="${r.routeId}">
-          ${avatar}
-          <span class="trk-route-card__main">
-            <span class="trk-route-card__title">${getIcon(r.sport)} ${r.name || getSportLabel(r.sport)}</span>
-            <span class="trk-route-card__meta">${r.ownerName || 'MapYou User'} · ${formatDistance(r.distanceKm)} km</span>
-          </span>
-        </div>`;
-            }).join('');
+            const seg = `<div class="trk-routes-seg">
+        <button class="trk-routes-seg__btn ${communityMode === 'near' ? 'trk-routes-seg__btn--active' : ''}" data-cmode="near">📍 Near me</button>
+        <button class="trk-routes-seg__btn ${communityMode === 'featured' ? 'trk-routes-seg__btn--active' : ''}" data-cmode="featured">⭐ Featured</button>
+      </div>`;
+            const body = shown.length === 0
+                ? `<div class="trk-routes-empty">${community.length === 0
+                    ? (communityMode === 'featured'
+                        ? 'No featured routes near you yet. Like routes to push them up here!'
+                        : 'No community routes near you yet. Be the first — share one from your Saved routes!')
+                    : 'No routes match your search.'}</div>`
+                : shown.map(r => {
+                    const avatar = r.ownerAvatarB64
+                        ? `<img class="trk-route-card__avatar" src="${r.ownerAvatarB64}" alt="" />`
+                        : `<span class="trk-route-card__avatar trk-route-card__avatar--ph">${(r.ownerName || '?').charAt(0).toUpperCase()}</span>`;
+                    return `<div class="trk-route-card" data-rid="${r.routeId}">
+              ${avatar}
+              <span class="trk-route-card__main">
+                <span class="trk-route-card__title">${getIcon(r.sport)} ${r.name || getSportLabel(r.sport)}</span>
+                <span class="trk-route-card__meta">${r.ownerName || 'MapYou User'} · ${formatDistance(r.distanceKm)} km</span>
+              </span>
+              <button class="trk-route-like ${r.liked ? 'trk-route-like--on' : ''}" data-like="${r.routeId}" aria-label="Like route">
+                <span class="trk-route-like__heart">♥</span>
+                <span class="trk-route-like__count">${r.likeCount ?? 0}</span>
+              </button>
+            </div>`;
+                }).join('');
+            listEl.innerHTML = seg + body;
+            // Segment switch (Near me / Featured)
+            listEl.querySelectorAll('[data-cmode]').forEach(b => b.addEventListener('click', () => {
+                const m = b.dataset.cmode;
+                if (m === communityMode)
+                    return;
+                communityMode = m;
+                communityLoaded = false;
+                void loadCommunity();
+            }));
+            // Heart like (toggle) — must not open the route
+            listEl.querySelectorAll('[data-like]').forEach(btn => btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const rid = btn.dataset.like;
+                const r = community.find(x => x.routeId === rid);
+                if (!r)
+                    return;
+                const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+                if (!userId)
+                    return;
+                try {
+                    const res = await fetch(`${BACKEND_URL}/routes/${rid}/like`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId }),
+                    });
+                    const j = await res.json();
+                    if (j.status !== 'ok')
+                        return;
+                    r.liked = j.liked;
+                    r.likeCount = j.count;
+                    btn.classList.toggle('trk-route-like--on', j.liked);
+                    const cnt = btn.querySelector('.trk-route-like__count');
+                    if (cnt)
+                        cnt.textContent = String(j.count);
+                }
+                catch { /* offline: ignore */ }
+            }));
+            // Open route (load ghost)
             listEl.querySelectorAll('.trk-route-card').forEach(card => {
                 card.addEventListener('click', () => {
                     const r = community.find(x => x.routeId === card.dataset.rid);
@@ -1934,6 +1981,11 @@ class App {
                     qs.set('lng', String(c.lng));
                     qs.set('radiusKm', '25');
                 }
+                const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+                if (userId)
+                    qs.set('userId', userId);
+                if (communityMode === 'featured')
+                    qs.set('sort', 'featured');
                 const res = await fetch(`${BACKEND_URL}/routes?${qs.toString()}`);
                 const json = await res.json();
                 community = (json.data ?? []);
