@@ -4,7 +4,7 @@
 // Bottom-sheet modal shown after clicking Finish.
 // User fills in name, description, photo, intensity, notes.
 // On save → writes EnrichedActivity to IndexedDB → triggers Home refresh.
-import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, getAllSports, saveCustomSport, deleteCustomSport, getCustomSports } from './Tracker.js';
+import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, getAllSports } from './Tracker.js';
 import { isRouteSaved, saveRoute, unsaveRoute, routeEligible } from './SavedRoutes.js';
 import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs } from './SearchView.js';
@@ -233,49 +233,40 @@ export class SaveActivityModal {
         overlay.id = 'samSportPickerOverlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
         const renderPicker = () => {
-            const customs = getCustomSports();
             const all = getAllSports();
-            overlay.innerHTML = '<div style="background:#1a1d24;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden">'
-                + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08)">'
+            const cats = [];
+            const byCat = {};
+            all.forEach(s => {
+                const c = s.category ?? 'Other';
+                if (!byCat[c]) {
+                    byCat[c] = [];
+                    cats.push(c);
+                }
+                byCat[c].push(s);
+            });
+            const sections = cats.map(c => '<div style="margin-top:16px">'
+                + '<div style="color:rgba(255,255,255,0.45);font-size:1.15rem;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;margin:0 0 8px 2px">' + c + '</div>'
+                + '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
+                + byCat[c].map(s => '<button data-pick="' + s.key + '" style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px">'
+                    + '<span style="font-size:2rem">' + s.icon + '</span>'
+                    + '<span style="color:#fff;font-size:1.2rem;font-weight:600;text-align:center">' + s.label + '</span>'
+                    + '</button>').join('')
+                + '</div></div>').join('');
+            overlay.innerHTML = '<div style="background:#1a1d24;border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:82vh;display:flex;flex-direction:column;overflow:hidden">'
+                + '<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.08);flex:0 0 auto">'
                 + '<span style="color:#fff;font-size:1.6rem;font-weight:700">Choose sport</span>'
                 + '<button id="samPickerClose" style="background:none;border:none;color:rgba(255,255,255,0.5);font-size:2rem;cursor:pointer;line-height:1">✕</button>'
                 + '</div>'
-                + '<div style="overflow-y:auto;padding:12px 16px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:10px">'
-                + all.map(s => '<button data-pick="' + s.key + '" style="background:rgba(255,255,255,0.06);border:1.5px solid rgba(255,255,255,0.1);border-radius:12px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative">'
-                    + '<span style="font-size:2rem">' + s.icon + '</span>'
-                    + '<span style="color:#fff;font-size:1.2rem;font-weight:600;text-align:center">' + s.label + '</span>'
-                    + (customs.find(c => c.key === s.key) ? '<button data-delete-sport="' + s.key + '" style="position:absolute;top:4px;right:4px;background:none;border:none;color:rgba(255,255,255,0.25);font-size:1rem;cursor:pointer;padding:2px">×</button>' : '')
-                    + '</button>').join('')
-                + '<button id="samAddCustomSport" style="background:rgba(255,255,255,0.04);border:1.5px dashed rgba(255,255,255,0.15);border-radius:12px;padding:12px 8px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:4px">'
-                + '<span style="font-size:2rem">➕</span>'
-                + '<span style="color:rgba(255,255,255,0.5);font-size:1.2rem;font-weight:600">Add custom</span>'
-                + '</button>'
-                + '</div></div>';
+                + '<div style="overflow-y:auto;padding:4px 16px 24px">' + sections + '</div>'
+                + '</div>';
             overlay.querySelector('#samPickerClose')?.addEventListener('click', () => overlay.remove());
             overlay.addEventListener('click', e => { if (e.target === overlay)
                 overlay.remove(); });
             overlay.querySelectorAll('[data-pick]').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    if (e.target.hasAttribute('data-delete-sport'))
-                        return;
+                btn.addEventListener('click', () => {
                     overlay.remove();
                     onSelect(btn.dataset.pick);
                 });
-            });
-            overlay.querySelectorAll('[data-delete-sport]').forEach(btn => {
-                btn.addEventListener('click', e => {
-                    e.stopPropagation();
-                    deleteCustomSport(btn.dataset.deleteSport);
-                    renderPicker();
-                });
-            });
-            overlay.querySelector('#samAddCustomSport')?.addEventListener('click', () => {
-                const name = prompt('Enter sport name:')?.trim();
-                if (!name)
-                    return;
-                const sport = saveCustomSport(name);
-                overlay.remove();
-                onSelect(sport.key);
             });
         };
         renderPicker();

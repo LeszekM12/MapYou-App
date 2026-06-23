@@ -8,26 +8,68 @@ export type SportType = string;
 export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'] as const;
 
 export const ALL_SPORTS: { key: string; icon: string; label: string; trackable: boolean; category: string }[] = [
-  { key: 'running',      icon: '🏃',  label: 'Running',      trackable: true,  category: 'Foot Sports'    },
-  { key: 'walking',      icon: '🚶',  label: 'Walking',      trackable: true,  category: 'Foot Sports'    },
-  { key: 'hiking',       icon: '🥾',  label: 'Hiking',       trackable: true,  category: 'Foot Sports'    },
-  { key: 'cycling',      icon: '🚴',  label: 'Cycling',      trackable: true,  category: 'Cycle Sports'   },
-  { key: 'skateboard',   icon: '🛹',  label: 'Skateboard',   trackable: true,  category: 'Wheel Sports'   },
-  { key: 'skiing',       icon: '⛷️',   label: 'Skiing',       trackable: true,  category: 'Winter Sports'  },
-  { key: 'rowing',       icon: '🚣',  label: 'Rowing',       trackable: true,  category: 'Water Sports'   },
-  { key: 'swimming',     icon: '🏊',  label: 'Swimming',     trackable: false, category: 'Water Sports'   },
-  { key: 'tennis',       icon: '🎾',  label: 'Tennis',       trackable: false, category: 'Racket Sports'  },
-  { key: 'football',     icon: '⚽',  label: 'Football',     trackable: false, category: 'Ball Sports'    },
-  { key: 'basketball',   icon: '🏀',  label: 'Basketball',   trackable: false, category: 'Ball Sports'    },
-  { key: 'volleyball',   icon: '🏐',  label: 'Volleyball',   trackable: false, category: 'Ball Sports'    },
-  { key: 'gym',          icon: '🏋️',   label: 'Gym',          trackable: false, category: 'Gym & Fitness'  },
-  { key: 'crossfit',     icon: '💪',  label: 'CrossFit',     trackable: false, category: 'Gym & Fitness'  },
-  { key: 'yoga',         icon: '🧘',  label: 'Yoga',         trackable: false, category: 'Gym & Fitness'  },
-  { key: 'pilates',      icon: '🤸',  label: 'Pilates',      trackable: false, category: 'Gym & Fitness'  },
-  { key: 'boxing',       icon: '🥊',  label: 'Boxing',       trackable: false, category: 'Gym & Fitness'  },
-  { key: 'martial_arts', icon: '🥋',  label: 'Martial Arts', trackable: false, category: 'Gym & Fitness'  },
-  { key: 'climbing',     icon: '🧗',  label: 'Climbing',     trackable: false, category: 'Gym & Fitness'  },
-  { key: 'dance',        icon: '💃',  label: 'Dance',        trackable: false, category: 'Gym & Fitness'  },
+  // Foot
+  { key: 'running',      icon: '🏃',  label: 'Running',         trackable: true,  category: 'Foot Sports'   },
+  { key: 'trail_run',    icon: '⛰️',   label: 'Trail Run',       trackable: true,  category: 'Foot Sports'   },
+  { key: 'walking',      icon: '🚶',  label: 'Walking',         trackable: true,  category: 'Foot Sports'   },
+  { key: 'hiking',       icon: '🥾',  label: 'Hiking',          trackable: true,  category: 'Foot Sports'   },
+  // Cycle
+  { key: 'cycling',      icon: '🚴',  label: 'Cycling',         trackable: true,  category: 'Cycle Sports'  },
+  { key: 'mtb',          icon: '🚵',  label: 'Mountain Bike',   trackable: true,  category: 'Cycle Sports'  },
+  { key: 'gravel',       icon: '🚲',  label: 'Gravel Ride',     trackable: true,  category: 'Cycle Sports'  },
+  { key: 'ebike',        icon: '⚡',  label: 'E-Bike Ride',     trackable: true,  category: 'Cycle Sports'  },
+  { key: 'emtb',         icon: '⚡',  label: 'E-Mountain Bike', trackable: true,  category: 'Cycle Sports'  },
+  { key: 'velomobile',   icon: '🚲',  label: 'Velomobile',      trackable: true,  category: 'Cycle Sports'  },
+  { key: 'handcycle',    icon: '🦽',  label: 'Handcycle',       trackable: true,  category: 'Cycle Sports'  },
+  // Wheel
+  { key: 'skateboard',   icon: '🛹',  label: 'Skateboard',      trackable: true,  category: 'Wheel Sports'  },
+  { key: 'inline_skate', icon: '🛼',  label: 'Inline Skate',    trackable: true,  category: 'Wheel Sports'  },
+  { key: 'roller_ski',   icon: '🎿',  label: 'Roller Ski',      trackable: true,  category: 'Wheel Sports'  },
+  { key: 'wheelchair',   icon: '♿',  label: 'Wheelchair',      trackable: true,  category: 'Wheel Sports'  },
+  // Water
+  { key: 'rowing',       icon: '🚣',  label: 'Rowing',          trackable: true,  category: 'Water Sports'  },
+  { key: 'canoe',        icon: '🛶',  label: 'Canoe',           trackable: true,  category: 'Water Sports'  },
+  { key: 'kayak',        icon: '🛶',  label: 'Kayak',           trackable: true,  category: 'Water Sports'  },
+  { key: 'sup',          icon: '🏄',  label: 'Stand Up Paddle', trackable: true,  category: 'Water Sports'  },
+  { key: 'surf',         icon: '🏄',  label: 'Surfing',         trackable: true,  category: 'Water Sports'  },
+  { key: 'kitesurf',     icon: '🪁',  label: 'Kitesurf',        trackable: true,  category: 'Water Sports'  },
+  { key: 'windsurf',     icon: '🏄',  label: 'Windsurf',        trackable: true,  category: 'Water Sports'  },
+  { key: 'swimming',     icon: '🏊',  label: 'Swimming',        trackable: false, category: 'Water Sports'  },
+  // Winter
+  { key: 'skiing',       icon: '⛷️',   label: 'Alpine Ski',      trackable: true,  category: 'Winter Sports' },
+  { key: 'backcountry_ski', icon: '🎿', label: 'Backcountry Ski', trackable: true, category: 'Winter Sports' },
+  { key: 'nordic_ski',   icon: '🎿',  label: 'Nordic Ski',      trackable: true,  category: 'Winter Sports' },
+  { key: 'snowboard',    icon: '🏂',  label: 'Snowboard',       trackable: true,  category: 'Winter Sports' },
+  { key: 'snowshoe',     icon: '🥾',  label: 'Snowshoe',        trackable: true,  category: 'Winter Sports' },
+  { key: 'ice_skate',    icon: '⛸️',   label: 'Ice Skate',       trackable: false, category: 'Winter Sports' },
+  // Racket
+  { key: 'tennis',       icon: '🎾',  label: 'Tennis',          trackable: false, category: 'Racket Sports' },
+  { key: 'badminton',    icon: '🏸',  label: 'Badminton',       trackable: false, category: 'Racket Sports' },
+  { key: 'table_tennis', icon: '🏓',  label: 'Table Tennis',    trackable: false, category: 'Racket Sports' },
+  { key: 'pickleball',   icon: '🥒',  label: 'Pickleball',      trackable: false, category: 'Racket Sports' },
+  { key: 'padel',        icon: '🎾',  label: 'Padel',           trackable: false, category: 'Racket Sports' },
+  { key: 'squash',       icon: '🎾',  label: 'Squash',          trackable: false, category: 'Racket Sports' },
+  { key: 'racquetball',  icon: '🎾',  label: 'Racquetball',     trackable: false, category: 'Racket Sports' },
+  // Ball
+  { key: 'football',     icon: '⚽',  label: 'Football',        trackable: false, category: 'Ball Sports'   },
+  { key: 'basketball',   icon: '🏀',  label: 'Basketball',      trackable: false, category: 'Ball Sports'   },
+  { key: 'volleyball',   icon: '🏐',  label: 'Volleyball',      trackable: false, category: 'Ball Sports'   },
+  { key: 'cricket',      icon: '🏏',  label: 'Cricket',         trackable: false, category: 'Ball Sports'   },
+  // Gym & Fitness
+  { key: 'gym',          icon: '🏋️',   label: 'Weight Training', trackable: false, category: 'Gym & Fitness' },
+  { key: 'crossfit',     icon: '💪',  label: 'CrossFit',        trackable: false, category: 'Gym & Fitness' },
+  { key: 'hiit',         icon: '🔥',  label: 'HIIT',            trackable: false, category: 'Gym & Fitness' },
+  { key: 'elliptical',   icon: '🌀',  label: 'Elliptical',      trackable: false, category: 'Gym & Fitness' },
+  { key: 'stair_stepper',icon: '🪜',  label: 'Stair Stepper',   trackable: false, category: 'Gym & Fitness' },
+  { key: 'yoga',         icon: '🧘',  label: 'Yoga',            trackable: false, category: 'Gym & Fitness' },
+  { key: 'pilates',      icon: '🤸',  label: 'Pilates',         trackable: false, category: 'Gym & Fitness' },
+  { key: 'boxing',       icon: '🥊',  label: 'Boxing',          trackable: false, category: 'Gym & Fitness' },
+  { key: 'martial_arts', icon: '🥋',  label: 'Martial Arts',    trackable: false, category: 'Gym & Fitness' },
+  { key: 'climbing',     icon: '🧗',  label: 'Rock Climb',      trackable: false, category: 'Gym & Fitness' },
+  { key: 'dance',        icon: '💃',  label: 'Dance',           trackable: false, category: 'Gym & Fitness' },
+  // Other
+  { key: 'golf',         icon: '⛳',  label: 'Golf',            trackable: true,  category: 'Other'         },
+  { key: 'workout',      icon: '🏅',  label: 'Workout',         trackable: false, category: 'Other'         },
 ];
 
 // Whether a sport is GPS-trackable (shows map) or timer-only (stopwatch).
@@ -146,7 +188,10 @@ export const SPORT_ICONS: Record<string, string> = {
 };
 
 export function getIcon(sport: string): string {
-  return SPORT_ICONS[sport] ?? getSportIcon(sport);
+  if (SPORT_ICONS[sport]) return SPORT_ICONS[sport];
+  const found = ALL_SPORTS.find(s => s.key === sport);
+  if (found) return found.icon;
+  return getSportIcon(sport);
 }
 
 export const SPORT_COLORS: Record<string, string> = {
@@ -192,7 +237,7 @@ export class Tracker {
   private _motionMag:    number[] = [];
   private _motionRestSince: number | null = null;
   private _motionHandler: ((e: DeviceMotionEvent) => void) | null = null;
-  private static readonly MOTION_SPORTS = ['running', 'walking', 'hiking'];
+  private static readonly MOTION_SPORTS = ['running', 'walking', 'hiking', 'trail_run', 'snowshoe'];
 
   constructor(map: L.Map, onUpdate: OnUpdate) {
     this.map      = map;
