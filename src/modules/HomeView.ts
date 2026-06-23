@@ -532,7 +532,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   const kcal    = estimateCalories(full.sport, full.distanceKm, full.durationSec, profile.weightKg);
 
   const ownCoords    = isOwn && Array.isArray(full.coords) && full.coords.length > 0;
-  const encoded      = (rec.coordsEnc as string | null) ?? null;
+  const encoded      = (rec._coordsEncResolved as string | null) ?? (rec.coordsEnc as string | null) ?? null;
   const friendCoords = !ownCoords && encoded ? decodePolyline(encoded) : null;
 
   const authorName = (rec.authorName as string) || (isOwn ? (profile.name || 'You') : getSportLabel(full.sport));

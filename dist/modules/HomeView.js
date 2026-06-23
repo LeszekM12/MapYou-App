@@ -494,7 +494,7 @@ export async function openActivityDetail(act, isOwn, actId) {
     const profile = loadProfileFromLocal();
     const kcal = estimateCalories(full.sport, full.distanceKm, full.durationSec, profile.weightKg);
     const ownCoords = isOwn && Array.isArray(full.coords) && full.coords.length > 0;
-    const encoded = rec.coordsEnc ?? null;
+    const encoded = rec._coordsEncResolved ?? rec.coordsEnc ?? null;
     const friendCoords = !ownCoords && encoded ? decodePolyline(encoded) : null;
     const authorName = rec.authorName || (isOwn ? (profile.name || 'You') : getSportLabel(full.sport));
     const avatarSrc = rec.avatarB64 ?? rec.authorAvatarUrl ?? (isOwn ? profile.avatarB64 : null);
