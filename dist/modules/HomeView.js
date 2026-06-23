@@ -566,10 +566,25 @@ export async function openActivityDetail(act, isOwn, actId) {
       ${splitsHtml}
       ${notesHtml}
 
-      <div class="ad-actions">
-        <button class="ad-act" id="adLike" data-like-count="${full.id}">👍 <span>${likeCount > 0 ? likeCount : ''}</span></button>
-        <button class="ad-act" id="adComment">💬</button>
-        <button class="ad-act" id="adShare">↗</button>
+      <div class="home-card__footer ad-footer" style="border-top:1px solid var(--app-border)">
+        <button class="home-card__action home-card__action--like" data-action="like" aria-label="Like">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <span class="home-card__action-count" data-like-count="${full.id}">${likeCount > 0 ? likeCount : 0}</span>
+        </button>
+        <button class="home-card__action home-card__action--comment" data-action="comment" aria-label="Comment">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+          </svg>
+          <span class="home-card__action-count" data-comment-count="${full.id}">0</span>
+        </button>
+        <button class="home-card__action home-card__action--share" data-action="share" aria-label="Share">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+        </button>
       </div>
     </div>`;
     document.body.appendChild(ov);
@@ -584,7 +599,43 @@ export async function openActivityDetail(act, isOwn, actId) {
         ov.remove();
     };
     ov.querySelector('#adBack')?.addEventListener('click', close);
+    // Draggable bottom sheet — drag the handle down to reveal more of the map
+    const sheet = ov.querySelector('.ad-sheet');
+    const grab = ov.querySelector('.ad-grab');
+    if (sheet && grab) {
+        let startY = 0, startT = 0, curT = 0, dragging = false;
+        const maxT = () => Math.max(0, sheet.offsetHeight - 150); // leave a peek when collapsed
+        grab.addEventListener('pointerdown', e => {
+            dragging = true;
+            startY = e.clientY;
+            startT = curT;
+            sheet.style.transition = 'none';
+            try {
+                grab.setPointerCapture(e.pointerId);
+            }
+            catch { /* ignore */ }
+        });
+        grab.addEventListener('pointermove', e => {
+            if (!dragging)
+                return;
+            let t = startT + (e.clientY - startY);
+            t = Math.max(0, Math.min(maxT(), t));
+            curT = t;
+            sheet.style.transform = `translateY(${t}px)`;
+        });
+        const end = () => {
+            if (!dragging)
+                return;
+            dragging = false;
+            sheet.style.transition = '';
+            curT = curT > maxT() * 0.4 ? maxT() : 0;
+            sheet.style.transform = `translateY(${curT}px)`;
+        };
+        grab.addEventListener('pointerup', end);
+        grab.addEventListener('pointercancel', end);
+    }
     // Hero map / minimap (after layout + entry animation, so dimensions are final)
+    const sheetPx = Math.round(window.innerHeight * 0.62);
     setTimeout(() => {
         const mapEl = document.getElementById('adHeroMap');
         if (!mapEl)
@@ -599,7 +650,8 @@ export async function openActivityDetail(act, isOwn, actId) {
             }
             else {
                 const line = L.polyline(pts, { color, weight: 4, opacity: 0.95 }).addTo(_adMap);
-                _adMap.fitBounds(line.getBounds(), { padding: [28, 28] });
+                // Push the route into the visible area above the sheet
+                _adMap.fitBounds(line.getBounds(), { paddingTopLeft: [28, 28], paddingBottomRight: [28, sheetPx] });
                 L.circleMarker(pts[0], { radius: 6, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(_adMap);
                 L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#e74c3c', fillOpacity: 1 }).addTo(_adMap);
             }
@@ -613,19 +665,66 @@ export async function openActivityDetail(act, isOwn, actId) {
             renderMinimapCanvas(mapEl, friendCoords, full.sport);
         }
     }, 320);
-    // Footer — reuse feed like/comment/share
-    ov.querySelector('#adComment')?.addEventListener('click', () => openCommentPanel(ov.querySelector('.ad-sheet'), full.id));
-    ov.querySelector('#adShare')?.addEventListener('click', () => openSharePanel(ov.querySelector('.ad-sheet'), full));
-    ov.querySelector('#adLike')?.addEventListener('click', () => {
-        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-        const span = ov.querySelector('#adLike span');
-        if (span)
-            span.textContent = String((Number(span.textContent) || 0) + 1);
-        void fetch(`${BACKEND_URL}/feed/like`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, itemId: full.id, itemType: 'activity' }),
-        }).catch(() => { });
+    // Footer — same like/comment/share behaviour as the feed (backend like toggle)
+    ov.querySelectorAll('.ad-footer .home-card__action').forEach(btn => {
+        btn.addEventListener('click', e => {
+            e.stopPropagation();
+            const action = btn.dataset.action;
+            const sheetEl = ov.querySelector('.ad-sheet');
+            if (action === 'like') {
+                btn.classList.add('home-card__action--pulse');
+                setTimeout(() => btn.classList.remove('home-card__action--pulse'), 400);
+                const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+                void fetch(`${BACKEND_URL}/feed/like`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId, itemId: full.id, itemType: 'activity' }),
+                }).then(r => r.json()).then((d) => {
+                    btn.classList.toggle('home-card__action--liked', d.liked);
+                    const el = ov.querySelector(`[data-like-count="${full.id}"]`);
+                    if (el)
+                        el.textContent = String(d.count);
+                }).catch(() => { });
+            }
+            if (action === 'comment') {
+                const existing = sheetEl.querySelector('.home-card__comment-panel');
+                if (existing) {
+                    existing.classList.remove('home-card__comment-panel--open');
+                    setTimeout(() => existing.remove(), 280);
+                }
+                else
+                    openCommentPanel(sheetEl, full.id);
+            }
+            if (action === 'share') {
+                const existing = sheetEl.querySelector('.home-card__share-panel');
+                if (existing) {
+                    existing.classList.remove('home-card__share-panel--open');
+                    setTimeout(() => existing.remove(), 280);
+                }
+                else
+                    openSharePanel(sheetEl, full);
+            }
+        });
     });
+    // Load current like state + count
+    {
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        if (userId) {
+            void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(full.id)}`, { cache: 'no-store' })
+                .then(r => r.json())
+                .then((resp) => {
+                if (resp.status !== 'ok')
+                    return;
+                const info = resp.data[full.id];
+                if (!info)
+                    return;
+                const likeBtn = ov.querySelector('.ad-footer .home-card__action--like');
+                likeBtn?.classList.toggle('home-card__action--liked', info.liked);
+                const el = ov.querySelector(`[data-like-count="${full.id}"]`);
+                if (el)
+                    el.textContent = String(info.count);
+            }).catch(() => { });
+        }
+    }
 }
 export function buildCard(act) {
     const card = document.createElement('article');
