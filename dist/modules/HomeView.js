@@ -7,7 +7,7 @@ import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadRee
 import { getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
-import { getNotifications, getUnreadCount, markAllRead, clearAll, onNotificationsChange, notifyActivityAdded, } from './NotificationsService.js';
+import { getNotifications, getUnreadCount, markAllRead, clearAll, onNotificationsChange, notifyActivityAdded, syncFromBackend, markAllReadRemote, } from './NotificationsService.js';
 import { profileView, updateBestStreak } from './ProfileView.js';
 import { searchView } from './SearchView.js';
 import { openPostModal } from './PostModal.js';
@@ -990,6 +990,19 @@ if (typeof window !== 'undefined' && !window.__activityDeepLinkBound) {
         setTimeout(() => void _routeNotifTarget({ kind: 'activity', id: dl.id, userId: dl.userId }), 600);
     }
 }
+const _NOTIF_EMPTY_HTML = '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
+function _notifItemHtml(n) {
+    return `
+    <div class="hn-item ${n.read ? '' : 'hn-item--unread'} ${n.target ? 'hn-item--link' : ''}" data-id="${n.id}">
+      <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
+      <div class="hn-item__body">
+        <div class="hn-item__title">${n.title}</div>
+        <div class="hn-item__body-text">${n.body}</div>
+        <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
+      </div>
+      ${n.target ? '<div class="hn-item__chevron">›</div>' : ''}
+    </div>`;
+}
 function _openNotifPanel() {
     document.getElementById('homeNotifPanel')?.remove();
     markAllRead();
@@ -1006,18 +1019,7 @@ function _openNotifPanel() {
         <button class="hn-clear" id="hnClear">Clear all</button>
       </div>
       <div class="hn-list" id="hnList">
-        ${notifs.length === 0
-        ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
-        : notifs.map(n => `
-            <div class="hn-item ${n.read ? '' : 'hn-item--unread'} ${n.target ? 'hn-item--link' : ''}" data-id="${n.id}">
-              <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
-              <div class="hn-item__body">
-                <div class="hn-item__title">${n.title}</div>
-                <div class="hn-item__body-text">${n.body}</div>
-                <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
-              </div>
-              ${n.target ? '<div class="hn-item__chevron">›</div>' : ''}
-            </div>`).join('')}
+        ${notifs.length === 0 ? _NOTIF_EMPTY_HTML : notifs.map(_notifItemHtml).join('')}
       </div>
     </div>`;
     document.body.appendChild(panel);
@@ -1033,15 +1035,31 @@ function _openNotifPanel() {
     panel.querySelector('#hnOverlay')?.addEventListener('click', close);
     document.addEventListener('keydown', e => { if (e.key === 'Escape')
         close(); }, { once: true });
-    // Tap a notification → jump straight to its content
-    panel.querySelectorAll('.hn-item').forEach(item => {
-        item.addEventListener('click', () => {
-            const n = notifs.find(x => x.id === item.dataset.id);
-            if (!n?.target)
-                return;
-            close();
-            void _routeNotifTarget(n.target);
+    // Tap a notification → jump straight to its content (re-bound after each render)
+    const bindItems = () => {
+        panel.querySelectorAll('.hn-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const n = getNotifications().find(x => x.id === item.dataset.id);
+                if (!n?.target)
+                    return;
+                close();
+                void _routeNotifTarget(n.target);
+            });
         });
+    };
+    bindItems();
+    // Pull friends' notifications from the backend so they show in the bell even
+    // when the phone never received (or has disabled) push, then re-render.
+    const uid = localStorage.getItem('mapyou_userId_profile') ?? '';
+    void syncFromBackend(uid).then(() => {
+        const listEl = panel.querySelector('#hnList');
+        if (!listEl)
+            return;
+        const fresh = getNotifications();
+        listEl.innerHTML = fresh.length === 0 ? _NOTIF_EMPTY_HTML : fresh.map(_notifItemHtml).join('');
+        bindItems();
+        markAllRead();
+        void markAllReadRemote(uid);
     });
     panel.querySelector('#hnClear')?.addEventListener('click', () => {
         clearAll();
@@ -1317,6 +1335,14 @@ export class HomeView {
             e.stopPropagation();
             _openNotifPanel();
         });
+        // One-time on load: pull friends' notifications so the bell badge reflects
+        // them even if push was never received / is disabled.
+        if (!window.__notifSyncedOnce) {
+            window.__notifSyncedOnce = true;
+            const _nuid = localStorage.getItem('mapyou_userId_profile') ?? '';
+            if (_nuid)
+                void syncFromBackend(_nuid);
+        }
         // Update badge when notifications change
         onNotificationsChange(count => {
             const bell = document.getElementById('homeNotifBell');

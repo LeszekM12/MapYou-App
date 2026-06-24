@@ -1,8 +1,10 @@
 // ─── NOTIFICATIONS SERVICE ────────────────────────────────────────────────────
 // src/modules/NotificationsService.ts
 //
-// Local in-app notification system (NOT push).
-// Stored in localStorage. Future: sync with backend for friends' activity.
+// Local in-app notification system + backend sync for friends' activity.
+// Stored in localStorage; backend notifications are merged in via syncFromBackend().
+
+import { BACKEND_URL } from '../config.js';
 
 const LS_KEY = 'mapyou_notifications';
 const LS_SEEN = 'mapyou_notifications_seen';
@@ -14,7 +16,15 @@ export type NotifType =
   | 'achievement'
   | 'weekly_goal'
   | 'streak'
-  | 'friend_activity'; // future backend
+  | 'friend_activity'
+  | 'friend_post'
+  | 'follow'
+  | 'follow_request'
+  | 'follow_accepted'
+  | 'comment'
+  | 'like'
+  | 'club_post'
+  | 'system';
 
 /** Deep-link target: tapping a notification jumps straight to this content. */
 export interface NotifTarget {
@@ -97,6 +107,78 @@ export function markRead(id: string): void {
 export function clearAll(): void {
   _save([]);
   _notifyListeners();
+}
+
+// ── Backend sync (friends' notifications appear in the bell even without push) ──
+
+interface BackendNotif {
+  notifId:   string;
+  userId:    string;
+  type:      string;
+  title:     string;
+  body:      string;
+  icon?:     string;
+  read:      boolean;
+  timestamp: number;
+  meta?:     string | null;
+}
+
+/** Build a deep-link target from a backend notification's type + meta string. */
+function _targetFromBackend(type: string, meta?: string | null): NotifTarget | undefined {
+  if (!meta) return undefined;
+  if (meta.startsWith('reel|')) {
+    const author = meta.slice(5);
+    return author ? { kind: 'reel', id: author, userId: author } : undefined;
+  }
+  if (meta.startsWith('live|')) {
+    const [, token, author] = meta.split('|');
+    return token ? { kind: 'live', id: token, userId: author } : undefined;
+  }
+  if (type === 'friend_activity' && meta.includes('|')) {
+    const [actId, author] = meta.split('|');
+    if (actId) return { kind: 'activity', id: actId, userId: author };
+  }
+  if (type === 'follow' || type === 'follow_request' || type === 'follow_accepted') {
+    const uid = meta.split('|')[0];
+    if (uid) return { kind: 'profile', id: uid, userId: uid };
+  }
+  return undefined;
+}
+
+/** Fetch the user's backend notifications and merge them into the local bell. */
+export async function syncFromBackend(userId: string): Promise<void> {
+  if (!userId) return;
+  try {
+    const res = await fetch(`${BACKEND_URL}/notifications?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+    const j = await res.json() as { status: string; data?: BackendNotif[] };
+    if (j.status !== 'ok' || !Array.isArray(j.data)) return;
+    const local = _load();
+    const localIds = new Set(local.map(n => n.id));
+    const incoming: AppNotification[] = j.data
+      .filter(b => b.notifId && !localIds.has(b.notifId))
+      .map(b => ({
+        id:        b.notifId,
+        type:      (b.type as NotifType),
+        title:     b.title,
+        body:      b.body,
+        timestamp: b.timestamp,
+        read:      b.read,
+        icon:      b.icon ?? '🔔',
+        target:    _targetFromBackend(b.type, b.meta),
+      }));
+    if (incoming.length === 0) return;
+    const merged = [...incoming, ...local].sort((a, b) => b.timestamp - a.timestamp);
+    _save(merged);
+    _notifyListeners();
+  } catch { /* offline: ignore */ }
+}
+
+/** Mark all backend notifications read (mirrors local markAllRead). */
+export async function markAllReadRemote(userId: string): Promise<void> {
+  if (!userId) return;
+  try {
+    await fetch(`${BACKEND_URL}/notifications/read-all?userId=${encodeURIComponent(userId)}`, { method: 'PUT' });
+  } catch { /* ignore */ }
 }
 
 // ── Listeners (for bell badge update) ────────────────────────────────────────
