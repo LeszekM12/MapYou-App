@@ -930,10 +930,25 @@ function _relTimeNotif(ts) {
 async function _routeNotifTarget(t) {
     try {
         if (t.kind === 'activity') {
-            const act = (await loadEnrichedActivities()).find(a => a.id === t.id);
             const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
-            if (act)
-                void openActivityDetail(act, !t.userId || t.userId === myUserId, t.id);
+            // Own activity — already in IndexedDB
+            const own = (await loadEnrichedActivities()).find(a => a.id === t.id);
+            if (own) {
+                void openActivityDetail(own, true, t.id);
+                return;
+            }
+            // Friend activity — fetch from backend (needs author userId)
+            if (t.userId && t.userId !== myUserId) {
+                try {
+                    const res = await fetch(`${BACKEND_URL}/enriched-activities/${encodeURIComponent(t.id)}?userId=${encodeURIComponent(t.userId)}`);
+                    const j = await res.json();
+                    if (j.status === 'ok' && j.data) {
+                        const act = { ...j.data, id: j.data.activityId ?? t.id };
+                        void openActivityDetail(act, false, t.id);
+                    }
+                }
+                catch { /* ignore */ }
+            }
         }
         else if (t.kind === 'reel') {
             const hv = homeView;
@@ -948,6 +963,32 @@ async function _routeNotifTarget(t) {
         }
     }
     catch { /* ignore routing errors */ }
+}
+// Parse an activity deep-link URL/hash: #activity=ID&u=AUTHOR
+function _parseActivityDeepLink(url) {
+    const m = url.match(/[#&?]activity=([^&]+)/);
+    if (!m)
+        return null;
+    const u = url.match(/[#&?]u=([^&]+)/);
+    return { id: decodeURIComponent(m[1]), userId: u ? decodeURIComponent(u[1]) : undefined };
+}
+// Push deep-links for activities: SW message (app open) + cold-start hash. Bound once.
+if (typeof window !== 'undefined' && !window.__activityDeepLinkBound) {
+    window.__activityDeepLinkBound = true;
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.addEventListener('message', e => {
+            if (e.data?.type === 'OPEN_ACTIVITY') {
+                const dl = _parseActivityDeepLink(e.data.url);
+                if (dl)
+                    void _routeNotifTarget({ kind: 'activity', id: dl.id, userId: dl.userId });
+            }
+        });
+    }
+    const dl = _parseActivityDeepLink(window.location.hash);
+    if (dl) {
+        history.replaceState(null, '', window.location.pathname);
+        setTimeout(() => void _routeNotifTarget({ kind: 'activity', id: dl.id, userId: dl.userId }), 600);
+    }
 }
 function _openNotifPanel() {
     document.getElementById('homeNotifPanel')?.remove();

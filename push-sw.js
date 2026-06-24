@@ -2,6 +2,14 @@
 
 const BACKEND_URL = 'https://mapty-backend.fly.dev';
 
+// Map a deep-link URL to the in-app message type the app listens for.
+function msgTypeForUrl(url) {
+  if (!url) return 'OPEN_LIVE';
+  if (url.includes('#activity=')) return 'OPEN_ACTIVITY';
+  if (url.includes('reels=') || url.includes('#reel=')) return 'OPEN_REELS';
+  return 'OPEN_LIVE';
+}
+
 self.addEventListener('push', event => {
   let data = {
     title: 'MapYou',
@@ -57,16 +65,14 @@ self.addEventListener('notificationclick', event => {
 
       if (appClient) {
         await appClient.focus();
-        const msgType = targetUrl.includes('reels=') ? 'OPEN_REELS' : 'OPEN_LIVE';
-        appClient.postMessage({ type: msgType, url: targetUrl });
+        appClient.postMessage({ type: msgTypeForUrl(targetUrl), url: targetUrl });
       } else {
         const fullUrl = targetUrl.startsWith('http')
           ? targetUrl
           : self.registration.scope.replace(/\/$/, '') + '/' + targetUrl.replace(/^\//, '');
         const newClient = await clients.openWindow(fullUrl);
         if (newClient) {
-          const msgType = targetUrl.includes('reels=') ? 'OPEN_REELS' : 'OPEN_LIVE';
-          setTimeout(() => newClient.postMessage({ type: msgType, url: targetUrl }), 2500);
+          setTimeout(() => newClient.postMessage({ type: msgTypeForUrl(targetUrl), url: targetUrl }), 2500);
         }
       }
     })
