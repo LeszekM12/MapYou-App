@@ -11,7 +11,7 @@ import { generateShareImageFromEnriched } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import {
   getNotifications, getUnreadCount, markAllRead, markRead, clearAll,
-  onNotificationsChange, notifyActivityAdded, type AppNotification,
+  onNotificationsChange, notifyActivityAdded, type AppNotification, type NotifTarget,
 } from './NotificationsService.js';
 import { profileView, updateBestStreak } from './ProfileView.js';
 import { searchView } from './SearchView.js';
@@ -956,6 +956,25 @@ function _relTimeNotif(ts: number): string {
   return `${days} day${days > 1 ? 's' : ''} ago`;
 }
 
+// Deep-link a tapped notification straight to its content.
+async function _routeNotifTarget(t: NotifTarget): Promise<void> {
+  try {
+    if (t.kind === 'activity') {
+      const act = (await loadEnrichedActivities()).find(a => a.id === t.id);
+      const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
+      if (act) void openActivityDetail(act, !t.userId || t.userId === myUserId, t.id);
+    } else if (t.kind === 'reel') {
+      const hv = homeView as unknown as Record<string, unknown>;
+      await (hv._openReelsViewer as (uid: string, idx: number) => Promise<void>)(t.userId ?? t.id, 0);
+    } else if (t.kind === 'live') {
+      const fn = (window as unknown as Record<string, unknown>).__openLive as ((token: string, name: string) => void) | undefined;
+      fn?.(t.id, t.name ?? 'Live Tracking');
+    } else if (t.kind === 'profile') {
+      openPublicProfile(t.userId ?? t.id);
+    }
+  } catch { /* ignore routing errors */ }
+}
+
 function _openNotifPanel(): void {
   document.getElementById('homeNotifPanel')?.remove();
   markAllRead();
@@ -977,13 +996,14 @@ function _openNotifPanel(): void {
         ${notifs.length === 0
           ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
           : notifs.map(n => `
-            <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
+            <div class="hn-item ${n.read ? '' : 'hn-item--unread'} ${n.target ? 'hn-item--link' : ''}" data-id="${n.id}">
               <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
               <div class="hn-item__body">
                 <div class="hn-item__title">${n.title}</div>
                 <div class="hn-item__body-text">${n.body}</div>
                 <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
               </div>
+              ${n.target ? '<div class="hn-item__chevron">›</div>' : ''}
             </div>`).join('')}
       </div>
     </div>`;
@@ -1002,6 +1022,16 @@ function _openNotifPanel(): void {
 
   panel.querySelector('#hnOverlay')?.addEventListener('click', close);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); }, { once: true });
+
+  // Tap a notification → jump straight to its content
+  panel.querySelectorAll<HTMLElement>('.hn-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const n = notifs.find(x => x.id === item.dataset.id);
+      if (!n?.target) return;
+      close();
+      void _routeNotifTarget(n.target);
+    });
+  });
 
   panel.querySelector('#hnClear')?.addEventListener('click', () => {
     clearAll();

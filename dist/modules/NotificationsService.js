@@ -19,7 +19,7 @@ function _save(notifs) {
     localStorage.setItem(LS_KEY, JSON.stringify(notifs.slice(0, 50)));
 }
 // ── Public API ─────────────────────────────────────────────────────────────────
-export function addNotification(type, title, body, icon = '🔔') {
+export function addNotification(type, title, body, icon = '🔔', target) {
     const notifs = _load();
     const n = {
         id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
@@ -29,6 +29,7 @@ export function addNotification(type, title, body, icon = '🔔') {
         timestamp: Date.now(),
         read: false,
         icon,
+        target,
     };
     notifs.unshift(n);
     _save(notifs);
@@ -66,9 +67,21 @@ function _notifyListeners() {
     _listeners.forEach(cb => cb(count));
 }
 // ── Pre-built triggers ────────────────────────────────────────────────────────
-export function notifyActivityAdded(name, distKm, sport) {
+export function notifyActivityAdded(name, distKm, sport, activityId) {
     const icons = { running: '🏃', walking: '🚶', cycling: '🚴' };
-    addNotification('activity_added', `${icons[sport] ?? '🏅'} Activity saved!`, `${name} — ${distKm.toFixed(2)} km. Check your stats!`, icons[sport] ?? '🏅');
+    addNotification('activity_added', `${icons[sport] ?? '🏅'} Activity saved!`, `${name} — ${distKm.toFixed(2)} km. Check your stats!`, icons[sport] ?? '🏅', activityId ? { kind: 'activity', id: activityId } : undefined);
+}
+/** Friend posted an activity — taps through to its detail screen. */
+export function notifyFriendActivity(friendName, activityId, userId, icon = '🏃') {
+    addNotification('friend_activity', `${friendName} shared an activity`, 'Tap to view their workout.', icon, { kind: 'activity', id: activityId, userId });
+}
+/** Friend posted a reel — taps through to the reel viewer. */
+export function notifyFriendReel(friendName, userId, icon = '🎬') {
+    addNotification('friend_activity', `${friendName} posted a reel`, 'Tap to watch.', icon, { kind: 'reel', id: userId, userId });
+}
+/** Friend started live tracking — taps through to the live map. */
+export function notifyFriendLive(friendName, token, userId, icon = '📍') {
+    addNotification('friend_activity', `${friendName} is live`, 'Tap to follow their route in real time.', icon, { kind: 'live', id: token, userId, name: `${friendName} — Live` });
 }
 export function notifyAchievement(title, desc) {
     addNotification('achievement', `🏆 ${title}`, desc, '🏆');

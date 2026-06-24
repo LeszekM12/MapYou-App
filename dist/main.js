@@ -885,7 +885,7 @@ class App {
                 source: 'manual',
                 elevGain: Number(_wm.elevGain ?? 0) || 0,
             });
-            notifyActivityAdded(workout.description ?? workout.type, _wmDistKm, workout.type);
+            notifyActivityAdded(workout.description ?? workout.type, _wmDistKm, workout.type, _wmEnriched.id);
             void homeView.render();
             void statsView.render();
         });
@@ -976,7 +976,7 @@ class App {
             elevGain: Number(_w.elevGain ?? 0) || 0,
         });
         // Notify + refresh views
-        notifyActivityAdded(workout.description ?? workout.type, _distKm, workout.type);
+        notifyActivityAdded(workout.description ?? workout.type, _distKm, workout.type, _enriched.id);
         void homeView.render();
         void statsView.render();
     }
@@ -2043,7 +2043,7 @@ class App {
                     intensity: enriched.intensity,
                     photoUrl: enriched.photoUrl,
                 });
-                notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);
+                notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport, enriched.id);
                 __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
                 await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
                 await statsView.render();
@@ -2707,7 +2707,7 @@ class App {
                     intensity: enriched.intensity,
                     photoUrl: enriched.photoUrl,
                 });
-                notifyActivityAdded(enriched.name || enriched.description, 0, enriched.sport);
+                notifyActivityAdded(enriched.name || enriched.description, 0, enriched.sport, enriched.id);
                 await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
                 await statsView.render();
                 await homeView.render();

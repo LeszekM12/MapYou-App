@@ -3582,3 +3582,8 @@ body {
 .trk-route-like__heart { font-size: 1.9rem; line-height: 1; color: var(--app-text-tertiary, #8b9197); transition: transform 0.15s, color 0.15s; }
 .trk-route-like--on .trk-route-like__heart { color: #ff3b30; transform: scale(1.12); }
 .trk-route-like__count { font-size: 1.1rem; font-weight: 700; color: var(--app-text-secondary, #9aa0a6); }
+
+/* ── Notification deep-link affordance ── */
+.hn-item--link { cursor: pointer; }
+.hn-item--link:active { background: var(--app-surface-1, rgba(255,255,255,0.05)); }
+.hn-item__chevron { margin-left: auto; align-self: center; flex-shrink: 0; font-size: 2.2rem; line-height: 1; color: var(--app-text-tertiary, #8b9197); padding: 0 4px 0 8px; }

@@ -60,6 +60,10 @@ export class FriendsView {
       history.replaceState(null, '', window.location.pathname);
     }
 
+    // Global hook so a tapped live notification (in-app bell) can open the live map
+    (window as unknown as Record<string, unknown>).__openLive = (token: string, name: string) =>
+      this._openLiveView(token, name);
+
     // Inicjalizuj mapę w kontenerze
     const mapContainer = document.getElementById('friendsLiveMapContainer');
     if (mapContainer) {

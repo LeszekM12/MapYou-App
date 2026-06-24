@@ -16,6 +16,14 @@ export type NotifType =
   | 'streak'
   | 'friend_activity'; // future backend
 
+/** Deep-link target: tapping a notification jumps straight to this content. */
+export interface NotifTarget {
+  kind:    'activity' | 'reel' | 'live' | 'profile';
+  id:      string;    // activityId | live token | userId (profile)
+  userId?: string;    // whose content (reel / live / profile)
+  name?:   string;    // optional display name (e.g. live tracking title)
+}
+
 export interface AppNotification {
   id:        string;
   type:      NotifType;
@@ -24,6 +32,7 @@ export interface AppNotification {
   timestamp: number;
   read:      boolean;
   icon?:     string;   // emoji or avatar URL
+  target?:   NotifTarget; // deep-link destination
 }
 
 // ── Storage ───────────────────────────────────────────────────────────────────
@@ -46,6 +55,7 @@ export function addNotification(
   title: string,
   body: string,
   icon = '🔔',
+  target?: NotifTarget,
 ): AppNotification {
   const notifs = _load();
   const n: AppNotification = {
@@ -56,6 +66,7 @@ export function addNotification(
     timestamp: Date.now(),
     read:      false,
     icon,
+    target,
   };
   notifs.unshift(n);
   _save(notifs);
@@ -105,14 +116,33 @@ function _notifyListeners(): void {
 
 // ── Pre-built triggers ────────────────────────────────────────────────────────
 
-export function notifyActivityAdded(name: string, distKm: number, sport: string): void {
+export function notifyActivityAdded(name: string, distKm: number, sport: string, activityId?: string): void {
   const icons: Record<string, string> = { running: '🏃', walking: '🚶', cycling: '🚴' };
   addNotification(
     'activity_added',
     `${icons[sport] ?? '🏅'} Activity saved!`,
     `${name} — ${distKm.toFixed(2)} km. Check your stats!`,
     icons[sport] ?? '🏅',
+    activityId ? { kind: 'activity', id: activityId } : undefined,
   );
+}
+
+/** Friend posted an activity — taps through to its detail screen. */
+export function notifyFriendActivity(friendName: string, activityId: string, userId: string, icon = '🏃'): void {
+  addNotification('friend_activity', `${friendName} shared an activity`, 'Tap to view their workout.', icon,
+    { kind: 'activity', id: activityId, userId });
+}
+
+/** Friend posted a reel — taps through to the reel viewer. */
+export function notifyFriendReel(friendName: string, userId: string, icon = '🎬'): void {
+  addNotification('friend_activity', `${friendName} posted a reel`, 'Tap to watch.', icon,
+    { kind: 'reel', id: userId, userId });
+}
+
+/** Friend started live tracking — taps through to the live map. */
+export function notifyFriendLive(friendName: string, token: string, userId: string, icon = '📍'): void {
+  addNotification('friend_activity', `${friendName} is live`, 'Tap to follow their route in real time.', icon,
+    { kind: 'live', id: token, userId, name: `${friendName} — Live` });
 }
 
 export function notifyAchievement(title: string, desc: string): void {

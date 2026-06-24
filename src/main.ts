@@ -911,7 +911,7 @@ class App {
         source:   'manual' as const,
         elevGain: Number(_wm.elevGain ?? 0) || 0,
       } as unknown as import('./modules/UnifiedWorkout.js').UnifiedWorkout);
-      notifyActivityAdded(workout.description ?? workout.type, _wmDistKm, workout.type);
+      notifyActivityAdded(workout.description ?? workout.type, _wmDistKm, workout.type, _wmEnriched.id);
       void homeView.render();
       void statsView.render();
     });
@@ -1001,7 +1001,7 @@ class App {
       elevGain: Number(_w.elevGain ?? 0) || 0,
     } as unknown as import('./modules/UnifiedWorkout.js').UnifiedWorkout);
     // Notify + refresh views
-    notifyActivityAdded(workout.description ?? workout.type, _distKm, workout.type);
+    notifyActivityAdded(workout.description ?? workout.type, _distKm, workout.type, _enriched.id);
     void homeView.render();
     void statsView.render();
   }
@@ -1984,7 +1984,7 @@ class App {
             intensity:   enriched.intensity,
             photoUrl:    enriched.photoUrl,
           } as import('./modules/UnifiedWorkout.js').UnifiedWorkout);
-          notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);
+          notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport, enriched.id);
           this.#tracker?.reset();
           await this.#historyPanel?.render();
           await statsView.render();
@@ -2615,7 +2615,7 @@ class App {
             intensity:   enriched.intensity,
             photoUrl:    enriched.photoUrl,
           } as import('./modules/UnifiedWorkout.js').UnifiedWorkout);
-          notifyActivityAdded(enriched.name || enriched.description, 0, enriched.sport);
+          notifyActivityAdded(enriched.name || enriched.description, 0, enriched.sport, enriched.id);
           await this.#historyPanel?.render();
           await statsView.render();
           await homeView.render();

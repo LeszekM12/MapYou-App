@@ -926,6 +926,29 @@ function _relTimeNotif(ts) {
     const days = Math.floor(hrs / 24);
     return `${days} day${days > 1 ? 's' : ''} ago`;
 }
+// Deep-link a tapped notification straight to its content.
+async function _routeNotifTarget(t) {
+    try {
+        if (t.kind === 'activity') {
+            const act = (await loadEnrichedActivities()).find(a => a.id === t.id);
+            const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
+            if (act)
+                void openActivityDetail(act, !t.userId || t.userId === myUserId, t.id);
+        }
+        else if (t.kind === 'reel') {
+            const hv = homeView;
+            await hv._openReelsViewer(t.userId ?? t.id, 0);
+        }
+        else if (t.kind === 'live') {
+            const fn = window.__openLive;
+            fn?.(t.id, t.name ?? 'Live Tracking');
+        }
+        else if (t.kind === 'profile') {
+            openPublicProfile(t.userId ?? t.id);
+        }
+    }
+    catch { /* ignore routing errors */ }
+}
 function _openNotifPanel() {
     document.getElementById('homeNotifPanel')?.remove();
     markAllRead();
@@ -945,13 +968,14 @@ function _openNotifPanel() {
         ${notifs.length === 0
         ? '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>'
         : notifs.map(n => `
-            <div class="hn-item ${n.read ? '' : 'hn-item--unread'}" data-id="${n.id}">
+            <div class="hn-item ${n.read ? '' : 'hn-item--unread'} ${n.target ? 'hn-item--link' : ''}" data-id="${n.id}">
               <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
               <div class="hn-item__body">
                 <div class="hn-item__title">${n.title}</div>
                 <div class="hn-item__body-text">${n.body}</div>
                 <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
               </div>
+              ${n.target ? '<div class="hn-item__chevron">›</div>' : ''}
             </div>`).join('')}
       </div>
     </div>`;
@@ -968,6 +992,16 @@ function _openNotifPanel() {
     panel.querySelector('#hnOverlay')?.addEventListener('click', close);
     document.addEventListener('keydown', e => { if (e.key === 'Escape')
         close(); }, { once: true });
+    // Tap a notification → jump straight to its content
+    panel.querySelectorAll('.hn-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const n = notifs.find(x => x.id === item.dataset.id);
+            if (!n?.target)
+                return;
+            close();
+            void _routeNotifTarget(n.target);
+        });
+    });
     panel.querySelector('#hnClear')?.addEventListener('click', () => {
         clearAll();
         panel.querySelector('#hnList').innerHTML =
