@@ -1408,7 +1408,135 @@ export class HomeView {
         </div>
       </div>`;
 
+    wrap.style.cursor = 'pointer';
+    wrap.setAttribute('role', 'button');
+    wrap.addEventListener('click', () => { void this._openStreakCalendar(); });
+
     return wrap;
+  }
+
+  // ── Activity calendar (opened from the streak panel) ────────────────────────
+
+  private async _openStreakCalendar(): Promise<void> {
+    document.getElementById('calOverlay')?.remove();
+
+    const acts = await loadEnrichedActivities();
+    const keyOf = (ts: number): string => {
+      const d = new Date(ts);
+      return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+    };
+    const byDay = new Map<string, EnrichedActivity[]>();
+    for (const a of acts) {
+      const k = keyOf(a.date);
+      const arr = byDay.get(k);
+      if (arr) arr.push(a); else byDay.set(k, [a]);
+    }
+
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const WD = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const curY = today.getFullYear(), curM = today.getMonth();
+
+    let viewY = curY, viewM = curM;
+    let selKey: string | null = keyOf(today.getTime());
+
+    const ov = document.createElement('div');
+    ov.id = 'calOverlay';
+    ov.className = 'cal-overlay';
+    document.body.appendChild(ov);
+
+    const close = (): void => ov.remove();
+
+    const renderDetail = (): string => {
+      if (!selKey) return '<div class="cal-empty">Pick a day to see its activities.</div>';
+      const list = byDay.get(selKey) ?? [];
+      const [y, m, d] = selKey.split('-').map(Number);
+      const dateLabel = `${d} ${MONTHS[m]} ${y}`;
+      if (list.length === 0) {
+        return `<div class="cal-detail__date">${dateLabel}</div><div class="cal-empty">No activities this day.</div>`;
+      }
+      const totKm  = list.reduce((s, a) => s + (a.distanceKm || 0), 0);
+      const totSec = list.reduce((s, a) => s + (a.durationSec || 0), 0);
+      const rows = list.map(a => `
+        <div class="cal-act" data-actid="${a.id}">
+          <span class="cal-act__icon">${getIcon(a.sport)}</span>
+          <span class="cal-act__main">
+            <span class="cal-act__title">${a.name || getSportLabel(a.sport)}</span>
+            <span class="cal-act__meta">${a.distanceKm > 0 ? formatDistance(a.distanceKm) + ' km · ' : ''}${formatDuration(a.durationSec)}</span>
+          </span>
+          <span class="cal-act__chevron">›</span>
+        </div>`).join('');
+      return `
+        <div class="cal-detail__date">${dateLabel}</div>
+        <div class="cal-summary">
+          <div class="cal-summary__item"><div class="cal-summary__val">${list.length}</div><div class="cal-summary__lbl">Activities</div></div>
+          <div class="cal-summary__item"><div class="cal-summary__val">${formatDistance(totKm)}</div><div class="cal-summary__lbl">km</div></div>
+          <div class="cal-summary__item"><div class="cal-summary__val">${formatDuration(totSec)}</div><div class="cal-summary__lbl">Time</div></div>
+        </div>
+        ${rows}`;
+    };
+
+    const render = (): void => {
+      const first = new Date(viewY, viewM, 1);
+      const lead = (first.getDay() + 6) % 7;                 // Monday-first offset
+      const daysInMonth = new Date(viewY, viewM + 1, 0).getDate();
+      const atCurrent = viewY === curY && viewM === curM;
+
+      let cells = '';
+      for (let i = 0; i < lead; i++) cells += '<div class="cal-cell cal-cell--empty"></div>';
+      for (let day = 1; day <= daysInMonth; day++) {
+        const key = `${viewY}-${viewM}-${day}`;
+        const cellDate = new Date(viewY, viewM, day);
+        const hasAct = byDay.has(key);
+        const isToday = viewY === curY && viewM === curM && day === today.getDate();
+        const isFuture = cellDate.getTime() > today.getTime();
+        const isSel = key === selKey;
+        const cls = ['cal-cell',
+          hasAct ? 'cal-cell--active' : '',
+          isToday ? 'cal-cell--today' : '',
+          isFuture ? 'cal-cell--future' : '',
+          isSel ? 'cal-cell--sel' : ''].filter(Boolean).join(' ');
+        cells += `<div class="${cls}" ${isFuture ? '' : `data-day="${day}"`}>${day}</div>`;
+      }
+
+      ov.innerHTML = `
+        <div class="cal-sheet">
+          <div class="cal-top"><button class="cal-close" id="calClose" aria-label="Close">✕</button></div>
+          <div class="cal-header">
+            <button class="cal-nav" id="calPrev" aria-label="Previous month">‹</button>
+            <div class="cal-header__title">${MONTHS[viewM]} ${viewY}</div>
+            <button class="cal-nav" id="calNext" aria-label="Next month" ${atCurrent ? 'disabled' : ''}>›</button>
+          </div>
+          <div class="cal-weekdays">${WD.map(w => `<span>${w}</span>`).join('')}</div>
+          <div class="cal-grid">${cells}</div>
+          <div class="cal-detail" id="calDetail">${renderDetail()}</div>
+        </div>`;
+
+      ov.querySelector('#calClose')?.addEventListener('click', close);
+      ov.querySelector('#calPrev')?.addEventListener('click', () => {
+        viewM--; if (viewM < 0) { viewM = 11; viewY--; }
+        render();
+      });
+      ov.querySelector('#calNext')?.addEventListener('click', () => {
+        if (atCurrent) return;
+        viewM++; if (viewM > 11) { viewM = 0; viewY++; }
+        render();
+      });
+      ov.querySelectorAll<HTMLElement>('[data-day]').forEach(cell => {
+        cell.addEventListener('click', () => {
+          selKey = `${viewY}-${viewM}-${cell.dataset.day}`;
+          render();
+        });
+      });
+      ov.querySelectorAll<HTMLElement>('.cal-act').forEach(row => {
+        row.addEventListener('click', () => {
+          const a = acts.find(x => x.id === row.dataset.actid);
+          if (a) void openActivityDetail(a, true, a.id);
+        });
+      });
+    };
+
+    render();
   }
 
   // ── Reels bar ──────────────────────────────────────────────────────────────
