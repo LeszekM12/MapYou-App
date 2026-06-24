@@ -6,7 +6,7 @@
 // - Sub-tabs: Activities, Stats, Best Efforts, Posts
 // - Trophies: activity milestones + weekly goal cups
 // - Heatmap (day × hour) + activity type pie chart
-import { loadUnifiedWorkouts, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
+import { loadUnifiedWorkouts, formatDurSec } from './UnifiedWorkout.js';
 import { getIcon as _getIcon, getColor as _getColor, getSportLabel as _getSportLabel } from './Tracker.js';
 import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId } from './UserProfile.js';
@@ -517,22 +517,51 @@ export class ProfileView {
             el.innerHTML = `<div class="pv-empty"><div class="pv-empty__icon">🏁</div><p>No activities yet</p></div>`;
             return;
         }
-        el.innerHTML = `<div class="pv-act-list">${this._workouts.slice(0, 20).map(w => `
-      <div class="pv-act-item">
-        <span class="pv-act-item__icon">${_getIcon(w.sport ?? w.type)}</span>
+        const list = this._workouts.slice(0, 20);
+        el.innerHTML = `<div class="pv-act-list">${list.map((w, i) => `
+      <div class="pv-act-item" data-idx="${i}">
+        <span class="pv-act-item__icon">${_getIcon(w.type)}</span>
         <div class="pv-act-item__info">
-          <span class="pv-act-item__name">${w.name || w.description || _getSportLabel(w.sport ?? w.type)}</span>
+          <span class="pv-act-item__name">${w.name || w.description || w.type}</span>
           <span class="pv-act-item__date">${_relDate(w.date)}</span>
         </div>
         <div class="pv-act-item__stats">
-          <span style="color:${_getColor(w.sport ?? w.type)}">${w.distanceKm.toFixed(2)} km</span>
+          <span style="color:${_getColor(w.type)}">${w.distanceKm.toFixed(2)} km</span>
           <span class="pv-act-item__time">${formatDurSec(w.durationSec)}</span>
         </div>
       </div>`).join('')}</div>`;
+        // Tap an activity → open the full detail screen (own activity: full data reloaded by id)
+        el.querySelectorAll('.pv-act-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const w = list[Number(item.dataset.idx)];
+                if (!w)
+                    return;
+                const act = {
+                    id: w.id,
+                    sport: w.sport ?? w.type,
+                    date: new Date(w.date).getTime(),
+                    name: w.name ?? '',
+                    description: w.description ?? '',
+                    photoUrl: w.photoUrl ?? null,
+                    distanceKm: w.distanceKm ?? 0,
+                    durationSec: w.durationSec ?? 0,
+                    paceMinKm: w.paceMinKm ?? 0,
+                    speedKmH: w.speedKmH ?? 0,
+                    intensity: w.intensity ?? 1,
+                    notes: w.notes ?? '',
+                    coords: w.coords ?? [],
+                };
+                void import('./HomeView.js').then(mod => {
+                    const fn = mod.openActivityDetail;
+                    if (typeof fn === 'function')
+                        fn(act, true, w.id);
+                });
+            });
+        });
     }
     _renderStats(el) {
         // Sport pills — only sports user has trained
-        const sportSet = new Set(this._workouts.map(w => w.sport ?? w.type));
+        const sportSet = new Set(this._workouts.map(w => w.type));
         const sports = ['all', ...Array.from(sportSet)];
         const pillsHtml = sports.map(s => {
             const icon = s === 'all' ? '🏅' : (_getIcon(s));
@@ -572,28 +601,44 @@ export class ProfileView {
         <canvas id="pvStatsChart" role="img" aria-label="Weekly activity chart"></canvas>
       </div>
 
-      <!-- Activity Types ranking -->
+      <!-- Activity Types pie -->
       <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
-      <div class="pv-types-wrap">
+      <div class="pv-pie-wrap">
         ${sportSet.size === 0
             ? '<p class="pv-empty-sub">No data yet</p>'
-            : (() => {
-                const counts = [...sportSet]
-                    .map(type => ({ type, cnt: this._workouts.filter(w => (w.sport ?? w.type) === type).length }))
-                    .sort((a, b) => b.cnt - a.cnt);
-                const max = Math.max(...counts.map(c => c.cnt), 1);
-                return counts.map(({ type, cnt }) => `
-                <div class="pv-type-row">
-                  <span class="pv-type-row__label">${_getIcon(type)} ${_getSportLabel(type)}</span>
-                  <div class="pv-type-row__track">
-                    <div class="pv-type-row__bar" style="width:${Math.round((cnt / max) * 100)}%"></div>
-                  </div>
-                  <span class="pv-type-row__count">${cnt}</span>
-                </div>`).join('');
-            })()}
+            : `<div class="pv-pie-container"><canvas id="pvPieChart" width="160" height="160"></canvas></div>
+             <div class="pv-pie-legend">
+               ${[...sportSet].map(type => {
+                const cnt = this._workouts.filter(w => w.type === type).length;
+                return `<div class="pv-pie-legend__item">
+                   <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
+                   <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
+                 </div>`;
+            }).join('')}
+             </div>`}
       </div>`;
         this._renderStatsWeek(el);
         this._bindStatsEvents(el);
+        // Pie chart
+        if (sportSet.size > 0) {
+            setTimeout(() => {
+                const canvas = document.getElementById('pvPieChart');
+                if (!canvas || typeof Chart === 'undefined')
+                    return;
+                if (_pieChart)
+                    _pieChart.destroy?.();
+                const typeCounts = {};
+                this._workouts.forEach(w => { typeCounts[w.type] = (typeCounts[w.type] ?? 0) + 1; });
+                _pieChart = new Chart(canvas, {
+                    type: 'doughnut',
+                    data: {
+                        labels: Object.keys(typeCounts),
+                        datasets: [{ data: Object.values(typeCounts), backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }],
+                    },
+                    options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
+                });
+            }, 150);
+        }
     }
     _renderStatsWeek(el) {
         const now = new Date();
@@ -609,7 +654,7 @@ export class ProfileView {
         const week = this._workouts.filter(w => {
             const d = new Date(w.date);
             return d >= mon && d <= sun &&
-                (this._statsActiveSport === "all" || (w.sport ?? w.type) === this._statsActiveSport);
+                (this._statsActiveSport === 'all' || w.type === this._statsActiveSport);
         });
         const wKm = week.reduce((s, w) => s + w.distanceKm, 0);
         const wSec = week.reduce((s, w) => s + w.durationSec, 0);
@@ -637,21 +682,20 @@ export class ProfileView {
         }
         document.getElementById('pvStatsNext')?.[this._statsWeekOffset < 0 ? 'removeAttribute' : 'setAttribute']('disabled', '');
         // Bar chart
-        const isDark = document.body.classList.contains('night-mode');
-        const otherClr = isDark ? '#ffffff' : '#1a1a1a';
         const sportColor = this._statsActiveSport === 'all' ? '#00c46a'
-            : (SPORT_COLORS_U[this._statsActiveSport] ?? otherClr);
+            : (_getColor(this._statsActiveSport));
         const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-        // Sum DURATION (seconds) per day — bars show time, not distance
-        const daySec = Array(7).fill(0);
+        // Always show km per day
+        const dayKm = Array(7).fill(0);
         const dayColors = Array(7).fill('rgba(0,196,106,0.12)');
         week.forEach(w => {
             const i = Math.floor((new Date(w.date).getTime() - mon.getTime()) / 86400000);
             if (i >= 0 && i < 7) {
-                daySec[i] += w.durationSec;
+                dayKm[i] += w.distanceKm;
                 dayColors[i] = i <= todayIdx ? sportColor : sportColor + '55';
             }
         });
+        const isDark = document.body.classList.contains('night-mode');
         const gridClr = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
         const tickClr = isDark ? '#6c7175' : '#999';
         const lblClr = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)';
@@ -668,7 +712,7 @@ export class ProfileView {
                     dd.setDate(mon.getDate() + i);
                     return `${d} ${dd.getDate()}`;
                 }),
-                datasets: [{ data: daySec, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
+                datasets: [{ data: dayKm, backgroundColor: dayColors, borderRadius: 6, borderSkipped: false }],
             },
             options: {
                 responsive: true, maintainAspectRatio: false,
@@ -689,13 +733,9 @@ export class ProfileView {
                         ctx.font = '10px Manrope, sans-serif';
                         ctx.textAlign = 'center';
                         meta.data.forEach((bar, i) => {
-                            const sec = daySec[i];
-                            if (sec > 0) {
-                                const h = Math.floor(sec / 3600);
-                                const m = Math.round((sec % 3600) / 60);
-                                const lbl = h > 0 ? `${h}h ${m}min` : `${m}min`;
-                                ctx.fillText(lbl, bar.x, bar.y - 4);
-                            }
+                            const v = dayKm[i];
+                            if (v > 0)
+                                ctx.fillText(v.toFixed(1), bar.x, bar.y - 4);
                         });
                         ctx.restore();
                     } },
@@ -853,7 +893,6 @@ const PUSH_TOGGLES = [
     { key: 'friend_activity', label: 'Friend activity', desc: 'When someone you follow saves an activity' },
     { key: 'friend_post', label: 'Friend post', desc: 'When someone you follow adds a post' },
     { key: 'club_post', label: 'Club post', desc: 'When someone posts in your club' },
-    { key: 'weather', label: 'Weather', desc: 'Good-weather reminders at 12:00 & 18:00 (silent)' },
     { key: 'activity_saved', label: 'Workout saved', desc: 'Confirmation after saving a workout' },
     { key: 'break_reminder', label: 'Training reminder', desc: 'After 3h and 24h away from the app' },
 ];
@@ -905,17 +944,17 @@ async function _showFollowList(parent, title, userIds, myUserId) {
 function _buildPushTogglesHtml(settings, togId) {
     return PUSH_TOGGLES.map(t => {
         const on = settings[t.key] !== false;
-        const bg = on ? '#00c46a' : 'var(--app-toggle-off, #c2c8d0)';
+        const bg = on ? '#00c46a' : 'rgba(255,255,255,0.15)';
         const lft = on ? '23px' : '3px';
-        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--app-border, rgba(128,128,128,0.18))">'
+        return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">'
             + '<div style="flex:1;margin-right:12px">'
-            + '<div style="font-weight:600;color:var(--app-text-primary, #fff);font-size:1.4rem">' + t.label + '</div>'
-            + '<div style="color:var(--app-text-tertiary, rgba(128,128,128,0.7));font-size:1.2rem;margin-top:2px">' + t.desc + '</div>'
+            + '<div style="font-weight:600;color:#fff;font-size:1.4rem">' + t.label + '</div>'
+            + '<div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px">' + t.desc + '</div>'
             + '</div>'
-            + '<label style="position:relative;width:48px;height:28px;flex-shrink:0;display:inline-block">'
+            + '<label style="position:relative;width:48px;height:28px;flex-shrink:0">'
             + '<input type="checkbox" id="' + togId(t.key) + '" ' + (on ? 'checked' : '') + ' style="opacity:0;width:0;height:0;position:absolute"/>'
-            + '<span class="pvPushSlider" data-key="' + t.key + '" style="position:absolute;inset:0;border-radius:28px;background:' + bg + ';cursor:pointer;transition:background 0.2s;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06)">'
-            + '<span style="position:absolute;top:3px;left:' + lft + ';width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)"></span>'
+            + '<span class="pvPushSlider" data-key="' + t.key + '" style="position:absolute;inset:0;border-radius:28px;background:' + bg + ';cursor:pointer;transition:background 0.2s">'
+            + '<span style="position:absolute;top:3px;left:' + lft + ';width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s"></span>'
             + '</span></label></div>';
     }).join('');
 }
@@ -958,8 +997,8 @@ async function _openSettingsModal(parent, userId) {
             </div>
             <label style="position:relative;width:48px;height:28px;flex-shrink:0;margin-left:12px">
               <input type="checkbox" id="pvPrivateToggle" ${isPrivate ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute"/>
-              <span id="pvPrivateSlider" style="position:absolute;inset:0;border-radius:28px;background:${isPrivate ? '#00c46a' : 'var(--app-toggle-off, #c2c8d0)'};cursor:pointer;transition:background 0.2s;box-shadow:inset 0 0 0 1px rgba(0,0,0,0.06)">
-                <span style="position:absolute;top:3px;left:${isPrivate ? '23px' : '3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s;box-shadow:0 1px 3px rgba(0,0,0,0.3)" id="pvPrivateThumb"></span>
+              <span id="pvPrivateSlider" style="position:absolute;inset:0;border-radius:28px;background:${isPrivate ? '#00c46a' : 'rgba(255,255,255,0.15)'};cursor:pointer;transition:background 0.2s">
+                <span style="position:absolute;top:3px;left:${isPrivate ? '23px' : '3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s" id="pvPrivateThumb"></span>
               </span>
             </label>
           </div>` : `
@@ -979,7 +1018,7 @@ async function _openSettingsModal(parent, userId) {
         if (privCb && privSlider && privThumb) {
             privCb.addEventListener('change', async () => {
                 const val = privCb.checked;
-                privSlider.style.background = val ? '#00c46a' : 'var(--app-toggle-off, #c2c8d0)';
+                privSlider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
                 privThumb.style.left = val ? '23px' : '3px';
                 isPrivate = val;
                 await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, {
@@ -997,7 +1036,7 @@ async function _openSettingsModal(parent, userId) {
                 return;
             cb.addEventListener('change', () => {
                 const val = cb.checked;
-                slider.style.background = val ? '#00c46a' : 'var(--app-toggle-off, #c2c8d0)';
+                slider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
                 thumb.style.left = val ? '23px' : '3px';
                 const s = _getPushSettings();
                 s[key] = val;
