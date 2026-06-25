@@ -3692,3 +3692,18 @@ body.night-mode .sv-chart-wrap {
 @media (prefers-reduced-motion: reduce) {
   .mlink-qr__logo img { animation: none; }
 }
+
+/* ── Full-screen comments view (keyboard-safe) ── */
+.cv-overlay { position: fixed; inset: 0; z-index: 100000; background: var(--app-bg-base, #0f1114); animation: adIn 0.2s ease; }
+.cv-sheet { position: absolute; top: 0; left: 0; right: 0; height: 100%; display: flex; flex-direction: column; will-change: height, transform; }
+.cv-header { display: flex; align-items: center; gap: 6px; padding: calc(12px + env(safe-area-inset-top, 0px)) 12px 12px; border-bottom: 1px solid var(--app-border, rgba(255,255,255,0.08)); flex-shrink: 0; }
+.cv-back { background: none; border: none; color: var(--app-text-primary, #fff); font-size: 2.8rem; line-height: 1; cursor: pointer; width: 36px; padding: 0; }
+.cv-title { font-size: 1.7rem; font-weight: 700; color: var(--app-text-primary, #fff); }
+.cv-list { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.cv-empty { color: var(--app-text-tertiary, rgba(255,255,255,0.5)); text-align: center; margin-top: 32px; font-size: 1.4rem; }
+.cv-item { display: flex; flex-direction: column; gap: 2px; }
+.cv-author { font-weight: 700; color: var(--app-text-primary, #fff); font-size: 1.35rem; }
+.cv-text { color: var(--app-text-secondary, rgba(255,255,255,0.75)); font-size: 1.45rem; line-height: 1.4; word-break: break-word; }
+.cv-form { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--app-border, rgba(255,255,255,0.08)); background: var(--app-bg-card, #1a1f23); }
+.cv-input { flex: 1; min-width: 0; background: var(--app-surface-1, rgba(255,255,255,0.06)); border: 1px solid var(--app-border, rgba(255,255,255,0.12)); border-radius: 22px; padding: 11px 16px; color: var(--app-text-primary, #fff); font-size: 1.6rem; font-family: inherit; outline: none; }
+.cv-send { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; border: none; background: #00c46a; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }

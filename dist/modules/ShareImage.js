@@ -36,40 +36,45 @@ async function _drawMapTiles(ctx, coords, canvasX, canvasY, canvasW, canvasH) {
     const lngs = coords.map(c => c[1]);
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs), maxLng = Math.max(...lngs);
-    let zoom = 14;
-    for (let z = 16; z >= 8; z--) {
-        const txa = _lngToTileX(minLng, z), txb = _lngToTileX(maxLng, z);
-        const tya = _latToTileY(maxLat, z), tyb = _latToTileY(minLat, z);
-        if ((txb - txa + 1) <= 6 && (tyb - tya + 1) <= 6) {
+    // Choose zoom so the route fills the frame tightly (Strava-like fitBounds)
+    const cLat = (minLat + maxLat) / 2;
+    const cLng = (minLng + maxLng) / 2;
+    const margin = 0.82; // route spans ~82% of the frame
+    let zoom = 16;
+    for (let z = 18; z >= 3; z--) {
+        const a = _latLngToPixel(maxLat, minLng, z);
+        const b = _latLngToPixel(minLat, maxLng, z);
+        if (Math.abs(b.x - a.x) <= canvasW * margin && Math.abs(b.y - a.y) <= canvasH * margin) {
             zoom = z;
             break;
         }
-        if (z === 8)
-            zoom = 8;
+        if (z === 3)
+            zoom = 3;
     }
-    const pad = 1;
-    const txMin = _lngToTileX(minLng, zoom) - pad;
-    const txMax = _lngToTileX(maxLng, zoom) + pad;
-    const tyMin = _latToTileY(maxLat, zoom) - pad;
-    const tyMax = _latToTileY(minLat, zoom) + pad;
-    const gridPixelX0 = txMin * 256;
-    const gridPixelY0 = tyMin * 256;
-    const cLat = (minLat + maxLat) / 2;
-    const cLng = (minLng + maxLng) / 2;
+    zoom = Math.max(3, Math.min(17, zoom));
     const centre = _latLngToPixel(cLat, cLng, zoom);
     const srcX = centre.x - canvasW / 2;
     const srcY = centre.y - canvasH / 2;
-    const tmpW = (txMax - txMin + 1) * 256;
-    const tmpH = (tyMax - tyMin + 1) * 256;
+    // Tiles covering exactly the crop window
+    const txMin = Math.floor(srcX / 256);
+    const txMax = Math.floor((srcX + canvasW) / 256);
+    const tyMin = Math.floor(srcY / 256);
+    const tyMax = Math.floor((srcY + canvasH) / 256);
+    const gridPixelX0 = txMin * 256;
+    const gridPixelY0 = tyMin * 256;
+    const cols = txMax - txMin + 1;
+    const rows = tyMax - tyMin + 1;
     const tmp = document.createElement('canvas');
-    tmp.width = tmpW;
-    tmp.height = tmpH;
+    tmp.width = cols * 256;
+    tmp.height = rows * 256;
     const tctx = tmp.getContext('2d');
+    tctx.fillStyle = '#e8eef0';
+    tctx.fillRect(0, 0, tmp.width, tmp.height);
     const subs = ['a', 'b', 'c'];
-    await Promise.all(Array.from({ length: (txMax - txMin + 1) * (tyMax - tyMin + 1) }, (_, idx) => {
-        const tx = txMin + Math.floor(idx / (tyMax - tyMin + 1));
-        const ty = tyMin + (idx % (tyMax - tyMin + 1));
-        const sub = subs[(tx + ty) % 3];
+    await Promise.all(Array.from({ length: cols * rows }, (_, idx) => {
+        const tx = txMin + Math.floor(idx / rows);
+        const ty = tyMin + (idx % rows);
+        const sub = subs[(((tx + ty) % 3) + 3) % 3];
         const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
         return _loadImage(url).then(img => {
             if (img)
@@ -85,7 +90,11 @@ async function _drawMapTiles(ctx, coords, canvasX, canvasY, canvasW, canvasH) {
         ctx.rect(canvasX, canvasY, canvasW, canvasH);
     ctx.clip();
     ctx.drawImage(tmp, srcX - gridPixelX0, srcY - gridPixelY0, canvasW, canvasH, canvasX, canvasY, canvasW, canvasH);
-    ctx.fillStyle = 'rgba(0,0,0,0.28)';
+    // Soft top-to-bottom darken for contrast with the route + dark card
+    const vg = ctx.createLinearGradient(0, canvasY, 0, canvasY + canvasH);
+    vg.addColorStop(0, 'rgba(0,0,0,0.08)');
+    vg.addColorStop(1, 'rgba(0,0,0,0.30)');
+    ctx.fillStyle = vg;
     ctx.fillRect(canvasX, canvasY, canvasW, canvasH);
     ctx.restore();
     return {
@@ -140,9 +149,7 @@ export async function generateShareImageFromEnriched(act) {
     const color = SPORT_COLORS[act.sport] ?? '#00c46a';
     const icon = SPORT_ICONS[act.sport] ?? '🏅';
     const hasPhoto = !!act.photoUrl;
-    const hasRoute = act.coords.length > 1;
-    const MAP_BLOCK = 444; // map height (420) + gap (24)
-    const canvasH = (hasPhoto ? 1200 : 1000) - (hasRoute ? 0 : MAP_BLOCK);
+    const canvasH = hasPhoto ? 1200 : 1000;
     const canvas = document.createElement('canvas');
     canvas.width = 800;
     canvas.height = canvasH;
@@ -184,25 +191,24 @@ export async function generateShareImageFromEnriched(act) {
     ctx.font = '15px Manrope, system-ui, sans-serif';
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.fillText(`${months[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()} · ${act.sport}`, 116, 92);
-    // ── Map area (only when a GPS route exists) ─────────────────────────────────
+    // ── Map area ─────────────────────────────────────────────────────────────────
     const mapX = 24, mapY = 108, mapW = 752, mapH = 420;
-    let nextY = mapY;
-    if (hasRoute) {
-        // Map background
-        roundRect(ctx, mapX, mapY, mapW, mapH, 20);
-        ctx.fillStyle = '#242a30';
-        ctx.fill();
+    // Map background
+    roundRect(ctx, mapX, mapY, mapW, mapH, 20);
+    ctx.fillStyle = '#242a30';
+    ctx.fill();
+    if (act.coords.length > 1) {
         const transform = await _drawMapTiles(ctx, act.coords, mapX, mapY, mapW, mapH);
         if (transform) {
             const { toCanvasX, toCanvasY } = transform;
             ctx.save();
             roundRect(ctx, mapX, mapY, mapW, mapH, 20);
             ctx.clip();
-            // Route shadow/glow
-            ctx.shadowColor = color;
-            ctx.shadowBlur = 16;
-            ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-            ctx.lineWidth = 8;
+            // Route casing (white outline) + glow
+            ctx.shadowColor = 'rgba(0,0,0,0.45)';
+            ctx.shadowBlur = 10;
+            ctx.strokeStyle = 'rgba(255,255,255,0.95)';
+            ctx.lineWidth = 11;
             ctx.lineJoin = 'round';
             ctx.lineCap = 'round';
             ctx.beginPath();
@@ -212,7 +218,7 @@ export async function generateShareImageFromEnriched(act) {
             });
             ctx.stroke();
             ctx.strokeStyle = color;
-            ctx.lineWidth = 4;
+            ctx.lineWidth = 6;
             ctx.shadowBlur = 0;
             ctx.beginPath();
             act.coords.forEach((c, i) => {
@@ -238,8 +244,15 @@ export async function generateShareImageFromEnriched(act) {
         else {
             _drawRouteFallback(ctx, act.coords, color, mapX, mapY, mapW, mapH);
         }
-        nextY = mapY + mapH + 24;
     }
+    else {
+        ctx.font = '20px Manrope, system-ui, sans-serif';
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.textAlign = 'center';
+        ctx.fillText('No GPS route recorded', 400, mapY + mapH / 2);
+        ctx.textAlign = 'left';
+    }
+    let nextY = mapY + mapH + 24;
     // ── Photo (if any) ───────────────────────────────────────────────────────────
     if (hasPhoto && act.photoUrl) {
         const photoImg = await _loadImage(act.photoUrl);

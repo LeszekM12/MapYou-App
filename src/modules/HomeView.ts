@@ -150,6 +150,104 @@ function openCommentPanel(card: HTMLElement, actId: string): void {
   input.addEventListener('keydown', e => { if (e.key === 'Enter') void sendComment(); });
 }
 
+// ── Full-screen comments view (Strava-style — keyboard never covers input) ────
+
+function openCommentsView(card: HTMLElement, actId: string): void {
+  document.getElementById('commentsView')?.remove();
+
+  const itemType = actId.startsWith('p_') ? 'post' : 'activity';
+  const realId   = actId.startsWith('p_') ? actId.slice(2) : actId;
+  const userId   = localStorage.getItem('mapyou_userId_profile') ?? '';
+  const userName = localStorage.getItem('mapyou_userName') ?? 'Athlete';
+
+  const ov = document.createElement('div');
+  ov.id = 'commentsView';
+  ov.className = 'cv-overlay';
+  ov.innerHTML = `
+    <div class="cv-sheet">
+      <div class="cv-header">
+        <button class="cv-back" id="cvBack" aria-label="Back">‹</button>
+        <span class="cv-title">Comments</span>
+      </div>
+      <div class="cv-list" id="cvList"><p class="cv-empty">Loading…</p></div>
+      <div class="cv-form">
+        <input class="cv-input" id="cvInput" placeholder="Add a comment…" maxlength="200"/>
+        <button class="cv-send" id="cvSend" aria-label="Send">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
+            <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+    </div>`;
+  document.body.appendChild(ov);
+
+  // Keep the sheet sized to the visible viewport so the keyboard never covers the input
+  const sheet = ov.querySelector<HTMLElement>('.cv-sheet')!;
+  const vv = window.visualViewport;
+  const applyVV = (): void => {
+    if (!vv) return;
+    sheet.style.height = `${vv.height}px`;
+    sheet.style.transform = `translateY(${vv.offsetTop}px)`;
+  };
+  if (vv) { vv.addEventListener('resize', applyVV); vv.addEventListener('scroll', applyVV); applyVV(); }
+
+  const close = (): void => {
+    if (vv) { vv.removeEventListener('resize', applyVV); vv.removeEventListener('scroll', applyVV); }
+    ov.remove();
+  };
+  ov.querySelector('#cvBack')?.addEventListener('click', close);
+
+  const input = ov.querySelector<HTMLInputElement>('#cvInput')!;
+  const list  = ov.querySelector<HTMLElement>('#cvList')!;
+
+  const render = (comments: Array<{ authorName: string; text: string }>): void => {
+    list.innerHTML = comments.length
+      ? comments.map(c => `<div class="cv-item">
+          <span class="cv-author">${c.authorName}</span>
+          <span class="cv-text">${c.text}</span>
+        </div>`).join('')
+      : '<p class="cv-empty">No comments yet — be the first.</p>';
+    list.scrollTop = list.scrollHeight;
+  };
+
+  const updateCount = (n: number): void => {
+    const el = card.querySelector<HTMLElement>(`[data-comment-count="${actId}"], [data-comment-count="${realId}"]`);
+    if (el) el.textContent = String(n);
+  };
+
+  void fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(realId)}`)
+    .then(r => r.json())
+    .then((d: { data: Array<{ authorName: string; text: string }> }) => {
+      render(d.data ?? []); updateCount(d.data?.length ?? 0);
+    })
+    .catch(() => { list.innerHTML = '<p class="cv-empty">No comments yet</p>'; });
+
+  const send = async (): Promise<void> => {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    input.disabled = true;
+    try {
+      const res = await fetch(`${BACKEND_URL}/feed/comment`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ userId, authorName: userName, itemId: realId, itemType, text }),
+      });
+      if (res.ok) {
+        const r2 = await fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(realId)}`);
+        const d2 = await r2.json() as { data: Array<{ authorName: string; text: string }> };
+        render(d2.data ?? []); updateCount(d2.data?.length ?? 0);
+      }
+    } catch {}
+    input.disabled = false;
+    input.focus();
+  };
+
+  ov.querySelector('#cvSend')?.addEventListener('click', () => void send());
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') void send(); });
+  setTimeout(() => input.focus(), 300);
+}
+
 // ── Share panel ───────────────────────────────────────────────────────────────
 
 function openSharePanel(card: HTMLElement, act: EnrichedActivity): void {
@@ -735,9 +833,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
         }).catch(() => { /* offline: ignore */ });
       }
       if (action === 'comment') {
-        const existing = sheetEl.querySelector('.home-card__comment-panel');
-        if (existing) { existing.classList.remove('home-card__comment-panel--open'); setTimeout(() => existing.remove(), 280); }
-        else openCommentPanel(sheetEl, full.id);
+        openCommentsView(sheetEl, full.id);
       }
       if (action === 'share') {
         const existing = sheetEl.querySelector('.home-card__share-panel');
