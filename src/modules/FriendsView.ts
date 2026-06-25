@@ -649,8 +649,11 @@ export class FriendsView {
           ((t: number, e: string) => { addData: (s: string) => void; make: () => void; createDataURL: (c: number, m: number) => string }) | undefined;
         const box = modal.querySelector('#mlinkQR');
         if (qrFn && box) {
-          const qr = qrFn(0, 'M'); qr.addData(link); qr.make();
-          box.innerHTML = `<img class="mlink-qr__img" alt="QR code" src="${qr.createDataURL(6, 8)}" />`;
+          const qr = qrFn(0, 'H'); qr.addData(link); qr.make();
+          box.innerHTML = `<div class="mlink-qr__inner">
+            <img class="mlink-qr__img" alt="QR code" src="${qr.createDataURL(6, 8)}" />
+            <span class="mlink-qr__logo"><img src="public/icon-192.png" alt="" /></span>
+          </div>`;
         }
       } catch {
         const box = modal.querySelector('#mlinkQR');
