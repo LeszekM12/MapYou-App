@@ -3668,3 +3668,11 @@ body.night-mode .sv-chart-wrap {
 .qrscan-viewport video { width: 100%; height: 100%; object-fit: cover; }
 .qrscan-frame { position: absolute; inset: 14%; border: 3px solid rgba(255,255,255,0.9); border-radius: 1.2rem; }
 .qrscan-hint { color: rgba(255,255,255,0.8); font-size: 1.3rem; margin: 0 0 1.4rem; }
+
+/* ── Profile: Activity Types horizontal ranking bars (restored) ── */
+.pv-types-wrap { display: flex; flex-direction: column; gap: 10px; padding: 0 16px 16px; }
+.pv-type-row { display: flex; align-items: center; gap: 10px; }
+.pv-type-row__label { flex: 0 0 38%; font-size: 1.25rem; color: var(--app-text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pv-type-row__track { flex: 1; height: 12px; background: var(--app-surface-2, rgba(128,128,128,0.12)); border-radius: 6px; overflow: hidden; }
+.pv-type-row__bar { height: 100%; background: var(--app-sport-other, var(--app-text-primary, #1a1a1a)); border-radius: 6px; opacity: 0.85; transition: width 0.5s cubic-bezier(0.4,0,0.2,1); }
+.pv-type-row__count { flex: 0 0 auto; min-width: 22px; text-align: right; font-size: 1.3rem; font-weight: 700; color: var(--app-text-primary); }

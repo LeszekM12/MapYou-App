@@ -601,44 +601,28 @@ export class ProfileView {
         <canvas id="pvStatsChart" role="img" aria-label="Weekly activity chart"></canvas>
       </div>
 
-      <!-- Activity Types pie -->
+      <!-- Activity Types ranking -->
       <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
-      <div class="pv-pie-wrap">
+      <div class="pv-types-wrap">
         ${sportSet.size === 0
             ? '<p class="pv-empty-sub">No data yet</p>'
-            : `<div class="pv-pie-container"><canvas id="pvPieChart" width="160" height="160"></canvas></div>
-             <div class="pv-pie-legend">
-               ${[...sportSet].map(type => {
-                const cnt = this._workouts.filter(w => w.type === type).length;
-                return `<div class="pv-pie-legend__item">
-                   <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
-                   <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
-                 </div>`;
-            }).join('')}
-             </div>`}
+            : (() => {
+                const counts = [...sportSet]
+                    .map(type => ({ type, cnt: this._workouts.filter(w => w.type === type).length }))
+                    .sort((a, b) => b.cnt - a.cnt);
+                const max = Math.max(...counts.map(c => c.cnt), 1);
+                return counts.map(({ type, cnt }) => `
+                <div class="pv-type-row">
+                  <span class="pv-type-row__label">${_getIcon(type)} ${_getSportLabel(type)}</span>
+                  <div class="pv-type-row__track">
+                    <div class="pv-type-row__bar" style="width:${Math.round((cnt / max) * 100)}%"></div>
+                  </div>
+                  <span class="pv-type-row__count">${cnt}</span>
+                </div>`).join('');
+            })()}
       </div>`;
         this._renderStatsWeek(el);
         this._bindStatsEvents(el);
-        // Pie chart
-        if (sportSet.size > 0) {
-            setTimeout(() => {
-                const canvas = document.getElementById('pvPieChart');
-                if (!canvas || typeof Chart === 'undefined')
-                    return;
-                if (_pieChart)
-                    _pieChart.destroy?.();
-                const typeCounts = {};
-                this._workouts.forEach(w => { typeCounts[w.type] = (typeCounts[w.type] ?? 0) + 1; });
-                _pieChart = new Chart(canvas, {
-                    type: 'doughnut',
-                    data: {
-                        labels: Object.keys(typeCounts),
-                        datasets: [{ data: Object.values(typeCounts), backgroundColor: Object.keys(typeCounts).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }],
-                    },
-                    options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
-                });
-            }, 150);
-        }
     }
     _renderStatsWeek(el) {
         const now = new Date();

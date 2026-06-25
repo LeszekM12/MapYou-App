@@ -501,36 +501,24 @@ function _renderStatsTab(el: HTMLElement, activities: FeedItem[]): void {
       <canvas id="ppStatsChart" role="img" aria-label="Weekly activity chart"></canvas>
     </div>
     <div class="pv-section-title" style="padding:16px 16px 8px;margin-top:8px">Activity Types</div>
-    <div class="pv-pie-wrap">
+    <div class="pv-types-wrap">
       ${sportSet.size === 0
         ? '<p class="pv-empty-sub" style="padding:0 16px">No data yet</p>'
-        : `<div class="pv-pie-container"><canvas id="ppPieChart" width="160" height="160"></canvas></div>
-           <div class="pv-pie-legend">
-             ${[...sportSet].map(type => {
-               const cnt = activities.filter(a => (a.data.sport ?? 'running') === type).length;
-               return `<div class="pv-pie-legend__item">
-                 <span class="pv-pie-legend__dot" style="background:${_getColor(type)}"></span>
-                 <span>${_getIcon(type)} ${_getSportLabel(type)} — ${cnt}</span>
-               </div>`;
-             }).join('')}
-           </div>`}
+        : (() => {
+            const counts = [...sportSet]
+              .map(type => ({ type, cnt: activities.filter(a => (a.data.sport ?? 'running') === type).length }))
+              .sort((a, b) => b.cnt - a.cnt);
+            const max = Math.max(...counts.map(c => c.cnt), 1);
+            return counts.map(({ type, cnt }) => `
+              <div class="pv-type-row">
+                <span class="pv-type-row__label">${_getIcon(type)} ${_getSportLabel(type)}</span>
+                <div class="pv-type-row__track">
+                  <div class="pv-type-row__bar" style="width:${Math.round((cnt / max) * 100)}%"></div>
+                </div>
+                <span class="pv-type-row__count">${cnt}</span>
+              </div>`).join('');
+          })()}
     </div>`;
-
-  // Pie
-  if (sportSet.size > 0) {
-    setTimeout(() => {
-      const canvas = document.getElementById('ppPieChart') as HTMLCanvasElement | null;
-      if (!canvas || !Chart) return;
-      if (_ppPieChart) (_ppPieChart as Record<string,()=>void>).destroy?.();
-      const tc: Record<string,number> = {};
-      activities.forEach(a => { const t = (a.data.sport ?? 'running') as string; tc[t] = (tc[t] ?? 0) + 1; });
-      _ppPieChart = new Chart(canvas, {
-        type: 'doughnut',
-        data: { labels: Object.keys(tc), datasets: [{ data: Object.values(tc), backgroundColor: Object.keys(tc).map(t => _getColor(t)), borderWidth: 0, hoverOffset: 6 }] },
-        options: { responsive: false, cutout: '65%', plugins: { legend: { display: false } } },
-      });
-    }, 100);
-  }
 
   const renderWeek = () => {
     const now = new Date();
