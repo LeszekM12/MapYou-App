@@ -930,7 +930,7 @@ async function _showFollowList(parent: HTMLElement, title: string, userIds: stri
 function _buildPushTogglesHtml(settings: Record<string,boolean>, togId: (k:string)=>string): string {
   return PUSH_TOGGLES.map(t => {
     const on  = settings[t.key] !== false;
-    const bg  = on ? '#00c46a' : 'rgba(255,255,255,0.15)';
+    const bg  = on ? '#00c46a' : 'rgba(120,120,128,0.4)';
     const lft = on ? '23px' : '3px';
     return '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">'
       + '<div style="flex:1;margin-right:12px">'
@@ -986,7 +986,7 @@ async function _openSettingsModal(parent: HTMLElement, userId: string): Promise<
             </div>
             <label style="position:relative;width:48px;height:28px;flex-shrink:0;margin-left:12px">
               <input type="checkbox" id="pvPrivateToggle" ${isPrivate ? 'checked' : ''} style="opacity:0;width:0;height:0;position:absolute"/>
-              <span id="pvPrivateSlider" style="position:absolute;inset:0;border-radius:28px;background:${isPrivate ? '#00c46a' : 'rgba(255,255,255,0.15)'};cursor:pointer;transition:background 0.2s">
+              <span id="pvPrivateSlider" style="position:absolute;inset:0;border-radius:28px;background:${isPrivate ? '#00c46a' : 'rgba(120,120,128,0.4)'};cursor:pointer;transition:background 0.2s">
                 <span style="position:absolute;top:3px;left:${isPrivate ? '23px' : '3px'};width:22px;height:22px;border-radius:50%;background:#fff;transition:left 0.2s" id="pvPrivateThumb"></span>
               </span>
             </label>
@@ -1008,7 +1008,7 @@ async function _openSettingsModal(parent: HTMLElement, userId: string): Promise<
     if (privCb && privSlider && privThumb) {
       privCb.addEventListener('change', async () => {
         const val = privCb.checked;
-        privSlider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
+        privSlider.style.background = val ? '#00c46a' : 'rgba(120,120,128,0.4)';
         privThumb.style.left = val ? '23px' : '3px';
         isPrivate = val;
         await fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, {
@@ -1026,7 +1026,7 @@ async function _openSettingsModal(parent: HTMLElement, userId: string): Promise<
       if (!cb || !thumb) return;
       cb.addEventListener('change', () => {
         const val = cb.checked;
-        slider.style.background = val ? '#00c46a' : 'rgba(255,255,255,0.15)';
+        slider.style.background = val ? '#00c46a' : 'rgba(120,120,128,0.4)';
         thumb.style.left = val ? '23px' : '3px';
         const s = _getPushSettings();
         s[key] = val;

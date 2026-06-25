@@ -595,6 +595,11 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   const ov = document.createElement('div');
   ov.id = 'activityDetailOverlay';
   ov.className = 'ad-overlay';
+  // When opened from a profile overlay (own #profileViewOverlay z5000 / public z9600),
+  // sit above it but below child panels (comments ~9999, photo zoom 99999).
+  if (document.getElementById('publicProfileOverlay') || document.getElementById('profileViewOverlay')) {
+    ov.style.zIndex = '9650';
+  }
   ov.innerHTML = `
     <div class="ad-hero">
       <button class="ad-back" id="adBack" aria-label="Back">
