@@ -3645,3 +3645,26 @@ body.night-mode .sv-chart-wrap {
   border: 1px solid rgba(255, 255, 255, 0.06);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
+
+/* ── Friends: My link modal (in-app QR + copy + share) ── */
+.mlink-overlay { position: fixed; inset: 0; z-index: 5000; background: rgba(0,0,0,0.55); display: flex; align-items: flex-end; justify-content: center; animation: adIn 0.2s ease; }
+.mlink-sheet { position: relative; width: 100%; max-width: 460px; background: var(--app-bg-base, #14181c); border-radius: 2rem 2rem 0 0; padding: 2.2rem 2rem calc(2.4rem + env(safe-area-inset-bottom, 0px)); text-align: center; box-sizing: border-box; }
+.mlink-close { position: absolute; top: 1.2rem; right: 1.4rem; background: none; border: none; color: var(--app-text-secondary, #9aa0a6); font-size: 2rem; line-height: 1; cursor: pointer; }
+.mlink-title { font-size: 1.9rem; font-weight: 800; color: var(--app-text-primary, #fff); margin: 0 0 0.4rem; }
+.mlink-sub { font-size: 1.3rem; color: var(--app-text-secondary, #9aa0a6); margin: 0 0 1.8rem; }
+.mlink-qr { width: 232px; height: 232px; margin: 0 auto 1.8rem; border-radius: 1.4rem; background: #fff; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 10px; box-sizing: border-box; }
+.mlink-qr__img { width: 100%; height: 100%; image-rendering: pixelated; }
+.mlink-qr__msg { font-size: 1.3rem; color: #555; padding: 1.2rem; }
+.mlink-actions { display: flex; gap: 1rem; }
+.mlink-btn { flex: 1; padding: 1.1rem; border-radius: 1.2rem; border: 1.5px solid var(--app-border, rgba(255,255,255,0.12)); background: var(--app-bg-card, rgba(255,255,255,0.06)); color: var(--app-text-primary, #fff); font-family: inherit; font-size: 1.4rem; font-weight: 700; cursor: pointer; }
+.mlink-btn--primary { background: #ff5a1f; border-color: #ff5a1f; color: #fff; }
+
+/* ── Friends: QR scanner ── */
+.qrscan-overlay { position: fixed; inset: 0; z-index: 5000; background: #000; display: flex; align-items: center; justify-content: center; animation: adIn 0.2s ease; }
+.qrscan-sheet { position: relative; width: 100%; max-width: 460px; padding: calc(2rem + env(safe-area-inset-top, 0px)) 2rem calc(2.4rem + env(safe-area-inset-bottom, 0px)); text-align: center; box-sizing: border-box; }
+.qrscan-close { position: absolute; top: calc(1.4rem + env(safe-area-inset-top, 0px)); right: 1.6rem; background: rgba(255,255,255,0.15); border: none; color: #fff; font-size: 1.8rem; width: 3.4rem; height: 3.4rem; border-radius: 50%; cursor: pointer; z-index: 2; }
+.qrscan-title { color: #fff; font-size: 1.9rem; font-weight: 800; margin: 0 0 1.6rem; }
+.qrscan-viewport { position: relative; width: 100%; aspect-ratio: 1; max-width: 320px; margin: 0 auto 1.4rem; border-radius: 1.6rem; overflow: hidden; background: #111; }
+.qrscan-viewport video { width: 100%; height: 100%; object-fit: cover; }
+.qrscan-frame { position: absolute; inset: 14%; border: 3px solid rgba(255,255,255,0.9); border-radius: 1.2rem; }
+.qrscan-hint { color: rgba(255,255,255,0.8); font-size: 1.3rem; margin: 0 0 1.4rem; }

@@ -113,14 +113,14 @@ export async function updateFriendLastSeen(subscriptionId: string): Promise<void
  */
 export async function generateInviteLink(
   name:       string,
-  pushSub:    Friend['pushSub'],
+  pushSub:    Friend['pushSub'] | null | undefined,
   backendUrl: string,
   userId?:    string,
 ): Promise<string> {
   const res  = await fetch(`${backendUrl}/live/invite`, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ name, pushSub, userId }),
+    body:    JSON.stringify({ name, pushSub: pushSub ?? undefined, userId }),
   });
   const data = await res.json() as { status: string; code: string };
   if (data.status !== 'ok') throw new Error('Failed to create invite');

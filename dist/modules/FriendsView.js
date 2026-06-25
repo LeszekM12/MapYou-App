@@ -61,6 +61,13 @@ export class FriendsView {
             writable: true,
             value: false
         });
+        // ── QR: external lib loader (CDN <script>, cached) ──────────────────────────
+        Object.defineProperty(this, "_scriptPromises", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: {}
+        });
     }
     // ── Init ───────────────────────────────────────────────────────────────────
     init() {
@@ -68,19 +75,7 @@ export class FriendsView {
         const inviteCode = checkInviteInUrl();
         if (inviteCode) {
             history.replaceState(null, '', window.location.pathname);
-            setTimeout(async () => {
-                // Spróbuj pobrać z backendu (krótki kod)
-                const inv = await fetchInviteByCode(inviteCode, BACKEND_URL);
-                if (inv) {
-                    this._showAddFriendModal(inv.name, inv.pushSub);
-                }
-                else {
-                    // Fallback — stary base64 format
-                    const parsed = parseInviteLink(`#invite=${inviteCode}`);
-                    if (parsed)
-                        this._showAddFriendModal(parsed.name, parsed.pushSub);
-                }
-            }, 500);
+            setTimeout(() => void this._processInviteCode(inviteCode), 500);
         }
         // Sprawdź czy URL zawiera #live= (oglądanie trasy)
         const hash = window.location.hash;
@@ -97,7 +92,7 @@ export class FriendsView {
             this._liveMap.init(mapContainer, (data) => this._onLiveUpdate(data));
         }
         // Podpnij przyciski
-        document.getElementById('btnShareMyLink')?.addEventListener('click', this._shareMyLink.bind(this));
+        document.getElementById('btnShareMyLink')?.addEventListener('click', () => this._showMyLinkModal());
         // Pre-generate invite link in background so it's ready when user taps
         void this._precacheInviteLink();
         document.getElementById('btnAddFriend')?.addEventListener('click', () => this._showAddFriendModal());
@@ -413,7 +408,7 @@ export class FriendsView {
             return;
         this._cachingLink = true;
         const name = getUserName();
-        // 1. Znajdź push sub (opcjonalnie — link działa też bez niego)
+        // 1. Znajdź push sub (opcjonalnie — krótki link powstaje też bez niego)
         let sub = null;
         try {
             const regs = await Promise.race([
@@ -427,36 +422,25 @@ export class FriendsView {
             }
         }
         catch { }
-        // 2. Spróbuj krótki link z backendu (działa z push sub lub bez)
-        if (sub) {
-            try {
-                const subJson = sub.toJSON();
-                const short = await Promise.race([
-                    generateInviteLink(name, subJson, BACKEND_URL, getUserId()),
-                    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 3000)),
-                ]);
-                this._cachedInviteLink = short;
-                this._cachingLink = false;
-                return;
-            }
-            catch { }
+        // 2. ZAWSZE próbuj krótkiego kodu z backendu (z push sub lub bez).
+        //    To jedyny naprawdę krótki format; base64 zostaje tylko na offline.
+        try {
+            const subJson = sub ? sub.toJSON() : undefined;
+            const short = await Promise.race([
+                generateInviteLink(name, subJson, BACKEND_URL, getUserId()),
+                new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), 5000)),
+            ]);
+            this._cachedInviteLink = short;
+            this._cachingLink = false;
+            return;
         }
-        // 3. Backend niedostępny lub brak push sub
+        catch { }
+        // 3. Backend niedostępny (offline) — awaryjny base64 (długi, ale działa bez sieci)
         const base = window.location.href.split('#')[0];
-        if (sub) {
-            // Mamy push sub — base64 z pełnymi danymi (działa bez backendu)
-            this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
-                name,
-                pushSub: sub.toJSON(),
-            }))}`;
-        }
-        else {
-            // Brak push sub — link tylko z imieniem (znajomy może dodać ale bez push)
-            this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
-                name,
-                pushSub: null,
-            }))}`;
-        }
+        this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
+            name,
+            pushSub: sub ? sub.toJSON() : null,
+        }))}`;
         this._cachingLink = false;
     }
     _shareMyLink() {
@@ -606,21 +590,190 @@ export class FriendsView {
             this._showToast(`${name} added! 🎉`);
         });
     }
-    // ── QR scanner ────────────────────────────────────────────────────────────
-    _scanQR() {
-        // Używamy jsQR przez dynamiczny import — ładuj tylko gdy potrzebne
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.capture = 'environment';
-        input.onchange = async () => {
-            const file = input.files?.[0];
-            if (!file)
+    _loadExternalScript(src) {
+        const existing = this._scriptPromises[src];
+        if (existing)
+            return existing;
+        const p = new Promise((resolve, reject) => {
+            const s = document.createElement('script');
+            s.src = src;
+            s.async = true;
+            s.onload = () => resolve();
+            s.onerror = () => reject(new Error('script load failed: ' + src));
+            document.head.appendChild(s);
+        });
+        this._scriptPromises[src] = p;
+        return p;
+    }
+    // ── My link modal (in-app QR + copy + share — works on iOS too) ─────────────
+    async _showMyLinkModal() {
+        document.getElementById('myLinkModal')?.remove();
+        if (!this._cachedInviteLink)
+            void this._precacheInviteLink();
+        const link = this._cachedInviteLink ?? '';
+        const modal = document.createElement('div');
+        modal.id = 'myLinkModal';
+        modal.className = 'mlink-overlay';
+        modal.innerHTML = `
+      <div class="mlink-sheet">
+        <button class="mlink-close" id="mlinkClose" aria-label="Close">✕</button>
+        <h2 class="mlink-title">Add me on MapYou</h2>
+        <p class="mlink-sub">Have a friend scan this in their app — or share the link.</p>
+        <div class="mlink-qr" id="mlinkQR"><div class="mlink-qr__msg">${link ? 'Generating…' : 'Preparing link… reopen in a moment'}</div></div>
+        <div class="mlink-actions">
+          <button class="mlink-btn" id="mlinkCopy">📋 Copy link</button>
+          <button class="mlink-btn mlink-btn--primary" id="mlinkShare">↗ Share</button>
+        </div>
+      </div>`;
+        document.body.appendChild(modal);
+        modal.querySelector('#mlinkClose')?.addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', e => { if (e.target === modal)
+            modal.remove(); });
+        modal.querySelector('#mlinkCopy')?.addEventListener('click', () => {
+            if (!link)
                 return;
-            // Prosty fallback — poproś o wklejenie linku (jsQR wymaga dodatkowej biblioteki)
-            this._showAddFriendModal();
+            navigator.clipboard?.writeText(link)
+                .then(() => this._showToast('Link copied! 📋'))
+                .catch(() => this._showToast('Could not copy'));
+        });
+        modal.querySelector('#mlinkShare')?.addEventListener('click', () => this._shareMyLink());
+        if (link) {
+            try {
+                await this._loadExternalScript('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js');
+                const qrFn = window.qrcode;
+                const box = modal.querySelector('#mlinkQR');
+                if (qrFn && box) {
+                    const qr = qrFn(0, 'M');
+                    qr.addData(link);
+                    qr.make();
+                    box.innerHTML = `<img class="mlink-qr__img" alt="QR code" src="${qr.createDataURL(6, 8)}" />`;
+                }
+            }
+            catch {
+                const box = modal.querySelector('#mlinkQR');
+                if (box)
+                    box.innerHTML = '<div class="mlink-qr__msg">QR unavailable offline — use Share</div>';
+            }
+        }
+    }
+    // ── Process a scanned / pasted invite (short code or old base64) ────────────
+    async _processInviteCode(raw) {
+        let code = (raw ?? '').trim();
+        const m = code.match(/[#&?]invite=([^&\s]+)/);
+        if (m)
+            code = m[1];
+        code = code.replace(/^#?invite=/, '');
+        if (!code) {
+            this._showToast('No invite found');
+            return;
+        }
+        const inv = await fetchInviteByCode(code, BACKEND_URL);
+        if (inv) {
+            this._showAddFriendModal(inv.name, inv.pushSub);
+            return;
+        }
+        const parsed = parseInviteLink(`#invite=${code}`);
+        if (parsed) {
+            this._showAddFriendModal(parsed.name, parsed.pushSub);
+            return;
+        }
+        this._showToast('Invite not found or expired');
+    }
+    // ── QR scanner (live camera via jsQR, photo fallback) ───────────────────────
+    async _scanQR() {
+        document.getElementById('qrScanModal')?.remove();
+        const modal = document.createElement('div');
+        modal.id = 'qrScanModal';
+        modal.className = 'qrscan-overlay';
+        modal.innerHTML = `
+      <div class="qrscan-sheet">
+        <button class="qrscan-close" id="qrScanClose" aria-label="Close">✕</button>
+        <h2 class="qrscan-title">Scan friend's QR</h2>
+        <div class="qrscan-viewport"><video id="qrScanVideo" playsinline muted></video><div class="qrscan-frame"></div></div>
+        <p class="qrscan-hint" id="qrScanHint">Point the camera at the QR code</p>
+        <button class="mlink-btn" id="qrScanPhoto">📷 Use a photo instead</button>
+      </div>`;
+        document.body.appendChild(modal);
+        let stream = null;
+        let raf = 0;
+        const cleanup = () => {
+            if (raf)
+                cancelAnimationFrame(raf);
+            if (stream)
+                stream.getTracks().forEach(t => t.stop());
+            modal.remove();
         };
-        input.click();
+        const onFound = (text) => { cleanup(); void this._processInviteCode(text); };
+        modal.querySelector('#qrScanClose')?.addEventListener('click', cleanup);
+        const jsqrUrl = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js';
+        const getJsQR = () => window.jsQR;
+        // Photo fallback (works even if live camera is blocked)
+        modal.querySelector('#qrScanPhoto')?.addEventListener('click', () => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.capture = 'environment';
+            input.onchange = async () => {
+                const file = input.files?.[0];
+                if (!file)
+                    return;
+                try {
+                    await this._loadExternalScript(jsqrUrl);
+                    const img = new Image();
+                    img.src = URL.createObjectURL(file);
+                    await img.decode();
+                    const c = document.createElement('canvas');
+                    c.width = img.naturalWidth;
+                    c.height = img.naturalHeight;
+                    const ctx = c.getContext('2d');
+                    if (!ctx)
+                        return;
+                    ctx.drawImage(img, 0, 0);
+                    const px = ctx.getImageData(0, 0, c.width, c.height);
+                    const r = getJsQR()?.(px.data, c.width, c.height);
+                    if (r?.data)
+                        onFound(r.data);
+                    else
+                        this._showToast('No QR found in photo');
+                }
+                catch {
+                    this._showToast('Could not read photo');
+                }
+            };
+            input.click();
+        });
+        // Live camera scan
+        try {
+            await this._loadExternalScript(jsqrUrl);
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+            const video = modal.querySelector('#qrScanVideo');
+            video.srcObject = stream;
+            await video.play();
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            const tick = () => {
+                if (!document.body.contains(modal) || !ctx)
+                    return;
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    const px = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const r = getJsQR()?.(px.data, canvas.width, canvas.height);
+                    if (r?.data) {
+                        onFound(r.data);
+                        return;
+                    }
+                }
+                raf = requestAnimationFrame(tick);
+            };
+            raf = requestAnimationFrame(tick);
+        }
+        catch {
+            const hint = modal.querySelector('#qrScanHint');
+            if (hint)
+                hint.textContent = 'Camera unavailable — tap “Use a photo instead”.';
+        }
     }
     // ── Live view ──────────────────────────────────────────────────────────────
     _openLiveView(token, name) {

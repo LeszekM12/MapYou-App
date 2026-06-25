@@ -68,7 +68,7 @@ export async function generateInviteLink(name, pushSub, backendUrl, userId) {
     const res = await fetch(`${backendUrl}/live/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, pushSub, userId }),
+        body: JSON.stringify({ name, pushSub: pushSub ?? undefined, userId }),
     });
     const data = await res.json();
     if (data.status !== 'ok')
