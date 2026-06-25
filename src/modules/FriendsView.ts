@@ -610,6 +610,45 @@ export class FriendsView {
     return p;
   }
 
+  // ── Telegram-style dotted/rounded QR (SVG from module matrix) ───────────────
+
+  private _buildDottedQR(count: number, isDark: (r: number, c: number) => boolean): string {
+    const green = '#0a7d46';                 // deep brand green — good contrast for scanning
+    const cell  = 10;                        // viewBox units per module
+    const size  = count * cell;
+    const r     = cell * 0.46;               // dot radius
+    const cen   = count / 2;
+    const logoHalf = count * 0.15;           // skip dots under the centered logo
+
+    const inFinder = (row: number, col: number): boolean => {
+      const box = (r0: number, c0: number): boolean =>
+        row >= r0 && row < r0 + 7 && col >= c0 && col < c0 + 7;
+      return box(0, 0) || box(0, count - 7) || box(count - 7, 0);
+    };
+    const inLogo = (row: number, col: number): boolean =>
+      Math.abs(row + 0.5 - cen) < logoHalf && Math.abs(col + 0.5 - cen) < logoHalf;
+
+    let dots = '';
+    for (let row = 0; row < count; row++) {
+      for (let col = 0; col < count; col++) {
+        if (!isDark(row, col) || inFinder(row, col) || inLogo(row, col)) continue;
+        dots += `<circle cx="${col * cell + cell / 2}" cy="${row * cell + cell / 2}" r="${r}"/>`;
+      }
+    }
+
+    const eye = (r0: number, c0: number): string => {
+      const x = c0 * cell, y = r0 * cell;
+      return `<rect x="${x}" y="${y}" width="${7 * cell}" height="${7 * cell}" rx="${cell * 2.2}" fill="${green}"/>`
+        + `<rect x="${x + cell}" y="${y + cell}" width="${5 * cell}" height="${5 * cell}" rx="${cell * 1.5}" fill="#fff"/>`
+        + `<rect x="${x + 2 * cell}" y="${y + 2 * cell}" width="${3 * cell}" height="${3 * cell}" rx="${cell}" fill="${green}"/>`;
+    };
+
+    return `<svg class="mlink-qr__svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${size} ${size}" width="100%" height="100%" shape-rendering="geometricPrecision">`
+      + `<g fill="${green}">${dots}</g>`
+      + eye(0, 0) + eye(0, count - 7) + eye(count - 7, 0)
+      + `</svg>`;
+  }
+
   // ── My link modal (in-app QR + copy + share — works on iOS too) ─────────────
 
   private async _showMyLinkModal(): Promise<void> {
@@ -646,14 +685,22 @@ export class FriendsView {
       try {
         await this._loadExternalScript('https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js');
         const qrFn = (window as unknown as Record<string, unknown>).qrcode as
-          ((t: number, e: string) => { addData: (s: string) => void; make: () => void; createDataURL: (c: number, m: number) => string }) | undefined;
+          ((t: number, e: string) => {
+            addData: (s: string) => void; make: () => void;
+            createDataURL: (c: number, m: number) => string;
+            getModuleCount: () => number; isDark: (r: number, c: number) => boolean;
+          }) | undefined;
         const box = modal.querySelector('#mlinkQR');
         if (qrFn && box) {
           const qr = qrFn(0, 'H'); qr.addData(link); qr.make();
-          box.innerHTML = `<div class="mlink-qr__inner">
-            <img class="mlink-qr__img" alt="QR code" src="${qr.createDataURL(6, 8)}" />
-            <span class="mlink-qr__logo"><img src="public/icon-192.png" alt="" /></span>
-          </div>`;
+          const logo = '<span class="mlink-qr__logo"><img src="public/icon-192.png" alt="" /></span>';
+          let inner: string;
+          try {
+            inner = this._buildDottedQR(qr.getModuleCount(), (r, c) => qr.isDark(r, c));
+          } catch {
+            inner = `<img class="mlink-qr__img" alt="QR code" src="${qr.createDataURL(6, 8)}" />`;
+          }
+          box.innerHTML = `<div class="mlink-qr__inner">${inner}${logo}</div>`;
         }
       } catch {
         const box = modal.querySelector('#mlinkQR');
