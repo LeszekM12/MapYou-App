@@ -1245,6 +1245,18 @@ export class HomeView {
             writable: true,
             value: false
         });
+        Object.defineProperty(this, "_homeSection", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 'home'
+        });
+        Object.defineProperty(this, "_switcherAutohideInited", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
         Object.defineProperty(this, "_feedLoading", {
             enumerable: true,
             configurable: true,
@@ -2267,10 +2279,14 @@ export class HomeView {
                 slot.remove();
         }).catch(() => { });
         scroll.appendChild(this._buildStreakWidget(activities));
+        // Section switcher (Home / Explore) — sticky, auto-hide like X
+        scroll.appendChild(this._buildSectionSwitcher());
+        this._setupSwitcherAutohide(scroll);
         // Dedicated feed container so the feed can be repainted alone when server data arrives
         const feedList = document.createElement('div');
         feedList.id = 'homeFeedList';
         scroll.appendChild(feedList);
+        this._setupSectionSwipe(feedList);
         const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
         const localFeed = [
             ...activities.map(a => ({ kind: 'activity', date: a.date, data: a, isLocal: true })),
@@ -2410,6 +2426,90 @@ export class HomeView {
                     paintFeed(result.feed);
             }).catch(() => { });
         }
+    }
+    // ── Section switcher: Home / Explore (style 3 — texts + dot) ────────────────
+    _buildSectionSwitcher() {
+        const sw = document.createElement('div');
+        sw.id = 'homeSwitcher';
+        sw.className = 'home-switcher';
+        sw.innerHTML = `
+      <button class="home-switcher__tab${this._homeSection === 'home' ? ' home-switcher__tab--active' : ''}" data-sec="home">Home</button>
+      <button class="home-switcher__tab${this._homeSection === 'explore' ? ' home-switcher__tab--active' : ''}" data-sec="explore">Explore</button>
+      <span class="home-switcher__dot"></span>`;
+        sw.querySelectorAll('.home-switcher__tab').forEach(t => t.addEventListener('click', () => this._setSection(t.dataset.sec === 'explore' ? 'explore' : 'home')));
+        requestAnimationFrame(() => this._positionSwitcherDot());
+        return sw;
+    }
+    _positionSwitcherDot() {
+        const sw = document.getElementById('homeSwitcher');
+        if (!sw)
+            return;
+        const active = sw.querySelector('.home-switcher__tab--active');
+        const dot = sw.querySelector('.home-switcher__dot');
+        if (!active || !dot)
+            return;
+        dot.style.left = `${active.offsetLeft + active.offsetWidth / 2}px`;
+    }
+    _setSection(sec) {
+        if (this._homeSection === sec)
+            return;
+        const dir = sec === 'explore' ? -1 : 1;
+        this._homeSection = sec;
+        const sw = document.getElementById('homeSwitcher');
+        sw?.querySelectorAll('.home-switcher__tab').forEach(t => t.classList.toggle('home-switcher__tab--active', t.dataset.sec === sec));
+        this._positionSwitcherDot();
+        // Brief slide feedback (Explore content is wired later; both show the current feed for now)
+        const fl = document.getElementById('homeFeedList');
+        if (fl) {
+            fl.style.transition = 'transform .16s ease, opacity .16s ease';
+            fl.style.transform = `translateX(${dir * -18}px)`;
+            fl.style.opacity = '0.5';
+            requestAnimationFrame(() => {
+                fl.style.transform = `translateX(${dir * 18}px)`;
+                setTimeout(() => { fl.style.transform = ''; fl.style.opacity = '1'; }, 30);
+            });
+        }
+    }
+    _setupSwitcherAutohide(scroll) {
+        if (this._switcherAutohideInited)
+            return;
+        this._switcherAutohideInited = true;
+        let lastY = scroll.scrollTop;
+        scroll.addEventListener('scroll', () => {
+            const sw = document.getElementById('homeSwitcher');
+            if (!sw)
+                return;
+            const y = scroll.scrollTop;
+            const stuck = sw.getBoundingClientRect().top <= scroll.getBoundingClientRect().top + 1;
+            if (!stuck) {
+                sw.classList.remove('home-switcher--hidden'); // natural spot under streak → always visible
+            }
+            else if (y > lastY + 6 && y > 120) {
+                sw.classList.add('home-switcher--hidden'); // scrolling down → hide
+            }
+            else if (y < lastY - 6) {
+                sw.classList.remove('home-switcher--hidden'); // scrolling up → show
+            }
+            lastY = y;
+        }, { passive: true });
+    }
+    _setupSectionSwipe(feedList) {
+        let sx = 0, sy = 0, active = false;
+        feedList.addEventListener('touchstart', e => {
+            sx = e.touches[0].clientX;
+            sy = e.touches[0].clientY;
+            active = true;
+        }, { passive: true });
+        feedList.addEventListener('touchend', e => {
+            if (!active)
+                return;
+            active = false;
+            const dx = e.changedTouches[0].clientX - sx;
+            const dy = e.changedTouches[0].clientY - sy;
+            if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5)
+                return; // need a clear horizontal swipe
+            this._setSection(dx < 0 ? 'explore' : 'home'); // left → Explore, right → Home
+        }, { passive: true });
     }
     // ── Pull-to-refresh (app-styled) ────────────────────────────────────────────
     _setupPullToRefresh(scroll) {

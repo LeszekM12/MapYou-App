@@ -3783,3 +3783,10 @@ body.night-mode .sv-chart-wrap {
 .home-ptr__spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid var(--app-surface-2, rgba(255,255,255,0.18)); border-top-color: #f97316; box-sizing: border-box; }
 .home-ptr--active .home-ptr__spinner { animation: hptrspin 0.7s linear infinite; }
 @keyframes hptrspin { to { transform: rotate(360deg); } }
+
+/* ── Home section switcher (Home / Explore — style 3, sticky auto-hide) ── */
+.home-switcher { position: sticky; top: 0; z-index: 30; display: flex; justify-content: center; gap: 40px; padding: 10px 0 14px; margin: 4px 0 2px; background: var(--color-dark--1, #f1f1f4); transition: transform .26s ease; will-change: transform; }
+.home-switcher--hidden { transform: translateY(-120%); }
+.home-switcher__tab { position: relative; font-size: 1.55rem; font-weight: 600; color: var(--app-text-tertiary, rgba(255,255,255,0.4)); background: none; border: none; cursor: pointer; padding: 2px 4px 0; font-family: inherit; -webkit-tap-highlight-color: transparent; transition: color .2s ease; }
+.home-switcher__tab--active { color: var(--app-text-primary, #fff); }
+.home-switcher__dot { position: absolute; bottom: 4px; left: 0; width: 6px; height: 6px; border-radius: 50%; background: #f97316; transform: translateX(-50%); transition: left .22s cubic-bezier(.4,0,.2,1); }
