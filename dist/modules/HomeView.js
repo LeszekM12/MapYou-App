@@ -642,7 +642,9 @@ export async function openActivityDetail(act, isOwn, actId) {
     const notesHtml = (isOwn && full.notes)
         ? `<div class="ad-section"><h3 class="ad-section-title">Notatki</h3><p class="ad-notes">🔒 ${full.notes}</p></div>`
         : '';
+    const itemId = actId || rec.activityId || full.id;
     const likeCount = rec._likeCount ?? 0;
+    const commentCount = rec._commentCount ?? 0;
     const heroInner = (ownCoords || friendCoords)
         ? `<div class="ad-hero-map" id="adHeroMap"></div>`
         : `<div class="ad-hero-empty" style="background:linear-gradient(135deg, ${color}22, ${color}44)"><span>${icon}</span></div>`;
@@ -691,13 +693,13 @@ export async function openActivityDetail(act, isOwn, actId) {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
-          <span class="home-card__action-count" data-like-count="${full.id}">${likeCount > 0 ? likeCount : 0}</span>
+          <span class="home-card__action-count" data-like-count="${itemId}">${likeCount > 0 ? likeCount : 0}</span>
         </button>
         <button class="home-card__action home-card__action--comment" data-action="comment" aria-label="Comment">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
           </svg>
-          <span class="home-card__action-count" data-comment-count="${full.id}">0</span>
+          <span class="home-card__action-count" data-comment-count="${itemId}">${commentCount > 0 ? commentCount : 0}</span>
         </button>
         <button class="home-card__action home-card__action--share" data-action="share" aria-label="Share">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -797,16 +799,16 @@ export async function openActivityDetail(act, isOwn, actId) {
                 const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
                 void fetch(`${BACKEND_URL}/feed/like`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, itemId: full.id, itemType: 'activity' }),
+                    body: JSON.stringify({ userId, itemId, itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
                     btn.classList.toggle('home-card__action--liked', d.liked);
-                    const el = ov.querySelector(`[data-like-count="${full.id}"]`);
+                    const el = ov.querySelector(`[data-like-count="${itemId}"]`);
                     if (el)
                         el.textContent = String(d.count);
                 }).catch(() => { });
             }
             if (action === 'comment') {
-                openCommentsView(sheetEl, full.id);
+                openCommentsView(sheetEl, itemId);
             }
             if (action === 'share') {
                 const existing = sheetEl.querySelector('.home-card__share-panel');
@@ -819,25 +821,35 @@ export async function openActivityDetail(act, isOwn, actId) {
             }
         });
     });
-    // Load current like state + count
+    // Load current like state + count, and the comment count
     {
         const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
         if (userId) {
-            void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(full.id)}`, { cache: 'no-store' })
+            void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemId)}`, { cache: 'no-store' })
                 .then(r => r.json())
                 .then((resp) => {
                 if (resp.status !== 'ok')
                     return;
-                const info = resp.data[full.id];
+                const info = resp.data[itemId];
                 if (!info)
                     return;
                 const likeBtn = ov.querySelector('.ad-footer .home-card__action--like');
                 likeBtn?.classList.toggle('home-card__action--liked', info.liked);
-                const el = ov.querySelector(`[data-like-count="${full.id}"]`);
+                const el = ov.querySelector(`[data-like-count="${itemId}"]`);
                 if (el)
                     el.textContent = String(info.count);
             }).catch(() => { });
         }
+        // Comment count — keep detail in sync with the feed (works for own + friends')
+        void fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(itemId)}`)
+            .then(r => r.json())
+            .then((d) => {
+            if (!Array.isArray(d.data))
+                return;
+            const el = ov.querySelector(`[data-comment-count="${itemId}"]`);
+            if (el)
+                el.textContent = String(d.data.length);
+        }).catch(() => { });
     }
 }
 export function buildCard(act) {
@@ -1465,64 +1477,162 @@ export class HomeView {
         });
         return greeting;
     }
-    _buildStreakWidget() {
+    _buildStreakWidget(activities) {
         const wrap = document.createElement('div');
-        wrap.className = 'home-streak';
-        // Compute streak from unifiedWorkouts
-        const workoutDates = new Set(this._workouts.map(w => {
-            const d = new Date(typeof w.date === 'number' ? w.date : w.date);
-            return d.toDateString();
-        }));
-        // Also include enriched activities dates
-        let streak = 0;
+        wrap.className = 'home-streak-carousel';
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const todayMs = today.getTime();
+        const dow = (today.getDay() + 6) % 7; // 0 = Monday
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - dow);
+        monday.setHours(0, 0, 0, 0);
+        // Active day keys (union of enriched activities + unified workouts) + per-day icon
+        const dayKey = (ts) => { const d = new Date(ts); d.setHours(0, 0, 0, 0); return d.getTime(); };
+        const activeKeys = new Set();
+        const dayMeta = new Map();
+        for (const a of activities) {
+            const k = dayKey(a.date);
+            activeKeys.add(k);
+            if (!dayMeta.has(k))
+                dayMeta.set(k, { icon: getIcon(a.sport), color: getColor(a.sport) });
+        }
+        for (const w of this._workouts) {
+            activeKeys.add(dayKey(typeof w.date === 'number' ? w.date : Date.parse(w.date)));
+        }
+        // Streak (consecutive days up to today)
+        let streak = 0;
         for (let i = 0; i < 365; i++) {
             const d = new Date(today);
             d.setDate(today.getDate() - i);
-            if (workoutDates.has(d.toDateString()))
+            if (activeKeys.has(d.getTime()))
                 streak++;
             else
                 break;
         }
-        const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const days = [];
-        for (let i = 6; i >= 0; i--) {
-            const d = new Date(today);
-            d.setDate(today.getDate() - i);
-            days.push({
-                label: DAY_LABELS[d.getDay()],
-                active: workoutDates.has(d.toDateString()),
-                isToday: i === 0,
-            });
-        }
-        // Update best streak record (for trophies + personal records)
         updateBestStreak(streak);
+        // Week day circles (Mon-first)
+        const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+        const days = Array.from({ length: 7 }, (_, i) => {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            const k = d.getTime();
+            const meta = dayMeta.get(k);
+            return {
+                label: DAY_LABELS[i], num: d.getDate(), key: k,
+                active: activeKeys.has(k), isToday: k === todayMs, isFuture: k > todayMs,
+                icon: meta?.icon ?? '', color: meta?.color ?? '',
+            };
+        });
+        const dayCircle = (d) => {
+            const cls = ['hday'];
+            if (d.isToday)
+                cls.push('hday--today');
+            if (d.active)
+                cls.push('hday--active');
+            if (d.isFuture)
+                cls.push('hday--future');
+            const style = d.active && !d.isToday ? ` style="background:${d.color}"` : '';
+            const inner = d.active ? `<span class="hday-ico">${d.icon}</span>` : `<span class="hday-num">${d.num}</span>`;
+            return `<div class="hday-col">
+        <span class="hday-label${d.isToday ? ' hday-label--today' : ''}">${d.label}</span>
+        <div class="${cls.join(' ')}"${style} ${d.active ? `data-day="${d.key}" role="button"` : ''}>${inner}</div>
+      </div>`;
+        };
+        // Weekly totals
+        const weekStart = monday.getTime();
+        const weekEnd = weekStart + 7 * 86400000;
+        const weekActs = activities.filter(a => a.date >= weekStart && a.date < weekEnd);
+        const weekCount = weekActs.length;
+        const weekTime = weekActs.reduce((s, a) => s + a.durationSec, 0);
+        const weekDist = weekActs.reduce((s, a) => s + a.distanceKm, 0);
         wrap.innerHTML = `
-      <div class="home-streak__inner">
-        <div class="home-streak__flame-wrap">
-          <svg class="home-streak__flame" viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 2C12 2 7 8 7 13.5C7 16.5376 9.46243 19 12 19C14.5376 19 17 16.5376 17 13.5C17 11 15 9 15 9C15 9 15 11.5 13 12.5C13 12.5 14 10 12 8C12 8 12 10.5 10.5 11.5C10.5 11.5 9 10 9 8C7.5 10 7 11.5 7 13.5" fill="#f97316" opacity="0.9"/>
-            <path d="M12 30C12 30 5 22 5 15C5 10.5 8 6 12 4C12 4 10 9 12 12C14 9 15 6 15 6C17 9 19 12 19 15C19 22 12 30 12 30Z" fill="#f97316"/>
-            <path d="M12 28C12 28 7 21 7 16C7 13 9 10.5 12 9C12 9 11 13 13 15C13 15 11 12 14 11C15 13 16 15 16 17C16 21 12 28 12 28Z" fill="#fb923c" opacity="0.7"/>
-          </svg>
-          <span class="home-streak__count">${streak}</span>
+      <div class="hsc-track">
+        <div class="hsc-slide hsc-streak">
+          <div class="hsc-streak__top">
+            <div class="hsc-flame">
+              <svg viewBox="0 0 24 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 30C12 30 5 22 5 15C5 10.5 8 6 12 4C12 4 10 9 12 12C14 9 15 6 15 6C17 9 19 12 19 15C19 22 12 30 12 30Z" fill="#f97316"/>
+                <path d="M12 28C12 28 7 21 7 16C7 13 9 10.5 12 9C12 9 11 13 13 15C13 15 11 12 14 11C15 13 16 15 16 17C16 21 12 28 12 28Z" fill="#fb923c" opacity="0.75"/>
+              </svg>
+              <span class="hsc-flame__num">${streak}</span>
+            </div>
+            <div class="hsc-streak__title">${streak === 0 ? 'Start your streak!' : streak === 1 ? '1-day streak' : `${streak}-day streak`}</div>
+          </div>
+          <div class="hsc-week">${days.map(dayCircle).join('')}</div>
         </div>
-        <div class="home-streak__right">
-          <div class="home-streak__title">${streak === 0 ? 'Start your streak!' : streak === 1 ? '1-day streak 🔥' : `${streak}-day streak 🔥`}</div>
-          <div class="home-streak__dots">
-            ${days.map(d => `
-              <div class="home-streak__day">
-                <div class="home-streak__dot${d.active ? ' home-streak__dot--active' : ''}${d.isToday ? ' home-streak__dot--today' : ''}"></div>
-                <span class="home-streak__day-label${d.isToday ? ' home-streak__day-label--today' : ''}">${d.label}</span>
-              </div>`).join('')}
+        <div class="hsc-slide hsc-week-ov">
+          <div class="hsc-week-ov__head">
+            <span class="hsc-week-ov__title">This week</span>
+            <button class="hsc-week-ov__more" id="hscMore">See more ›</button>
+          </div>
+          <div class="hsc-week-ov__stats">
+            <div class="hsc-ovstat"><span class="hsc-ovstat__v">${weekCount}</span><span class="hsc-ovstat__l">Activities</span></div>
+            <div class="hsc-ovstat"><span class="hsc-ovstat__v">${formatDuration(weekTime)}</span><span class="hsc-ovstat__l">Time</span></div>
+            <div class="hsc-ovstat"><span class="hsc-ovstat__v">${formatDistance(weekDist)}</span><span class="hsc-ovstat__l">Distance (km)</span></div>
           </div>
         </div>
-      </div>`;
-        wrap.style.cursor = 'pointer';
-        wrap.setAttribute('role', 'button');
-        wrap.addEventListener('click', () => { void this._openStreakCalendar(); });
+      </div>
+      <div class="hsc-dots"><span class="hsc-dot hsc-dot--active"></span><span class="hsc-dot"></span></div>`;
+        // Dots follow horizontal scroll
+        const track = wrap.querySelector('.hsc-track');
+        const dots = wrap.querySelectorAll('.hsc-dot');
+        track.addEventListener('scroll', () => {
+            const idx = Math.round(track.scrollLeft / Math.max(1, track.clientWidth));
+            dots.forEach((d, i) => d.classList.toggle('hsc-dot--active', i === idx));
+        }, { passive: true });
+        // Tap a day with activity → day details
+        wrap.querySelectorAll('[data-day]').forEach(el => el.addEventListener('click', () => { void this._openDayDetails(Number(el.dataset.day)); }));
+        // "See more" → month calendar
+        wrap.querySelector('#hscMore')?.addEventListener('click', () => { void this._openStreakCalendar(); });
         return wrap;
+    }
+    // ── Day details (opened from a streak day circle) ───────────────────────────
+    async _openDayDetails(dayMs) {
+        document.getElementById('dayDetailsOverlay')?.remove();
+        const acts = (await loadEnrichedActivities())
+            .filter(a => { const d = new Date(a.date); d.setHours(0, 0, 0, 0); return d.getTime() === dayMs; })
+            .sort((x, y) => y.date - x.date);
+        const dateLabel = new Date(dayMs).toLocaleDateString('pl-PL', { weekday: 'long', day: 'numeric', month: 'long' });
+        const totDist = acts.reduce((s, a) => s + a.distanceKm, 0);
+        const totTime = acts.reduce((s, a) => s + a.durationSec, 0);
+        const ov = document.createElement('div');
+        ov.id = 'dayDetailsOverlay';
+        ov.className = 'dd-overlay';
+        ov.innerHTML = `
+      <div class="dd-sheet">
+        <div class="dd-header">
+          <button class="dd-back" id="ddBack" aria-label="Back">‹</button>
+          <span class="dd-title">${dateLabel}</span>
+        </div>
+        <div class="dd-summary">
+          <div class="dd-stat"><span class="dd-stat-v">${acts.length}</span><span class="dd-stat-l">Activities</span></div>
+          <div class="dd-stat"><span class="dd-stat-v">${formatDistance(totDist)}</span><span class="dd-stat-l">km</span></div>
+          <div class="dd-stat"><span class="dd-stat-v">${formatDuration(totTime)}</span><span class="dd-stat-l">Time</span></div>
+        </div>
+        <div class="dd-list">${acts.length
+            ? acts.map(a => `
+            <div class="dd-item" data-id="${a.id}">
+              <span class="dd-item-icon" style="background:${getColor(a.sport)}22;color:${getColor(a.sport)}">${getIcon(a.sport)}</span>
+              <span class="dd-item-main">
+                <span class="dd-item-title">${getSportLabel(a.sport)}</span>
+                <span class="dd-item-meta">${formatDistance(a.distanceKm)} km · ${formatDuration(a.durationSec)}</span>
+              </span>
+              <span class="dd-item-chev">›</span>
+            </div>`).join('')
+            : '<p class="dd-empty">No activities this day</p>'}</div>
+      </div>`;
+        document.body.appendChild(ov);
+        ov.querySelector('#ddBack')?.addEventListener('click', () => ov.remove());
+        ov.addEventListener('click', e => { if (e.target === ov)
+            ov.remove(); });
+        ov.querySelectorAll('.dd-item').forEach(el => el.addEventListener('click', () => {
+            const a = acts.find(x => x.id === el.dataset.id);
+            if (!a)
+                return;
+            ov.remove();
+            void openActivityDetail(a, true, a.id);
+        }));
     }
     // ── Activity calendar (opened from the streak panel) ────────────────────────
     async _openStreakCalendar() {
@@ -2139,7 +2249,7 @@ export class HomeView {
             else
                 slot.remove();
         }).catch(() => { });
-        scroll.appendChild(this._buildStreakWidget());
+        scroll.appendChild(this._buildStreakWidget(activities));
         // Dedicated feed container so the feed can be repainted alone when server data arrives
         const feedList = document.createElement('div');
         feedList.id = 'homeFeedList';
