@@ -3707,3 +3707,22 @@ body.night-mode .sv-chart-wrap {
 .cv-form { flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid var(--app-border, rgba(255,255,255,0.08)); background: var(--app-bg-card, #1a1f23); }
 .cv-input { flex: 1; min-width: 0; background: var(--app-surface-1, rgba(255,255,255,0.06)); border: 1px solid var(--app-border, rgba(255,255,255,0.12)); border-radius: 22px; padding: 11px 16px; color: var(--app-text-primary, #fff); font-size: 1.6rem; font-family: inherit; outline: none; }
 .cv-send { flex-shrink: 0; width: 44px; height: 44px; border-radius: 50%; border: none; background: #00c46a; color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+
+/* ── Saved route shared in community: frame + flag + like count ── */
+.trk-route-card--community { border: 1.5px solid rgba(0,196,106,0.55); box-shadow: 0 0 0 1px rgba(0,196,106,0.15); }
+.trk-route-card__cflag { display: inline-block; margin-left: 8px; padding: 1px 8px; font-size: 1rem; font-weight: 700; color: #00c46a; background: rgba(0,196,106,0.14); border-radius: 999px; vertical-align: middle; }
+.trk-route-card__likes { display: inline-flex; align-items: center; gap: 4px; font-size: 1.3rem; font-weight: 700; color: var(--app-text-secondary, #9aa0a6); padding: 0 6px; white-space: nowrap; }
+.trk-route-card__likes-heart { color: #ff4d6d; font-size: 1.4rem; }
+.trk-route-card__owner { cursor: pointer; }
+
+/* ── Confirm delete dialog ── */
+.trk-confirm { max-width: 380px; }
+.trk-confirm__body { padding: 24px 22px 20px; text-align: center; }
+.trk-confirm__icon { font-size: 3.2rem; margin-bottom: 6px; }
+.trk-confirm__title { font-size: 1.85rem; font-weight: 800; color: var(--app-text-primary, #fff); margin: 0 0 8px; }
+.trk-confirm__text { font-size: 1.4rem; line-height: 1.45; color: var(--app-text-secondary, #9aa0a6); margin: 0 0 20px; }
+.trk-confirm__text b { color: #00c46a; }
+.trk-confirm__actions { display: flex; gap: 10px; }
+.trk-confirm__btn { flex: 1; padding: 13px; border-radius: 14px; font-family: inherit; font-size: 1.5rem; font-weight: 700; cursor: pointer; border: none; }
+.trk-confirm__btn--cancel { background: var(--app-surface-1, rgba(255,255,255,0.08)); color: var(--app-text-primary, #fff); }
+.trk-confirm__btn--danger { background: #e5484d; color: #fff; }

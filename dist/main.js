@@ -1837,6 +1837,23 @@ class App {
         let community = [];
         let communityLoaded = false;
         let communityMode = 'near';
+        // routeId -> likeCount for routes THIS user has published to community
+        let myPublished = {};
+        const loadMyPublished = async () => {
+            const uid = localStorage.getItem('mapyou_userId_profile') ?? '';
+            if (!uid) {
+                myPublished = {};
+                return;
+            }
+            try {
+                const res = await fetch(`${BACKEND_URL}/routes/mine/${encodeURIComponent(uid)}`);
+                const json = await res.json();
+                const map = {};
+                (json.data ?? []).forEach(d => { map[d.routeId] = d.likeCount ?? 0; });
+                myPublished = map;
+            }
+            catch { /* offline: leave as-is */ }
+        };
         // ── Saved tab ──
         const renderSaved = (filter = '') => {
             const routes = getSavedRoutes();
@@ -1854,13 +1871,17 @@ class App {
             listEl.innerHTML = shown.map(r => {
                 const d = new Date(r.date);
                 const dateTxt = isNaN(d.getTime()) ? '' : d.toLocaleDateString();
-                return `<div class="trk-route-card" data-id="${r.id}">
+                const inComm = Object.prototype.hasOwnProperty.call(myPublished, r.id);
+                const likes = myPublished[r.id] ?? 0;
+                return `<div class="trk-route-card ${inComm ? 'trk-route-card--community' : ''}" data-id="${r.id}">
           <span class="trk-route-card__icon">${getIcon(r.sport)}</span>
           <span class="trk-route-card__main">
-            <span class="trk-route-card__title">${getSportLabel(r.sport)}</span>
+            <span class="trk-route-card__title">${getSportLabel(r.sport)}${inComm ? '<span class="trk-route-card__cflag">In community</span>' : ''}</span>
             <span class="trk-route-card__meta">${dateTxt} · ${formatDuration(r.durationSec)} · ${formatDistance(r.distanceKm)} km</span>
           </span>
-          <button class="trk-route-card__share" data-share="${r.id}" aria-label="Share to community" title="Share to community">⇪</button>
+          ${inComm
+                    ? `<span class="trk-route-card__likes" title="Likes in community"><span class="trk-route-card__likes-heart">♥</span> ${likes}</span>`
+                    : `<button class="trk-route-card__share" data-share="${r.id}" aria-label="Share to community" title="Share to community">⇪</button>`}
           <button class="trk-route-card__del" data-del="${r.id}" aria-label="Remove">✕</button>
         </div>`;
             }).join('');
@@ -1878,14 +1899,27 @@ class App {
                     e.stopPropagation();
                     const r = getSavedRoutes().find(x => x.id === btn.dataset.share);
                     if (r)
-                        this._openPublishDialog(r);
+                        this._openPublishDialog(r, async () => { await loadMyPublished(); renderSaved(searchEl.value); });
                 });
             });
             listEl.querySelectorAll('[data-del]').forEach(btn => {
                 btn.addEventListener('click', e => {
                     e.stopPropagation();
-                    unsaveRoute(btn.dataset.del);
-                    renderSaved(searchEl.value);
+                    const id = btn.dataset.del;
+                    const inComm = Object.prototype.hasOwnProperty.call(myPublished, id);
+                    this._confirmDeleteRoute(inComm, async () => {
+                        unsaveRoute(id);
+                        if (inComm) {
+                            const uid = localStorage.getItem('mapyou_userId_profile') ?? '';
+                            try {
+                                await fetch(`${BACKEND_URL}/routes/${encodeURIComponent(id)}?userId=${encodeURIComponent(uid)}`, { method: 'DELETE' });
+                            }
+                            catch { /* offline: stays in community until next attempt */ }
+                            delete myPublished[id];
+                            communityLoaded = false; // force community refetch next time
+                        }
+                        renderSaved(searchEl.value);
+                    });
                 });
             });
         };
@@ -1908,13 +1942,13 @@ class App {
                     : 'No routes match your search.'}</div>`
                 : shown.map(r => {
                     const avatar = r.ownerAvatarB64
-                        ? `<img class="trk-route-card__avatar" src="${r.ownerAvatarB64}" alt="" />`
-                        : `<span class="trk-route-card__avatar trk-route-card__avatar--ph">${(r.ownerName || '?').charAt(0).toUpperCase()}</span>`;
+                        ? `<img class="trk-route-card__avatar trk-route-card__owner" data-owner="${r.ownerUserId}" src="${r.ownerAvatarB64}" alt="" />`
+                        : `<span class="trk-route-card__avatar trk-route-card__avatar--ph trk-route-card__owner" data-owner="${r.ownerUserId}">${(r.ownerName || '?').charAt(0).toUpperCase()}</span>`;
                     return `<div class="trk-route-card" data-rid="${r.routeId}">
               ${avatar}
               <span class="trk-route-card__main">
                 <span class="trk-route-card__title">${getIcon(r.sport)} ${r.name || getSportLabel(r.sport)}</span>
-                <span class="trk-route-card__meta">${r.ownerName || 'MapYou User'} · ${formatDistance(r.distanceKm)} km</span>
+                <span class="trk-route-card__meta"><span class="trk-route-card__owner" data-owner="${r.ownerUserId}">${r.ownerName || 'MapYou User'}</span> · ${formatDistance(r.distanceKm)} km</span>
               </span>
               <button class="trk-route-like ${r.liked ? 'trk-route-like--on' : ''}" data-like="${r.routeId}" aria-label="Like route">
                 <span class="trk-route-like__heart">♥</span>
@@ -1970,6 +2004,15 @@ class App {
                     overlay.remove();
                 });
             });
+            // Open the route owner's public profile (avatar / name)
+            listEl.querySelectorAll('[data-owner]').forEach(el => el.addEventListener('click', e => {
+                e.stopPropagation();
+                const uid = el.dataset.owner;
+                if (!uid)
+                    return;
+                overlay.remove();
+                void import('./modules/PublicProfile.js').then(m => m.openPublicProfile(uid)).catch(() => { });
+            }));
         };
         const loadCommunity = async () => {
             listEl.innerHTML = '<div class="trk-routes-empty">Loading…</div>';
@@ -2018,7 +2061,31 @@ class App {
             switchTab(b.dataset.tab);
         }));
         searchEl.addEventListener('input', () => (tab === 'saved' ? renderSaved(searchEl.value) : renderCommunity(searchEl.value)));
+        await loadMyPublished();
         switchTab('saved');
+    }
+    _confirmDeleteRoute(inCommunity, onConfirm) {
+        document.getElementById('trkConfirmOverlay')?.remove();
+        const ov = document.createElement('div');
+        ov.id = 'trkConfirmOverlay';
+        ov.className = 'trk-picker-overlay';
+        ov.innerHTML = `<div class="trk-picker trk-confirm">
+      <div class="trk-confirm__body">
+        <div class="trk-confirm__icon">🗑️</div>
+        <h3 class="trk-confirm__title">Delete this route?</h3>
+        <p class="trk-confirm__text">This removes it from your saved routes.${inCommunity ? ' It is shared in <b>Community</b> — it will be removed from there too, for everyone.' : ''}</p>
+        <div class="trk-confirm__actions">
+          <button class="trk-confirm__btn trk-confirm__btn--cancel" id="trkConfCancel">Cancel</button>
+          <button class="trk-confirm__btn trk-confirm__btn--danger" id="trkConfDel">Delete</button>
+        </div>
+      </div>
+    </div>`;
+        const close = () => ov.remove();
+        ov.querySelector('#trkConfCancel')?.addEventListener('click', close);
+        ov.addEventListener('click', e => { if (e.target === ov)
+            close(); });
+        ov.querySelector('#trkConfDel')?.addEventListener('click', () => { close(); onConfirm(); });
+        document.body.appendChild(ov);
     }
     // Shared finish pipeline (used by real Stop AND the dev simulator)
     _finishWithActivity(activity) {
@@ -2152,7 +2219,7 @@ class App {
         const out = coords.slice(s, e + 1);
         return out.length >= 2 ? out : coords;
     }
-    _openPublishDialog(route) {
+    _openPublishDialog(route, onPublished) {
         document.getElementById('trkPublishOverlay')?.remove();
         const ov = document.createElement('div');
         ov.id = 'trkPublishOverlay';
@@ -2190,8 +2257,10 @@ class App {
             const ok = await this._publishRoute(route, trim, name);
             goBtn.textContent = ok ? 'Published ✓' : 'Failed — retry';
             goBtn.disabled = false;
-            if (ok)
+            if (ok) {
+                onPublished?.();
                 setTimeout(() => ov.remove(), 700);
+            }
         });
         document.body.appendChild(ov);
     }
