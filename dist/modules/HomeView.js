@@ -57,6 +57,13 @@ function intensityColor(n) {
 }
 // ── Mini map — uses renderMinimapCanvas from cloudSync.ts ──────────────────
 // ── Comment panel ─────────────────────────────────────────────────────────────
+// Keep every like button for an item (feed card, post card, activity detail) in sync
+function broadcastLike(id, liked, count) {
+    document.querySelectorAll(`[data-like-count="${id}"], [data-like-count="p_${id}"]`).forEach(el => {
+        el.textContent = String(count);
+        el.closest('.home-card__action')?.classList.toggle('home-card__action--liked', liked);
+    });
+}
 function openCommentPanel(card, actId) {
     card.querySelector('.home-card__comment-panel')?.remove();
     const panel = document.createElement('div');
@@ -461,10 +468,7 @@ export function buildPostCard(post, onRefresh) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, itemId: post.id, itemType: 'post' }),
         }).then(r => r.json()).then((d) => {
-            btn.classList.toggle('home-card__action--liked', d.liked);
-            const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
-            if (el)
-                el.textContent = String(d.count);
+            broadcastLike(post.id, d.liked, d.count);
         }).catch(() => {
             const liked = btn.classList.toggle('home-card__action--liked');
             const lsKey = `hc_likes_p_${post.id}`;
@@ -721,12 +725,17 @@ export async function openActivityDetail(act, isOwn, actId) {
         ov.remove();
     };
     ov.querySelector('#adBack')?.addEventListener('click', close);
-    // Draggable bottom sheet — drag the handle down to reveal more of the map
+    // Draggable bottom sheet — drag up to expand (~80%), down to reveal the map
     const sheet = ov.querySelector('.ad-sheet');
     const grab = ov.querySelector('.ad-grab');
     if (sheet && grab) {
         let startY = 0, startT = 0, curT = 0, dragging = false;
-        const maxT = () => Math.max(0, sheet.offsetHeight - 150); // leave a peek when collapsed
+        const expandedT = 0; // translateY 0 → full 80vh visible
+        const defaultT = () => Math.round(window.innerHeight * 0.24); // rest: ~56vh visible
+        const maxT = () => Math.max(0, sheet.offsetHeight - 150); // collapsed: 150px peek
+        // Start at the comfortable default position (not fully expanded)
+        curT = defaultT();
+        sheet.style.transform = `translateY(${curT}px)`;
         grab.addEventListener('pointerdown', e => {
             dragging = true;
             startY = e.clientY;
@@ -741,7 +750,7 @@ export async function openActivityDetail(act, isOwn, actId) {
             if (!dragging)
                 return;
             let t = startT + (e.clientY - startY);
-            t = Math.max(0, Math.min(maxT(), t));
+            t = Math.max(expandedT, Math.min(maxT(), t));
             curT = t;
             sheet.style.transform = `translateY(${t}px)`;
         });
@@ -750,14 +759,21 @@ export async function openActivityDetail(act, isOwn, actId) {
                 return;
             dragging = false;
             sheet.style.transition = '';
-            curT = curT > maxT() * 0.4 ? maxT() : 0;
+            const dT = defaultT(), mT = maxT();
+            // Snap to the nearest of: expanded (80%) / default (~56%) / collapsed (peek)
+            if (curT < dT * 0.5)
+                curT = expandedT;
+            else if (curT < (dT + mT) / 2)
+                curT = dT;
+            else
+                curT = mT;
             sheet.style.transform = `translateY(${curT}px)`;
         };
         grab.addEventListener('pointerup', end);
         grab.addEventListener('pointercancel', end);
     }
     // Hero map / minimap (after layout + entry animation, so dimensions are final)
-    const sheetPx = Math.round(window.innerHeight * 0.62);
+    const sheetPx = Math.round(window.innerHeight * 0.56);
     setTimeout(() => {
         const mapEl = document.getElementById('adHeroMap');
         if (!mapEl)
@@ -801,10 +817,7 @@ export async function openActivityDetail(act, isOwn, actId) {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, itemId, itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
-                    btn.classList.toggle('home-card__action--liked', d.liked);
-                    const el = ov.querySelector(`[data-like-count="${itemId}"]`);
-                    if (el)
-                        el.textContent = String(d.count);
+                    broadcastLike(itemId, d.liked, d.count);
                 }).catch(() => { });
             }
             if (action === 'comment') {
@@ -966,10 +979,7 @@ export function buildCard(act) {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, itemId: act.id, itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
-                    btn.classList.toggle('home-card__action--liked', d.liked);
-                    const el = card.querySelector(`[data-like-count="${act.id}"]`);
-                    if (el)
-                        el.textContent = String(d.count);
+                    broadcastLike(act.id, d.liked, d.count);
                 }).catch(() => {
                     // offline fallback
                     const liked = btn.classList.toggle('home-card__action--liked');
@@ -1228,6 +1238,12 @@ export class HomeView {
             configurable: true,
             writable: true,
             value: true
+        });
+        Object.defineProperty(this, "_ptrInited", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
         });
         Object.defineProperty(this, "_feedLoading", {
             enumerable: true,
@@ -2227,6 +2243,7 @@ export class HomeView {
             return;
         this._inited = true;
         const scroll = this.container;
+        this._setupPullToRefresh(scroll);
         scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
         const [activities, posts, workouts] = await Promise.all([
             loadEnrichedActivities(),
@@ -2393,6 +2410,75 @@ export class HomeView {
                     paintFeed(result.feed);
             }).catch(() => { });
         }
+    }
+    // ── Pull-to-refresh (app-styled) ────────────────────────────────────────────
+    _setupPullToRefresh(scroll) {
+        if (this._ptrInited)
+            return;
+        this._ptrInited = true;
+        const ind = document.createElement('div');
+        ind.className = 'home-ptr';
+        ind.innerHTML = '<div class="home-ptr__spinner"></div>';
+        (scroll.parentElement ?? document.body).appendChild(ind);
+        const spinner = ind.querySelector('.home-ptr__spinner');
+        const THRESH = 64;
+        let startY = 0, pulling = false, dist = 0, refreshing = false;
+        const reset = () => { ind.style.transform = 'translateX(-50%) translateY(0)'; ind.style.opacity = '0'; spinner.style.transform = ''; };
+        scroll.addEventListener('touchstart', e => {
+            if (refreshing)
+                return;
+            pulling = scroll.scrollTop <= 0;
+            startY = e.touches[0].clientY;
+        }, { passive: true });
+        scroll.addEventListener('touchmove', e => {
+            if (!pulling || refreshing)
+                return;
+            dist = e.touches[0].clientY - startY;
+            if (dist <= 0 || scroll.scrollTop > 0) {
+                pulling = scroll.scrollTop <= 0;
+                reset();
+                return;
+            }
+            const d = Math.min(110, dist * 0.5); // damped travel
+            ind.style.transform = `translateX(-50%) translateY(${d}px)`;
+            ind.style.opacity = String(Math.min(1, d / THRESH));
+            spinner.style.transform = `rotate(${d * 4}deg)`;
+            if (dist > 6)
+                e.preventDefault(); // take over the gesture
+        }, { passive: false });
+        const release = async () => {
+            if (!pulling)
+                return;
+            pulling = false;
+            if (refreshing)
+                return;
+            if (dist * 0.5 < THRESH) {
+                reset();
+                return;
+            }
+            refreshing = true;
+            ind.classList.add('home-ptr--active');
+            ind.style.transform = `translateX(-50%) translateY(${THRESH}px)`;
+            ind.style.opacity = '1';
+            spinner.style.transform = '';
+            try {
+                const uid = localStorage.getItem('mapyou_userId_profile') ?? '';
+                if (uid) {
+                    try {
+                        sessionStorage.removeItem(`mapyou_feedcache_${uid}`);
+                    }
+                    catch { /* ignore */ }
+                }
+                await this.render();
+            }
+            finally {
+                refreshing = false;
+                ind.classList.remove('home-ptr--active');
+                reset();
+            }
+        };
+        scroll.addEventListener('touchend', () => void release(), { passive: true });
+        scroll.addEventListener('touchcancel', () => void release(), { passive: true });
     }
     // ── Feed cache + background fetch helpers ───────────────────────────────────
     _feedSig(feed) {
@@ -2637,10 +2723,7 @@ export class HomeView {
                     });
                     if (res.ok) {
                         const d = await res.json();
-                        newLike.classList.toggle('home-card__action--liked', d.liked);
-                        const el = card.querySelector(`[data-like-count="${act.id}"]`);
-                        if (el)
-                            el.textContent = String(d.count);
+                        broadcastLike(act.id, d.liked, d.count);
                     }
                 });
             }
