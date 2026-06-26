@@ -2125,49 +2125,48 @@ export class HomeView {
     scroll.innerHTML = '';
     scroll.appendChild(this._buildGreeting(activities.length + posts.length));
 
-    // Reels bar — directly under header, BEFORE streak (Instagram style)
-    const reelsBar = await this._buildReelsBar();
-    if (reelsBar) scroll.appendChild(reelsBar);
+    // Reels bar — filled asynchronously so it never blocks the feed
+    const reelsSlot = document.createElement('div');
+    reelsSlot.id = 'homeReelsSlot';
+    scroll.appendChild(reelsSlot);
+    void this._buildReelsBar().then(bar => {
+      const slot = document.getElementById('homeReelsSlot');
+      if (!slot) return;
+      if (bar) slot.replaceWith(bar); else slot.remove();
+    }).catch(() => { /* ignore */ });
 
     scroll.appendChild(this._buildStreakWidget());
 
-    // Pobierz unified feed z Atlas (własne + znajomych)
-    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-    let serverFeed: Array<{ kind: string; date: number; data: Record<string, unknown> }> = [];
-    let serverRes: { hasMore?: boolean } = {};
-    if (userId) {
-      try {
-        const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-        if (res.ok) {
-          const d = await res.json() as { status: string; hasMore: boolean; data: typeof serverFeed };
-          serverFeed = d.data ?? [];
-          this._feedHasMore = d.hasMore ?? false;
-          if (serverFeed.length > 0) this._feedCursor = serverFeed[serverFeed.length - 1].date as number;
-        }
-      } catch { /* offline */ }
-    }
+    // Dedicated feed container so the feed can be repainted alone when server data arrives
+    const feedList = document.createElement('div');
+    feedList.id = 'homeFeedList';
+    scroll.appendChild(feedList);
 
+    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     type FeedItem = { kind: string; date: number; data: Record<string, unknown>; isLocal?: boolean };
 
-    const feed: FeedItem[] = serverFeed.length > 0
-      ? serverFeed
-      : [
-          ...activities.map(a => ({ kind: 'activity', date: a.date, data: a as unknown as Record<string, unknown>, isLocal: true })),
-          ...posts.map(p => ({ kind: 'post', date: p.date, data: p as unknown as Record<string, unknown>, isLocal: true })),
-        ].sort((a, b) => b.date - a.date);
+    const localFeed: FeedItem[] = [
+      ...activities.map(a => ({ kind: 'activity', date: a.date, data: a as unknown as Record<string, unknown>, isLocal: true })),
+      ...posts.map(p => ({ kind: 'post', date: p.date, data: p as unknown as Record<string, unknown>, isLocal: true })),
+    ].sort((a, b) => b.date - a.date);
 
-    if (feed.length === 0) {
-      const empty = document.createElement('div');
-      empty.className = 'home-empty';
-      empty.innerHTML = `
-        <div class="home-empty__icon">🏃</div>
-        <h3 class="home-empty__title">Nothing here yet</h3>
-        <p class="home-empty__sub">Finish a workout or tap + to create a post</p>`;
-      scroll.appendChild(empty);
-      return;
-    }
+    const paintFeed = (feed: FeedItem[]): void => {
+      feedList.innerHTML = '';
+      this._feedObserver?.disconnect();
+      document.getElementById('feedSentinel')?.remove();
 
-    feed.forEach((item, idx) => {
+      if (feed.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'home-empty';
+        empty.innerHTML = `
+          <div class="home-empty__icon">🏃</div>
+          <h3 class="home-empty__title">Nothing here yet</h3>
+          <p class="home-empty__sub">Finish a workout or tap + to create a post</p>`;
+        feedList.appendChild(empty);
+        return;
+      }
+
+      feed.forEach((item, idx) => {
       const isOwn = (item.data.userId === userId) || !!item.isLocal;
       let card: HTMLElement;
 
@@ -2214,7 +2213,7 @@ export class HomeView {
           void openActivityDetail(item.data as unknown as EnrichedActivity, isOwn, (item.data.activityId ?? item.data.id) as string);
         });
       }
-      scroll.appendChild(card);
+      feedList.appendChild(card);
 
       const actId = (item.data.activityId ?? item.data.id) as string;
       if (item.kind === 'activity') {
@@ -2236,28 +2235,87 @@ export class HomeView {
       }
     });
 
-    const friendsFeedEl = document.getElementById('friendsFeed');
-    if (friendsFeedEl) friendsFeedEl.innerHTML = '';
+      const friendsFeedEl = document.getElementById('friendsFeed');
+      if (friendsFeedEl) friendsFeedEl.innerHTML = '';
 
-    // Batch load liked state
-    if (userId && feed.length > 0) {
-      const itemIds = feed.map(f => (f.data.activityId ?? f.data.postId ?? f.data.id) as string).filter(Boolean);
-      void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemIds.join(','))}`, { cache: 'no-store' })
-        .then(r => r.json())
-        .then((resp: { status: string; data: Record<string, { count: number; liked: boolean }> }) => {
-          if (resp.status !== 'ok') return;
-          for (const [id, info] of Object.entries(resp.data)) {
-            if (!info.liked) continue;
-            const btn = scroll.querySelector<HTMLElement>(`[data-like-count="${id}"]`)?.closest('.home-card__action') as HTMLElement | null;
-            if (btn) btn.classList.add('home-card__action--liked');
-            const btnP = scroll.querySelector<HTMLElement>(`[data-like-count="p_${id}"]`)?.closest('.home-card__action') as HTMLElement | null;
-            if (btnP) btnP.classList.add('home-card__action--liked');
-          }
-        }).catch(() => {});
+      // Batch load liked state
+      if (userId && feed.length > 0) {
+        const itemIds = feed.map(f => (f.data.activityId ?? f.data.postId ?? f.data.id) as string).filter(Boolean);
+        void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemIds.join(','))}`, { cache: 'no-store' })
+          .then(r => r.json())
+          .then((resp: { status: string; data: Record<string, { count: number; liked: boolean }> }) => {
+            if (resp.status !== 'ok') return;
+            for (const [id, info] of Object.entries(resp.data)) {
+              if (!info.liked) continue;
+              const btn = feedList.querySelector<HTMLElement>(`[data-like-count="${id}"]`)?.closest('.home-card__action') as HTMLElement | null;
+              if (btn) btn.classList.add('home-card__action--liked');
+              const btnP = feedList.querySelector<HTMLElement>(`[data-like-count="p_${id}"]`)?.closest('.home-card__action') as HTMLElement | null;
+              if (btnP) btnP.classList.add('home-card__action--liked');
+            }
+          }).catch(() => {});
+      }
+
+      // Infinite scroll
+      this._setupInfiniteScroll(feedList, activities, posts, userId);
+    };
+
+    // 1) Instant paint — cached server feed (incl. friends) if present, else local-only
+    const cached = this._readFeedCache(userId);
+    if (cached) {
+      this._feedHasMore = cached.hasMore;
+      if (cached.feed.length > 0) this._feedCursor = cached.feed[cached.feed.length - 1].date;
     }
+    const initialFeed = (cached && cached.feed.length > 0) ? (cached.feed as FeedItem[]) : localFeed;
+    paintFeed(initialFeed);
+    const shownSig = this._feedSig(initialFeed);
 
-    // Infinite scroll
-    this._setupInfiniteScroll(scroll, activities, posts, userId);
+    // 2) Revalidate from server in the background (timeout-guarded), repaint only if changed
+    if (userId) {
+      void this._fetchServerFeed(userId).then(result => {
+        if (!result) return;                                 // offline / timeout: keep what's shown
+        this._writeFeedCache(userId, result.feed, result.hasMore);
+        this._feedHasMore = result.hasMore;
+        if (result.feed.length > 0) this._feedCursor = result.feed[result.feed.length - 1].date;
+        if (!document.body.contains(feedList)) return;       // user navigated away
+        if (this._feedSig(result.feed as FeedItem[]) !== shownSig) paintFeed(result.feed as FeedItem[]);
+      }).catch(() => { /* ignore */ });
+    }
+  }
+
+  // ── Feed cache + background fetch helpers ───────────────────────────────────
+
+  private _feedSig(feed: Array<{ date: number; data: Record<string, unknown> }>): string {
+    return feed.map(f =>
+      `${(f.data.activityId ?? f.data.postId ?? f.data.id) as string}:${(f.data._likeCount ?? 0) as number}:${(f.data._commentCount ?? 0) as number}`,
+    ).join('|');
+  }
+
+  private _readFeedCache(userId: string): { feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore: boolean } | null {
+    if (!userId) return null;
+    try {
+      const raw = sessionStorage.getItem(`mapyou_feedcache_${userId}`);
+      if (!raw) return null;
+      const o = JSON.parse(raw) as { feed?: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore?: boolean };
+      return Array.isArray(o.feed) ? { feed: o.feed, hasMore: !!o.hasMore } : null;
+    } catch { return null; }
+  }
+
+  private _writeFeedCache(userId: string, feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>, hasMore: boolean): void {
+    if (!userId) return;
+    try { sessionStorage.setItem(`mapyou_feedcache_${userId}`, JSON.stringify({ feed, hasMore })); }
+    catch { /* quota exceeded — skip caching */ }
+  }
+
+  private async _fetchServerFeed(userId: string): Promise<{ feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore: boolean } | null> {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 5000);
+      const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store', signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const d = await res.json() as { status: string; hasMore: boolean; data: Array<{ kind: string; date: number; data: Record<string, unknown> }> };
+      return { feed: d.data ?? [], hasMore: d.hasMore ?? false };
+    } catch { return null; }
   }
 
   private _setupInfiniteScroll(scroll: HTMLElement, activities: import('./db.js').EnrichedActivity[], posts: import('./db.js').PostRecord[], userId: string): void {

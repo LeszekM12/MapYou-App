@@ -2126,138 +2126,204 @@ export class HomeView {
         this._workouts = workouts;
         scroll.innerHTML = '';
         scroll.appendChild(this._buildGreeting(activities.length + posts.length));
-        // Reels bar — directly under header, BEFORE streak (Instagram style)
-        const reelsBar = await this._buildReelsBar();
-        if (reelsBar)
-            scroll.appendChild(reelsBar);
+        // Reels bar — filled asynchronously so it never blocks the feed
+        const reelsSlot = document.createElement('div');
+        reelsSlot.id = 'homeReelsSlot';
+        scroll.appendChild(reelsSlot);
+        void this._buildReelsBar().then(bar => {
+            const slot = document.getElementById('homeReelsSlot');
+            if (!slot)
+                return;
+            if (bar)
+                slot.replaceWith(bar);
+            else
+                slot.remove();
+        }).catch(() => { });
         scroll.appendChild(this._buildStreakWidget());
-        // Pobierz unified feed z Atlas (własne + znajomych)
+        // Dedicated feed container so the feed can be repainted alone when server data arrives
+        const feedList = document.createElement('div');
+        feedList.id = 'homeFeedList';
+        scroll.appendChild(feedList);
         const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-        let serverFeed = [];
-        let serverRes = {};
-        if (userId) {
-            try {
-                const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-                if (res.ok) {
-                    const d = await res.json();
-                    serverFeed = d.data ?? [];
-                    this._feedHasMore = d.hasMore ?? false;
-                    if (serverFeed.length > 0)
-                        this._feedCursor = serverFeed[serverFeed.length - 1].date;
+        const localFeed = [
+            ...activities.map(a => ({ kind: 'activity', date: a.date, data: a, isLocal: true })),
+            ...posts.map(p => ({ kind: 'post', date: p.date, data: p, isLocal: true })),
+        ].sort((a, b) => b.date - a.date);
+        const paintFeed = (feed) => {
+            feedList.innerHTML = '';
+            this._feedObserver?.disconnect();
+            document.getElementById('feedSentinel')?.remove();
+            if (feed.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'home-empty';
+                empty.innerHTML = `
+          <div class="home-empty__icon">🏃</div>
+          <h3 class="home-empty__title">Nothing here yet</h3>
+          <p class="home-empty__sub">Finish a workout or tap + to create a post</p>`;
+                feedList.appendChild(empty);
+                return;
+            }
+            feed.forEach((item, idx) => {
+                const isOwn = (item.data.userId === userId) || !!item.isLocal;
+                let card;
+                if (isOwn && item.kind === 'activity') {
+                    const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
+                    if (localAct) {
+                        // Save coordsEnc BEFORE mutating coords
+                        const enc = item.data.coordsEnc ??
+                            (localAct.coords && localAct.coords.length > 0
+                                ? encodePolyline(localAct.coords)
+                                : null);
+                        item.data._coordsEncResolved = enc;
+                        localAct.coordsEnc = enc;
+                        localAct.coords = [];
+                    }
+                    card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
                 }
-            }
-            catch { /* offline */ }
-        }
-        const feed = serverFeed.length > 0
-            ? serverFeed
-            : [
-                ...activities.map(a => ({ kind: 'activity', date: a.date, data: a, isLocal: true })),
-                ...posts.map(p => ({ kind: 'post', date: p.date, data: p, isLocal: true })),
-            ].sort((a, b) => b.date - a.date);
-        if (feed.length === 0) {
-            const empty = document.createElement('div');
-            empty.className = 'home-empty';
-            empty.innerHTML = `
-        <div class="home-empty__icon">🏃</div>
-        <h3 class="home-empty__title">Nothing here yet</h3>
-        <p class="home-empty__sub">Finish a workout or tap + to create a post</p>`;
-            scroll.appendChild(empty);
-            return;
-        }
-        feed.forEach((item, idx) => {
-            const isOwn = (item.data.userId === userId) || !!item.isLocal;
-            let card;
-            if (isOwn && item.kind === 'activity') {
-                const localAct = activities.find(a => a.id === (item.data.activityId ?? item.data.id));
-                if (localAct) {
-                    // Save coordsEnc BEFORE mutating coords
-                    const enc = item.data.coordsEnc ??
-                        (localAct.coords && localAct.coords.length > 0
-                            ? encodePolyline(localAct.coords)
-                            : null);
-                    item.data._coordsEncResolved = enc;
-                    localAct.coordsEnc = enc;
-                    localAct.coords = [];
+                else if (isOwn && item.kind === 'post') {
+                    const localPost = posts.find(p => p.id === (item.data.postId ?? item.data.id));
+                    card = localPost
+                        ? buildPostCard(localPost, () => this.render())
+                        : this._buildFriendFeedCard(item.kind, item.data, userId);
                 }
-                card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
-            }
-            else if (isOwn && item.kind === 'post') {
-                const localPost = posts.find(p => p.id === (item.data.postId ?? item.data.id));
-                card = localPost
-                    ? buildPostCard(localPost, () => this.render())
-                    : this._buildFriendFeedCard(item.kind, item.data, userId);
-            }
-            else {
-                card = this._buildFriendFeedCard(item.kind, item.data, userId);
-            }
-            // Set like/comment counts from feed response
-            const itemId = (item.data.activityId ?? item.data.postId ?? item.data.id);
-            const lc = (item.data._likeCount ?? 0);
-            const cc = (item.data._commentCount ?? 0);
-            if (lc > 0) {
-                const likeEl = card.querySelector(`[data-like-count="${itemId}"], [data-like-count="p_${itemId}"]`);
-                if (likeEl)
-                    likeEl.textContent = String(lc);
-            }
-            if (cc > 0) {
-                const commentEl = card.querySelector(`[data-comment-count="${itemId}"]`);
-                if (commentEl)
-                    commentEl.textContent = String(cc);
-            }
-            card.style.animationDelay = `${idx * 60}ms`;
-            if (item.kind === 'activity') {
-                card.style.cursor = 'pointer';
-                card.addEventListener('click', e => {
-                    if (e.target.closest('button, a, video, input, [data-action], [data-pm], .home-card__photo, .home-card__avatar--user, .home-card__comment-panel, .hcs'))
-                        return;
-                    void openActivityDetail(item.data, isOwn, (item.data.activityId ?? item.data.id));
-                });
-            }
-            scroll.appendChild(card);
-            const actId = (item.data.activityId ?? item.data.id);
-            if (item.kind === 'activity') {
-                requestAnimationFrame(() => {
-                    setTimeout(() => {
-                        const coordsEnc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? null);
-                        const localAct = activities.find(a => a.id === actId);
-                        const enc = coordsEnc ?? null;
-                        if (enc) {
-                            const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
-                            if (mapEl) {
-                                mapEl.style.display = 'block';
-                                const coords = decodePolyline(enc);
-                                renderMinimapCanvas(mapEl, coords, (item.data.sport ?? localAct?.sport ?? 'running'));
+                else {
+                    card = this._buildFriendFeedCard(item.kind, item.data, userId);
+                }
+                // Set like/comment counts from feed response
+                const itemId = (item.data.activityId ?? item.data.postId ?? item.data.id);
+                const lc = (item.data._likeCount ?? 0);
+                const cc = (item.data._commentCount ?? 0);
+                if (lc > 0) {
+                    const likeEl = card.querySelector(`[data-like-count="${itemId}"], [data-like-count="p_${itemId}"]`);
+                    if (likeEl)
+                        likeEl.textContent = String(lc);
+                }
+                if (cc > 0) {
+                    const commentEl = card.querySelector(`[data-comment-count="${itemId}"]`);
+                    if (commentEl)
+                        commentEl.textContent = String(cc);
+                }
+                card.style.animationDelay = `${idx * 60}ms`;
+                if (item.kind === 'activity') {
+                    card.style.cursor = 'pointer';
+                    card.addEventListener('click', e => {
+                        if (e.target.closest('button, a, video, input, [data-action], [data-pm], .home-card__photo, .home-card__avatar--user, .home-card__comment-panel, .hcs'))
+                            return;
+                        void openActivityDetail(item.data, isOwn, (item.data.activityId ?? item.data.id));
+                    });
+                }
+                feedList.appendChild(card);
+                const actId = (item.data.activityId ?? item.data.id);
+                if (item.kind === 'activity') {
+                    requestAnimationFrame(() => {
+                        setTimeout(() => {
+                            const coordsEnc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? null);
+                            const localAct = activities.find(a => a.id === actId);
+                            const enc = coordsEnc ?? null;
+                            if (enc) {
+                                const mapEl = card.querySelector('.home-card__map-wrap--canvas, .home-card__map-wrap');
+                                if (mapEl) {
+                                    mapEl.style.display = 'block';
+                                    const coords = decodePolyline(enc);
+                                    renderMinimapCanvas(mapEl, coords, (item.data.sport ?? localAct?.sport ?? 'running'));
+                                }
                             }
-                        }
-                    }, 80 + idx * 30);
-                });
-            }
-        });
-        const friendsFeedEl = document.getElementById('friendsFeed');
-        if (friendsFeedEl)
-            friendsFeedEl.innerHTML = '';
-        // Batch load liked state
-        if (userId && feed.length > 0) {
-            const itemIds = feed.map(f => (f.data.activityId ?? f.data.postId ?? f.data.id)).filter(Boolean);
-            void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemIds.join(','))}`, { cache: 'no-store' })
-                .then(r => r.json())
-                .then((resp) => {
-                if (resp.status !== 'ok')
-                    return;
-                for (const [id, info] of Object.entries(resp.data)) {
-                    if (!info.liked)
-                        continue;
-                    const btn = scroll.querySelector(`[data-like-count="${id}"]`)?.closest('.home-card__action');
-                    if (btn)
-                        btn.classList.add('home-card__action--liked');
-                    const btnP = scroll.querySelector(`[data-like-count="p_${id}"]`)?.closest('.home-card__action');
-                    if (btnP)
-                        btnP.classList.add('home-card__action--liked');
+                        }, 80 + idx * 30);
+                    });
                 }
+            });
+            const friendsFeedEl = document.getElementById('friendsFeed');
+            if (friendsFeedEl)
+                friendsFeedEl.innerHTML = '';
+            // Batch load liked state
+            if (userId && feed.length > 0) {
+                const itemIds = feed.map(f => (f.data.activityId ?? f.data.postId ?? f.data.id)).filter(Boolean);
+                void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemIds.join(','))}`, { cache: 'no-store' })
+                    .then(r => r.json())
+                    .then((resp) => {
+                    if (resp.status !== 'ok')
+                        return;
+                    for (const [id, info] of Object.entries(resp.data)) {
+                        if (!info.liked)
+                            continue;
+                        const btn = feedList.querySelector(`[data-like-count="${id}"]`)?.closest('.home-card__action');
+                        if (btn)
+                            btn.classList.add('home-card__action--liked');
+                        const btnP = feedList.querySelector(`[data-like-count="p_${id}"]`)?.closest('.home-card__action');
+                        if (btnP)
+                            btnP.classList.add('home-card__action--liked');
+                    }
+                }).catch(() => { });
+            }
+            // Infinite scroll
+            this._setupInfiniteScroll(feedList, activities, posts, userId);
+        };
+        // 1) Instant paint — cached server feed (incl. friends) if present, else local-only
+        const cached = this._readFeedCache(userId);
+        if (cached) {
+            this._feedHasMore = cached.hasMore;
+            if (cached.feed.length > 0)
+                this._feedCursor = cached.feed[cached.feed.length - 1].date;
+        }
+        const initialFeed = (cached && cached.feed.length > 0) ? cached.feed : localFeed;
+        paintFeed(initialFeed);
+        const shownSig = this._feedSig(initialFeed);
+        // 2) Revalidate from server in the background (timeout-guarded), repaint only if changed
+        if (userId) {
+            void this._fetchServerFeed(userId).then(result => {
+                if (!result)
+                    return; // offline / timeout: keep what's shown
+                this._writeFeedCache(userId, result.feed, result.hasMore);
+                this._feedHasMore = result.hasMore;
+                if (result.feed.length > 0)
+                    this._feedCursor = result.feed[result.feed.length - 1].date;
+                if (!document.body.contains(feedList))
+                    return; // user navigated away
+                if (this._feedSig(result.feed) !== shownSig)
+                    paintFeed(result.feed);
             }).catch(() => { });
         }
-        // Infinite scroll
-        this._setupInfiniteScroll(scroll, activities, posts, userId);
+    }
+    // ── Feed cache + background fetch helpers ───────────────────────────────────
+    _feedSig(feed) {
+        return feed.map(f => `${(f.data.activityId ?? f.data.postId ?? f.data.id)}:${(f.data._likeCount ?? 0)}:${(f.data._commentCount ?? 0)}`).join('|');
+    }
+    _readFeedCache(userId) {
+        if (!userId)
+            return null;
+        try {
+            const raw = sessionStorage.getItem(`mapyou_feedcache_${userId}`);
+            if (!raw)
+                return null;
+            const o = JSON.parse(raw);
+            return Array.isArray(o.feed) ? { feed: o.feed, hasMore: !!o.hasMore } : null;
+        }
+        catch {
+            return null;
+        }
+    }
+    _writeFeedCache(userId, feed, hasMore) {
+        if (!userId)
+            return;
+        try {
+            sessionStorage.setItem(`mapyou_feedcache_${userId}`, JSON.stringify({ feed, hasMore }));
+        }
+        catch { /* quota exceeded — skip caching */ }
+    }
+    async _fetchServerFeed(userId) {
+        try {
+            const ctrl = new AbortController();
+            const timer = setTimeout(() => ctrl.abort(), 5000);
+            const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store', signal: ctrl.signal });
+            clearTimeout(timer);
+            if (!res.ok)
+                return null;
+            const d = await res.json();
+            return { feed: d.data ?? [], hasMore: d.hasMore ?? false };
+        }
+        catch {
+            return null;
+        }
     }
     _setupInfiniteScroll(scroll, activities, posts, userId) {
         this._feedObserver?.disconnect();
