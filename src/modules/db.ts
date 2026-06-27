@@ -94,10 +94,14 @@ export interface ReelRecord {
   publicId:     string;
   caption:      string | null;
   activityId:   string | null;   // deep-link target: tap reel → activity details
+  audience:     string;          // everyone | friends
   captionX:     number;
   captionY:     number;
   captionSize:  number;
   captionColor: string;
+  captionFont:  string | null;
+  captionWeight:string | null;
+  captionStyle: string | null;   // none | highlight | neon
   duration:     number;
   views:        string[];
   likes:        string[];

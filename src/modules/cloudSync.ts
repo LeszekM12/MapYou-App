@@ -725,8 +725,12 @@ export async function uploadReel(
     captionY?:     number;
     captionSize?:  number;
     captionColor?: string;
+    captionFont?:  string | null;
+    captionWeight?:string | null;
+    captionStyle?: string | null;
     duration?:     number;
     activityId?:   string | null;
+    audience?:     string;
   } = {},
 ): Promise<ReelRecord | null> {
   if (!file || !userId) return null;
@@ -748,10 +752,14 @@ export async function uploadReel(
       publicId:     up.publicId,
       caption:      meta.caption ?? null,
       activityId:   meta.activityId ?? null,
+      audience:     meta.audience ?? 'everyone',
       captionX:     meta.captionX ?? 50,
       captionY:     meta.captionY ?? 80,
       captionSize:  meta.captionSize ?? 20,
       captionColor: meta.captionColor ?? '#ffffff',
+      captionFont:  meta.captionFont ?? null,
+      captionWeight: meta.captionWeight ?? null,
+      captionStyle: meta.captionStyle ?? 'none',
       duration:     meta.duration ?? 5,
       views:        [],
       likes:        [],
@@ -771,8 +779,10 @@ export async function uploadReel(
           mediaUrl: reel.mediaUrl, mediaType: reel.mediaType,
           publicId: reel.publicId, caption: reel.caption,
           activityId: reel.activityId,
+          audience: reel.audience,
           captionX: reel.captionX, captionY: reel.captionY,
           captionSize: reel.captionSize, captionColor: reel.captionColor,
+          captionFont: reel.captionFont, captionWeight: reel.captionWeight, captionStyle: reel.captionStyle,
           duration: reel.duration,
         }),
         signal: AbortSignal.timeout(10_000),
@@ -970,10 +980,14 @@ const userId = getUserId();
           publicId:     '',
           caption:      r['caption'] as string | null,
           activityId:   (r['activityId'] as string | null) ?? null,
+          audience:     (r['audience'] as string) ?? 'everyone',
           captionX:     r['captionX'] as number,
           captionY:     r['captionY'] as number,
           captionSize:  r['captionSize'] as number,
           captionColor: r['captionColor'] as string,
+          captionFont:  (r['captionFont'] as string | null) ?? null,
+          captionWeight:(r['captionWeight'] as string | null) ?? null,
+          captionStyle: (r['captionStyle'] as string | null) ?? 'none',
           duration:     r['duration'] as number,
           views:        r['views'] as string[],
           likes:        r['likes'] as string[],

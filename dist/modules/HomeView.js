@@ -2165,24 +2165,55 @@ export class HomeView {
           <span style="font-size:14px;font-weight:700;color:#fff;" id="reelSizeLabel">M</span>
           <span class="home-reel-creator__tool-lbl">Size</span>
         </button>
-        <button class="home-reel-creator__tool-btn" id="reelGridToggle" title="Alignment grid">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" width="20" height="20"><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
-          <span class="home-reel-creator__tool-lbl">Grid</span>
+        <button class="home-reel-creator__tool-btn" id="reelFontPicker" title="Font">
+          <span style="font-size:15px;font-weight:800;color:#fff;font-family:Georgia,serif;" id="reelFontLabel">Aa</span>
+          <span class="home-reel-creator__tool-lbl">Font</span>
+        </button>
+        <button class="home-reel-creator__tool-btn" id="reelStylePicker" title="Text style">
+          <span style="font-size:14px;font-weight:800;color:#000;background:#fff;border-radius:5px;padding:1px 5px;">A</span>
+          <span class="home-reel-creator__tool-lbl">Style</span>
+        </button>
+        <button class="home-reel-creator__tool-btn" id="reelStickerPicker" title="Stickers">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" width="22" height="22"><path d="M15.5 3H6a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h7l8-8V6a3 3 0 0 0-3-3z"/><path d="M14 21v-4a3 3 0 0 1 3-3h4"/></svg>
+          <span class="home-reel-creator__tool-lbl">Stickers</span>
         </button>
       </div>
       <!-- Text input — shown when text tool active -->
       <input type="text" class="home-reel-creator__caption" id="reelCaption" placeholder="Type text…" maxlength="80" style="display:none"/>
-      <!-- Bottom bar — share button + hint -->
+      <!-- Bottom bar — audience + share -->
       <div class="home-reel-creator__bottom">
-        <span class="home-reel-creator__hint">Max 10 MB photos · 500 MB videos</span>
+        <div class="home-reel-creator__audience" id="reelAudience">
+          <button class="rca-opt rca-opt--active" data-aud="everyone" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 2.5 15.3 0 18M12 3c-2.5 2.7-2.5 15.3 0 18"/></svg>
+            Everyone
+          </button>
+          <button class="rca-opt" data-aud="friends" type="button">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M16 11a4 4 0 1 0-4-4M3 21v-1a5 5 0 0 1 5-5h2a5 5 0 0 1 5 5v1M21 21v-1a5 5 0 0 0-3-4.5"/><circle cx="9" cy="7" r="4"/></svg>
+            Friends
+          </button>
+        </div>
         <button class="home-reel-creator__share" id="reelCreatorShare" disabled>Share ➤</button>
       </div>`;
         document.body.appendChild(overlay);
         requestAnimationFrame(() => overlay.classList.add('home-reel-creator--visible'));
         let selectedFile = null;
         let reelActivityId = null;
+        let audience = 'everyone';
+        let isVideoMedia = false;
+        const stickers = [];
+        let selectedSticker = null;
         let captionColor = '#ffffff';
         let captionSize = 20;
+        const FONTS = [
+            { lbl: 'Aa', css: '-apple-system, system-ui, sans-serif', weight: '700' },
+            { lbl: 'Aa', css: 'Georgia, "Times New Roman", serif', weight: '700' },
+            { lbl: 'Aa', css: '"Courier New", monospace', weight: '700' },
+            { lbl: 'Aa', css: '"Trebuchet MS", "Segoe UI", sans-serif', weight: '900' },
+            { lbl: 'Aa', css: '"Brush Script MT", "Comic Sans MS", cursive', weight: '700' },
+        ];
+        const STYLES = ['none', 'highlight', 'neon'];
+        let captionFontIdx = 0;
+        let captionStyleIdx = 0;
         let isDragging = false;
         let dragStartX = 0, dragStartY = 0;
         let captionPct = { x: 50, y: 80 };
@@ -2210,10 +2241,13 @@ export class HomeView {
             }
             selectedFile = file;
             reelActivityId = null;
+            isVideoMedia = isVid;
+            stickers.length = 0;
+            selectedSticker = null;
             const url = URL.createObjectURL(file);
             canvas.innerHTML = isVid
-                ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__grid" id="reelGrid" hidden></div>`
-                : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__grid" id="reelGrid" hidden></div>`;
+                ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`
+                : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
             // Reset tool overlays so ensureTools() re-creates them inside new canvas
             _palette = null;
             _sizeWrap = null;
@@ -2234,29 +2268,52 @@ export class HomeView {
                 const file = new File([blob], 'reel.jpg', { type: 'image/jpeg' });
                 selectedFile = file;
                 reelActivityId = actv.id;
+                isVideoMedia = false;
+                stickers.length = 0;
+                selectedSticker = null;
                 const url = URL.createObjectURL(file);
-                canvas.innerHTML = `<img src="${url}" class="home-reel-creator__preview" alt="reel"/><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__grid" id="reelGrid" hidden></div>`;
+                canvas.innerHTML = `<img src="${url}" class="home-reel-creator__preview" alt="reel"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
                 _palette = null;
                 _sizeWrap = null;
                 tools.style.display = 'flex';
                 shareBtn.disabled = false;
             });
         });
-        // Alignment grid toggle (rule-of-thirds + center lines)
-        overlay.querySelector('#reelGridToggle')?.addEventListener('click', () => {
-            const grid = overlay.querySelector('#reelGrid');
-            if (!grid)
-                return;
-            grid.hidden = !grid.hidden;
-            overlay.querySelector('#reelGridToggle')?.classList.toggle('home-reel-creator__tool-btn--active', !grid.hidden);
+        // Font cycle
+        overlay.querySelector('#reelFontPicker')?.addEventListener('click', () => {
+            captionFontIdx = (captionFontIdx + 1) % FONTS.length;
+            const lbl = overlay.querySelector('#reelFontLabel');
+            if (lbl)
+                lbl.style.fontFamily = FONTS[captionFontIdx].css;
+            updateCaptionOverlay();
+        });
+        // Text style cycle (none → highlight → neon)
+        overlay.querySelector('#reelStylePicker')?.addEventListener('click', () => {
+            captionStyleIdx = (captionStyleIdx + 1) % STYLES.length;
+            overlay.querySelector('#reelStylePicker')?.classList.toggle('home-reel-creator__tool-btn--active', STYLES[captionStyleIdx] !== 'none');
+            updateCaptionOverlay();
         });
         // Caption drag
+        const _captionStyleCss = (style, color) => {
+            if (style === 'highlight') {
+                const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(color.toLowerCase());
+                return `background:${color};color:${dark ? '#000' : '#fff'};padding:0.08em 0.28em;border-radius:0.18em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`;
+            }
+            if (style === 'neon') {
+                return `color:#fff;text-shadow:0 0 4px ${color},0 0 12px ${color},0 0 22px ${color};`;
+            }
+            return `color:${color};`;
+        };
         const updateCaptionOverlay = () => {
             const ov = overlay.querySelector('#captionOverlay');
             if (!ov)
                 return;
             const text = captionEl.value;
-            ov.innerHTML = text ? `<span class="home-reel-creator__caption-text" style="font-size:${captionSize}px;color:${captionColor};left:${captionPct.x}%;top:${captionPct.y}%;transform:translate(-50%,-50%)">${text}</span>` : '';
+            const f = FONTS[captionFontIdx];
+            const styleCss = _captionStyleCss(STYLES[captionStyleIdx], captionColor);
+            ov.innerHTML = text
+                ? `<span class="home-reel-creator__caption-text" style="font-size:${captionSize}px;font-family:${f.css};font-weight:${f.weight};left:${captionPct.x}%;top:${captionPct.y}%;transform:translate(-50%,-50%);${styleCss}">${text}</span>`
+                : '';
         };
         captionEl.addEventListener('input', updateCaptionOverlay);
         const isToolEl = (t) => {
@@ -2282,17 +2339,309 @@ export class HomeView {
             dragStartX = e.touches[0].clientX;
             dragStartY = e.touches[0].clientY;
         }, { passive: true });
+        const SNAP = 2.4; // % proximity to lock onto a guide
+        const X_TARGETS = [50, 33.333, 66.667]; // center + thirds
+        const Y_TARGETS = [50, 33.333, 66.667];
+        const renderGuides = (vx, hy) => {
+            const g = overlay.querySelector('#reelGuides');
+            if (!g)
+                return;
+            g.innerHTML =
+                (vx !== null ? `<div class="rg-line rg-line--v" style="left:${vx}%"></div>` : '') +
+                    (hy !== null ? `<div class="rg-line rg-line--h" style="top:${hy}%"></div>` : '');
+        };
+        const clearGuides = () => { const g = overlay.querySelector('#reelGuides'); if (g)
+            g.innerHTML = ''; };
         const onMove = (x, y) => {
             if (!isDragging)
                 return;
             const rect = canvas.getBoundingClientRect();
-            captionPct = { x: ((x - rect.left) / rect.width) * 100, y: ((y - rect.top) / rect.height) * 100 };
+            let px = ((x - rect.left) / rect.width) * 100;
+            let py = ((y - rect.top) / rect.height) * 100;
+            let vGuide = null, hGuide = null;
+            for (const t of X_TARGETS) {
+                if (Math.abs(px - t) < SNAP) {
+                    px = t;
+                    vGuide = t;
+                    break;
+                }
+            }
+            for (const t of Y_TARGETS) {
+                if (Math.abs(py - t) < SNAP) {
+                    py = t;
+                    hGuide = t;
+                    break;
+                }
+            }
+            px = Math.max(4, Math.min(96, px));
+            py = Math.max(4, Math.min(96, py));
+            captionPct = { x: px, y: py };
             updateCaptionOverlay();
+            renderGuides(vGuide, hGuide);
         };
         canvas.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
         canvas.addEventListener('touchmove', e => onMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-        window.addEventListener('mouseup', () => { isDragging = false; });
-        window.addEventListener('touchend', () => { isDragging = false; });
+        window.addEventListener('mouseup', () => { isDragging = false; clearGuides(); });
+        window.addEventListener('touchend', () => { isDragging = false; clearGuides(); });
+        // ── Audience selector ──
+        overlay.querySelector('#reelAudience')?.addEventListener('click', e => {
+            const btn = e.target.closest('.rca-opt');
+            if (!btn)
+                return;
+            audience = btn.dataset.aud ?? 'everyone';
+            overlay.querySelectorAll('.rca-opt').forEach(b => b.classList.toggle('rca-opt--active', b === btn));
+        });
+        // ── Sticker layer engine ──
+        const _dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+        const stickerLabel = (s) => s.kind === 'emoji' ? s.text :
+            s.kind === 'location' ? `📍 ${s.text}` :
+                s.kind === 'time' ? `🕐 ${s.text}` :
+                    s.kind === 'hashtag' ? `#${s.text}` : `@${s.text}`;
+        const wireSticker = (el) => {
+            const cont = el.parentElement;
+            const id = el.dataset.id ?? '';
+            const layer = () => stickers.find(s => s.id === id);
+            const applyStyle = () => { const L = layer(); if (L) {
+                el.style.left = `${L.x}%`;
+                el.style.top = `${L.y}%`;
+                el.style.transform = `translate(-50%,-50%) scale(${L.scale})`;
+            } };
+            el.querySelector('.rst-del')?.addEventListener('click', ev => {
+                ev.stopPropagation();
+                const i = stickers.findIndex(s => s.id === id);
+                if (i >= 0)
+                    stickers.splice(i, 1);
+                selectedSticker = null;
+                renderStickers();
+            });
+            const pts = new Map();
+            let pinchBase = null;
+            el.addEventListener('pointerdown', ev => {
+                if (ev.target.classList.contains('rst-del'))
+                    return;
+                ev.stopPropagation();
+                ev.preventDefault();
+                selectedSticker = id;
+                cont?.querySelectorAll('.rst-layer').forEach(n => n.classList.toggle('rst-layer--sel', n === el));
+                try {
+                    el.setPointerCapture(ev.pointerId);
+                }
+                catch { /* ok */ }
+                pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+                if (pts.size === 2) {
+                    const a = [...pts.values()];
+                    pinchBase = { dist: _dist(a[0], a[1]), scale: layer()?.scale ?? 1 };
+                }
+            });
+            el.addEventListener('pointermove', ev => {
+                if (!pts.has(ev.pointerId))
+                    return;
+                pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+                const L = layer();
+                if (!L)
+                    return;
+                if (pts.size >= 2 && pinchBase) {
+                    const a = [...pts.values()];
+                    L.scale = Math.max(0.4, Math.min(3, pinchBase.scale * (_dist(a[0], a[1]) / pinchBase.dist)));
+                    applyStyle();
+                    return;
+                }
+                const rect = canvas.getBoundingClientRect();
+                let px = ((ev.clientX - rect.left) / rect.width) * 100;
+                let py = ((ev.clientY - rect.top) / rect.height) * 100;
+                let vG = null, hG = null;
+                for (const t of X_TARGETS) {
+                    if (Math.abs(px - t) < SNAP) {
+                        px = t;
+                        vG = t;
+                        break;
+                    }
+                }
+                for (const t of Y_TARGETS) {
+                    if (Math.abs(py - t) < SNAP) {
+                        py = t;
+                        hG = t;
+                        break;
+                    }
+                }
+                px = Math.max(4, Math.min(96, px));
+                py = Math.max(4, Math.min(96, py));
+                L.x = px;
+                L.y = py;
+                applyStyle();
+                renderGuides(vG, hG);
+            });
+            const end = (ev) => { pts.delete(ev.pointerId); if (pts.size < 2)
+                pinchBase = null; if (pts.size === 0)
+                clearGuides(); };
+            el.addEventListener('pointerup', end);
+            el.addEventListener('pointercancel', end);
+        };
+        const renderStickers = () => {
+            const cont = overlay.querySelector('#reelStickers');
+            if (!cont)
+                return;
+            cont.innerHTML = stickers.map(s => {
+                const sel = s.id === selectedSticker ? ' rst-layer--sel' : '';
+                const inner = s.kind === 'emoji'
+                    ? `<span class="rst-emoji">${s.text}</span>`
+                    : `<span class="rst-pill">${stickerLabel(s)}</span>`;
+                return `<div class="rst-layer${sel}" data-id="${s.id}" style="left:${s.x}%;top:${s.y}%;transform:translate(-50%,-50%) scale(${s.scale})">${inner}<button class="rst-del" type="button">✕</button></div>`;
+            }).join('');
+            cont.querySelectorAll('.rst-layer').forEach(el => wireSticker(el));
+        };
+        const addSticker = (kind, text) => {
+            const t = text.trim();
+            if (!t)
+                return;
+            const id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+            stickers.push({ id, kind, text: t, x: 50, y: 45, scale: 1 });
+            selectedSticker = id;
+            renderStickers();
+        };
+        // ── Sticker tray (IG-style bottom sheet) ──
+        const EMOJIS = ['🔥', '💪', '🏃', '🚴', '🏆', '⚡', '❤️', '😤', '🎉', '👏', '🥇', '💦', '🌄', '🧗', '⛰️', '🏅', '😮‍💨', '🚀', '✨', '💯', '🦵', '🫶', '😎', '🥵'];
+        overlay.querySelector('#reelStickerPicker')?.addEventListener('click', () => {
+            if (!selectedFile)
+                return;
+            if (isVideoMedia) {
+                adToast('Stickers work on photos & workout reels');
+                return;
+            }
+            const tray = document.createElement('div');
+            tray.className = 'rst-tray';
+            tray.innerHTML = `
+        <div class="rst-tray__sheet">
+          <div class="rst-tray__bar"></div>
+          <div class="rst-tray__row">
+            <button class="rst-opt" data-act="location"><span class="rst-opt__ic" style="color:#7c3aed">📍</span>Location</button>
+            <button class="rst-opt" data-act="time"><span class="rst-opt__ic">🕐</span>Time</button>
+            <button class="rst-opt" data-act="hashtag"><span class="rst-opt__ic" style="color:#d946ef">#</span>Hashtag</button>
+            <button class="rst-opt" data-act="mention"><span class="rst-opt__ic" style="color:#f97316">@</span>Mention</button>
+          </div>
+          <div class="rst-tray__title">Emoji</div>
+          <div class="rst-tray__emoji">${EMOJIS.map(e => `<button class="rst-emoji-btn" data-emoji="${e}">${e}</button>`).join('')}</div>
+          <p class="rst-tray__note">Music, GIF, cutouts, polls & avatars aren't available yet.</p>
+        </div>`;
+            document.body.appendChild(tray);
+            const close = () => tray.remove();
+            tray.addEventListener('click', ev => { if (ev.target === tray)
+                close(); });
+            tray.querySelectorAll('.rst-emoji-btn').forEach(b => b.addEventListener('click', () => { addSticker('emoji', b.dataset.emoji ?? '🔥'); close(); }));
+            tray.querySelectorAll('.rst-opt').forEach(b => b.addEventListener('click', () => {
+                const act = b.dataset.act;
+                close();
+                if (act === 'time') {
+                    addSticker('time', new Date().toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' }));
+                    return;
+                }
+                const ph = act === 'location' ? 'Place name' : act === 'hashtag' ? 'hashtag' : 'username';
+                const val = window.prompt(act === 'location' ? 'Location' : act === 'hashtag' ? 'Hashtag (without #)' : 'Mention (without @)', '') ?? '';
+                if (val.trim())
+                    addSticker(act, val.replace(/^[#@]/, '').trim() || ph);
+            }));
+        });
+        // ── Flatten caption + stickers onto the media (photos & workout reels) ──
+        const _imgFromFile = (f) => new Promise(res => {
+            const i = new Image();
+            const u = URL.createObjectURL(f);
+            i.onload = () => res(i);
+            i.onerror = () => res(null);
+            i.src = u;
+        });
+        const _rr = (ctx, x, y, w, h, r) => {
+            ctx.beginPath();
+            ctx.moveTo(x + r, y);
+            ctx.arcTo(x + w, y, x + w, y + h, r);
+            ctx.arcTo(x + w, y + h, x, y + h, r);
+            ctx.arcTo(x, y + h, x, y, r);
+            ctx.arcTo(x, y, x + w, y, r);
+            ctx.closePath();
+        };
+        const bakeFlat = async () => {
+            if (!selectedFile)
+                return null;
+            const W = 1080, H = 1920;
+            const img = await _imgFromFile(selectedFile);
+            if (!img)
+                return null;
+            const c = document.createElement('canvas');
+            c.width = W;
+            c.height = H;
+            const ctx = c.getContext('2d');
+            if (!ctx)
+                return null;
+            const sc = Math.max(W / img.width, H / img.height);
+            const dw = img.width * sc, dh = img.height * sc;
+            ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+            const pxScale = W / canvas.getBoundingClientRect().width;
+            // caption
+            const capText = captionEl.value.trim();
+            if (capText) {
+                const f = FONTS[captionFontIdx];
+                const fs = captionSize * pxScale;
+                ctx.font = `${f.weight} ${fs}px ${f.css}`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const x = captionPct.x / 100 * W, y = captionPct.y / 100 * H;
+                const st = STYLES[captionStyleIdx];
+                const w = ctx.measureText(capText).width;
+                if (st === 'highlight') {
+                    const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(captionColor.toLowerCase());
+                    const padX = fs * 0.28, padY = fs * 0.16;
+                    _rr(ctx, x - w / 2 - padX, y - fs / 2 - padY, w + padX * 2, fs + padY * 2, fs * 0.2);
+                    ctx.fillStyle = captionColor;
+                    ctx.fill();
+                    ctx.fillStyle = dark ? '#000' : '#fff';
+                    ctx.fillText(capText, x, y);
+                }
+                else if (st === 'neon') {
+                    ctx.save();
+                    ctx.shadowColor = captionColor;
+                    ctx.shadowBlur = fs * 0.55;
+                    ctx.fillStyle = '#fff';
+                    ctx.fillText(capText, x, y);
+                    ctx.fillText(capText, x, y);
+                    ctx.restore();
+                }
+                else {
+                    ctx.fillStyle = captionColor;
+                    ctx.fillText(capText, x, y);
+                }
+            }
+            // stickers
+            for (const s of stickers) {
+                const x = s.x / 100 * W, y = s.y / 100 * H;
+                if (s.kind === 'emoji') {
+                    const fs = 64 * pxScale * s.scale;
+                    ctx.font = `${fs}px system-ui`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(s.text, x, y);
+                    continue;
+                }
+                const label = stickerLabel(s);
+                const fs = 30 * pxScale * s.scale;
+                ctx.font = `700 ${fs}px system-ui`;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                const padX = fs * 0.55, padY = fs * 0.34;
+                const w = ctx.measureText(label).width;
+                const bw = w + padX * 2, bh = fs + padY * 2;
+                ctx.save();
+                ctx.shadowColor = 'rgba(0,0,0,0.18)';
+                ctx.shadowBlur = 14 * pxScale;
+                ctx.shadowOffsetY = 4 * pxScale;
+                _rr(ctx, x - bw / 2, y - bh / 2, bw, bh, bh / 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.restore();
+                ctx.fillStyle = '#16181c';
+                ctx.fillText(label, x - bw / 2 + padX, y);
+            }
+            const blob = await new Promise(r => c.toBlob(b => r(b), 'image/jpeg', 0.92));
+            return blob ? new File([blob], 'reel.jpg', { type: 'image/jpeg' }) : null;
+        };
         // Colors
         overlay.querySelectorAll('.home-reel-creator__color-btn').forEach(btn => {
             btn.addEventListener('click', () => {
@@ -2376,13 +2725,28 @@ export class HomeView {
             shareBtn.disabled = true;
             shareBtn.textContent = 'Uploading…';
             const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
-            const reel = await uploadReel(selectedFile, myUserId, {
-                caption: captionEl.value || null,
+            // Flatten caption + stickers into the image (photos & workout reels).
+            // Video can't be baked in-browser → keep caption as a metadata overlay.
+            let fileToUpload = selectedFile;
+            let captionMeta = captionEl.value || null;
+            if (!isVideoMedia && (captionMeta || stickers.length > 0)) {
+                const baked = await bakeFlat();
+                if (baked) {
+                    fileToUpload = baked;
+                    captionMeta = null;
+                }
+            }
+            const reel = await uploadReel(fileToUpload, myUserId, {
+                caption: captionMeta,
                 captionX: captionPct.x,
                 captionY: captionPct.y,
                 captionSize,
                 captionColor,
+                captionFont: FONTS[captionFontIdx].css,
+                captionWeight: FONTS[captionFontIdx].weight,
+                captionStyle: STYLES[captionStyleIdx],
                 activityId: reelActivityId,
+                audience,
             });
             if (reel) {
                 overlay.classList.remove('home-reel-creator--visible');
@@ -2432,7 +2796,20 @@ export class HomeView {
           ${isVideo
                 ? `<video class="home-reel-viewer__media" src="${reel.mediaUrl}" autoplay muted playsinline id="reelViewerVideo" oncontextmenu="return false"></video>`
                 : `<img class="home-reel-viewer__media" src="${reel.mediaUrl}" alt="reel" oncontextmenu="return false" draggable="false"/>`}
-          ${reel.caption ? `<span class="home-reel-viewer__caption" style="left:${reel.captionX}%;top:${reel.captionY}%;font-size:${reel.captionSize}px;color:${reel.captionColor}">${reel.caption}</span>` : ''}
+          ${reel.caption ? `<span class="home-reel-viewer__caption" style="${(() => {
+                const ff = reel.captionFont ? `font-family:${reel.captionFont};` : '';
+                const fw = `font-weight:${reel.captionWeight ?? '700'};`;
+                const base = `left:${reel.captionX}%;top:${reel.captionY}%;font-size:${reel.captionSize}px;${ff}${fw}`;
+                const st = reel.captionStyle ?? 'none';
+                if (st === 'highlight') {
+                    const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes((reel.captionColor || '').toLowerCase());
+                    return `${base}background:${reel.captionColor};color:${dark ? '#000' : '#fff'};padding:0.08em 0.28em;border-radius:0.18em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`;
+                }
+                if (st === 'neon') {
+                    return `${base}color:#fff;text-shadow:0 0 4px ${reel.captionColor},0 0 12px ${reel.captionColor},0 0 22px ${reel.captionColor};`;
+                }
+                return `${base}color:${reel.captionColor};`;
+            })()}">${reel.caption}</span>` : ''}
           ${reel.activityId ? `<button class="home-reel-viewer__activity" id="reelViewerActivity">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
             View activity
