@@ -1,7 +1,8 @@
 // ─── HOME VIEW — Activity Feed ────────────────────────────────────────────────
 // src/modules/HomeView.ts
 
-import { loadEnrichedActivities, type EnrichedActivity } from './db.js';
+import { loadEnrichedActivities, deleteEnrichedActivity, deleteActivity, updateEnrichedActivityFields, type EnrichedActivity } from './db.js';
+import { isRouteSaved, saveRoute, unsaveRoute, type SavedRoute } from './SavedRoutes.js';
 import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
@@ -629,6 +630,123 @@ function estimateCalories(sport: string, distanceKm: number, durationSec: number
 
 let _adMap: L.Map | null = null;
 
+function adToast(msg: string): void {
+  document.getElementById('adToast')?.remove();
+  const t = document.createElement('div');
+  t.id = 'adToast';
+  t.className = 'ad-toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  requestAnimationFrame(() => t.classList.add('ad-toast--show'));
+  setTimeout(() => { t.classList.remove('ad-toast--show'); setTimeout(() => t.remove(), 250); }, 2200);
+}
+
+function openActivityOptionsMenu(
+  ov: HTMLElement,
+  itemId: string,
+  visibility: 'everyone' | 'friends' | 'only_me',
+  muted: boolean,
+  closeDetail: () => void,
+): void {
+  document.getElementById('adMenuOverlay')?.remove();
+  const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+  const opts: Array<{ v: 'everyone' | 'friends' | 'only_me'; ic: string; t: string; s: string }> = [
+    { v: 'everyone', ic: '🌐', t: 'Everyone', s: 'Visible to everyone' },
+    { v: 'friends',  ic: '👥', t: 'Friends',  s: 'You and your friends' },
+    { v: 'only_me',  ic: '🔒', t: 'Only me',  s: 'Only you can see it' },
+  ];
+  const menu = document.createElement('div');
+  menu.id = 'adMenuOverlay';
+  menu.className = 'adm-overlay';
+  menu.innerHTML = `
+    <div class="adm-sheet">
+      <div class="adm-grab"></div>
+      <div class="adm-section-title">Who can see this?</div>
+      ${opts.map(o => `
+        <button class="adm-row${o.v === visibility ? ' adm-row--active' : ''}" data-vis="${o.v}">
+          <span class="adm-ic">${o.ic}</span>
+          <span class="adm-txt"><span class="adm-t">${o.t}</span><span class="adm-s">${o.s}</span></span>
+          <span class="adm-check">${o.v === visibility ? '✓' : ''}</span>
+        </button>`).join('')}
+      <div class="adm-divider"></div>
+      <button class="adm-row" id="admMute">
+        <span class="adm-ic">🚫</span>
+        <span class="adm-txt"><span class="adm-t">Hide from feed</span><span class="adm-s">Stays on your profile, not in feeds</span></span>
+        <span class="adm-toggle${muted ? ' adm-toggle--on' : ''}"><span class="adm-knob"></span></span>
+      </button>
+      <div class="adm-divider"></div>
+      <button class="adm-row adm-row--danger" id="admDelete">
+        <span class="adm-ic">🗑️</span>
+        <span class="adm-txt"><span class="adm-t">Delete activity</span><span class="adm-s">This cannot be undone</span></span>
+      </button>
+    </div>`;
+  document.body.appendChild(menu);
+  const closeMenu = (): void => menu.remove();
+  menu.addEventListener('click', e => { if (e.target === menu) closeMenu(); });
+
+  let curVis = visibility, curMuted = muted;
+  const refreshBadge = (): void => {
+    const badge = ov.querySelector('#adVisBadge');
+    if (!badge) return;
+    const t  = curVis === 'everyone' ? 'Everyone' : curVis === 'friends' ? 'Friends' : 'Only me';
+    const ic = curVis === 'everyone' ? '🌐' : curVis === 'friends' ? '👥' : '🔒';
+    badge.textContent = `${ic} ${t}${curMuted ? ' · Hidden from feed' : ''}`;
+  };
+  const patch = async (body: { visibility?: string; muted?: boolean }): Promise<void> => {
+    try {
+      await fetch(`${BACKEND_URL}/enriched-activities/${encodeURIComponent(itemId)}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, ...body }),
+      });
+    } catch { /* offline: local change stays, syncs later */ }
+  };
+
+  menu.querySelectorAll<HTMLElement>('[data-vis]').forEach(row => {
+    row.addEventListener('click', () => {
+      const v = row.dataset.vis as 'everyone' | 'friends' | 'only_me';
+      curVis = v;
+      menu.querySelectorAll<HTMLElement>('[data-vis]').forEach(r => {
+        r.classList.toggle('adm-row--active', r === row);
+        const chk = r.querySelector('.adm-check'); if (chk) chk.textContent = r === row ? '✓' : '';
+      });
+      void updateEnrichedActivityFields(itemId, { visibility: v });
+      void patch({ visibility: v });
+      refreshBadge();
+      adToast('Visibility updated');
+    });
+  });
+
+  menu.querySelector('#admMute')?.addEventListener('click', () => {
+    curMuted = !curMuted;
+    menu.querySelector('.adm-toggle')?.classList.toggle('adm-toggle--on', curMuted);
+    void updateEnrichedActivityFields(itemId, { muted: curMuted });
+    void patch({ muted: curMuted });
+    refreshBadge();
+    adToast(curMuted ? 'Hidden from feed' : 'Shown in feed');
+  });
+
+  menu.querySelector('#admDelete')?.addEventListener('click', () => {
+    if (!confirm('Delete this activity? This cannot be undone.')) return;
+    void (async () => {
+      try {
+        await fetch(`${BACKEND_URL}/enriched-activities/${encodeURIComponent(itemId)}?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+      } catch { /* ignore */ }
+      await deleteEnrichedActivity(itemId);
+      await deleteActivity(itemId);
+      try {
+        const k = 'mapyou_deleted_workout_ids';
+        const arr = JSON.parse(localStorage.getItem(k) || '[]') as string[];
+        if (Array.isArray(arr) && !arr.includes(itemId)) { arr.push(itemId); localStorage.setItem(k, JSON.stringify(arr)); }
+      } catch { /* ignore */ }
+      try { sessionStorage.removeItem(`mapyou_feedcache_${userId}`); } catch { /* ignore */ }
+      closeMenu();
+      closeDetail();
+      adToast('Activity deleted');
+      void homeView.render();
+    })();
+  });
+}
+
 export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, actId?: string): Promise<void> {
   document.getElementById('activityDetailOverlay')?.remove();
   if (_adMap) { try { _adMap.remove(); } catch { /* ignore */ } _adMap = null; }
@@ -654,6 +772,14 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   const ownCoords    = isOwn && Array.isArray(full.coords) && full.coords.length > 0;
   const encoded      = (rec._coordsEncResolved as string | null) ?? (rec.coordsEnc as string | null) ?? null;
   const friendCoords = !ownCoords && encoded ? decodePolyline(encoded) : null;
+
+  const routeCoords = (ownCoords ? (full.coords as Array<[number, number]>) : (friendCoords ?? [])) as Array<[number, number]>;
+  const hasRoute    = routeCoords.length > 0;
+  const visibility  = ((rec.visibility as string) || 'everyone') as 'everyone' | 'friends' | 'only_me';
+  const muted       = rec.muted === true;
+  const visText     = visibility === 'everyone' ? 'Everyone' : visibility === 'friends' ? 'Friends' : 'Only me';
+  const visIco      = visibility === 'everyone' ? '🌐' : visibility === 'friends' ? '👥' : '🔒';
+  const visBadge    = `${visIco} ${visText}${muted ? ' · Hidden from feed' : ''}`;
 
   const authorName = (rec.authorName as string) || (isOwn ? (profile.name || 'You') : getSportLabel(full.sport));
   const avatarSrc  = (rec.avatarB64 as string | null) ?? (rec.authorAvatarUrl as string | null) ?? (isOwn ? profile.avatarB64 : null);
@@ -693,7 +819,8 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   const itemId       = actId || (rec.activityId as string) || full.id;
   const likeCount    = (rec._likeCount as number) ?? 0;
   const commentCount = (rec._commentCount as number) ?? 0;
-  const viewCount    = (rec._viewCount as number) ?? (rec.views as number) ?? 0;
+  const viewCount    = (((act as unknown as Record<string, unknown>)._viewCount ?? (act as unknown as Record<string, unknown>).views) as number)
+                       ?? (rec._viewCount as number) ?? (rec.views as number) ?? 0;
 
   const heroInner = (ownCoords || friendCoords)
     ? `<div class="ad-hero-map" id="adHeroMap"></div>`
@@ -713,6 +840,14 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       ${heroInner}
+      <div class="ad-hero-ctrls">
+        ${hasRoute ? `<button class="ad-ctrl" id="adBookmark" aria-label="Save route">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="${isRouteSaved(itemId) ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </button>` : ''}
+        ${isOwn ? `<button class="ad-ctrl" id="adMore" aria-label="Options">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+        </button>` : ''}
+      </div>
     </div>
     <div class="ad-sheet">
       <div class="ad-grab"></div>
@@ -724,6 +859,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
         </div>
         <span class="ad-sport" style="color:${color}">${getSportLabel(full.sport)}</span>
       </div>
+      ${isOwn ? `<div class="ad-vis" id="adVisBadge">${visBadge}</div>` : ''}
 
       <h2 class="ad-title">${title}</h2>
       ${full.description && full.description !== title ? `<p class="ad-desc">${full.description}</p>` : ''}
@@ -774,6 +910,31 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
     ov.remove();
   };
   ov.querySelector('#adBack')?.addEventListener('click', close);
+
+  // Bookmark — save/unsave this route to Track → Routes (anyone with a map)
+  const bookmarkBtn = ov.querySelector<HTMLElement>('#adBookmark');
+  bookmarkBtn?.addEventListener('click', () => {
+    const svg = bookmarkBtn.querySelector('svg');
+    if (isRouteSaved(itemId)) {
+      unsaveRoute(itemId);
+      svg?.setAttribute('fill', 'none');
+      adToast('Removed from saved routes');
+    } else {
+      const route: SavedRoute = {
+        id: itemId, name: title, sport: full.sport,
+        distanceKm: full.distanceKm, durationSec: full.durationSec,
+        date: new Date(full.date).toISOString(), coords: routeCoords,
+      };
+      saveRoute(route);
+      svg?.setAttribute('fill', 'currentColor');
+      adToast('Saved to Track → Routes');
+    }
+  });
+
+  // Author-only options menu (visibility / hide-from-feed / delete)
+  ov.querySelector<HTMLElement>('#adMore')?.addEventListener('click', () => {
+    openActivityOptionsMenu(ov, itemId, visibility, muted, close);
+  });
 
   // Draggable bottom sheet — drag up to expand (~80%), down to reveal the map
   const sheet = ov.querySelector('.ad-sheet') as HTMLElement;

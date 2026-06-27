@@ -200,6 +200,14 @@ export async function loadEnrichedActivities() {
 export async function deleteEnrichedActivity(id) {
     await db.enrichedActivities.delete(id);
 }
+export async function updateEnrichedActivityFields(id, changes) {
+    try {
+        await db.enrichedActivities.update(id, changes);
+    }
+    catch (err) {
+        console.warn('[DB] update enriched error:', err);
+    }
+}
 // ── CRUD — profile ────────────────────────────────────────────────────────────
 export async function saveProfileToDB(profile) {
     try {

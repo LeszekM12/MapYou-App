@@ -346,6 +346,11 @@ export async function loadEnrichedActivities(): Promise<EnrichedActivity[]> {
 export async function deleteEnrichedActivity(id: string): Promise<void> {
   await db.enrichedActivities.delete(id);
 }
+
+export async function updateEnrichedActivityFields(id: string, changes: Partial<EnrichedActivity>): Promise<void> {
+  try { await db.enrichedActivities.update(id, changes as Record<string, unknown>); }
+  catch (err) { console.warn('[DB] update enriched error:', err); }
+}
 // ── CRUD — profile ────────────────────────────────────────────────────────────
 
 export async function saveProfileToDB(profile: ProfileRecord): Promise<void> {
