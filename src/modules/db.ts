@@ -93,6 +93,7 @@ export interface ReelRecord {
   mediaType:    'image' | 'video';
   publicId:     string;
   caption:      string | null;
+  activityId:   string | null;   // deep-link target: tap reel → activity details
   captionX:     number;
   captionY:     number;
   captionSize:  number;

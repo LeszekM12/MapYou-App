@@ -726,6 +726,7 @@ export async function uploadReel(
     captionSize?:  number;
     captionColor?: string;
     duration?:     number;
+    activityId?:   string | null;
   } = {},
 ): Promise<ReelRecord | null> {
   if (!file || !userId) return null;
@@ -746,6 +747,7 @@ export async function uploadReel(
       mediaType:    up.mediaType,
       publicId:     up.publicId,
       caption:      meta.caption ?? null,
+      activityId:   meta.activityId ?? null,
       captionX:     meta.captionX ?? 50,
       captionY:     meta.captionY ?? 80,
       captionSize:  meta.captionSize ?? 20,
@@ -768,6 +770,7 @@ export async function uploadReel(
           authorName: reel.authorName, avatarB64: null,
           mediaUrl: reel.mediaUrl, mediaType: reel.mediaType,
           publicId: reel.publicId, caption: reel.caption,
+          activityId: reel.activityId,
           captionX: reel.captionX, captionY: reel.captionY,
           captionSize: reel.captionSize, captionColor: reel.captionColor,
           duration: reel.duration,

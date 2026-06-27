@@ -8,7 +8,7 @@ import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import type { SportType } from './Tracker.js';
-import { generateShareImageFromEnriched } from './ShareImage.js';
+import { generateShareImageFromEnriched, composeActivityReel } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import {
   getNotifications, getUnreadCount, markAllRead, markRead, clearAll,
@@ -2023,6 +2023,35 @@ export class HomeView {
 
   // ── Reel Creator ───────────────────────────────────────────────────────────
 
+  private async _openWorkoutPicker(onPick: (act: EnrichedActivity) => void): Promise<void> {
+    const acts = (await loadEnrichedActivities()).slice(0, 50);
+    const ov = document.createElement('div');
+    ov.className = 'rwp-overlay';
+    ov.innerHTML = `
+      <div class="rwp-sheet">
+        <div class="rwp-header"><span class="rwp-title">Choose a workout</span><button class="rwp-close" id="rwpClose" aria-label="Close">✕</button></div>
+        <div class="rwp-list">${acts.length ? acts.map(a => `
+          <button class="rwp-item" data-id="${a.id}">
+            <span class="rwp-ic" style="background:${getColor(a.sport)}22;color:${getColor(a.sport)}">${getIcon(a.sport)}</span>
+            <span class="rwp-main">
+              <span class="rwp-name">${(a.name || '').replace(/^(undefined|null)\s*/i, '').trim() || getSportLabel(a.sport)}</span>
+              <span class="rwp-meta">${formatDistance(a.distanceKm)} km · ${formatDuration(a.durationSec)} · ${new Date(a.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}</span>
+            </span>
+            <span class="rwp-chev">›</span>
+          </button>`).join('') : '<p class="rwp-empty">No workouts yet — record one first</p>'}</div>
+      </div>`;
+    document.body.appendChild(ov);
+    const close = (): void => ov.remove();
+    ov.querySelector('#rwpClose')?.addEventListener('click', close);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+    ov.querySelectorAll<HTMLElement>('.rwp-item').forEach(el => el.addEventListener('click', () => {
+      const a = acts.find(x => x.id === el.dataset.id);
+      if (!a) return;
+      close();
+      onPick(a);
+    }));
+  }
+
   private async _openReelCreator(): Promise<void> {
     const overlay = document.createElement('div');
     overlay.className = 'home-reel-creator';
@@ -2042,6 +2071,10 @@ export class HomeView {
           <span>Tap to add photo or video</span>
           <input type="file" accept="image/*,video/*" id="reelFileInput" style="display:none"/>
         </label>
+        <button class="home-reel-creator__workout" id="reelFromWorkout" type="button">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+          <span>Create from a workout</span>
+        </button>
       </div>
       <!-- Right side tools — Instagram style, visible after file selected -->
       <div class="home-reel-creator__right-tools" id="reelCreatorTools" style="display:none">
@@ -2057,6 +2090,10 @@ export class HomeView {
           <span style="font-size:14px;font-weight:700;color:#fff;" id="reelSizeLabel">M</span>
           <span class="home-reel-creator__tool-lbl">Size</span>
         </button>
+        <button class="home-reel-creator__tool-btn" id="reelGridToggle" title="Alignment grid">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.6" width="20" height="20"><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+          <span class="home-reel-creator__tool-lbl">Grid</span>
+        </button>
       </div>
       <!-- Text input — shown when text tool active -->
       <input type="text" class="home-reel-creator__caption" id="reelCaption" placeholder="Type text…" maxlength="80" style="display:none"/>
@@ -2070,6 +2107,7 @@ export class HomeView {
     requestAnimationFrame(() => overlay.classList.add('home-reel-creator--visible'));
 
     let selectedFile: File | null = null;
+    let reelActivityId: string | null = null;
     let captionColor = '#ffffff';
     let captionSize  = 20;
     let isDragging   = false;
@@ -2094,14 +2132,41 @@ export class HomeView {
       if (!isVid && file.size > 10 * 1024 * 1024) { alert('Max 10 MB for photos'); return; }
       if (isVid  && file.size > 500 * 1024 * 1024) { alert('Max 500 MB for videos'); return; }
       selectedFile = file;
+      reelActivityId = null;
       const url = URL.createObjectURL(file);
       canvas.innerHTML = isVid
-        ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div>`
-        : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div>`;
+        ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__grid" id="reelGrid" hidden></div>`
+        : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__grid" id="reelGrid" hidden></div>`;
       // Reset tool overlays so ensureTools() re-creates them inside new canvas
       _palette = null; _sizeWrap = null;
       tools.style.display = 'flex';
       shareBtn.disabled = false;
+    });
+
+    // Create from a workout → compose a clean 9:16 reel and link it to the activity
+    overlay.querySelector('#reelFromWorkout')?.addEventListener('click', () => {
+      void this._openWorkoutPicker(async (actv) => {
+        canvas.innerHTML = '<div class="home-reel-creator__composing"><div class="home-loading__spinner"></div><span>Building your reel…</span></div>';
+        const prof = loadProfileFromLocal();
+        const blob = await composeActivityReel(actv, { authorName: prof.name || 'You', avatarUrl: prof.avatarB64 ?? null });
+        if (!blob) { alert('Could not build the reel — this workout has no route or stats.'); canvas.innerHTML = ''; return; }
+        const file = new File([blob], 'reel.jpg', { type: 'image/jpeg' });
+        selectedFile = file;
+        reelActivityId = actv.id;
+        const url = URL.createObjectURL(file);
+        canvas.innerHTML = `<img src="${url}" class="home-reel-creator__preview" alt="reel"/><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__grid" id="reelGrid" hidden></div>`;
+        _palette = null; _sizeWrap = null;
+        tools.style.display = 'flex';
+        shareBtn.disabled = false;
+      });
+    });
+
+    // Alignment grid toggle (rule-of-thirds + center lines)
+    overlay.querySelector('#reelGridToggle')?.addEventListener('click', () => {
+      const grid = overlay.querySelector<HTMLElement>('#reelGrid');
+      if (!grid) return;
+      grid.hidden = !grid.hidden;
+      overlay.querySelector('#reelGridToggle')?.classList.toggle('home-reel-creator__tool-btn--active', !grid.hidden);
     });
 
     // Caption drag
@@ -2232,6 +2297,7 @@ export class HomeView {
         captionY:     captionPct.y,
         captionSize,
         captionColor,
+        activityId:   reelActivityId,
       });
       if (reel) {
         overlay.classList.remove('home-reel-creator--visible');
@@ -2288,6 +2354,11 @@ export class HomeView {
             ? `<video class="home-reel-viewer__media" src="${reel.mediaUrl}" autoplay muted playsinline id="reelViewerVideo" oncontextmenu="return false"></video>`
             : `<img class="home-reel-viewer__media" src="${reel.mediaUrl}" alt="reel" oncontextmenu="return false" draggable="false"/>`}
           ${reel.caption ? `<span class="home-reel-viewer__caption" style="left:${reel.captionX}%;top:${reel.captionY}%;font-size:${reel.captionSize}px;color:${reel.captionColor}">${reel.caption}</span>` : ''}
+          ${reel.activityId ? `<button class="home-reel-viewer__activity" id="reelViewerActivity">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
+            View activity
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>` : ''}
         </div>
         <div class="home-reel-viewer__top">
           <div class="home-reel-viewer__bars">
@@ -2341,6 +2412,22 @@ export class HomeView {
 
       // Close
       overlay.querySelector('#reelViewerClose')?.addEventListener('click', closeViewer);
+
+      // View activity — deep-link from an activity reel into its details
+      overlay.querySelector('#reelViewerActivity')?.addEventListener('click', async e => {
+        e.stopPropagation();
+        const aid = reel.activityId;
+        if (!aid) return;
+        closeViewer();
+        let act = (await loadEnrichedActivities()).find(a => a.id === aid) ?? null;
+        if (!act) {
+          try {
+            const res = await fetch(`${BACKEND_URL}/enriched-activities/${encodeURIComponent(aid)}?userId=${encodeURIComponent(group.userId)}`, { cache: 'no-store' });
+            if (res.ok) { const d = await res.json() as { data?: EnrichedActivity } & EnrichedActivity; act = (d.data ?? d) as EnrichedActivity; }
+          } catch { /* ignore */ }
+        }
+        if (act) void openActivityDetail(act, act.userId === myUserId, aid);
+      });
 
       // Author click — pause reel and open profile
       overlay.querySelector('#reelViewerAuthor')?.addEventListener('click', () => {
