@@ -969,6 +969,7 @@ const userId = getUserId();
           mediaType:    r['mediaType'] as 'image' | 'video',
           publicId:     '',
           caption:      r['caption'] as string | null,
+          activityId:   (r['activityId'] as string | null) ?? null,
           captionX:     r['captionX'] as number,
           captionY:     r['captionY'] as number,
           captionSize:  r['captionSize'] as number,

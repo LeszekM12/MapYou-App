@@ -857,6 +857,7 @@ export const CS = {
                     mediaType: r['mediaType'],
                     publicId: '',
                     caption: r['caption'],
+                    activityId: r['activityId'] ?? null,
                     captionX: r['captionX'],
                     captionY: r['captionY'],
                     captionSize: r['captionSize'],

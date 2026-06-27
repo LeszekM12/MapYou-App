@@ -2508,7 +2508,7 @@ export class HomeView {
                     catch { /* ignore */ }
                 }
                 if (act)
-                    void openActivityDetail(act, act.userId === myUserId, aid);
+                    void openActivityDetail(act, group.userId === myUserId, aid);
             });
             // Author click — pause reel and open profile
             overlay.querySelector('#reelViewerAuthor')?.addEventListener('click', () => {

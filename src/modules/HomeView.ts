@@ -2426,7 +2426,7 @@ export class HomeView {
             if (res.ok) { const d = await res.json() as { data?: EnrichedActivity } & EnrichedActivity; act = (d.data ?? d) as EnrichedActivity; }
           } catch { /* ignore */ }
         }
-        if (act) void openActivityDetail(act, act.userId === myUserId, aid);
+        if (act) void openActivityDetail(act, group.userId === myUserId, aid);
       });
 
       // Author click — pause reel and open profile
