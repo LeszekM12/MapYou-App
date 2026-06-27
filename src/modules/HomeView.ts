@@ -2619,7 +2619,10 @@ export class HomeView {
       <button class="home-switcher__tab${this._homeSection === 'explore' ? ' home-switcher__tab--active' : ''}" data-sec="explore">Explore</button>
       <span class="home-switcher__dot"></span>`;
     sw.querySelectorAll<HTMLElement>('.home-switcher__tab').forEach(t =>
-      t.addEventListener('click', () => this._setSection(t.dataset.sec === 'explore' ? 'explore' : 'home')));
+      t.addEventListener('click', () => {
+        this.container?.scrollTo({ top: 0, behavior: 'smooth' });
+        this._setSection(t.dataset.sec === 'explore' ? 'explore' : 'home');
+      }));
     requestAnimationFrame(() => this._positionSwitcherDot());
     return sw;
   }
@@ -2630,11 +2633,12 @@ export class HomeView {
     const active = sw.querySelector<HTMLElement>('.home-switcher__tab--active');
     const dot    = sw.querySelector<HTMLElement>('.home-switcher__dot');
     if (!active || !dot) return;
+    dot.style.transition = '';   // restore CSS transition (drag sets it to none)
     dot.style.left = `${active.offsetLeft + active.offsetWidth / 2}px`;
   }
 
-  private _setSection(sec: 'home' | 'explore'): void {
-    if (this._homeSection === sec) return;
+  private _setSection(sec: 'home' | 'explore', fromSwipe = false): void {
+    if (this._homeSection === sec && !fromSwipe) return;
     const dir = sec === 'explore' ? -1 : 1;
     this._homeSection = sec;
 
@@ -2643,16 +2647,17 @@ export class HomeView {
       t.classList.toggle('home-switcher__tab--active', t.dataset.sec === sec));
     this._positionSwitcherDot();
 
-    // Brief slide feedback
-    const fl = document.getElementById('homeFeedList');
-    if (fl) {
-      fl.style.transition = 'transform .16s ease, opacity .16s ease';
-      fl.style.transform = `translateX(${dir * -18}px)`;
-      fl.style.opacity = '0.5';
-      requestAnimationFrame(() => {
-        fl.style.transform = `translateX(${dir * 18}px)`;
-        setTimeout(() => { fl.style.transform = ''; fl.style.opacity = '1'; }, 30);
-      });
+    if (!fromSwipe) {
+      const fl = document.getElementById('homeFeedList');
+      if (fl) {
+        fl.style.transition = 'transform .16s ease, opacity .16s ease';
+        fl.style.transform = `translateX(${dir * -18}px)`;
+        fl.style.opacity = '0.5';
+        requestAnimationFrame(() => {
+          fl.style.transform = `translateX(${dir * 18}px)`;
+          setTimeout(() => { fl.style.transform = ''; fl.style.opacity = '1'; }, 30);
+        });
+      }
     }
 
     if (sec === 'explore') {
@@ -2661,6 +2666,43 @@ export class HomeView {
     } else {
       this._repaintFeed?.(this._lastHomeFeed);
     }
+  }
+
+  private _commitSwipe(sec: 'home' | 'explore'): void {
+    const fl = document.getElementById('homeFeedList');
+    if (!fl) { this._setSection(sec, true); return; }
+    const w = fl.clientWidth || window.innerWidth;
+    const out = sec === 'explore' ? -w : w;
+    const sw = document.getElementById('homeSwitcher');
+    sw?.querySelectorAll<HTMLElement>('.home-switcher__tab').forEach(t =>
+      t.classList.toggle('home-switcher__tab--active', t.dataset.sec === sec));
+    this._positionSwitcherDot();
+    fl.style.transition = 'transform .16s ease, opacity .16s ease';
+    fl.style.transform = `translateX(${out}px)`;
+    fl.style.opacity = '0';
+    setTimeout(() => {
+      this._setSection(sec, true);                 // repaint, no built-in slide
+      fl.style.transition = 'none';
+      fl.style.transform = `translateX(${-out}px)`;
+      fl.style.opacity = '0';
+      requestAnimationFrame(() => {
+        fl.style.transition = 'transform .2s ease, opacity .2s ease';
+        fl.style.transform = '';
+        fl.style.opacity = '1';
+      });
+    }, 160);
+  }
+
+  private _dragDot(p: number): void {
+    const sw = document.getElementById('homeSwitcher'); if (!sw) return;
+    const tabs = sw.querySelectorAll<HTMLElement>('.home-switcher__tab');
+    const dot  = sw.querySelector<HTMLElement>('.home-switcher__dot');
+    if (tabs.length < 2 || !dot) return;
+    const homeC = tabs[0].offsetLeft + tabs[0].offsetWidth / 2;
+    const explC = tabs[1].offsetLeft + tabs[1].offsetWidth / 2;
+    const cl = Math.max(0, Math.min(1, p));
+    dot.style.transition = 'none';
+    dot.style.left = `${homeC + (explC - homeC) * cl}px`;
   }
 
   private _paintFeedLoading(): void {
@@ -2772,17 +2814,56 @@ export class HomeView {
   }
 
   private _setupSectionSwipe(feedList: HTMLElement): void {
-    let sx = 0, sy = 0, active = false;
+    let sx = 0, sy = 0, dx = 0, active = false, decided = false, horizontal = false;
+    const width = (): number => feedList.clientWidth || window.innerWidth || 1;
+
     feedList.addEventListener('touchstart', e => {
-      sx = e.touches[0].clientX; sy = e.touches[0].clientY; active = true;
+      if (e.touches.length !== 1) { active = false; return; }
+      sx = e.touches[0].clientX; sy = e.touches[0].clientY;
+      dx = 0; active = true; decided = false; horizontal = false;
     }, { passive: true });
-    feedList.addEventListener('touchend', e => {
+
+    feedList.addEventListener('touchmove', e => {
+      if (!active) return;
+      dx = e.touches[0].clientX - sx;
+      const dy = e.touches[0].clientY - sy;
+      if (!decided) {
+        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+          decided = true;
+          horizontal = Math.abs(dx) > Math.abs(dy) * 1.3;
+          if (horizontal) feedList.style.transition = 'none';
+        }
+      }
+      if (!horizontal) return;
+      e.preventDefault();
+      const cur = this._homeSection;
+      let d = dx;
+      if (cur === 'home' && d > 0) d *= 0.25;        // nothing left of Home
+      if (cur === 'explore' && d < 0) d *= 0.25;     // nothing right of Explore
+      const w = width();
+      const cl = Math.max(-w, Math.min(w, d));
+      feedList.style.transform = `translateX(${cl}px)`;
+      feedList.style.opacity = String(1 - Math.min(0.45, Math.abs(cl) / w * 0.6));
+      const p = cur === 'home' ? -cl / w : 1 - (cl / w);   // 0 = Home, 1 = Explore
+      this._dragDot(p);
+    }, { passive: false });
+
+    const end = (): void => {
       if (!active) return; active = false;
-      const dx = e.changedTouches[0].clientX - sx;
-      const dy = e.changedTouches[0].clientY - sy;
-      if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5) return;  // need a clear horizontal swipe
-      this._setSection(dx < 0 ? 'explore' : 'home');           // left → Explore, right → Home
-    }, { passive: true });
+      if (!horizontal) { feedList.style.transform = ''; feedList.style.opacity = '1'; return; }
+      const w = width();
+      const cur = this._homeSection;
+      const progress = dx / w;
+      if (cur === 'home' && progress < -0.28)        this._commitSwipe('explore');
+      else if (cur === 'explore' && progress > 0.28) this._commitSwipe('home');
+      else {
+        feedList.style.transition = 'transform .2s ease, opacity .2s ease';
+        feedList.style.transform = ''; feedList.style.opacity = '1';
+        this._positionSwitcherDot();
+      }
+    };
+    feedList.addEventListener('touchend', end, { passive: true });
+    feedList.addEventListener('touchcancel', end, { passive: true });
   }
 
   // ── Pull-to-refresh (app-styled) ────────────────────────────────────────────
@@ -2806,6 +2887,7 @@ export class HomeView {
       if (refreshing) return;
       pulling = scroll.scrollTop <= 0;
       startY = e.touches[0].clientY;
+      dist = 0;
     }, { passive: true });
 
     scroll.addEventListener('touchmove', e => {

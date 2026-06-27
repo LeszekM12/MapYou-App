@@ -3780,7 +3780,7 @@ body.night-mode .sv-chart-wrap {
 
 /* ── Home pull-to-refresh (app-styled spinner) ── */
 .home-ptr { position: absolute; top: 0; left: 50%; transform: translateX(-50%) translateY(0); margin-top: calc(env(safe-area-inset-top, 0px) + 6px); z-index: 60; width: 40px; height: 40px; border-radius: 50%; background: var(--app-bg-card, #1a1f23); box-shadow: 0 6px 18px rgba(0,0,0,0.28); display: flex; align-items: center; justify-content: center; opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
-.home-ptr__spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid var(--app-surface-2, rgba(255,255,255,0.18)); border-top-color: #f97316; box-sizing: border-box; }
+.home-ptr__spinner { width: 20px; height: 20px; border-radius: 50%; border: 2.5px solid var(--app-surface-2, rgba(255,255,255,0.18)); border-top-color: var(--color-brand--2, #00c46a); box-sizing: border-box; }
 .home-ptr--active .home-ptr__spinner { animation: hptrspin 0.7s linear infinite; }
 @keyframes hptrspin { to { transform: rotate(360deg); } }
 
