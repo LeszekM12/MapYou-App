@@ -2154,32 +2154,22 @@ export class HomeView {
       <!-- Right side tools — Instagram style, visible after file selected -->
       <div class="home-reel-creator__right-tools" id="reelCreatorTools" style="display:none">
         <button class="home-reel-creator__tool-btn" id="reelTextToggle" title="Add text">
-          <span style="font-size:16px;font-weight:700;color:#fff;">Aa</span>
+          <span style="font-size:17px;font-weight:800;color:#fff;">Aa</span>
           <span class="home-reel-creator__tool-lbl">Text</span>
         </button>
-        <div class="home-reel-creator__tool-btn" id="reelColorPicker" title="Color">
-          <div class="home-reel-creator__color-wheel"></div>
-          <span class="home-reel-creator__tool-lbl">Color</span>
-        </div>
-        <button class="home-reel-creator__tool-btn" id="reelSizePicker" title="Size">
-          <span style="font-size:14px;font-weight:700;color:#fff;" id="reelSizeLabel">M</span>
-          <span class="home-reel-creator__tool-lbl">Size</span>
-        </button>
-        <button class="home-reel-creator__tool-btn" id="reelFontPicker" title="Font">
-          <span style="font-size:15px;font-weight:800;color:#fff;font-family:Georgia,serif;" id="reelFontLabel">Aa</span>
-          <span class="home-reel-creator__tool-lbl">Font</span>
-        </button>
-        <button class="home-reel-creator__tool-btn" id="reelStylePicker" title="Text style">
-          <span style="font-size:14px;font-weight:800;color:#000;background:#fff;border-radius:5px;padding:1px 5px;">A</span>
-          <span class="home-reel-creator__tool-lbl">Style</span>
-        </button>
         <button class="home-reel-creator__tool-btn" id="reelStickerPicker" title="Stickers">
-          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" width="22" height="22"><path d="M15.5 3H6a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h7l8-8V6a3 3 0 0 0-3-3z"/><path d="M14 21v-4a3 3 0 0 1 3-3h4"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7" width="23" height="23"><path d="M15.5 3H6a3 3 0 0 0-3 3v12a3 3 0 0 0 3 3h7l8-8V6a3 3 0 0 0-3-3z"/><path d="M14 21v-4a3 3 0 0 1 3-3h4"/></svg>
           <span class="home-reel-creator__tool-lbl">Stickers</span>
         </button>
+        <button class="home-reel-creator__tool-btn" id="reelDrawToggle" title="Draw">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" width="22" height="22"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>
+          <span class="home-reel-creator__tool-lbl">Draw</span>
+        </button>
+        <button class="home-reel-creator__tool-btn" id="reelDownload" title="Save to device">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" width="22" height="22"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span class="home-reel-creator__tool-lbl">Save</span>
+        </button>
       </div>
-      <!-- Text input — shown when text tool active -->
-      <input type="text" class="home-reel-creator__caption" id="reelCaption" placeholder="Type text…" maxlength="80" style="display:none"/>
       <!-- Bottom bar — audience + share -->
       <div class="home-reel-creator__bottom">
         <div class="home-reel-creator__audience" id="reelAudience">
@@ -2202,25 +2192,17 @@ export class HomeView {
         let isVideoMedia = false;
         const stickers = [];
         let selectedSticker = null;
-        let captionColor = '#ffffff';
-        let captionSize = 20;
         const FONTS = [
-            { lbl: 'Aa', css: '-apple-system, system-ui, sans-serif', weight: '700' },
-            { lbl: 'Aa', css: 'Georgia, "Times New Roman", serif', weight: '700' },
-            { lbl: 'Aa', css: '"Courier New", monospace', weight: '700' },
-            { lbl: 'Aa', css: '"Trebuchet MS", "Segoe UI", sans-serif', weight: '900' },
-            { lbl: 'Aa', css: '"Brush Script MT", "Comic Sans MS", cursive', weight: '700' },
+            { lbl: 'Modern', css: '-apple-system, system-ui, sans-serif', weight: '700' },
+            { lbl: 'Classic', css: 'Georgia, "Times New Roman", serif', weight: '700' },
+            { lbl: 'Typewriter', css: '"Courier New", monospace', weight: '700' },
+            { lbl: 'Strong', css: '"Trebuchet MS", "Segoe UI", sans-serif', weight: '900' },
+            { lbl: 'Script', css: '"Brush Script MT", "Comic Sans MS", cursive', weight: '700' },
         ];
         const STYLES = ['none', 'highlight', 'neon'];
-        let captionFontIdx = 0;
-        let captionStyleIdx = 0;
-        let isDragging = false;
-        let dragStartX = 0, dragStartY = 0;
-        let captionPct = { x: 50, y: 80 };
         const canvas = overlay.querySelector('#reelCreatorCanvas');
         const tools = overlay.querySelector('#reelCreatorTools');
         const shareBtn = overlay.querySelector('#reelCreatorShare');
-        const captionEl = overlay.querySelector('#reelCaption');
         overlay.querySelector('#reelCreatorClose')?.addEventListener('click', () => {
             overlay.classList.remove('home-reel-creator--visible');
             setTimeout(() => overlay.remove(), 350);
@@ -2248,9 +2230,11 @@ export class HomeView {
             canvas.innerHTML = isVid
                 ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`
                 : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
-            // Reset tool overlays so ensureTools() re-creates them inside new canvas
-            _palette = null;
-            _sizeWrap = null;
+            stickers.length = 0;
+            selectedSticker = null;
+            renderStickers();
+            drawCanvas = null;
+            _spawnN = 0;
             tools.style.display = 'flex';
             shareBtn.disabled = false;
         });
@@ -2273,73 +2257,26 @@ export class HomeView {
                 selectedSticker = null;
                 const url = URL.createObjectURL(file);
                 canvas.innerHTML = `<img src="${url}" class="home-reel-creator__preview" alt="reel"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
-                _palette = null;
-                _sizeWrap = null;
+                drawCanvas = null;
+                _spawnN = 0;
+                renderStickers();
                 tools.style.display = 'flex';
                 shareBtn.disabled = false;
             });
         });
-        // Font cycle
-        overlay.querySelector('#reelFontPicker')?.addEventListener('click', () => {
-            captionFontIdx = (captionFontIdx + 1) % FONTS.length;
-            const lbl = overlay.querySelector('#reelFontLabel');
-            if (lbl)
-                lbl.style.fontFamily = FONTS[captionFontIdx].css;
-            updateCaptionOverlay();
-        });
-        // Text style cycle (none → highlight → neon)
-        overlay.querySelector('#reelStylePicker')?.addEventListener('click', () => {
-            captionStyleIdx = (captionStyleIdx + 1) % STYLES.length;
-            overlay.querySelector('#reelStylePicker')?.classList.toggle('home-reel-creator__tool-btn--active', STYLES[captionStyleIdx] !== 'none');
-            updateCaptionOverlay();
-        });
-        // Caption drag
-        const _captionStyleCss = (style, color) => {
+        // Shared text styling (render + bake). Plain style gets a soft shadow so
+        // white / light text stays readable on any background.
+        const _layerStyleCss = (style, color) => {
             if (style === 'highlight') {
-                const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(color.toLowerCase());
-                return `background:${color};color:${dark ? '#000' : '#fff'};padding:0.08em 0.28em;border-radius:0.18em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`;
+                const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa', '#fef08a'].includes(color.toLowerCase());
+                return `background:${color};color:${dark ? '#000' : '#fff'};padding:0.08em 0.32em;border-radius:0.16em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`;
             }
-            if (style === 'neon') {
+            if (style === 'neon')
                 return `color:#fff;text-shadow:0 0 4px ${color},0 0 12px ${color},0 0 22px ${color};`;
-            }
-            return `color:${color};`;
+            return `color:${color};text-shadow:0 1px 3px rgba(0,0,0,0.34);`;
         };
-        const updateCaptionOverlay = () => {
-            const ov = overlay.querySelector('#captionOverlay');
-            if (!ov)
-                return;
-            const text = captionEl.value;
-            const f = FONTS[captionFontIdx];
-            const styleCss = _captionStyleCss(STYLES[captionStyleIdx], captionColor);
-            ov.innerHTML = text
-                ? `<span class="home-reel-creator__caption-text" style="font-size:${captionSize}px;font-family:${f.css};font-weight:${f.weight};left:${captionPct.x}%;top:${captionPct.y}%;transform:translate(-50%,-50%);${styleCss}">${text}</span>`
-                : '';
-        };
-        captionEl.addEventListener('input', updateCaptionOverlay);
-        const isToolEl = (t) => {
-            if (!t)
-                return false;
-            const el = t;
-            return !!(el.closest('.home-reel-creator__size-slider-wrap') ||
-                el.closest('.home-reel-creator__palette') ||
-                el.closest('.home-reel-creator__right-tools') ||
-                el.closest('.home-reel-creator__caption'));
-        };
-        canvas.addEventListener('mousedown', e => {
-            if (isToolEl(e.target))
-                return;
-            isDragging = true;
-            dragStartX = e.clientX;
-            dragStartY = e.clientY;
-        });
-        canvas.addEventListener('touchstart', e => {
-            if (isToolEl(e.target))
-                return;
-            isDragging = true;
-            dragStartX = e.touches[0].clientX;
-            dragStartY = e.touches[0].clientY;
-        }, { passive: true });
-        const SNAP = 2.4; // % proximity to lock onto a guide
+        // Snap guides (shared by every draggable layer)
+        const SNAP = 2.4;
         const X_TARGETS = [50, 33.333, 66.667]; // center + thirds
         const Y_TARGETS = [50, 33.333, 66.667];
         const renderGuides = (vx, hy) => {
@@ -2352,37 +2289,7 @@ export class HomeView {
         };
         const clearGuides = () => { const g = overlay.querySelector('#reelGuides'); if (g)
             g.innerHTML = ''; };
-        const onMove = (x, y) => {
-            if (!isDragging)
-                return;
-            const rect = canvas.getBoundingClientRect();
-            let px = ((x - rect.left) / rect.width) * 100;
-            let py = ((y - rect.top) / rect.height) * 100;
-            let vGuide = null, hGuide = null;
-            for (const t of X_TARGETS) {
-                if (Math.abs(px - t) < SNAP) {
-                    px = t;
-                    vGuide = t;
-                    break;
-                }
-            }
-            for (const t of Y_TARGETS) {
-                if (Math.abs(py - t) < SNAP) {
-                    py = t;
-                    hGuide = t;
-                    break;
-                }
-            }
-            px = Math.max(4, Math.min(96, px));
-            py = Math.max(4, Math.min(96, py));
-            captionPct = { x: px, y: py };
-            updateCaptionOverlay();
-            renderGuides(vGuide, hGuide);
-        };
-        canvas.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
-        canvas.addEventListener('touchmove', e => onMove(e.touches[0].clientX, e.touches[0].clientY), { passive: true });
-        window.addEventListener('mouseup', () => { isDragging = false; clearGuides(); });
-        window.addEventListener('touchend', () => { isDragging = false; clearGuides(); });
+        window.addEventListener('pointerup', () => clearGuides());
         // ── Audience selector ──
         overlay.querySelector('#reelAudience')?.addEventListener('click', e => {
             const btn = e.target.closest('.rca-opt');
@@ -2393,6 +2300,9 @@ export class HomeView {
         });
         // ── Sticker layer engine ──
         const _dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+        const _angle = (a, b) => Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI;
+        const _esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const TEXT_BASE = 34; // px in preview space; transform scale resizes
         const stickerLabel = (s) => s.kind === 'emoji' ? s.text :
             s.kind === 'location' ? `📍 ${s.text}` :
                 s.kind === 'time' ? `🕐 ${s.text}` :
@@ -2404,7 +2314,7 @@ export class HomeView {
             const applyStyle = () => { const L = layer(); if (L) {
                 el.style.left = `${L.x}%`;
                 el.style.top = `${L.y}%`;
-                el.style.transform = `translate(-50%,-50%) scale(${L.scale})`;
+                el.style.transform = `translate(-50%,-50%) rotate(${L.rotation}deg) scale(${L.scale})`;
             } };
             el.querySelector('.rst-del')?.addEventListener('click', ev => {
                 ev.stopPropagation();
@@ -2416,6 +2326,8 @@ export class HomeView {
             });
             const pts = new Map();
             let pinchBase = null;
+            let moved = false;
+            let downX = 0, downY = 0;
             el.addEventListener('pointerdown', ev => {
                 if (ev.target.classList.contains('rst-del'))
                     return;
@@ -2428,9 +2340,15 @@ export class HomeView {
                 }
                 catch { /* ok */ }
                 pts.set(ev.pointerId, { x: ev.clientX, y: ev.clientY });
+                if (pts.size === 1) {
+                    moved = false;
+                    downX = ev.clientX;
+                    downY = ev.clientY;
+                }
                 if (pts.size === 2) {
                     const a = [...pts.values()];
-                    pinchBase = { dist: _dist(a[0], a[1]), scale: layer()?.scale ?? 1 };
+                    const L = layer();
+                    pinchBase = { dist: _dist(a[0], a[1]), scale: L?.scale ?? 1, angle: _angle(a[0], a[1]), rot: L?.rotation ?? 0 };
                 }
             });
             el.addEventListener('pointermove', ev => {
@@ -2440,9 +2358,12 @@ export class HomeView {
                 const L = layer();
                 if (!L)
                     return;
+                if (Math.hypot(ev.clientX - downX, ev.clientY - downY) > 6)
+                    moved = true;
                 if (pts.size >= 2 && pinchBase) {
                     const a = [...pts.values()];
-                    L.scale = Math.max(0.4, Math.min(3, pinchBase.scale * (_dist(a[0], a[1]) / pinchBase.dist)));
+                    L.scale = Math.max(0.4, Math.min(4, pinchBase.scale * (_dist(a[0], a[1]) / pinchBase.dist)));
+                    L.rotation = pinchBase.rot + (_angle(a[0], a[1]) - pinchBase.angle);
                     applyStyle();
                     return;
                 }
@@ -2471,9 +2392,17 @@ export class HomeView {
                 applyStyle();
                 renderGuides(vG, hG);
             });
-            const end = (ev) => { pts.delete(ev.pointerId); if (pts.size < 2)
-                pinchBase = null; if (pts.size === 0)
-                clearGuides(); };
+            const end = (ev) => {
+                pts.delete(ev.pointerId);
+                if (pts.size < 2)
+                    pinchBase = null;
+                if (pts.size === 0) {
+                    clearGuides();
+                    const L = layer();
+                    if (!moved && L && L.kind === 'text')
+                        openTextEditor(L); // tap text → edit
+                }
+            };
             el.addEventListener('pointerup', end);
             el.addEventListener('pointercancel', end);
         };
@@ -2483,19 +2412,30 @@ export class HomeView {
                 return;
             cont.innerHTML = stickers.map(s => {
                 const sel = s.id === selectedSticker ? ' rst-layer--sel' : '';
-                const inner = s.kind === 'emoji'
-                    ? `<span class="rst-emoji">${s.text}</span>`
-                    : `<span class="rst-pill">${stickerLabel(s)}</span>`;
-                return `<div class="rst-layer${sel}" data-id="${s.id}" style="left:${s.x}%;top:${s.y}%;transform:translate(-50%,-50%) scale(${s.scale})">${inner}<button class="rst-del" type="button">✕</button></div>`;
+                let inner;
+                if (s.kind === 'text') {
+                    const f = FONTS[s.fontIdx] ?? FONTS[0];
+                    const styleCss = _layerStyleCss(STYLES[s.styleIdx] ?? 'none', s.color);
+                    inner = `<span class="rst-text" style="font-size:${TEXT_BASE}px;font-family:${f.css};font-weight:${f.weight};text-align:${s.align};${styleCss}">${_esc(s.text).replace(/\n/g, '<br>')}</span>`;
+                }
+                else if (s.kind === 'emoji') {
+                    inner = `<span class="rst-emoji">${s.text}</span>`;
+                }
+                else {
+                    inner = `<span class="rst-pill">${stickerLabel(s)}</span>`;
+                }
+                return `<div class="rst-layer${sel}" data-id="${s.id}" style="left:${s.x}%;top:${s.y}%;transform:translate(-50%,-50%) rotate(${s.rotation}deg) scale(${s.scale})">${inner}<button class="rst-del" type="button">✕</button></div>`;
             }).join('');
             cont.querySelectorAll('.rst-layer').forEach(el => wireSticker(el));
         };
+        let _spawnN = 0;
         const addSticker = (kind, text) => {
             const t = text.trim();
             if (!t)
                 return;
             const id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
-            stickers.push({ id, kind, text: t, x: 50, y: 45, scale: 1 });
+            const y = 30 + ((_spawnN++ % 4) * 10); // stagger so new layers don't cover existing ones
+            stickers.push({ id, kind, text: t, x: 50, y, scale: 1, rotation: 0, color: '#ffffff', fontIdx: 0, styleIdx: 0, align: 'center' });
             selectedSticker = id;
             renderStickers();
         };
@@ -2575,51 +2515,69 @@ export class HomeView {
             const dw = img.width * sc, dh = img.height * sc;
             ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
             const pxScale = W / canvas.getBoundingClientRect().width;
-            // caption
-            const capText = captionEl.value.trim();
-            if (capText) {
-                const f = FONTS[captionFontIdx];
-                const fs = captionSize * pxScale;
-                ctx.font = `${f.weight} ${fs}px ${f.css}`;
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                const x = captionPct.x / 100 * W, y = captionPct.y / 100 * H;
-                const st = STYLES[captionStyleIdx];
-                const w = ctx.measureText(capText).width;
-                if (st === 'highlight') {
-                    const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(captionColor.toLowerCase());
-                    const padX = fs * 0.28, padY = fs * 0.16;
-                    _rr(ctx, x - w / 2 - padX, y - fs / 2 - padY, w + padX * 2, fs + padY * 2, fs * 0.2);
-                    ctx.fillStyle = captionColor;
-                    ctx.fill();
-                    ctx.fillStyle = dark ? '#000' : '#fff';
-                    ctx.fillText(capText, x, y);
-                }
-                else if (st === 'neon') {
-                    ctx.save();
-                    ctx.shadowColor = captionColor;
-                    ctx.shadowBlur = fs * 0.55;
-                    ctx.fillStyle = '#fff';
-                    ctx.fillText(capText, x, y);
-                    ctx.fillText(capText, x, y);
-                    ctx.restore();
-                }
-                else {
-                    ctx.fillStyle = captionColor;
-                    ctx.fillText(capText, x, y);
-                }
-            }
-            // stickers
+            // brush drawing sits under text & stickers
+            if (drawCanvas && drawCanvas.width > 0)
+                ctx.drawImage(drawCanvas, 0, 0, W, H);
+            // layers (text + stickers), honouring rotation & scale
             for (const s of stickers) {
                 const x = s.x / 100 * W, y = s.y / 100 * H;
+                ctx.save();
+                ctx.translate(x, y);
+                if (s.rotation)
+                    ctx.rotate(s.rotation * Math.PI / 180);
                 if (s.kind === 'emoji') {
                     const fs = 64 * pxScale * s.scale;
                     ctx.font = `${fs}px system-ui`;
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText(s.text, x, y);
+                    ctx.fillText(s.text, 0, 0);
+                    ctx.restore();
                     continue;
                 }
+                if (s.kind === 'text') {
+                    const f = FONTS[s.fontIdx] ?? FONTS[0];
+                    const fs = TEXT_BASE * pxScale * s.scale;
+                    ctx.font = `${f.weight} ${fs}px ${f.css}`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    const lines = s.text.split('\n');
+                    const lh = fs * 1.18;
+                    const st = STYLES[s.styleIdx] ?? 'none';
+                    lines.forEach((ln, i) => {
+                        const ly = (i - (lines.length - 1) / 2) * lh;
+                        const w = ctx.measureText(ln).width;
+                        if (st === 'highlight') {
+                            const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(s.color.toLowerCase());
+                            const padX = fs * 0.3, padY = fs * 0.14;
+                            _rr(ctx, -w / 2 - padX, ly - fs / 2 - padY, w + padX * 2, fs + padY * 2, fs * 0.18);
+                            ctx.fillStyle = s.color;
+                            ctx.fill();
+                            ctx.fillStyle = dark ? '#000' : '#fff';
+                            ctx.fillText(ln, 0, ly);
+                        }
+                        else if (st === 'neon') {
+                            ctx.save();
+                            ctx.shadowColor = s.color;
+                            ctx.shadowBlur = fs * 0.55;
+                            ctx.fillStyle = '#fff';
+                            ctx.fillText(ln, 0, ly);
+                            ctx.fillText(ln, 0, ly);
+                            ctx.restore();
+                        }
+                        else {
+                            ctx.save();
+                            ctx.shadowColor = 'rgba(0,0,0,0.34)';
+                            ctx.shadowBlur = fs * 0.12;
+                            ctx.shadowOffsetY = fs * 0.04;
+                            ctx.fillStyle = s.color;
+                            ctx.fillText(ln, 0, ly);
+                            ctx.restore();
+                        }
+                    });
+                    ctx.restore();
+                    continue;
+                }
+                // pills (location / time / hashtag / mention)
                 const label = stickerLabel(s);
                 const fs = 30 * pxScale * s.scale;
                 ctx.font = `700 ${fs}px system-ui`;
@@ -2632,92 +2590,191 @@ export class HomeView {
                 ctx.shadowColor = 'rgba(0,0,0,0.18)';
                 ctx.shadowBlur = 14 * pxScale;
                 ctx.shadowOffsetY = 4 * pxScale;
-                _rr(ctx, x - bw / 2, y - bh / 2, bw, bh, bh / 2);
+                _rr(ctx, -bw / 2, -bh / 2, bw, bh, bh / 2);
                 ctx.fillStyle = '#ffffff';
                 ctx.fill();
                 ctx.restore();
                 ctx.fillStyle = '#16181c';
-                ctx.fillText(label, x - bw / 2 + padX, y);
+                ctx.fillText(label, -bw / 2 + padX, 0);
+                ctx.restore();
             }
             const blob = await new Promise(r => c.toBlob(b => r(b), 'image/jpeg', 0.92));
             return blob ? new File([blob], 'reel.jpg', { type: 'image/jpeg' }) : null;
         };
-        // Colors
-        overlay.querySelectorAll('.home-reel-creator__color-btn').forEach(btn => {
-            btn.addEventListener('click', () => {
-                captionColor = btn.dataset.color ?? '#ffffff';
-                updateCaptionOverlay();
-            });
-        });
-        // Sizes
-        overlay.querySelectorAll('.home-reel-creator__sizes button').forEach(btn => {
-            btn.addEventListener('click', () => {
-                overlay.querySelectorAll('.home-reel-creator__sizes button').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                captionSize = Number(btn.dataset.size ?? 20);
-                updateCaptionOverlay();
-            });
-        });
-        // Share
-        // Show caption input when text tool clicked
-        overlay.querySelector('#reelTextToggle')?.addEventListener('click', () => {
-            const cap = overlay.querySelector('#reelCaption');
-            cap.style.display = cap.style.display === 'none' ? 'block' : 'none';
-            if (cap.style.display === 'block')
-                cap.focus();
-        });
-        // Color & size tools — lazy init after file pick to survive canvas.innerHTML reset
-        const COLORS = ['#ffffff', '#000000', '#ff3b30', '#ff9500', '#ffcc00', '#00c46a', '#007aff', '#af52de', '#ff2d55', '#5ac8fa'];
-        let _palette = null;
-        let _sizeWrap = null;
-        const ensureTools = () => {
-            if (_palette)
-                return;
-            _palette = document.createElement('div');
-            _palette.className = 'home-reel-creator__palette';
-            _palette.style.display = 'none';
-            _palette.innerHTML = COLORS.map(c => `<button class="home-reel-creator__color-swatch" data-color="${c}" style="background:${c}"></button>`).join('');
-            canvas.appendChild(_palette);
-            _palette.addEventListener('click', e => {
-                const btn = e.target.closest('[data-color]');
-                if (!btn)
+        // ── Instagram-style text editor (tap "Aa" or tap a text layer) ──
+        const PRESET_COLORS = ['#ffffff', '#000000', '#ff3b30', '#ff9500', '#ffcc00', '#00c46a', '#00b8d4', '#007aff', '#af52de', '#ff2d55'];
+        const addTextLayer = (t) => {
+            const id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
+            stickers.push({ id, kind: 'text', text: t.text, x: 50, y: 42, scale: 1, rotation: 0, color: t.color, fontIdx: t.fontIdx, styleIdx: t.styleIdx, align: t.align });
+            selectedSticker = id;
+            renderStickers();
+        };
+        const openTextEditor = (existing) => {
+            const draft = existing
+                ? { text: existing.text, color: existing.color, fontIdx: existing.fontIdx, styleIdx: existing.styleIdx, align: existing.align }
+                : { text: '', color: '#ffffff', fontIdx: 0, styleIdx: 0, align: 'center' };
+            const ed = document.createElement('div');
+            ed.className = 'rte-overlay';
+            ed.innerHTML = `
+        <div class="rte-top">
+          <button class="rte-btn" id="rteCancel" type="button">Cancel</button>
+          <div class="rte-top-tools">
+            <button class="rte-icn" id="rteAlign" title="Align">≡</button>
+            <button class="rte-icn" id="rteStyle" title="Style">A</button>
+          </div>
+          <button class="rte-btn rte-btn--done" id="rteDone" type="button">Done</button>
+        </div>
+        <div class="rte-stage"><div class="rte-input" id="rteInput" contenteditable="true" role="textbox" aria-label="Text"></div></div>
+        <div class="rte-fonts" id="rteFonts">${FONTS.map((f, i) => `<button class="rte-font${i === draft.fontIdx ? ' rte-font--on' : ''}" data-f="${i}" style="font-family:${f.css};font-weight:${f.weight}">${f.lbl}</button>`).join('')}</div>
+        <div class="rte-palette" id="rtePalette">
+          <div class="rte-hue" id="rteHue"></div>
+          <div class="rte-presets">${PRESET_COLORS.map(c => `<button class="rte-swatch" data-c="${c}" style="background:${c}"></button>`).join('')}</div>
+        </div>`;
+            document.body.appendChild(ed);
+            const input = ed.querySelector('#rteInput');
+            input.innerText = draft.text;
+            const applyPreview = () => {
+                const f = FONTS[draft.fontIdx];
+                input.style.fontFamily = f.css;
+                input.style.fontWeight = f.weight;
+                input.style.textAlign = draft.align;
+                const st = STYLES[draft.styleIdx];
+                input.style.background = 'transparent';
+                input.style.textShadow = '';
+                input.style.padding = '0';
+                if (st === 'highlight') {
+                    const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(draft.color.toLowerCase());
+                    input.style.background = draft.color;
+                    input.style.color = dark ? '#000' : '#fff';
+                    input.style.padding = '2px 10px';
+                    input.style.borderRadius = '8px';
+                }
+                else if (st === 'neon') {
+                    input.style.color = '#fff';
+                    input.style.textShadow = `0 0 4px ${draft.color},0 0 14px ${draft.color}`;
+                }
+                else {
+                    input.style.color = draft.color;
+                    input.style.textShadow = '0 1px 4px rgba(0,0,0,0.4)';
+                }
+                ed.querySelectorAll('.rte-font').forEach(b => b.classList.toggle('rte-font--on', Number(b.dataset.f) === draft.fontIdx));
+            };
+            applyPreview();
+            setTimeout(() => { input.focus(); const r = document.createRange(); r.selectNodeContents(input); r.collapse(false); const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }, 60);
+            ed.querySelectorAll('.rte-font').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); draft.fontIdx = Number(b.dataset.f); applyPreview(); }));
+            ed.querySelectorAll('.rte-swatch').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); draft.color = b.dataset.c ?? '#ffffff'; applyPreview(); }));
+            const hue = ed.querySelector('#rteHue');
+            const pickHue = (clientX) => { const r = hue.getBoundingClientRect(); const t = Math.max(0, Math.min(1, (clientX - r.left) / r.width)); draft.color = `hsl(${Math.round(t * 360)}, 85%, 55%)`; applyPreview(); };
+            let hueDown = false;
+            hue.addEventListener('pointerdown', e => { hueDown = true; pickHue(e.clientX); });
+            hue.addEventListener('pointermove', e => { if (hueDown)
+                pickHue(e.clientX); });
+            window.addEventListener('pointerup', () => { hueDown = false; });
+            ed.querySelector('#rteAlign')?.addEventListener('pointerdown', e => { e.preventDefault(); draft.align = draft.align === 'center' ? 'left' : draft.align === 'left' ? 'right' : 'center'; applyPreview(); });
+            ed.querySelector('#rteStyle')?.addEventListener('pointerdown', e => { e.preventDefault(); draft.styleIdx = (draft.styleIdx + 1) % STYLES.length; applyPreview(); });
+            ed.querySelector('#rteCancel')?.addEventListener('click', () => ed.remove());
+            ed.querySelector('#rteDone')?.addEventListener('click', () => {
+                const text = (input.innerText ?? '').trim();
+                ed.remove();
+                if (!text) {
+                    if (existing) {
+                        const i = stickers.findIndex(s => s.id === existing.id);
+                        if (i >= 0)
+                            stickers.splice(i, 1);
+                        selectedSticker = null;
+                        renderStickers();
+                    }
                     return;
-                captionColor = btn.dataset.color ?? '#ffffff';
-                const wheel = overlay.querySelector('.home-reel-creator__color-wheel');
-                if (wheel)
-                    wheel.style.background = captionColor;
-                updateCaptionOverlay();
-                _palette.style.display = 'none';
-            });
-            _sizeWrap = document.createElement('div');
-            _sizeWrap.className = 'home-reel-creator__size-slider-wrap';
-            _sizeWrap.style.display = 'none';
-            _sizeWrap.innerHTML = `
-        <input type="range" min="12" max="48" value="${captionSize}" step="1" class="home-reel-creator__size-slider"/>
-        <span class="home-reel-creator__size-val">${captionSize}px</span>`;
-            canvas.appendChild(_sizeWrap);
-            _sizeWrap.querySelector('input')?.addEventListener('input', e => {
-                captionSize = Number(e.target.value);
-                const val = _sizeWrap.querySelector('.home-reel-creator__size-val');
-                if (val)
-                    val.textContent = `${captionSize}px`;
-                const lbl = overlay.querySelector('#reelSizeLabel');
-                if (lbl)
-                    lbl.textContent = String(captionSize);
-                updateCaptionOverlay();
+                }
+                if (existing) {
+                    existing.text = text;
+                    existing.color = draft.color;
+                    existing.fontIdx = draft.fontIdx;
+                    existing.styleIdx = draft.styleIdx;
+                    existing.align = draft.align;
+                    selectedSticker = existing.id;
+                    renderStickers();
+                }
+                else
+                    addTextLayer({ ...draft, text });
             });
         };
-        overlay.querySelector('#reelColorPicker')?.addEventListener('click', () => {
-            ensureTools();
-            const isOpen = _palette.style.display !== 'none';
-            _palette.style.display = isOpen ? 'none' : 'flex';
-            _sizeWrap.style.display = 'none';
+        overlay.querySelector('#reelTextToggle')?.addEventListener('click', () => { if (selectedFile)
+            openTextEditor(); });
+        // ── Draw (brush over the media, baked at share) ──
+        let drawCanvas = null;
+        let drawColor = '#ff3b30';
+        let drawSize = 8;
+        let drawNeon = false;
+        const ensureDrawCanvas = () => {
+            if (drawCanvas && drawCanvas.isConnected)
+                return drawCanvas;
+            const rect = canvas.getBoundingClientRect();
+            drawCanvas = document.createElement('canvas');
+            drawCanvas.className = 'home-reel-creator__draw';
+            drawCanvas.width = Math.round(rect.width);
+            drawCanvas.height = Math.round(rect.height);
+            canvas.appendChild(drawCanvas);
+            return drawCanvas;
+        };
+        overlay.querySelector('#reelDrawToggle')?.addEventListener('click', () => {
+            if (!selectedFile)
+                return;
+            if (isVideoMedia) {
+                adToast('Draw works on photos & workout reels');
+                return;
+            }
+            const dc = ensureDrawCanvas();
+            if (!dc)
+                return;
+            dc.classList.add('home-reel-creator__draw--active');
+            const dctx = dc.getContext('2d');
+            let drawing = false;
+            const pos = (e) => { const r = dc.getBoundingClientRect(); return { x: (e.clientX - r.left) * (dc.width / r.width), y: (e.clientY - r.top) * (dc.height / r.height) }; };
+            const down = (e) => { drawing = true; const p = pos(e); dctx.beginPath(); dctx.moveTo(p.x, p.y); dctx.lineCap = 'round'; dctx.lineJoin = 'round'; };
+            const move = (e) => { if (!drawing)
+                return; const p = pos(e); dctx.strokeStyle = drawColor; dctx.lineWidth = drawSize; dctx.shadowColor = drawNeon ? drawColor : 'transparent'; dctx.shadowBlur = drawNeon ? drawSize * 1.6 : 0; dctx.lineTo(p.x, p.y); dctx.stroke(); };
+            const up = () => { drawing = false; };
+            dc.addEventListener('pointerdown', down);
+            dc.addEventListener('pointermove', move);
+            window.addEventListener('pointerup', up);
+            // draw toolbar
+            const bar = document.createElement('div');
+            bar.className = 'rdraw-bar';
+            bar.innerHTML = `
+        ${PRESET_COLORS.slice(0, 8).map(c => `<button class="rdraw-c" data-c="${c}" style="background:${c}"></button>`).join('')}
+        <button class="rdraw-x" id="rdrawNeon" title="Neon">✨</button>
+        <button class="rdraw-x" id="rdrawErase" title="Erase">⌫</button>
+        <button class="rdraw-done" id="rdrawDone">Done</button>`;
+            overlay.appendChild(bar);
+            bar.querySelectorAll('.rdraw-c').forEach(b => b.addEventListener('click', () => { drawColor = b.dataset.c ?? '#ff3b30'; drawNeon = false; bar.querySelector('#rdrawNeon')?.classList.remove('rdraw-x--on'); }));
+            bar.querySelector('#rdrawNeon')?.addEventListener('click', () => { drawNeon = !drawNeon; bar.querySelector('#rdrawNeon')?.classList.toggle('rdraw-x--on', drawNeon); });
+            bar.querySelector('#rdrawErase')?.addEventListener('click', () => dctx.clearRect(0, 0, dc.width, dc.height));
+            bar.querySelector('#rdrawDone')?.addEventListener('click', () => {
+                dc.classList.remove('home-reel-creator__draw--active');
+                dc.removeEventListener('pointerdown', down);
+                dc.removeEventListener('pointermove', move);
+                window.removeEventListener('pointerup', up);
+                bar.remove();
+            });
         });
-        overlay.querySelector('#reelSizePicker')?.addEventListener('click', () => {
-            ensureTools();
-            const isOpen = _sizeWrap.style.display !== 'none';
-            _sizeWrap.style.display = isOpen ? 'none' : 'flex';
-            _palette.style.display = 'none';
+        // ── Save to device (flatten and download) ──
+        overlay.querySelector('#reelDownload')?.addEventListener('click', async () => {
+            if (!selectedFile)
+                return;
+            if (isVideoMedia) {
+                adToast('Saving works on photos & workout reels');
+                return;
+            }
+            const baked = await bakeFlat();
+            const out = baked ?? selectedFile;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(out);
+            a.download = 'mapyou-reel.jpg';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            adToast('Saved to your device');
         });
         shareBtn.addEventListener('click', async () => {
             if (!selectedFile)
@@ -2725,26 +2782,35 @@ export class HomeView {
             shareBtn.disabled = true;
             shareBtn.textContent = 'Uploading…';
             const myUserId = localStorage.getItem('mapyou_userId_profile') ?? '';
-            // Flatten caption + stickers into the image (photos & workout reels).
-            // Video can't be baked in-browser → keep caption as a metadata overlay.
+            // Photos & workout reels: flatten every layer (text, stickers, drawing) into the image.
+            // Video can't be baked in-browser → keep the first text layer as a metadata overlay.
             let fileToUpload = selectedFile;
-            let captionMeta = captionEl.value || null;
-            if (!isVideoMedia && (captionMeta || stickers.length > 0)) {
+            let captionMeta = null;
+            let cMeta = { x: 50, y: 80, size: 20, color: '#ffffff', font: FONTS[0].css, weight: FONTS[0].weight, style: 'none' };
+            const hasOverlays = stickers.length > 0 || (!!drawCanvas && drawCanvas.width > 0);
+            if (!isVideoMedia && hasOverlays) {
                 const baked = await bakeFlat();
-                if (baked) {
+                if (baked)
                     fileToUpload = baked;
-                    captionMeta = null;
+            }
+            else if (isVideoMedia) {
+                const tl = stickers.find(s => s.kind === 'text');
+                if (tl) {
+                    captionMeta = tl.text;
+                    cMeta = { x: tl.x, y: tl.y, size: Math.round(34 * tl.scale), color: tl.color, font: FONTS[tl.fontIdx].css, weight: FONTS[tl.fontIdx].weight, style: STYLES[tl.styleIdx] };
                 }
+                if (stickers.some(s => s.kind !== 'text'))
+                    adToast('Stickers aren\u2019t saved on videos yet');
             }
             const reel = await uploadReel(fileToUpload, myUserId, {
                 caption: captionMeta,
-                captionX: captionPct.x,
-                captionY: captionPct.y,
-                captionSize,
-                captionColor,
-                captionFont: FONTS[captionFontIdx].css,
-                captionWeight: FONTS[captionFontIdx].weight,
-                captionStyle: STYLES[captionStyleIdx],
+                captionX: cMeta.x,
+                captionY: cMeta.y,
+                captionSize: cMeta.size,
+                captionColor: cMeta.color,
+                captionFont: cMeta.font,
+                captionWeight: cMeta.weight,
+                captionStyle: cMeta.style,
                 activityId: reelActivityId,
                 audience,
             });
