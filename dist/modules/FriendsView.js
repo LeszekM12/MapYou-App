@@ -117,22 +117,7 @@ export class FriendsView {
                 }
             }
             if (e.data?.type === 'OPEN_REELS') {
-                const url = e.data.url;
-                const match = url.match(/reels=([^&]+)/);
-                const userId = match ? decodeURIComponent(match[1]) : null;
-                if (userId) {
-                    void (async () => {
-                        const { openReelViewer } = await import('./HomeView.js');
-                        if (!openReelViewer)
-                            return;
-                        const BACKEND_URL = (await import('../config.js')).BACKEND_URL;
-                        const res = await fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-                        const d = await res.json();
-                        const group = d.data?.find(g => g.userId === userId);
-                        if (group)
-                            openReelViewer(group, () => { });
-                    })();
-                }
+                // Handled globally at boot in main.ts (setupReelsDeepLink) for instant open.
             }
         });
     }

@@ -26,7 +26,7 @@ import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendW
 import { Tracker, formatDuration, formatPace, formatDistance, isTrackable, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
 import { getSavedRoutes, saveRoute, unsaveRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.js';
-import { homeView } from './modules/HomeView.js';
+import { homeView, openReelViewer } from './modules/HomeView.js';
 import { statsView } from './modules/StatsView.js';
 import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified } from './modules/UnifiedWorkout.js';
@@ -3968,4 +3968,37 @@ setTimeout(() => {
 }, 3000);
 // ─── Hydratacja — pobierz dane z Atlas do IndexedDB jeśli puste ──────────────
 void CS.hydrate();
+// ─── Reels deep-link (tap powiadomienia) — obsługa od razu przy starcie, ──────
+//     niezależnie od FriendsView, żeby reel otwierał się natychmiast ───────────
+(function setupReelsDeepLink() {
+    const parseId = (s) => { const m = s.match(/reels=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
+    const openFor = async (userId) => {
+        if (document.querySelector('.home-reel-viewer'))
+            return; // już otwarty
+        try {
+            const res = await fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+            const d = await res.json();
+            const group = d.data?.find(g => g.userId === userId) ?? d.data?.[0];
+            if (group)
+                openReelViewer(group, () => { });
+        }
+        catch { /* ignore */ }
+    };
+    const fromUrl = parseId(location.search) ?? parseId(location.hash);
+    if (fromUrl) {
+        void openFor(fromUrl);
+        try {
+            history.replaceState(null, '', location.pathname);
+        }
+        catch { /* ignore */ }
+    }
+    navigator.serviceWorker?.addEventListener('message', e => {
+        const data = e.data;
+        if (data?.type === 'OPEN_REELS') {
+            const id = parseId(String(data.url ?? ''));
+            if (id)
+                void openFor(id);
+        }
+    });
+})();
 //# sourceMappingURL=main.js.map

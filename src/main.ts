@@ -36,7 +36,7 @@ import { Tracker, type SportType, type ActivityRecord, formatDuration, formatPac
 import { getSavedRoutes, saveRoute, unsaveRoute, type SavedRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
 import { saveActivity } from './modules/db.js';
-import { homeView } from './modules/HomeView.js';
+import { homeView, openReelViewer } from './modules/HomeView.js';
 import { statsView } from './modules/StatsView.js';
 import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified, saveUnifiedWorkout } from './modules/UnifiedWorkout.js';
@@ -3686,3 +3686,27 @@ setTimeout(() => {
 
 // ─── Hydratacja — pobierz dane z Atlas do IndexedDB jeśli puste ──────────────
 void CS.hydrate();
+
+// ─── Reels deep-link (tap powiadomienia) — obsługa od razu przy starcie, ──────
+//     niezależnie od FriendsView, żeby reel otwierał się natychmiast ───────────
+(function setupReelsDeepLink(): void {
+  const parseId = (s: string): string | null => { const m = s.match(/reels=([^&]+)/); return m ? decodeURIComponent(m[1]) : null; };
+  const openFor = async (userId: string): Promise<void> => {
+    if (document.querySelector('.home-reel-viewer')) return; // już otwarty
+    try {
+      const res = await fetch(`${BACKEND_URL}/reels/feed?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+      const d = await res.json() as { data?: { userId: string; reels: unknown[] }[] };
+      const group = d.data?.find(g => g.userId === userId) ?? d.data?.[0];
+      if (group) openReelViewer(group as never, () => { /* noop */ });
+    } catch { /* ignore */ }
+  };
+  const fromUrl = parseId(location.search) ?? parseId(location.hash);
+  if (fromUrl) {
+    void openFor(fromUrl);
+    try { history.replaceState(null, '', location.pathname); } catch { /* ignore */ }
+  }
+  navigator.serviceWorker?.addEventListener('message', e => {
+    const data = (e as MessageEvent).data as { type?: string; url?: string } | undefined;
+    if (data?.type === 'OPEN_REELS') { const id = parseId(String(data.url ?? '')); if (id) void openFor(id); }
+  });
+})();

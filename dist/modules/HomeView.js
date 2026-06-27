@@ -65,6 +65,27 @@ function broadcastLike(id, liked, count) {
         el.closest('.home-card__action')?.classList.toggle('home-card__action--liked', liked);
     });
 }
+// Local liked-reels cache so a like shows instantly on re-entry, before the
+// feed re-fetch catches up with the server.
+function getLikedReels() {
+    try {
+        return new Set(JSON.parse(localStorage.getItem('mapyou_liked_reels') ?? '[]'));
+    }
+    catch {
+        return new Set();
+    }
+}
+function setReelLiked(id, liked) {
+    const s = getLikedReels();
+    if (liked)
+        s.add(id);
+    else
+        s.delete(id);
+    try {
+        localStorage.setItem('mapyou_liked_reels', JSON.stringify([...s]));
+    }
+    catch { /* ignore */ }
+}
 function openCommentPanel(card, actId) {
     card.querySelector('.home-card__comment-panel')?.remove();
     const panel = document.createElement('div');
@@ -2538,30 +2559,33 @@ export class HomeView {
                     const f = FONTS[s.fontIdx] ?? FONTS[0];
                     const fs = TEXT_BASE * pxScale * s.scale;
                     ctx.font = `${f.weight} ${fs}px ${f.css}`;
-                    ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     const lines = s.text.split('\n');
                     const lh = fs * 1.18;
                     const st = STYLES[s.styleIdx] ?? 'none';
+                    const maxW = Math.max(...lines.map(l => ctx.measureText(l).width), 1);
+                    const anchorX = s.align === 'left' ? -maxW / 2 : s.align === 'right' ? maxW / 2 : 0;
+                    ctx.textAlign = s.align === 'left' ? 'left' : s.align === 'right' ? 'right' : 'center';
                     lines.forEach((ln, i) => {
                         const ly = (i - (lines.length - 1) / 2) * lh;
                         const w = ctx.measureText(ln).width;
+                        const lineLeft = s.align === 'left' ? anchorX : s.align === 'right' ? anchorX - w : -w / 2;
                         if (st === 'highlight') {
                             const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(s.color.toLowerCase());
                             const padX = fs * 0.3, padY = fs * 0.14;
-                            _rr(ctx, -w / 2 - padX, ly - fs / 2 - padY, w + padX * 2, fs + padY * 2, fs * 0.18);
+                            _rr(ctx, lineLeft - padX, ly - fs / 2 - padY, w + padX * 2, fs + padY * 2, fs * 0.18);
                             ctx.fillStyle = s.color;
                             ctx.fill();
                             ctx.fillStyle = dark ? '#000' : '#fff';
-                            ctx.fillText(ln, 0, ly);
+                            ctx.fillText(ln, anchorX, ly);
                         }
                         else if (st === 'neon') {
                             ctx.save();
                             ctx.shadowColor = s.color;
                             ctx.shadowBlur = fs * 0.55;
                             ctx.fillStyle = '#fff';
-                            ctx.fillText(ln, 0, ly);
-                            ctx.fillText(ln, 0, ly);
+                            ctx.fillText(ln, anchorX, ly);
+                            ctx.fillText(ln, anchorX, ly);
                             ctx.restore();
                         }
                         else {
@@ -2570,7 +2594,7 @@ export class HomeView {
                             ctx.shadowBlur = fs * 0.12;
                             ctx.shadowOffsetY = fs * 0.04;
                             ctx.fillStyle = s.color;
-                            ctx.fillText(ln, 0, ly);
+                            ctx.fillText(ln, anchorX, ly);
                             ctx.restore();
                         }
                     });
@@ -2605,14 +2629,14 @@ export class HomeView {
         const PRESET_COLORS = ['#ffffff', '#000000', '#ff3b30', '#ff9500', '#ffcc00', '#00c46a', '#00b8d4', '#007aff', '#af52de', '#ff2d55'];
         const addTextLayer = (t) => {
             const id = `s_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
-            stickers.push({ id, kind: 'text', text: t.text, x: 50, y: 42, scale: 1, rotation: 0, color: t.color, fontIdx: t.fontIdx, styleIdx: t.styleIdx, align: t.align });
+            stickers.push({ id, kind: 'text', text: t.text, x: 50, y: 42, scale: t.scale, rotation: 0, color: t.color, fontIdx: t.fontIdx, styleIdx: t.styleIdx, align: t.align });
             selectedSticker = id;
             renderStickers();
         };
         const openTextEditor = (existing) => {
             const draft = existing
-                ? { text: existing.text, color: existing.color, fontIdx: existing.fontIdx, styleIdx: existing.styleIdx, align: existing.align }
-                : { text: '', color: '#ffffff', fontIdx: 0, styleIdx: 0, align: 'center' };
+                ? { text: existing.text, color: existing.color, fontIdx: existing.fontIdx, styleIdx: existing.styleIdx, align: existing.align, scale: existing.scale }
+                : { text: '', color: '#ffffff', fontIdx: 0, styleIdx: 0, align: 'center', scale: 1 };
             const ed = document.createElement('div');
             ed.className = 'rte-overlay';
             ed.innerHTML = `
@@ -2624,7 +2648,7 @@ export class HomeView {
           </div>
           <button class="rte-btn rte-btn--done" id="rteDone" type="button">Done</button>
         </div>
-        <div class="rte-stage"><div class="rte-input" id="rteInput" contenteditable="true" role="textbox" aria-label="Text"></div></div>
+        <div class="rte-stage"><input type="range" class="rte-size" id="rteSize" min="0.5" max="3" step="0.05" value="${draft.scale}"/><div class="rte-input" id="rteInput" contenteditable="true" role="textbox" aria-label="Text"></div></div>
         <div class="rte-fonts" id="rteFonts">${FONTS.map((f, i) => `<button class="rte-font${i === draft.fontIdx ? ' rte-font--on' : ''}" data-f="${i}" style="font-family:${f.css};font-weight:${f.weight}">${f.lbl}</button>`).join('')}</div>
         <div class="rte-palette" id="rtePalette">
           <div class="rte-hue" id="rteHue"></div>
@@ -2638,6 +2662,7 @@ export class HomeView {
                 input.style.fontFamily = f.css;
                 input.style.fontWeight = f.weight;
                 input.style.textAlign = draft.align;
+                input.style.fontSize = `${Math.round(30 * draft.scale)}px`;
                 const st = STYLES[draft.styleIdx];
                 input.style.background = 'transparent';
                 input.style.textShadow = '';
@@ -2663,6 +2688,8 @@ export class HomeView {
             setTimeout(() => { input.focus(); const r = document.createRange(); r.selectNodeContents(input); r.collapse(false); const sel = window.getSelection(); sel?.removeAllRanges(); sel?.addRange(r); }, 60);
             ed.querySelectorAll('.rte-font').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); draft.fontIdx = Number(b.dataset.f); applyPreview(); }));
             ed.querySelectorAll('.rte-swatch').forEach(b => b.addEventListener('pointerdown', e => { e.preventDefault(); draft.color = b.dataset.c ?? '#ffffff'; applyPreview(); }));
+            const sizeEl = ed.querySelector('#rteSize');
+            sizeEl?.addEventListener('input', () => { draft.scale = Number(sizeEl.value); applyPreview(); });
             const hue = ed.querySelector('#rteHue');
             const pickHue = (clientX) => { const r = hue.getBoundingClientRect(); const t = Math.max(0, Math.min(1, (clientX - r.left) / r.width)); draft.color = `hsl(${Math.round(t * 360)}, 85%, 55%)`; applyPreview(); };
             let hueDown = false;
@@ -2692,6 +2719,7 @@ export class HomeView {
                     existing.fontIdx = draft.fontIdx;
                     existing.styleIdx = draft.styleIdx;
                     existing.align = draft.align;
+                    existing.scale = draft.scale;
                     selectedSticker = existing.id;
                     renderStickers();
                 }
@@ -2854,7 +2882,10 @@ export class HomeView {
             const totalReels = group.reels.length;
             // Mark as viewed
             void CS.markReelViewed(reel.id);
-            const isLiked = reel.likes.includes(myUserId);
+            const likedLocal = getLikedReels();
+            const serverLiked = reel.likes.includes(myUserId);
+            const isLiked = serverLiked || likedLocal.has(reel.id);
+            const likeCount = reel.likes.length + (isLiked && !serverLiked ? 1 : 0);
             const isVideo = reel.mediaType === 'video';
             const dur = isVideo ? reel.duration : (reel.duration || 5);
             overlay.innerHTML = `
@@ -2898,7 +2929,7 @@ export class HomeView {
         <div class="home-reel-viewer__actions">
           <button class="home-reel-viewer__like ${isLiked ? 'liked' : ''}" id="reelViewerLike">
             <svg viewBox="0 0 24 24" fill="${isLiked ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="2" width="24" height="24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            <span id="reelLikeCount">${reel.likes.length}</span>
+            <span id="reelLikeCount">${likeCount}</span>
           </button>
           ${group.userId === myUserId ? `<button class="home-reel-viewer__delete" id="reelViewerDelete">🗑</button>` : ''}
         </div>
@@ -2999,13 +3030,28 @@ export class HomeView {
             });
             // Like
             overlay.querySelector('#reelViewerLike')?.addEventListener('click', async () => {
+                const btn = overlay.querySelector('#reelViewerLike');
+                const countEl = overlay.querySelector('#reelLikeCount');
+                const svg = btn?.querySelector('svg');
+                // Optimistic: flip instantly and persist locally so it survives re-entry
+                const nowLiked = !btn?.classList.contains('liked');
+                btn?.classList.toggle('liked', nowLiked);
+                svg?.setAttribute('fill', nowLiked ? 'currentColor' : 'none');
+                if (countEl)
+                    countEl.textContent = String(Math.max(0, parseInt(countEl.textContent ?? '0', 10) + (nowLiked ? 1 : -1)));
+                setReelLiked(reel.id, nowLiked);
+                // Reconcile with the server
                 const result = await CS.likeReel(reel.id);
                 if (result) {
-                    const btn = overlay.querySelector('#reelViewerLike');
                     btn?.classList.toggle('liked', result.liked);
-                    const countEl = overlay.querySelector('#reelLikeCount');
+                    svg?.setAttribute('fill', result.liked ? 'currentColor' : 'none');
                     if (countEl)
                         countEl.textContent = String(result.count);
+                    setReelLiked(reel.id, result.liked);
+                    if (result.liked && !reel.likes.includes(myUserId))
+                        reel.likes.push(myUserId);
+                    else if (!result.liked)
+                        reel.likes = reel.likes.filter(u => u !== myUserId);
                 }
             });
             // Delete (own reel)
