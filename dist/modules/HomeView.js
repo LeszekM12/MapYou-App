@@ -649,6 +649,7 @@ export async function openActivityDetail(act, isOwn, actId) {
     const itemId = actId || rec.activityId || full.id;
     const likeCount = rec._likeCount ?? 0;
     const commentCount = rec._commentCount ?? 0;
+    const viewCount = rec._viewCount ?? rec.views ?? 0;
     const heroInner = (ownCoords || friendCoords)
         ? `<div class="ad-hero-map" id="adHeroMap"></div>`
         : `<div class="ad-hero-empty" style="background:linear-gradient(135deg, ${color}22, ${color}44)"><span>${icon}</span></div>`;
@@ -705,6 +706,12 @@ export async function openActivityDetail(act, isOwn, actId) {
           </svg>
           <span class="home-card__action-count" data-comment-count="${itemId}">${commentCount > 0 ? commentCount : 0}</span>
         </button>
+        <span class="home-card__action home-card__action--views" aria-label="Views">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span class="home-card__action-count">${viewCount > 0 ? viewCount : 0}</span>
+        </span>
         <button class="home-card__action home-card__action--share" data-action="share" aria-label="Share">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
@@ -957,6 +964,13 @@ export function buildCard(act) {
         </svg>
         <span class="home-card__action-count" data-comment-count="${act.id}">0</span>
       </button>
+
+      <span class="home-card__action home-card__action--views" aria-label="Views">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span class="home-card__action-count">${act.views ?? 0}</span>
+      </span>
 
       <button class="home-card__action home-card__action--share" data-action="share" aria-label="Share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -1252,6 +1266,84 @@ export class HomeView {
             value: 'home'
         });
         Object.defineProperty(this, "_switcherAutohideInited", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
+        Object.defineProperty(this, "_exploreFeed", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
+        Object.defineProperty(this, "_exploreOffset", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 0
+        });
+        Object.defineProperty(this, "_exploreHasMore", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
+        Object.defineProperty(this, "_exploreLoading", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
+        Object.defineProperty(this, "_geo", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
+        Object.defineProperty(this, "_geoTried", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
+        Object.defineProperty(this, "_lastHomeFeed", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: []
+        });
+        Object.defineProperty(this, "_repaintFeed", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
+        Object.defineProperty(this, "_impObserver", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: void 0
+        });
+        Object.defineProperty(this, "_impSeen", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: new Set()
+        });
+        Object.defineProperty(this, "_impPending", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: new Set()
+        });
+        Object.defineProperty(this, "_impTimer", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: void 0
+        });
+        Object.defineProperty(this, "_impFlushBound", {
             enumerable: true,
             configurable: true,
             writable: true,
@@ -2256,6 +2348,7 @@ export class HomeView {
         this._inited = true;
         const scroll = this.container;
         this._setupPullToRefresh(scroll);
+        this._homeSection = 'home';
         scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
         const [activities, posts, workouts] = await Promise.all([
             loadEnrichedActivities(),
@@ -2320,6 +2413,7 @@ export class HomeView {
                         item.data._coordsEncResolved = enc;
                         localAct.coordsEnc = enc;
                         localAct.coords = [];
+                        localAct.views = item.data._viewCount ?? 0;
                     }
                     card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
                 }
@@ -2356,6 +2450,8 @@ export class HomeView {
                     });
                 }
                 feedList.appendChild(card);
+                if (item.kind === 'activity')
+                    this._observeImpression(card, (item.data.activityId ?? item.data.id));
                 const actId = (item.data.activityId ?? item.data.id);
                 if (item.kind === 'activity') {
                     requestAnimationFrame(() => {
@@ -2401,6 +2497,7 @@ export class HomeView {
             // Infinite scroll
             this._setupInfiniteScroll(feedList, activities, posts, userId);
         };
+        this._repaintFeed = paintFeed;
         // 1) Instant paint — cached server feed (incl. friends) if present, else local-only
         const cached = this._readFeedCache(userId);
         if (cached) {
@@ -2409,6 +2506,7 @@ export class HomeView {
                 this._feedCursor = cached.feed[cached.feed.length - 1].date;
         }
         const initialFeed = (cached && cached.feed.length > 0) ? cached.feed : localFeed;
+        this._lastHomeFeed = initialFeed;
         paintFeed(initialFeed);
         const shownSig = this._feedSig(initialFeed);
         // 2) Revalidate from server in the background (timeout-guarded), repaint only if changed
@@ -2420,8 +2518,11 @@ export class HomeView {
                 this._feedHasMore = result.hasMore;
                 if (result.feed.length > 0)
                     this._feedCursor = result.feed[result.feed.length - 1].date;
+                this._lastHomeFeed = result.feed;
                 if (!document.body.contains(feedList))
                     return; // user navigated away
+                if (this._homeSection !== 'home')
+                    return; // don't clobber the Explore view
                 if (this._feedSig(result.feed) !== shownSig)
                     paintFeed(result.feed);
             }).catch(() => { });
@@ -2458,7 +2559,7 @@ export class HomeView {
         const sw = document.getElementById('homeSwitcher');
         sw?.querySelectorAll('.home-switcher__tab').forEach(t => t.classList.toggle('home-switcher__tab--active', t.dataset.sec === sec));
         this._positionSwitcherDot();
-        // Brief slide feedback (Explore content is wired later; both show the current feed for now)
+        // Brief slide feedback
         const fl = document.getElementById('homeFeedList');
         if (fl) {
             fl.style.transition = 'transform .16s ease, opacity .16s ease';
@@ -2469,6 +2570,116 @@ export class HomeView {
                 setTimeout(() => { fl.style.transform = ''; fl.style.opacity = '1'; }, 30);
             });
         }
+        if (sec === 'explore') {
+            if (this._exploreFeed)
+                this._repaintFeed?.(this._exploreFeed); // instant from memory
+            else {
+                this._paintFeedLoading();
+                void this._loadExplore();
+            }
+        }
+        else {
+            this._repaintFeed?.(this._lastHomeFeed);
+        }
+    }
+    _paintFeedLoading() {
+        const fl = document.getElementById('homeFeedList');
+        if (fl)
+            fl.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
+    }
+    async _getGeo() {
+        if (this._geo)
+            return this._geo;
+        if (this._geoTried)
+            return null;
+        this._geoTried = true;
+        if (!('geolocation' in navigator))
+            return null;
+        return new Promise(resolve => {
+            let done = false;
+            const finish = (v) => { if (!done) {
+                done = true;
+                this._geo = v;
+                resolve(v);
+            } };
+            const t = setTimeout(() => finish(null), 6000);
+            navigator.geolocation.getCurrentPosition(pos => { clearTimeout(t); finish({ lat: pos.coords.latitude, lng: pos.coords.longitude }); }, () => { clearTimeout(t); finish(null); }, { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 });
+        });
+    }
+    async _loadExplore() {
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        if (!userId)
+            return;
+        const geo = await this._getGeo();
+        const geoQ = geo ? `&lat=${geo.lat}&lng=${geo.lng}` : '';
+        try {
+            const res = await fetch(`${BACKEND_URL}/feed/explore?userId=${encodeURIComponent(userId)}${geoQ}&offset=0`, { cache: 'no-store' });
+            const d = await res.json();
+            this._exploreFeed = d.data ?? [];
+            this._exploreOffset = this._exploreFeed.length;
+            this._exploreHasMore = d.hasMore ?? false;
+            if (this._homeSection === 'explore')
+                this._repaintFeed?.(this._exploreFeed);
+        }
+        catch {
+            if (this._homeSection === 'explore') {
+                const fl = document.getElementById('homeFeedList');
+                if (fl)
+                    fl.innerHTML = `
+          <div class="home-empty">
+            <div class="home-empty__icon">🌐</div>
+            <h3 class="home-empty__title">Couldn't load Explore</h3>
+            <p class="home-empty__sub">Check your connection and try again</p>
+          </div>`;
+            }
+        }
+    }
+    // ── Impression tracking (X-style reach) ─────────────────────────────────────
+    _observeImpression(card, id) {
+        if (!id || this._impSeen.has(id))
+            return;
+        if (!this._impObserver) {
+            this._impObserver = new IntersectionObserver(entries => {
+                for (const e of entries) {
+                    if (!e.isIntersecting || e.intersectionRatio < 0.5)
+                        continue;
+                    const eid = e.target.dataset.impId;
+                    this._impObserver?.unobserve(e.target);
+                    if (eid && !this._impSeen.has(eid)) {
+                        this._impSeen.add(eid);
+                        this._impPending.add(eid);
+                        this._scheduleImpFlush();
+                    }
+                }
+            }, { threshold: [0.5] });
+        }
+        if (!this._impFlushBound) {
+            this._impFlushBound = true;
+            const flush = () => { void this._flushImpressions(); };
+            document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden')
+                flush(); });
+            window.addEventListener('pagehide', flush);
+        }
+        card.dataset.impId = id;
+        this._impObserver.observe(card);
+    }
+    _scheduleImpFlush() {
+        if (this._impTimer)
+            return;
+        this._impTimer = window.setTimeout(() => { this._impTimer = undefined; void this._flushImpressions(); }, 4000);
+    }
+    async _flushImpressions() {
+        if (this._impPending.size === 0)
+            return;
+        const ids = [...this._impPending];
+        this._impPending.clear();
+        try {
+            await fetch(`${BACKEND_URL}/feed/impressions`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ids }),
+            });
+        }
+        catch { /* offline: drop (already marked seen this session) */ }
     }
     _setupSwitcherAutohide(scroll) {
         if (this._switcherAutohideInited)
@@ -2624,36 +2835,56 @@ export class HomeView {
     _setupInfiniteScroll(scroll, activities, posts, userId) {
         this._feedObserver?.disconnect();
         document.getElementById('feedSentinel')?.remove();
-        if (!this._feedHasMore)
+        const hasMore = this._homeSection === 'explore' ? this._exploreHasMore : this._feedHasMore;
+        if (!hasMore)
             return;
         const sentinel = document.createElement('div');
         sentinel.id = 'feedSentinel';
         sentinel.style.height = '1px';
         scroll.appendChild(sentinel);
         this._feedObserver = new IntersectionObserver(entries => {
-            if (entries[0].isIntersecting && !this._feedLoading && this._feedHasMore) {
+            const explore = this._homeSection === 'explore';
+            const loading = explore ? this._exploreLoading : this._feedLoading;
+            const more = explore ? this._exploreHasMore : this._feedHasMore;
+            if (entries[0].isIntersecting && !loading && more) {
                 void this._loadMoreFeed(scroll, activities, posts, userId);
             }
         }, { rootMargin: '300px' });
         this._feedObserver.observe(sentinel);
     }
     async _loadMoreFeed(scroll, activities, posts, userId) {
-        if (this._feedLoading || !this._feedHasMore)
+        const explore = this._homeSection === 'explore';
+        if ((explore ? this._exploreLoading : this._feedLoading) || !(explore ? this._exploreHasMore : this._feedHasMore))
             return;
-        this._feedLoading = true;
+        if (explore)
+            this._exploreLoading = true;
+        else
+            this._feedLoading = true;
         const spinner = document.createElement('div');
         spinner.id = 'feedLoadMore';
         spinner.className = 'home-loading';
         spinner.innerHTML = '<div class="home-loading__spinner"></div>';
         document.getElementById('feedSentinel')?.before(spinner);
         try {
-            const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}&before=${this._feedCursor}`, { cache: 'no-store' });
+            const geoQ = this._geo ? `&lat=${this._geo.lat}&lng=${this._geo.lng}` : '';
+            const url = explore
+                ? `${BACKEND_URL}/feed/explore?userId=${encodeURIComponent(userId)}${geoQ}&offset=${this._exploreOffset}`
+                : `${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}&before=${this._feedCursor}`;
+            const res = await fetch(url, { cache: 'no-store' });
             if (res.ok) {
                 const d = await res.json();
                 const newItems = d.data ?? [];
-                this._feedHasMore = d.hasMore ?? false;
+                if (explore)
+                    this._exploreHasMore = d.hasMore ?? false;
+                else
+                    this._feedHasMore = d.hasMore ?? false;
                 if (newItems.length > 0) {
-                    this._feedCursor = newItems[newItems.length - 1].date;
+                    if (explore) {
+                        this._exploreOffset += newItems.length;
+                        this._exploreFeed?.push(...newItems);
+                    }
+                    else
+                        this._feedCursor = newItems[newItems.length - 1].date;
                     document.getElementById('feedLoadMore')?.remove();
                     document.getElementById('feedSentinel')?.remove();
                     newItems.forEach((item, idx) => {
@@ -2667,6 +2898,7 @@ export class HomeView {
                                     (local.coords && local.coords.length > 0 ? encodePolyline(local.coords) : null);
                                 local.coordsEnc = resolvedEnc;
                                 local.coords = [];
+                                local.views = item.data._viewCount ?? 0;
                             }
                             card = local ? buildCard(local) : this._buildFriendFeedCard(item.kind, item.data, userId);
                         }
@@ -2695,6 +2927,8 @@ export class HomeView {
                             });
                         }
                         scroll.appendChild(card);
+                        if (item.kind === 'activity')
+                            this._observeImpression(card, (item.data.activityId ?? item.data.id));
                         if (item.kind === 'activity' && resolvedEnc) {
                             requestAnimationFrame(() => {
                                 setTimeout(() => {
@@ -2707,8 +2941,11 @@ export class HomeView {
                             });
                         }
                     });
-                    if (this._feedHasMore)
+                    if (explore ? this._exploreHasMore : this._feedHasMore)
                         this._setupInfiniteScroll(scroll, activities, posts, userId);
+                }
+                else if (explore) {
+                    this._exploreHasMore = false;
                 }
                 else {
                     this._feedHasMore = false;
@@ -2717,7 +2954,10 @@ export class HomeView {
         }
         catch { }
         document.getElementById('feedLoadMore')?.remove();
-        this._feedLoading = false;
+        if (explore)
+            this._exploreLoading = false;
+        else
+            this._feedLoading = false;
     }
     async _renderFriendsFeed() {
         const feedEl = document.getElementById('friendsFeed');
@@ -2781,6 +3021,7 @@ export class HomeView {
                 intensity: +(data.intensity ?? 0),
                 notes: (data.notes ?? ''),
                 coords: [],
+                views: +(data._viewCount ?? data.views ?? 0),
             };
             const card = buildCard(act);
             // Override avatar and name with friend's

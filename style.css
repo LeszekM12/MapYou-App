@@ -3790,3 +3790,6 @@ body.night-mode .sv-chart-wrap {
 .home-switcher__tab { position: relative; font-size: 1.55rem; font-weight: 600; color: var(--app-text-tertiary, rgba(255,255,255,0.4)); background: none; border: none; cursor: pointer; padding: 2px 4px 0; font-family: inherit; -webkit-tap-highlight-color: transparent; transition: color .2s ease; }
 .home-switcher__tab--active { color: var(--app-text-primary, #fff); }
 .home-switcher__dot { position: absolute; bottom: 4px; left: 0; width: 6px; height: 6px; border-radius: 50%; background: #f97316; transform: translateX(-50%); transition: left .22s cubic-bezier(.4,0,.2,1); }
+
+/* ── Views (impression) counter — non-interactive, near share ── */
+.home-card__action--views { cursor: default; pointer-events: none; }

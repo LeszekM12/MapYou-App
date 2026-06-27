@@ -693,6 +693,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   const itemId       = actId || (rec.activityId as string) || full.id;
   const likeCount    = (rec._likeCount as number) ?? 0;
   const commentCount = (rec._commentCount as number) ?? 0;
+  const viewCount    = (rec._viewCount as number) ?? (rec.views as number) ?? 0;
 
   const heroInner = (ownCoords || friendCoords)
     ? `<div class="ad-hero-map" id="adHeroMap"></div>`
@@ -751,6 +752,12 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
           </svg>
           <span class="home-card__action-count" data-comment-count="${itemId}">${commentCount > 0 ? commentCount : 0}</span>
         </button>
+        <span class="home-card__action home-card__action--views" aria-label="Views">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+          <span class="home-card__action-count">${viewCount > 0 ? viewCount : 0}</span>
+        </span>
         <button class="home-card__action home-card__action--share" data-action="share" aria-label="Share">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
@@ -983,6 +990,13 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
         </svg>
         <span class="home-card__action-count" data-comment-count="${act.id}">0</span>
       </button>
+
+      <span class="home-card__action home-card__action--views" aria-label="Views">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+          <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/>
+        </svg>
+        <span class="home-card__action-count">${((act as unknown as Record<string, unknown>).views as number) ?? 0}</span>
+      </span>
 
       <button class="home-card__action home-card__action--share" data-action="share" aria-label="Share">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
@@ -1245,6 +1259,19 @@ export class HomeView {
   private _ptrInited:    boolean                   = false;
   private _homeSection:  'home' | 'explore'        = 'home';
   private _switcherAutohideInited: boolean         = false;
+  private _exploreFeed:    Array<{ kind: string; date: number; data: Record<string, unknown> }> | null = null;
+  private _exploreOffset:  number                  = 0;
+  private _exploreHasMore: boolean                 = false;
+  private _exploreLoading: boolean                 = false;
+  private _geo:            { lat: number; lng: number } | null = null;
+  private _geoTried:       boolean                 = false;
+  private _lastHomeFeed:   Array<{ kind: string; date: number; data: Record<string, unknown> }> = [];
+  private _repaintFeed:    ((feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>) => void) | null = null;
+  private _impObserver?:   IntersectionObserver;
+  private _impSeen:        Set<string>             = new Set();
+  private _impPending:     Set<string>             = new Set();
+  private _impTimer?:      number;
+  private _impFlushBound:  boolean                 = false;
   private _feedLoading:  boolean                   = false;
   private _feedObserver: IntersectionObserver|null = null;
 
@@ -2238,6 +2265,7 @@ export class HomeView {
     this._inited = true;
     const scroll = this.container;
     this._setupPullToRefresh(scroll);
+    this._homeSection = 'home';
 
     scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
 
@@ -2312,6 +2340,7 @@ export class HomeView {
           (item.data as Record<string,unknown>)._coordsEncResolved = enc;
           (localAct as unknown as Record<string,unknown>).coordsEnc = enc;
           (localAct as unknown as Record<string,unknown>).coords = [];
+          (localAct as unknown as Record<string,unknown>).views = (item.data._viewCount as number) ?? 0;
         }
         card = localAct ? buildCard(localAct) : this._buildFriendFeedCard(item.kind, item.data, userId);
       } else if (isOwn && item.kind === 'post') {
@@ -2345,6 +2374,7 @@ export class HomeView {
         });
       }
       feedList.appendChild(card);
+      if (item.kind === 'activity') this._observeImpression(card, (item.data.activityId ?? item.data.id) as string);
 
       const actId = (item.data.activityId ?? item.data.id) as string;
       if (item.kind === 'activity') {
@@ -2389,6 +2419,7 @@ export class HomeView {
       // Infinite scroll
       this._setupInfiniteScroll(feedList, activities, posts, userId);
     };
+    this._repaintFeed = paintFeed;
 
     // 1) Instant paint — cached server feed (incl. friends) if present, else local-only
     const cached = this._readFeedCache(userId);
@@ -2397,6 +2428,7 @@ export class HomeView {
       if (cached.feed.length > 0) this._feedCursor = cached.feed[cached.feed.length - 1].date;
     }
     const initialFeed = (cached && cached.feed.length > 0) ? (cached.feed as FeedItem[]) : localFeed;
+    this._lastHomeFeed = initialFeed;
     paintFeed(initialFeed);
     const shownSig = this._feedSig(initialFeed);
 
@@ -2407,7 +2439,9 @@ export class HomeView {
         this._writeFeedCache(userId, result.feed, result.hasMore);
         this._feedHasMore = result.hasMore;
         if (result.feed.length > 0) this._feedCursor = result.feed[result.feed.length - 1].date;
+        this._lastHomeFeed = result.feed as FeedItem[];
         if (!document.body.contains(feedList)) return;       // user navigated away
+        if (this._homeSection !== 'home') return;            // don't clobber the Explore view
         if (this._feedSig(result.feed as FeedItem[]) !== shownSig) paintFeed(result.feed as FeedItem[]);
       }).catch(() => { /* ignore */ });
     }
@@ -2448,7 +2482,7 @@ export class HomeView {
       t.classList.toggle('home-switcher__tab--active', t.dataset.sec === sec));
     this._positionSwitcherDot();
 
-    // Brief slide feedback (Explore content is wired later; both show the current feed for now)
+    // Brief slide feedback
     const fl = document.getElementById('homeFeedList');
     if (fl) {
       fl.style.transition = 'transform .16s ease, opacity .16s ease';
@@ -2459,6 +2493,101 @@ export class HomeView {
         setTimeout(() => { fl.style.transform = ''; fl.style.opacity = '1'; }, 30);
       });
     }
+
+    if (sec === 'explore') {
+      if (this._exploreFeed) this._repaintFeed?.(this._exploreFeed);   // instant from memory
+      else { this._paintFeedLoading(); void this._loadExplore(); }
+    } else {
+      this._repaintFeed?.(this._lastHomeFeed);
+    }
+  }
+
+  private _paintFeedLoading(): void {
+    const fl = document.getElementById('homeFeedList');
+    if (fl) fl.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
+  }
+
+  private async _getGeo(): Promise<{ lat: number; lng: number } | null> {
+    if (this._geo) return this._geo;
+    if (this._geoTried) return null;
+    this._geoTried = true;
+    if (!('geolocation' in navigator)) return null;
+    return new Promise(resolve => {
+      let done = false;
+      const finish = (v: { lat: number; lng: number } | null): void => { if (!done) { done = true; this._geo = v; resolve(v); } };
+      const t = setTimeout(() => finish(null), 6000);
+      navigator.geolocation.getCurrentPosition(
+        pos => { clearTimeout(t); finish({ lat: pos.coords.latitude, lng: pos.coords.longitude }); },
+        ()  => { clearTimeout(t); finish(null); },
+        { enableHighAccuracy: false, timeout: 6000, maximumAge: 600000 },
+      );
+    });
+  }
+
+  private async _loadExplore(): Promise<void> {
+    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+    if (!userId) return;
+    const geo = await this._getGeo();
+    const geoQ = geo ? `&lat=${geo.lat}&lng=${geo.lng}` : '';
+    try {
+      const res = await fetch(`${BACKEND_URL}/feed/explore?userId=${encodeURIComponent(userId)}${geoQ}&offset=0`, { cache: 'no-store' });
+      const d = await res.json() as { status: string; hasMore: boolean; data: Array<{ kind: string; date: number; data: Record<string, unknown> }> };
+      this._exploreFeed    = d.data ?? [];
+      this._exploreOffset  = this._exploreFeed.length;
+      this._exploreHasMore = d.hasMore ?? false;
+      if (this._homeSection === 'explore') this._repaintFeed?.(this._exploreFeed);
+    } catch {
+      if (this._homeSection === 'explore') {
+        const fl = document.getElementById('homeFeedList');
+        if (fl) fl.innerHTML = `
+          <div class="home-empty">
+            <div class="home-empty__icon">🌐</div>
+            <h3 class="home-empty__title">Couldn't load Explore</h3>
+            <p class="home-empty__sub">Check your connection and try again</p>
+          </div>`;
+      }
+    }
+  }
+
+  // ── Impression tracking (X-style reach) ─────────────────────────────────────
+
+  private _observeImpression(card: HTMLElement, id: string): void {
+    if (!id || this._impSeen.has(id)) return;
+    if (!this._impObserver) {
+      this._impObserver = new IntersectionObserver(entries => {
+        for (const e of entries) {
+          if (!e.isIntersecting || e.intersectionRatio < 0.5) continue;
+          const eid = (e.target as HTMLElement).dataset.impId;
+          this._impObserver?.unobserve(e.target);
+          if (eid && !this._impSeen.has(eid)) { this._impSeen.add(eid); this._impPending.add(eid); this._scheduleImpFlush(); }
+        }
+      }, { threshold: [0.5] });
+    }
+    if (!this._impFlushBound) {
+      this._impFlushBound = true;
+      const flush = (): void => { void this._flushImpressions(); };
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flush(); });
+      window.addEventListener('pagehide', flush);
+    }
+    card.dataset.impId = id;
+    this._impObserver.observe(card);
+  }
+
+  private _scheduleImpFlush(): void {
+    if (this._impTimer) return;
+    this._impTimer = window.setTimeout(() => { this._impTimer = undefined; void this._flushImpressions(); }, 4000);
+  }
+
+  private async _flushImpressions(): Promise<void> {
+    if (this._impPending.size === 0) return;
+    const ids = [...this._impPending];
+    this._impPending.clear();
+    try {
+      await fetch(`${BACKEND_URL}/feed/impressions`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      });
+    } catch { /* offline: drop (already marked seen this session) */ }
   }
 
   private _setupSwitcherAutohide(scroll: HTMLElement): void {
@@ -2592,13 +2721,17 @@ export class HomeView {
   private _setupInfiniteScroll(scroll: HTMLElement, activities: import('./db.js').EnrichedActivity[], posts: import('./db.js').PostRecord[], userId: string): void {
     this._feedObserver?.disconnect();
     document.getElementById('feedSentinel')?.remove();
-    if (!this._feedHasMore) return;
+    const hasMore = this._homeSection === 'explore' ? this._exploreHasMore : this._feedHasMore;
+    if (!hasMore) return;
     const sentinel = document.createElement('div');
     sentinel.id = 'feedSentinel';
     sentinel.style.height = '1px';
     scroll.appendChild(sentinel);
     this._feedObserver = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && !this._feedLoading && this._feedHasMore) {
+      const explore = this._homeSection === 'explore';
+      const loading = explore ? this._exploreLoading : this._feedLoading;
+      const more    = explore ? this._exploreHasMore : this._feedHasMore;
+      if (entries[0].isIntersecting && !loading && more) {
         void this._loadMoreFeed(scroll, activities, posts, userId);
       }
     }, { rootMargin: '300px' });
@@ -2606,21 +2739,27 @@ export class HomeView {
   }
 
   private async _loadMoreFeed(scroll: HTMLElement, activities: import('./db.js').EnrichedActivity[], posts: import('./db.js').PostRecord[], userId: string): Promise<void> {
-    if (this._feedLoading || !this._feedHasMore) return;
-    this._feedLoading = true;
+    const explore = this._homeSection === 'explore';
+    if ((explore ? this._exploreLoading : this._feedLoading) || !(explore ? this._exploreHasMore : this._feedHasMore)) return;
+    if (explore) this._exploreLoading = true; else this._feedLoading = true;
     const spinner = document.createElement('div');
     spinner.id = 'feedLoadMore';
     spinner.className = 'home-loading';
     spinner.innerHTML = '<div class="home-loading__spinner"></div>';
     document.getElementById('feedSentinel')?.before(spinner);
     try {
-      const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}&before=${this._feedCursor}`, { cache: 'no-store' });
+      const geoQ = this._geo ? `&lat=${this._geo.lat}&lng=${this._geo.lng}` : '';
+      const url = explore
+        ? `${BACKEND_URL}/feed/explore?userId=${encodeURIComponent(userId)}${geoQ}&offset=${this._exploreOffset}`
+        : `${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}&before=${this._feedCursor}`;
+      const res = await fetch(url, { cache: 'no-store' });
       if (res.ok) {
         const d = await res.json() as { status: string; hasMore: boolean; data: Array<{ kind: string; date: number; data: Record<string, unknown> }> };
         const newItems = d.data ?? [];
-        this._feedHasMore = d.hasMore ?? false;
+        if (explore) this._exploreHasMore = d.hasMore ?? false; else this._feedHasMore = d.hasMore ?? false;
         if (newItems.length > 0) {
-          this._feedCursor = newItems[newItems.length - 1].date;
+          if (explore) { this._exploreOffset += newItems.length; this._exploreFeed?.push(...newItems); }
+          else this._feedCursor = newItems[newItems.length - 1].date;
           document.getElementById('feedLoadMore')?.remove();
           document.getElementById('feedSentinel')?.remove();
           newItems.forEach((item, idx) => {
@@ -2634,6 +2773,7 @@ export class HomeView {
                   (local.coords && local.coords.length > 0 ? encodePolyline(local.coords as Array<[number,number]>) : null);
                 (local as unknown as Record<string,unknown>).coordsEnc = resolvedEnc;
                 (local as unknown as Record<string,unknown>).coords = [];
+                (local as unknown as Record<string,unknown>).views = (item.data._viewCount as number) ?? 0;
               }
               card = local ? buildCard(local) : this._buildFriendFeedCard(item.kind, item.data, userId);
             } else if (isOwn && item.kind === 'post') {
@@ -2654,6 +2794,7 @@ export class HomeView {
               });
             }
             scroll.appendChild(card);
+            if (item.kind === 'activity') this._observeImpression(card, (item.data.activityId ?? item.data.id) as string);
             if (item.kind === 'activity' && resolvedEnc) {
               requestAnimationFrame(() => {
                 setTimeout(() => {
@@ -2666,14 +2807,12 @@ export class HomeView {
               });
             }
           });
-          if (this._feedHasMore) this._setupInfiniteScroll(scroll, activities, posts, userId);
-        } else {
-          this._feedHasMore = false;
-        }
+          if (explore ? this._exploreHasMore : this._feedHasMore) this._setupInfiniteScroll(scroll, activities, posts, userId);
+        } else if (explore) { this._exploreHasMore = false; } else { this._feedHasMore = false; }
       }
     } catch {}
     document.getElementById('feedLoadMore')?.remove();
-    this._feedLoading = false;
+    if (explore) this._exploreLoading = false; else this._feedLoading = false;
   }
 
   private async _renderFriendsFeed(): Promise<void> {
@@ -2742,6 +2881,7 @@ export class HomeView {
         intensity:   +(data.intensity ?? 0),
         notes:       (data.notes ?? '') as string,
         coords:      [] as Array<[number, number]>,
+        views:       +(data._viewCount ?? data.views ?? 0),
       } as unknown as import('./db.js').EnrichedActivity;
 
       const card = buildCard(act);
