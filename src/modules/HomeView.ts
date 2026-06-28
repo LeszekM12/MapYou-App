@@ -2073,6 +2073,7 @@ export class HomeView {
         <span class="home-reel-creator__title">New Reel</span>
         <div style="width:28px;"></div>
       </div>
+      <div class="home-reel-creator__stage">
       <div class="home-reel-creator__canvas" id="reelCreatorCanvas">
         <label class="home-reel-creator__pick" for="reelFileInput">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40">
@@ -2087,6 +2088,7 @@ export class HomeView {
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
           <span>Create from a workout</span>
         </button>
+      </div>
       </div>
       <!-- Right side tools — Instagram style, visible after file selected -->
       <div class="home-reel-creator__right-tools" id="reelCreatorTools" style="display:none">
@@ -2199,7 +2201,8 @@ export class HomeView {
 
     // Shared text styling (render + bake). Plain style gets a soft shadow so
     // white / light text stays readable on any background.
-    const _layerStyleCss = (style: string, color: string): string => {
+    const _layerStyleCss = (style: string, colorIn: string): string => {
+      const color = colorIn || '#ffffff';
       if (style === 'highlight') {
         const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa', '#fef08a'].includes(color.toLowerCase());
         return `background:${color};color:${dark ? '#000' : '#fff'};padding:0.08em 0.32em;border-radius:0.16em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`;
@@ -2326,6 +2329,13 @@ export class HomeView {
       selectedSticker = id; renderStickers();
     };
 
+    // Tap empty canvas → deselect the active layer (hide outline + delete handle)
+    canvas.addEventListener('pointerdown', e => {
+      const t = e.target as HTMLElement;
+      if (t.closest('.rst-layer')) return;
+      if (selectedSticker) { selectedSticker = null; renderStickers(); }
+    });
+
     // ── Sticker tray (IG-style bottom sheet) ──
     const EMOJIS = ['🔥','💪','🏃','🚴','🏆','⚡','❤️','😤','🎉','👏','🥇','💦','🌄','🧗','⛰️','🏅','😮‍💨','🚀','✨','💯','🦵','🫶','😎','🥵'];
     overlay.querySelector('#reelStickerPicker')?.addEventListener('click', () => {
@@ -2402,6 +2412,7 @@ export class HomeView {
           const lines = s.text.split('\n');
           const lh = fs * 1.18;
           const st = STYLES[s.styleIdx] ?? 'none';
+          const col = s.color || '#ffffff';
           const maxW = Math.max(...lines.map(l => ctx.measureText(l).width), 1);
           const anchorX = s.align === 'left' ? -maxW / 2 : s.align === 'right' ? maxW / 2 : 0;
           ctx.textAlign = s.align === 'left' ? 'left' : s.align === 'right' ? 'right' : 'center';
@@ -2410,14 +2421,14 @@ export class HomeView {
             const w = ctx.measureText(ln).width;
             const lineLeft = s.align === 'left' ? anchorX : s.align === 'right' ? anchorX - w : -w / 2;
             if (st === 'highlight') {
-              const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(s.color.toLowerCase());
+              const dark = ['#ffffff', '#ffcc00', '#ffd60a', '#00c46a', '#5ac8fa'].includes(col.toLowerCase());
               const padX = fs * 0.3, padY = fs * 0.14;
-              _rr(ctx, lineLeft - padX, ly - fs / 2 - padY, w + padX * 2, fs + padY * 2, fs * 0.18); ctx.fillStyle = s.color; ctx.fill();
+              _rr(ctx, lineLeft - padX, ly - fs / 2 - padY, w + padX * 2, fs + padY * 2, fs * 0.18); ctx.fillStyle = col; ctx.fill();
               ctx.fillStyle = dark ? '#000' : '#fff'; ctx.fillText(ln, anchorX, ly);
             } else if (st === 'neon') {
-              ctx.save(); ctx.shadowColor = s.color; ctx.shadowBlur = fs * 0.55; ctx.fillStyle = '#fff'; ctx.fillText(ln, anchorX, ly); ctx.fillText(ln, anchorX, ly); ctx.restore();
+              ctx.save(); ctx.shadowColor = col; ctx.shadowBlur = fs * 0.55; ctx.fillStyle = '#fff'; ctx.fillText(ln, anchorX, ly); ctx.fillText(ln, anchorX, ly); ctx.restore();
             } else {
-              ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.34)'; ctx.shadowBlur = fs * 0.12; ctx.shadowOffsetY = fs * 0.04; ctx.fillStyle = s.color; ctx.fillText(ln, anchorX, ly); ctx.restore();
+              ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.34)'; ctx.shadowBlur = fs * 0.12; ctx.shadowOffsetY = fs * 0.04; ctx.fillStyle = col; ctx.fillText(ln, anchorX, ly); ctx.restore();
             }
           });
           ctx.restore(); continue;
@@ -2489,7 +2500,12 @@ export class HomeView {
       const sizeEl = ed.querySelector<HTMLInputElement>('#rteSize');
       sizeEl?.addEventListener('input', () => { draft.scale = Number(sizeEl.value); applyPreview(); });
       const hue = ed.querySelector<HTMLElement>('#rteHue')!;
-      const pickHue = (clientX: number): void => { const r = hue.getBoundingClientRect(); const t = Math.max(0, Math.min(1, (clientX - r.left) / r.width)); draft.color = `hsl(${Math.round(t * 360)}, 85%, 55%)`; applyPreview(); };
+      const pickHue = (clientX: number): void => {
+        const r = hue.getBoundingClientRect();
+        const t = Math.max(0, Math.min(1, (clientX - r.left) / r.width));
+        draft.color = t < 0.05 ? '#ffffff' : t < 0.10 ? '#000000' : `hsl(${Math.round(((t - 0.10) / 0.90) * 360)}, 85%, 55%)`;
+        applyPreview();
+      };
       let hueDown = false;
       hue.addEventListener('pointerdown', e => { hueDown = true; pickHue(e.clientX); });
       hue.addEventListener('pointermove', e => { if (hueDown) pickHue(e.clientX); });
@@ -2709,6 +2725,46 @@ export class HomeView {
       let paused = false;
       overlay.querySelector('.home-reel-viewer__bg')?.addEventListener('touchstart', () => { paused = true; videEl?.pause(); }, { passive: true });
       overlay.querySelector('.home-reel-viewer__bg')?.addEventListener('touchend', () => { paused = false; videEl?.play().catch(()=>{}); });
+
+      // Pinch-to-zoom the media; springs back on release. Listeners live on the
+      // overlay because the tap-nav layers sit above the media and eat its events.
+      const mediaEl = overlay.querySelector<HTMLElement>('.home-reel-viewer__media');
+      if (mediaEl) {
+        overlay.style.touchAction = 'none';
+        const zp = new Map<number, { x: number; y: number }>();
+        let zbase: { dist: number; cx: number; cy: number } | null = null;
+        const zd = (a: { x: number; y: number }, b: { x: number; y: number }): number => Math.hypot(a.x - b.x, a.y - b.y);
+        overlay.addEventListener('pointerdown', e => {
+          zp.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (zp.size === 2) {
+            const a = [...zp.values()];
+            zbase = { dist: zd(a[0], a[1]), cx: (a[0].x + a[1].x) / 2, cy: (a[0].y + a[1].y) / 2 };
+            mediaEl.style.transition = 'none'; paused = true; videEl?.pause();
+          }
+        });
+        overlay.addEventListener('pointermove', e => {
+          if (!zp.has(e.pointerId)) return;
+          zp.set(e.pointerId, { x: e.clientX, y: e.clientY });
+          if (zp.size >= 2 && zbase) {
+            const a = [...zp.values()];
+            const scale = Math.max(1, Math.min(4, zd(a[0], a[1]) / zbase.dist));
+            const cx = (a[0].x + a[1].x) / 2, cy = (a[0].y + a[1].y) / 2;
+            mediaEl.style.transform = `translate(${cx - zbase.cx}px, ${cy - zbase.cy}px) scale(${scale})`;
+            e.preventDefault();
+          }
+        });
+        const zreset = (e: PointerEvent): void => {
+          zp.delete(e.pointerId);
+          if (zp.size < 2 && zbase) {
+            zbase = null;
+            mediaEl.style.transition = 'transform 0.25s ease';
+            mediaEl.style.transform = '';
+            paused = false; videEl?.play().catch(() => { /* ok */ });
+          }
+        };
+        overlay.addEventListener('pointerup', zreset);
+        overlay.addEventListener('pointercancel', zreset);
+      }
 
       this._viewerInterval = setInterval(() => {
         if (paused) return;

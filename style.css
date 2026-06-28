@@ -3907,7 +3907,7 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
 
 /* ── Reel: text layer ── */
 .rst-layer { max-width: 86%; }
-.rst-text { display: block; white-space: pre-wrap; word-break: break-word; line-height: 1.18; pointer-events: none; }
+.rst-text { display: block; color: #fff; white-space: pre-wrap; word-break: break-word; line-height: 1.18; pointer-events: none; }
 
 /* ── Reel: Instagram-style text editor ── */
 .rte-overlay { position: fixed; inset: 0; z-index: 100004; background: rgba(0,0,0,0.55); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); display: flex; flex-direction: column; animation: adIn .18s ease; }
