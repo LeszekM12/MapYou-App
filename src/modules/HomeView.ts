@@ -2142,10 +2142,10 @@ export class HomeView {
     let selectedSticker: string | null = null;
     const FONTS = [
       { lbl: 'Modern', css: '-apple-system, system-ui, sans-serif', weight: '700' },
-      { lbl: 'Classic', css: 'Georgia, "Times New Roman", serif', weight: '700' },
-      { lbl: 'Typewriter', css: '"Courier New", monospace', weight: '700' },
-      { lbl: 'Strong', css: '"Trebuchet MS", "Segoe UI", sans-serif', weight: '900' },
-      { lbl: 'Script', css: '"Brush Script MT", "Comic Sans MS", cursive', weight: '700' },
+      { lbl: 'Classic', css: "Georgia, 'Times New Roman', serif", weight: '700' },
+      { lbl: 'Typewriter', css: "'Courier New', monospace", weight: '700' },
+      { lbl: 'Strong', css: "'Trebuchet MS', 'Segoe UI', sans-serif", weight: '900' },
+      { lbl: 'Script', css: "'Brush Script MT', 'Comic Sans MS', cursive", weight: '700' },
     ];
     const STYLES = ['none', 'highlight', 'neon'] as const;
 
@@ -2309,7 +2309,7 @@ export class HomeView {
         if (s.kind === 'text') {
           const f = FONTS[s.fontIdx] ?? FONTS[0];
           const styleCss = _layerStyleCss(STYLES[s.styleIdx] ?? 'none', s.color);
-          inner = `<span class="rst-text" style="font-size:${TEXT_BASE}px;font-family:${f.css};font-weight:${f.weight};text-align:${s.align};${styleCss}">${_esc(s.text).replace(/\n/g, '<br>')}</span>`;
+          inner = `<span class="rst-text" style="font-size:${TEXT_BASE}px;font-family:${f.css.replace(/"/g, "'")};font-weight:${f.weight};text-align:${s.align};${styleCss}">${_esc(s.text).replace(/\n/g, '<br>')}</span>`;
         } else if (s.kind === 'emoji') {
           inner = `<span class="rst-emoji">${s.text}</span>`;
         } else {
