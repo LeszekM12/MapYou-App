@@ -24,36 +24,20 @@ class MockHealthProvider {
         return total;
     }
 }
-// ─── Native provider (Capacitor: Health Connect on Android, HealthKit on iOS) ─
-// The plugin package name is held in a variable so the web `tsc` build does NOT
-// try to resolve it (it isn't installed on the web project). On a native build
-// where the plugin IS installed, the dynamic import resolves at runtime.
-const HEALTH_PLUGIN = 'capacitor-health'; // ← chosen plugin; see setup notes
+function getCapacitorPlugin() {
+    const cap = globalThis.Capacitor;
+    if (!cap?.Plugins)
+        return null;
+    // capacitor-health registers as "HealthPlugin"; check likely names defensively.
+    const p = (cap.Plugins['HealthPlugin'] ?? cap.Plugins['Health'] ?? cap.Plugins['CapacitorHealth']);
+    return p ?? null;
+}
 class NativeHealthProvider {
-    constructor() {
-        Object.defineProperty(this, "_plugin", {
-            enumerable: true,
-            configurable: true,
-            writable: true,
-            value: null
-        });
-    }
-    async plugin() {
-        if (this._plugin)
-            return this._plugin;
-        try {
-            const mod = await import(/* @vite-ignore */ HEALTH_PLUGIN);
-            // Plugins commonly export the API as `Health` or as a default; be liberal.
-            const api = (mod['Health'] ?? mod['CapacitorHealth'] ?? mod['default']);
-            this._plugin = api ?? null;
-        }
-        catch {
-            this._plugin = null;
-        }
-        return this._plugin;
+    plugin() {
+        return getCapacitorPlugin();
     }
     async isAvailable() {
-        const p = await this.plugin();
+        const p = this.plugin();
         if (!p)
             return false;
         try {
@@ -64,7 +48,7 @@ class NativeHealthProvider {
         }
     }
     async requestPermissions() {
-        const p = await this.plugin();
+        const p = this.plugin();
         if (!p)
             return false;
         try {
@@ -76,7 +60,7 @@ class NativeHealthProvider {
         }
     }
     async getSteps(startMs, endMs) {
-        const p = await this.plugin();
+        const p = this.plugin();
         if (!p)
             return 0;
         try {
@@ -99,19 +83,27 @@ function isNativePlatform() {
     return !!cap?.isNativePlatform?.();
 }
 let _provider = null;
+let _providerKind = 'mock';
 export async function getHealthProvider() {
     if (_provider)
         return _provider;
     if (isNativePlatform()) {
         const native = new NativeHealthProvider();
         if (await native.isAvailable()) {
+            // Ask the OS for read permission before the first real read. The system
+            // sheet shows once; afterwards this resolves silently.
+            await native.requestPermissions().catch(() => false);
             _provider = native;
+            _providerKind = 'native';
             return native;
         }
     }
     _provider = new MockHealthProvider();
+    _providerKind = 'mock';
     return _provider;
 }
+/** 'native' = real Health Connect / HealthKit; 'mock' = demo numbers (web dev). */
+export function getHealthProviderKind() { return _providerKind; }
 // ─── Permission gate (ask once, remember the answer) ─────────────────────────
 const PERM_KEY = 'mapyou_health_perm';
 export async function ensureStepPermission() {
@@ -144,9 +136,6 @@ function writeCache(c) {
 }
 /** Steps for a single calendar day. Reads cache instantly, refreshes in bg. */
 export async function getDaySteps(dayMs) {
-    if (!hasAskedHealthPermission() && !isNativePlatform()) {
-        // On web with no permission yet we still show mock numbers for dev.
-    }
     const p = await getHealthProvider();
     const start = startOfDay(dayMs);
     try {

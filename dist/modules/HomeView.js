@@ -6,7 +6,7 @@ import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
 import { getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
-import { getWeekSteps, getDaySteps, getCachedDaySteps } from './health.js';
+import { getWeekSteps, getDaySteps, getCachedDaySteps, getHealthProviderKind } from './health.js';
 import { generateShareImageFromEnriched, composeActivityReel } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { getNotifications, getUnreadCount, markAllRead, clearAll, onNotificationsChange, notifyActivityAdded, syncFromBackend, markAllReadRemote, } from './NotificationsService.js';
@@ -1892,8 +1892,9 @@ export class HomeView {
         // Steps from Health (Health Connect / HealthKit; mock on web) — fill async
         void getWeekSteps(weekStart).then(steps => {
             const el = wrap.querySelector('#hscWeekSteps');
+            const demo = getHealthProviderKind() === 'mock' ? '~' : '';
             if (el)
-                el.textContent = steps == null ? '–' : steps.toLocaleString('pl-PL');
+                el.textContent = steps == null ? '–' : demo + steps.toLocaleString('pl-PL');
         });
         return wrap;
     }
@@ -1939,8 +1940,9 @@ export class HomeView {
             ov.remove(); });
         void getDaySteps(dayMs).then(steps => {
             const el = ov.querySelector('#ddSteps');
+            const demo = getHealthProviderKind() === 'mock' ? '~' : '';
             if (el)
-                el.textContent = steps == null ? '–' : steps.toLocaleString('pl-PL');
+                el.textContent = steps == null ? '–' : demo + steps.toLocaleString('pl-PL');
         });
         ov.querySelectorAll('.dd-item').forEach(el => el.addEventListener('click', () => {
             const a = acts.find(x => x.id === el.dataset.id);
