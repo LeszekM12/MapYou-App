@@ -7,6 +7,10 @@
 
 
 import { BACKEND_URL } from './config.js';
+import { installNativeGeolocation } from './modules/nativeGeo.js';
+// Swap navigator.geolocation for the native Capacitor implementation ASAP,
+// before any module captures a reference. No-op on web/PWA.
+installNativeGeolocation();
 import { Workout, Running, Cycling, Walking } from './models/Workout.js';
 import { WorkoutType } from './types/index.js';
 import type { Coords } from './types/index.js';

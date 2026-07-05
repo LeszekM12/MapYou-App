@@ -37,6 +37,20 @@ if (!m.includes('com.google.android.apps.healthdata')) {
   console.log('• Manifest: uprawnienia już są');
 }
 
+// 1a-bis. Location permissions (web geolocation shim → native GPS)
+if (!m.includes('ACCESS_FINE_LOCATION')) {
+  const loc = `
+    <!-- Lokalizacja: natywny GPS dla mapy/trackera (krok A); tło dojdzie w kroku B -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+`;
+  m = m.replace(/<application/, loc + '\n    <application');
+  changed = true;
+  console.log('✓ Manifest: dodano uprawnienia lokalizacji');
+} else {
+  console.log('• Manifest: uprawnienia lokalizacji już są');
+}
+
 // 1b. Permission-rationale activities (inside <application>, before its close)
 if (!m.includes('PermissionsRationaleActivity')) {
   const acts = `
