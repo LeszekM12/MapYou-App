@@ -8,6 +8,7 @@
 
 import { BACKEND_URL } from './config.js';
 import { installNativeGeolocation } from './modules/nativeGeo.js';
+import { initBgTrackingGuide } from './modules/bgGuide.js';
 // Swap navigator.geolocation for the native Capacitor implementation ASAP,
 // before any module captures a reference. No-op on web/PWA.
 installNativeGeolocation();
@@ -437,6 +438,7 @@ class App {
 
     btnGear.addEventListener('click', e => { e.stopPropagation(); panel.classList.toggle('hidden'); });
     btnBack.addEventListener('click', () => panel.classList.add('hidden'));
+    initBgTrackingGuide();
 
     document.addEventListener('click', (e: MouseEvent) => {
       if (!panel.classList.contains('hidden') &&
