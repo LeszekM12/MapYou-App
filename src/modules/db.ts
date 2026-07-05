@@ -47,6 +47,16 @@ export interface EnrichedActivity {
   muted?:      boolean;         // if true: not published to main/club feeds (still in stats & history)
   coords:      Array<[number, number]>;
   laps?:       Array<{ km: number; durationSec: number; paceMinKm: number }>; // per-km splits (tracked)
+  // Health metrics (watch/Health import or future sensors)
+  avgHr?:      number | null;
+  maxHr?:      number | null;
+  hrSeries?:   Array<[number, number]> | null; // [secOffset, bpm] downsampled
+  calories?:   number | null;
+  elevGain?:   number | null;                  // metres climbed
+  elevSeries?: Array<[number, number]> | null; // [distanceM, elevM] downsampled
+  source?:     'in_app' | 'manual' | 'apple_health' | 'health_connect' | null;
+  sourceId?:   string | null;                  // health-store UUID (dedup)
+  sourceName?: string | null;                  // recording device/app, e.g. "Garmin Forerunner 255"
 }
 
 /** Unified workout — single model for manual + tracked workouts */

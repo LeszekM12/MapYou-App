@@ -7,7 +7,7 @@ import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
-import { getWeekSteps, getDaySteps, getCachedDaySteps, getHealthProviderKind } from './health.js';
+import { getWeekSteps, getDaySteps, getCachedDaySteps, getHealthProviderKind, getImportableWorkouts, markHealthImported } from './health.js';
 import type { SportType } from './Tracker.js';
 import { generateShareImageFromEnriched, composeActivityReel } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
@@ -1504,6 +1504,14 @@ export class HomeView {
           </span>
           <span class="home-fab__option-label">Add activity</span>
         </button>
+        <button class="home-fab__option" id="fabOptHealth">
+          <span class="home-fab__option-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+            </svg>
+          </span>
+          <span class="home-fab__option-label">Import from Health</span>
+        </button>
       </div>
       <button class="home-fab__btn" id="homeFABBtn" aria-label="Create">
         <svg class="home-fab__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="24" height="24">
@@ -1593,10 +1601,123 @@ export class HomeView {
       );
     });
 
+    // Import from Health (Health Connect / HealthKit) → picker → SaveActivityModal
+    fab.querySelector('#fabOptHealth')?.addEventListener('click', e => {
+      e.stopPropagation();
+      toggleMenu(false);
+      void this._openHealthImport();
+    });
+
     // Close menu on outside click
     document.addEventListener('click', (e) => {
       if (!fab.contains(e.target as Node)) toggleMenu(false);
     });
+  }
+
+  // ── Import workouts from Apple Health / Health Connect ─────────────────────
+  private async _openHealthImport(): Promise<void> {
+    document.getElementById('healthImportOv')?.remove();
+    const ov = document.createElement('div');
+    ov.id = 'healthImportOv';
+    ov.className = 'rwp-overlay';
+    ov.innerHTML = `
+      <div class="rwp-sheet">
+        <div class="rwp-header"><span class="rwp-title">Import from Health</span><button class="rwp-close" id="hiClose" aria-label="Close">✕</button></div>
+        <div class="rwp-list" id="hiList"><p class="rwp-empty">Loading workouts…</p></div>
+      </div>`;
+    document.body.appendChild(ov);
+    const close = (): void => ov.remove();
+    ov.querySelector('#hiClose')?.addEventListener('click', close);
+    ov.addEventListener('click', e => { if (e.target === ov) close(); });
+
+    const list = ov.querySelector<HTMLElement>('#hiList')!;
+    const workouts = await getImportableWorkouts(14);
+    const demo = getHealthProviderKind() === 'mock';
+    if (!workouts.length) {
+      list.innerHTML = '<p class="rwp-empty">No workouts in Health from the last 14 days.<br>Record one with your watch or phone and come back!</p>';
+      return;
+    }
+    list.innerHTML = (demo ? '<p class="hi-demo">~ Demo data (web preview)</p>' : '') + workouts.map((w, i) => {
+      const d = new Date(w.startMs);
+      const meta = [
+        w.distanceKm != null ? `${w.distanceKm.toFixed(2)} km` : null,
+        formatDuration(w.durationSec),
+        w.avgHr != null ? `♥ ${w.avgHr}` : null,
+        w.calories != null ? `${w.calories} kcal` : null,
+      ].filter(Boolean).join(' · ');
+      return `
+        <button class="rwp-item${w.imported ? ' hi-done' : ''}" data-i="${i}" ${w.imported ? 'disabled' : ''}>
+          <span class="rwp-ic" style="background:${getColor(w.sport)}22;color:${getColor(w.sport)}">${getIcon(w.sport)}</span>
+          <span class="rwp-main">
+            <span class="rwp-name">${getSportLabel(w.sport)} · ${d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</span>
+            <span class="rwp-meta">${meta}${w.coords.length ? '' : ' · indoor'} · ${w.sourceName}</span>
+          </span>
+          <span class="rwp-chev">${w.imported ? '✓' : '›'}</span>
+        </button>`;
+    }).join('');
+
+    list.querySelectorAll<HTMLElement>('.rwp-item:not(.hi-done)').forEach(el => el.addEventListener('click', () => {
+      const w = workouts[Number(el.dataset.i)];
+      if (!w) return;
+      close();
+      const durationMin = w.durationSec / 60;
+      const distanceKm = w.distanceKm ?? 0;
+      const activity = {
+        id:          String(Date.now()),
+        sport:       w.sport as import('./Tracker.js').SportType,
+        date:        new Date(w.startMs).toISOString(),
+        distanceKm,
+        durationSec: w.durationSec,
+        paceMinKm:   distanceKm > 0.01 ? durationMin / distanceKm : 0,
+        speedKmH:    durationMin > 0 ? distanceKm / (durationMin / 60) : 0,
+        coords:      w.coords,
+        description: '',
+      };
+      openSaveActivityModal(
+        activity,
+        async (enriched) => {
+          markHealthImported(w.sourceId);
+          // Attach watch metrics the modal doesn't know about, then persist the
+          // enriched record again (local + backend upsert).
+          const withHealth = {
+            ...enriched,
+            avgHr:      w.avgHr,
+            maxHr:      w.maxHr,
+            hrSeries:   w.hrSeries.length ? w.hrSeries : null,
+            calories:   w.calories,
+            source:     'health_connect' as const,
+            sourceId:   w.sourceId,
+            sourceName: w.sourceName,
+          };
+          await CS.saveEnrichedActivity(withHealth);
+          notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);
+          await CS.saveUnifiedWorkout({
+            id:          enriched.id,
+            type:        enriched.sport as import('./UnifiedWorkout.js').WorkoutType,
+            source:      'manual',
+            date:        new Date(enriched.date).toISOString(),
+            distanceKm:  enriched.distanceKm,
+            durationSec: enriched.durationSec,
+            paceMinKm:   enriched.paceMinKm,
+            speedKmH:    enriched.speedKmH,
+            elevGain:    0,
+            coords:      enriched.coords,
+            name:        enriched.name,
+            description: enriched.description,
+            notes:       enriched.notes,
+            intensity:   enriched.intensity,
+            photoUrl:    enriched.photoUrl,
+          });
+          const _userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+          const { loadEnrichedActivities: _hlea, loadUnifiedWorkouts: _hluw, loadPosts: _hlp } = await import('./db.js');
+          const [_enriched2, _unified2, _posts2] = await Promise.all([_hlea(), _hluw(), _hlp()]);
+          await pushNow(_userId, _enriched2, _unified2, _posts2);
+          await this.render();
+          await statsView.render();
+        },
+        undefined,
+      );
+    }));
   }
 
   private _buildGreeting(activityCount: number): HTMLElement {
