@@ -1,6 +1,7 @@
 // ─── TRACKER MODULE ──────────────────────────────────────────────────────────
 // src/modules/Tracker.ts
 import { bgTracker } from './bgTracker.js';
+import { workoutNotification } from './workoutNotification.js';
 export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'];
 export const ALL_SPORTS = [
     // Foot
@@ -384,8 +385,11 @@ export class Tracker {
         if (this._autoPauseOn && this._useMotionAP)
             this._startMotion();
         this.timerInterval = setInterval(() => {
-            if (!this._paused)
-                this.onUpdate(this._buildStats());
+            if (!this._paused) {
+                const stats = this._buildStats();
+                this.onUpdate(stats);
+                this._updateNotification(stats);
+            }
         }, 1000);
     }
     // ── Pause ───────────────────────────────────────────────────────────────────
@@ -419,6 +423,7 @@ export class Tracker {
         this._paused = false;
         this._stopGPS();
         this._stopMotion();
+        void workoutNotification.clear();
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;
@@ -449,6 +454,7 @@ export class Tracker {
     reset() {
         this._stopGPS();
         this._stopMotion();
+        void workoutNotification.clear();
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;
@@ -569,7 +575,9 @@ export class Tracker {
             }).addTo(this.map);
         }
         this.map.panTo([lat, lng], { animate: true, duration: 0.8 });
-        this.onUpdate(this._buildStats());
+        const _st = this._buildStats();
+        this.onUpdate(_st);
+        this._updateNotification(_st); // GPS fixes keep arriving in bg even if the JS timer sleeps
     }
     // ── Auto-pause shared logic (freeze time/distance, keep sensors running) ──
     _enterAutoPause() {
@@ -635,6 +643,20 @@ export class Tracker {
     _elapsedSec() {
         const autoPauseLive = this._autoPaused ? (Date.now() - this._autoPauseStart) : 0;
         return Math.max(0, (Date.now() - this.startTime - this.pausedTime - autoPauseLive) / 1000);
+    }
+    // Live lock-screen notification (Strava-style). Throttled inside the module.
+    _updateNotification(stats) {
+        const label = getSportLabel(this.sport);
+        const title = this._autoPaused
+            ? `MapYou · ${label} (auto-paused)`
+            : `MapYou · ${label}`;
+        const isSpeedSport = this.sport === 'cycling' || this.sport === 'ebike' ||
+            this.sport === 'skiing' || this.sport === 'snowboard';
+        const third = isSpeedSport
+            ? `${stats.speedKmH.toFixed(1)} km/h`
+            : `${formatPace(stats.paceMinKm)} /km`;
+        const body = `${stats.distanceKm.toFixed(2)} km · ${formatDuration(stats.durationSec)} · ${third}`;
+        void workoutNotification.update(title, body);
     }
     _buildStats() {
         const durationSec = Math.floor(this._elapsedSec());

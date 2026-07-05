@@ -3,6 +3,7 @@
 
 import type { Coords } from '../types/index.js';
 import { bgTracker } from './bgTracker.js';
+import { workoutNotification } from './workoutNotification.js';
 
 export type SportType = string;
 
@@ -285,7 +286,11 @@ export class Tracker {
     if (this._autoPauseOn && this._useMotionAP) this._startMotion();
 
     this.timerInterval = setInterval(() => {
-      if (!this._paused) this.onUpdate(this._buildStats());
+      if (!this._paused) {
+        const stats = this._buildStats();
+        this.onUpdate(stats);
+        this._updateNotification(stats);
+      }
     }, 1000);
   }
 
@@ -322,6 +327,7 @@ export class Tracker {
 
     this._stopGPS();
     this._stopMotion();
+    void workoutNotification.clear();
     if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
     if (this.dotMarker)     { this.map.removeLayer(this.dotMarker); this.dotMarker = null; }
 
@@ -350,6 +356,7 @@ export class Tracker {
   reset(): void {
     this._stopGPS();
     this._stopMotion();
+    void workoutNotification.clear();
     if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
     if (this.polyline)  { this.map.removeLayer(this.polyline);  this.polyline  = null; }
     if (this.dotMarker) { this.map.removeLayer(this.dotMarker); this.dotMarker = null; }
@@ -470,7 +477,9 @@ export class Tracker {
     }
 
     this.map.panTo([lat, lng], { animate: true, duration: 0.8 });
-    this.onUpdate(this._buildStats());
+    const _st = this._buildStats();
+    this.onUpdate(_st);
+    this._updateNotification(_st);   // GPS fixes keep arriving in bg even if the JS timer sleeps
   }
 
   // ── Auto-pause shared logic (freeze time/distance, keep sensors running) ──
@@ -530,6 +539,21 @@ export class Tracker {
   private _elapsedSec(): number {
     const autoPauseLive = this._autoPaused ? (Date.now() - this._autoPauseStart) : 0;
     return Math.max(0, (Date.now() - this.startTime - this.pausedTime - autoPauseLive) / 1000);
+  }
+
+  // Live lock-screen notification (Strava-style). Throttled inside the module.
+  private _updateNotification(stats: TrackerStats): void {
+    const label = getSportLabel(this.sport);
+    const title = this._autoPaused
+      ? `MapYou · ${label} (auto-paused)`
+      : `MapYou · ${label}`;
+    const isSpeedSport = this.sport === 'cycling' || this.sport === 'ebike' ||
+                         this.sport === 'skiing' || this.sport === 'snowboard';
+    const third = isSpeedSport
+      ? `${stats.speedKmH.toFixed(1)} km/h`
+      : `${formatPace(stats.paceMinKm)} /km`;
+    const body = `${stats.distanceKm.toFixed(2)} km · ${formatDuration(stats.durationSec)} · ${third}`;
+    void workoutNotification.update(title, body);
   }
 
   private _buildStats(): TrackerStats {
