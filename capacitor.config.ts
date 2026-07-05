@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'www',
   // For fast dev you can point the native shell at your live PWA instead of a
   // bundled copy. Comment out `server` to ship the bundled www/.
-  server: { url: 'https://leszekm12.github.io/Mapty-App', cleartext: false },
+  server: { url: 'https://leszekm12.github.io/MapYou-App', cleartext: false },
 };
 
 export default config;
