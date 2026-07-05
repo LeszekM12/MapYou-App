@@ -7,6 +7,7 @@ import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
 import { SPORT_COLORS, SPORT_ICONS, getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
+import { getWeekSteps, getDaySteps, getCachedDaySteps } from './health.js';
 import type { SportType } from './Tracker.js';
 import { generateShareImageFromEnriched, composeActivityReel } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
@@ -1767,6 +1768,7 @@ export class HomeView {
             <div class="hsc-ovstat"><span class="hsc-ovstat__v">${weekCount}</span><span class="hsc-ovstat__l">Activities</span></div>
             <div class="hsc-ovstat"><span class="hsc-ovstat__v">${formatDuration(weekTime)}</span><span class="hsc-ovstat__l">Time</span></div>
             <div class="hsc-ovstat"><span class="hsc-ovstat__v">${formatDistance(weekDist)}</span><span class="hsc-ovstat__l">Distance (km)</span></div>
+            <div class="hsc-ovstat"><span class="hsc-ovstat__v" id="hscWeekSteps">–</span><span class="hsc-ovstat__l">Steps</span></div>
           </div>
         </div>
       </div>
@@ -1786,6 +1788,12 @@ export class HomeView {
 
     // "See more" → month calendar
     wrap.querySelector('#hscMore')?.addEventListener('click', () => { void this._openStreakCalendar(); });
+
+    // Steps from Health (Health Connect / HealthKit; mock on web) — fill async
+    void getWeekSteps(weekStart).then(steps => {
+      const el = wrap.querySelector<HTMLElement>('#hscWeekSteps');
+      if (el) el.textContent = steps == null ? '–' : steps.toLocaleString('pl-PL');
+    });
 
     return wrap;
   }
@@ -1815,6 +1823,7 @@ export class HomeView {
           <div class="dd-stat"><span class="dd-stat-v">${acts.length}</span><span class="dd-stat-l">Activities</span></div>
           <div class="dd-stat"><span class="dd-stat-v">${formatDistance(totDist)}</span><span class="dd-stat-l">km</span></div>
           <div class="dd-stat"><span class="dd-stat-v">${formatDuration(totTime)}</span><span class="dd-stat-l">Time</span></div>
+          <div class="dd-stat"><span class="dd-stat-v" id="ddSteps">${(() => { const c = getCachedDaySteps(dayMs); return c == null ? '–' : c.toLocaleString('pl-PL'); })()}</span><span class="dd-stat-l">Steps</span></div>
         </div>
         <div class="dd-list">${acts.length
           ? acts.map(a => `
@@ -1832,6 +1841,10 @@ export class HomeView {
 
     ov.querySelector('#ddBack')?.addEventListener('click', () => ov.remove());
     ov.addEventListener('click', e => { if (e.target === ov) ov.remove(); });
+    void getDaySteps(dayMs).then(steps => {
+      const el = ov.querySelector<HTMLElement>('#ddSteps');
+      if (el) el.textContent = steps == null ? '–' : steps.toLocaleString('pl-PL');
+    });
     ov.querySelectorAll<HTMLElement>('.dd-item').forEach(el =>
       el.addEventListener('click', () => {
         const a = acts.find(x => x.id === el.dataset.id);

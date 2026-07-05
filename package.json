@@ -6,11 +6,20 @@
     "build": "tsc",
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
-    "dev": "http-server ."
+    "dev": "http-server .",
+    "build:app": "tsc && node scripts/assemble-www.mjs",
+    "android": "npm run build:app && npx cap copy android && npx cap open android",
+    "android:patch": "node scripts/patch-android.mjs"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.1",
     "@types/leaflet": "^1.9.0",
     "http-server": "^14.1.1",
     "typescript": "^5.4.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "capacitor-health": "^8.1.2"
   }
 }

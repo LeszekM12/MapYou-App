@@ -1,0 +1,8 @@
+# Capacitor / Android — artefakty buildów i ustawienia lokalne
+android/.gradle/
+android/.idea/
+android/.kotlin/
+android/build/
+android/app/build/
+android/local.properties
+android/capacitor-cordova-android-plugins/build/

@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">MapYou</string>
+    <string name="title_activity_main">MapYou</string>
+    <string name="package_name">com.leszekm12.mapyou</string>
+    <string name="custom_url_scheme">com.leszekm12.mapyou</string>
+</resources>
