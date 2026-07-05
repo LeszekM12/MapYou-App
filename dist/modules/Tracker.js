@@ -1,5 +1,6 @@
 // ─── TRACKER MODULE ──────────────────────────────────────────────────────────
 // src/modules/Tracker.ts
+import { bgTracker } from './bgTracker.js';
 export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'];
 export const ALL_SPORTS = [
     // Foot
@@ -226,6 +227,12 @@ export class Tracker {
             writable: true,
             value: null
         });
+        Object.defineProperty(this, "_bgActive", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        }); // background foreground-service GPS in use
         Object.defineProperty(this, "startTime", {
             enumerable: true,
             configurable: true,
@@ -474,9 +481,28 @@ export class Tracker {
     }
     // ── Private ─────────────────────────────────────────────────────────────────
     _startGPS() {
+        // Native: record via a background foreground-service so the route keeps
+        // logging with the screen locked. Web/PWA: foreground watch (Krok A).
+        if (bgTracker.isAvailable()) {
+            this._bgActive = true;
+            const label = getSportLabel(this.sport);
+            void bgTracker.start(pos => this._onPosition(pos), { title: `MapYou · ${label}`, message: 'Nagrywanie trasy…' }, err => console.warn('[Tracker] bg GPS:', err)).then(ok => { if (!ok) {
+                this._bgActive = false;
+                this._startForegroundGPS();
+            } });
+            return;
+        }
+        this._startForegroundGPS();
+    }
+    _startForegroundGPS() {
         this.watchId = navigator.geolocation.watchPosition(pos => this._onPosition(pos), err => console.warn('[Tracker] GPS:', err), { enableHighAccuracy: true, maximumAge: 1000, timeout: 10000 });
     }
     _stopGPS() {
+        if (this._bgActive) {
+            this._bgActive = false;
+            void bgTracker.stop();
+            return;
+        }
         if (this.watchId !== null) {
             navigator.geolocation.clearWatch(this.watchId);
             this.watchId = null;

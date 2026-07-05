@@ -2,6 +2,7 @@
 // src/modules/Tracker.ts
 
 import type { Coords } from '../types/index.js';
+import { bgTracker } from './bgTracker.js';
 
 export type SportType = string;
 
@@ -216,6 +217,7 @@ export class Tracker {
   private polyline:      L.Polyline | null = null;
   private dotMarker:     L.CircleMarker | null = null;
   private watchId:       number | null = null;
+  private _bgActive:     boolean = false;   // background foreground-service GPS in use
   private startTime:     number = 0;
   private pausedTime:    number = 0;   // ms spędzone na pauzie
   private pauseStart:    number = 0;
@@ -377,6 +379,22 @@ export class Tracker {
   // ── Private ─────────────────────────────────────────────────────────────────
 
   private _startGPS(): void {
+    // Native: record via a background foreground-service so the route keeps
+    // logging with the screen locked. Web/PWA: foreground watch (Krok A).
+    if (bgTracker.isAvailable()) {
+      this._bgActive = true;
+      const label = getSportLabel(this.sport);
+      void bgTracker.start(
+        pos => this._onPosition(pos),
+        { title: `MapYou · ${label}`, message: 'Nagrywanie trasy…' },
+        err => console.warn('[Tracker] bg GPS:', err),
+      ).then(ok => { if (!ok) { this._bgActive = false; this._startForegroundGPS(); } });
+      return;
+    }
+    this._startForegroundGPS();
+  }
+
+  private _startForegroundGPS(): void {
     this.watchId = navigator.geolocation.watchPosition(
       pos => this._onPosition(pos),
       err => console.warn('[Tracker] GPS:', err),
@@ -385,6 +403,7 @@ export class Tracker {
   }
 
   private _stopGPS(): void {
+    if (this._bgActive) { this._bgActive = false; void bgTracker.stop(); return; }
     if (this.watchId !== null) {
       navigator.geolocation.clearWatch(this.watchId);
       this.watchId = null;

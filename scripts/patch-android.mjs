@@ -51,6 +51,22 @@ if (!m.includes('ACCESS_FINE_LOCATION')) {
   console.log('• Manifest: uprawnienia lokalizacji już są');
 }
 
+// 1a-ter. Background location + foreground service (Krok B — nagrywanie w tle)
+if (!m.includes('ACCESS_BACKGROUND_LOCATION')) {
+  const bg = `
+    <!-- Krok B: nagrywanie trasy w tle / przy zablokowanym ekranie -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+`;
+  m = m.replace(/<application/, bg + '\n    <application');
+  changed = true;
+  console.log('✓ Manifest: dodano uprawnienia tła + foreground service');
+} else {
+  console.log('• Manifest: uprawnienia tła już są');
+}
+
 // 1b. Permission-rationale activities (inside <application>, before its close)
 if (!m.includes('PermissionsRationaleActivity')) {
   const acts = `

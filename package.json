@@ -18,6 +18,7 @@
     "typescript": "^5.4.0"
   },
   "dependencies": {
+    "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor/android": "^8.4.1",
     "@capacitor/core": "^8.4.1",
     "@capacitor/geolocation": "^8.2.0",
