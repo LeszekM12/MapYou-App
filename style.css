@@ -3971,3 +3971,24 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
 
 /* ── Activity detail: recording device badge (Strava-style) ── */
 .ad-device { display: inline-flex; align-items: center; gap: 7px; margin: -6px 0 12px; padding: 6px 12px; border-radius: 999px; background: var(--app-surface-1, rgba(255,255,255,0.05)); color: var(--app-text-secondary, rgba(255,255,255,0.65)); font-size: 1.25rem; font-weight: 600; }
+
+/* ── Activity detail: analytics charts (pace + HR) ── */
+.ad-chart { width: 100%; height: auto; display: block; margin: 4px 0 6px; }
+.adc-x { font-size: 10px; fill: var(--app-text-tertiary, rgba(255,255,255,0.45)); text-anchor: middle; font-weight: 600; }
+.adc-v { font-size: 9px; fill: var(--app-text-secondary, rgba(255,255,255,0.6)); text-anchor: middle; font-weight: 700; font-variant-numeric: tabular-nums; }
+.adc-y { font-size: 9px; fill: var(--app-text-tertiary, rgba(255,255,255,0.4)); font-variant-numeric: tabular-nums; }
+.adc-avg { stroke: var(--app-text-secondary, rgba(255,255,255,0.55)); stroke-width: 1.4; stroke-dasharray: 5 4; }
+.adc-grid { stroke: var(--app-border, rgba(255,255,255,0.09)); stroke-width: 1; }
+.adc-hr-area { fill: rgba(239, 68, 68, 0.26); }
+.adc-hr-line { fill: none; stroke: #ef4444; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.adc-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 1.25rem; color: var(--app-text-secondary, rgba(255,255,255,0.6)); }
+.adc-meta b { color: var(--app-text-primary, #fff); font-variant-numeric: tabular-nums; }
+
+/* HR zones */
+.adz-note { font-size: 1.15rem; color: var(--app-text-tertiary, rgba(255,255,255,0.45)); margin: 0 0 10px; }
+.adz-row { display: grid; grid-template-columns: 28px 1fr 40px 96px; align-items: center; gap: 8px; margin-bottom: 8px; }
+.adz-name { font-size: 1.25rem; font-weight: 800; color: var(--app-text-primary, #fff); }
+.adz-bar { height: 16px; border-radius: 8px; background: var(--app-surface-1, rgba(255,255,255,0.06)); overflow: hidden; }
+.adz-fill { height: 100%; border-radius: 8px; }
+.adz-pct { font-size: 1.2rem; font-weight: 700; color: var(--app-text-primary, #fff); text-align: right; font-variant-numeric: tabular-nums; }
+.adz-range { font-size: 1.1rem; color: var(--app-text-tertiary, rgba(255,255,255,0.45)); text-align: right; font-variant-numeric: tabular-nums; }

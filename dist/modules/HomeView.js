@@ -792,6 +792,94 @@ export async function openActivityDetail(act, isOwn, actId) {
         }).join('');
         splitsHtml = `<div class="ad-section"><h3 class="ad-section-title">Splity (per km)</h3>${rows}</div>`;
     }
+    // ── (c) Pace analysis — bars per km, Strava-style ───────────────────────────
+    let paceHtml = '';
+    if (Array.isArray(lapsArr) && lapsArr.length > 1) {
+        const paces = lapsArr.map(l => l.paceMinKm || 0).filter(p => p > 0);
+        if (paces.length > 1) {
+            const minP = Math.min(...paces), maxP = Math.max(...paces);
+            const avgP = paces.reduce((a, v) => a + v, 0) / paces.length;
+            const W = 320, H = 150, padL = 6, padB = 20, padT = 10;
+            const n = lapsArr.length, bw = (W - padL * 2) / n;
+            const span = Math.max(0.001, maxP - minP);
+            const yFor = (p) => padT + ((p - minP) / span) * (H - padT - padB) * 0.72;
+            const bars = lapsArr.map((l, i) => {
+                const y = yFor(l.paceMinKm || maxP);
+                const x = padL + i * bw + 2.5;
+                const fast = (l.paceMinKm || 0) === minP;
+                return `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${Math.max(6, bw - 5).toFixed(1)}" height="${(H - padB - y).toFixed(1)}" rx="6" fill="${color}" opacity="${fast ? '1' : '0.68'}"/>
+                <text x="${(x + (bw - 5) / 2).toFixed(1)}" y="${H - 6}" class="adc-x">${l.km}</text>
+                <text x="${(x + (bw - 5) / 2).toFixed(1)}" y="${(y - 5).toFixed(1)}" class="adc-v">${formatPace(l.paceMinKm)}</text>`;
+            }).join('');
+            const avgY = yFor(avgP);
+            const fastIdx = lapsArr.findIndex(l => (l.paceMinKm || 0) === minP);
+            paceHtml = `<div class="ad-section">
+        <h3 class="ad-section-title">Analiza tempa</h3>
+        <svg class="ad-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+          <line x1="${padL}" y1="${avgY.toFixed(1)}" x2="${W - padL}" y2="${avgY.toFixed(1)}" class="adc-avg"/>
+          ${bars}
+        </svg>
+        <div class="adc-meta">
+          <span>Śr. tempo <b>${formatPace(avgP)} /km</b></span>
+          <span>Najszybszy <b>km ${lapsArr[fastIdx]?.km ?? 1} · ${formatPace(minP)}</b></span>
+        </div>
+      </div>`;
+        }
+    }
+    // ── (d) Heart rate — area chart + zones S1–S5 ───────────────────────────────
+    let hrHtml = '';
+    const hrS = (full.hrSeries ?? null);
+    if (Array.isArray(hrS) && hrS.length > 3) {
+        const W = 320, H = 140, padL = 30, padB = 6, padT = 8;
+        const tMax = Math.max(1, hrS[hrS.length - 1][0]);
+        const bpms = hrS.map(x => x[1]);
+        const lo = Math.max(40, Math.min(...bpms) - 8), hi = Math.max(...bpms) + 8;
+        const X = (t) => padL + (t / tMax) * (W - padL - 4);
+        const Y = (b) => padT + (1 - (b - lo) / (hi - lo)) * (H - padT - padB);
+        const line = hrS.map(([t, b]) => `${X(t).toFixed(1)},${Y(b).toFixed(1)}`).join(' ');
+        const area = `${X(hrS[0][0]).toFixed(1)},${H - padB} ${line} ${X(tMax).toFixed(1)},${H - padB}`;
+        // ticks: 3 horizontal grid lines
+        const ticks = [0.25, 0.5, 0.75].map(f => { const b = Math.round(lo + (hi - lo) * f); const y = Y(b); return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - 4}" y2="${y.toFixed(1)}" class="adc-grid"/><text x="2" y="${(y + 3).toFixed(1)}" class="adc-y">${b}</text>`; }).join('');
+        // zones from HR max (birthDate → 220-age; fallback 190)
+        let hrMaxTheo = 190;
+        const bd = profile.birthDate;
+        if (bd) {
+            const age = Math.floor((Date.now() - Date.parse(bd)) / (365.25 * 864e5));
+            if (age > 5 && age < 110)
+                hrMaxTheo = 220 - age;
+        }
+        const bounds = [0.65, 0.75, 0.85, 0.95].map(f => Math.round(hrMaxTheo * f));
+        const zoneOf = (b) => b < bounds[0] ? 0 : b < bounds[1] ? 1 : b < bounds[2] ? 2 : b < bounds[3] ? 3 : 4;
+        const timeIn = [0, 0, 0, 0, 0];
+        for (let i = 0; i < hrS.length - 1; i++)
+            timeIn[zoneOf(hrS[i][1])] += Math.max(0, hrS[i + 1][0] - hrS[i][0]);
+        const tot = timeIn.reduce((a, v) => a + v, 0) || 1;
+        const pct = timeIn.map(v => Math.round((v / tot) * 100));
+        const zoneLbl = [`0–${bounds[0] - 1}`, `${bounds[0]}–${bounds[1] - 1}`, `${bounds[1]}–${bounds[2] - 1}`, `${bounds[2]}–${bounds[3] - 1}`, `> ${bounds[3]}`];
+        const zoneCol = ['#f8a5a5', '#f47c7c', '#ef4444', '#c62828', '#8e1616'];
+        const zoneRows = [4, 3, 2, 1, 0].map(z => `
+      <div class="adz-row">
+        <span class="adz-name">S${z + 1}</span>
+        <div class="adz-bar"><div class="adz-fill" style="width:${Math.max(2, pct[z])}%;background:${zoneCol[z]}"></div></div>
+        <span class="adz-pct">${pct[z]}%</span>
+        <span class="adz-range">${zoneLbl[z]} BPM</span>
+      </div>`).join('');
+        hrHtml = `<div class="ad-section">
+      <h3 class="ad-section-title">Tętno</h3>
+      <svg class="ad-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+        ${ticks}
+        <polygon points="${area}" class="adc-hr-area"/>
+        <polyline points="${line}" class="adc-hr-line"/>
+      </svg>
+      <div class="adc-meta">
+        ${full.avgHr != null ? `<span>Średnie <b>${full.avgHr} BPM</b></span>` : ''}
+        ${full.maxHr != null ? `<span>Maksymalne <b>${full.maxHr} BPM</b></span>` : ''}
+      </div>
+      <h3 class="ad-section-title" style="margin-top:14px">Strefy tętna</h3>
+      <p class="adz-note">Na podstawie tętna maksymalnego ${hrMaxTheo} BPM${bd ? '' : ' (ustaw datę urodzenia w profilu, aby doprecyzować)'}.</p>
+      ${zoneRows}
+    </div>`;
+    }
     const notesHtml = (isOwn && full.notes)
         ? `<div class="ad-section"><h3 class="ad-section-title">Notatki</h3><p class="ad-notes">🔒 ${full.notes}</p></div>`
         : '';
@@ -856,6 +944,8 @@ export async function openActivityDetail(act, isOwn, actId) {
 
       ${photoHtml}
       ${splitsHtml}
+      ${paceHtml}
+      ${hrHtml}
       ${notesHtml}
 
       <div class="home-card__footer ad-footer" style="border-top:1px solid var(--app-border)">
