@@ -1104,9 +1104,36 @@ export async function openActivityDetail(act, isOwn, actId) {
     const grab = ov.querySelector('.ad-grab');
     if (sheet && grab) {
         let startY = 0, startT = 0, curT = 0, dragging = false;
-        const expandedT = 0; // translateY 0 → full 80vh visible
-        const defaultT = () => Math.round(window.innerHeight * 0.24); // rest: ~56vh visible
+        const expandedT = 0; // translateY 0 → FULL SCREEN (100dvh sheet)
+        const defaultT = () => Math.round(window.innerHeight * 0.44); // rest: ~56vh visible
         const maxT = () => Math.max(0, sheet.offsetHeight - 150); // collapsed: 150px peek
+        // Strava-style top bar: appears once the sheet passes ~80% of the screen.
+        // Fixed overlay with safe-area padding (fixes the PWA status-bar overlap).
+        const topbar = document.createElement('div');
+        topbar.className = 'ad-topbar';
+        topbar.innerHTML = `
+      <button class="ad-topbar__btn" id="adTbClose" aria-label="Collapse">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="22" height="22"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <span class="ad-topbar__title">${(full.name || '').replace(/</g, '&lt;') || getSportLabel(full.sport)}</span>
+      <span class="ad-topbar__actions">
+        ${hasRoute ? `<button class="ad-topbar__btn" id="adTbBookmark" aria-label="Save route">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
+        </button>` : ''}
+        ${isOwn ? `<button class="ad-topbar__btn" id="adTbMore" aria-label="Options">
+          <svg viewBox="0 0 24 24" fill="currentColor" width="20" height="20"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>
+        </button>` : ''}
+      </span>`;
+        ov.appendChild(topbar);
+        const setTopbar = () => { topbar.classList.toggle('ad-topbar--on', curT < window.innerHeight * 0.2); };
+        // Top bar buttons proxy the hero controls (one source of logic)
+        topbar.querySelector('#adTbClose')?.addEventListener('click', () => {
+            curT = defaultT();
+            sheet.style.transform = `translateY(${curT}px)`;
+            setTopbar();
+        });
+        topbar.querySelector('#adTbBookmark')?.addEventListener('click', () => ov.querySelector('#adBookmark')?.click());
+        topbar.querySelector('#adTbMore')?.addEventListener('click', () => ov.querySelector('#adMore')?.click());
         // Start at the comfortable default position (not fully expanded)
         curT = defaultT();
         sheet.style.transform = `translateY(${curT}px)`;
@@ -1127,6 +1154,7 @@ export async function openActivityDetail(act, isOwn, actId) {
             t = Math.max(expandedT, Math.min(maxT(), t));
             curT = t;
             sheet.style.transform = `translateY(${t}px)`;
+            setTopbar();
         });
         const end = () => {
             if (!dragging)
@@ -1134,7 +1162,7 @@ export async function openActivityDetail(act, isOwn, actId) {
             dragging = false;
             sheet.style.transition = '';
             const dT = defaultT(), mT = maxT();
-            // Snap to the nearest of: expanded (80%) / default (~56%) / collapsed (peek)
+            // Snap to the nearest of: full screen / default (~56%) / collapsed (peek)
             if (curT < dT * 0.5)
                 curT = expandedT;
             else if (curT < (dT + mT) / 2)
@@ -1142,6 +1170,7 @@ export async function openActivityDetail(act, isOwn, actId) {
             else
                 curT = mT;
             sheet.style.transform = `translateY(${curT}px)`;
+            setTopbar();
         };
         grab.addEventListener('pointerup', end);
         grab.addEventListener('pointercancel', end);
