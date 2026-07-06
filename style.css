@@ -3961,3 +3961,13 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
 .hi-demo { text-align: center; font-size: 1.15rem; color: var(--app-text-tertiary, rgba(255,255,255,0.45)); margin: 2px 0 6px; }
 .rwp-item.hi-done { opacity: 0.45; }
 .rwp-item.hi-done .rwp-chev { color: var(--color-brand--2, #00c46a); font-weight: 800; }
+
+/* ── Health import diagnostics ── */
+.hi-diag { background: var(--app-surface-1, rgba(255,255,255,0.05)); border-radius: 14px; padding: 12px 14px; margin: 8px 12px 4px; }
+.hi-diag__t { font-size: 1.3rem; font-weight: 700; color: var(--app-text-primary, #fff); margin: 0 0 8px; }
+.hi-diag__p { font-size: 1.2rem; line-height: 1.5; color: var(--app-text-secondary, rgba(255,255,255,0.65)); margin: 0 0 8px; }
+.hi-diag__p b { color: var(--app-text-primary, #fff); }
+.hi-openhc { width: 100%; margin-top: 4px; padding: 11px; border: none; border-radius: 12px; background: var(--color-brand--2, #00c46a); color: #fff; font-size: 1.35rem; font-weight: 800; cursor: pointer; font-family: inherit; }
+
+/* ── Activity detail: recording device badge (Strava-style) ── */
+.ad-device { display: inline-flex; align-items: center; gap: 7px; margin: -6px 0 12px; padding: 6px 12px; border-radius: 999px; background: var(--app-surface-1, rgba(255,255,255,0.05)); color: var(--app-text-secondary, rgba(255,255,255,0.65)); font-size: 1.25rem; font-weight: 600; }

@@ -6,7 +6,7 @@ import { openPublicProfile } from './PublicProfile.js';
 import { BACKEND_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
 import { getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
-import { getWeekSteps, getDaySteps, getCachedDaySteps, getHealthProviderKind, getImportableWorkouts, markHealthImported } from './health.js';
+import { getWeekSteps, getDaySteps, getCachedDaySteps, getHealthProviderKind, getImportableWorkouts, markHealthImported, openHealthConnectSettings } from './health.js';
 import { generateShareImageFromEnriched, composeActivityReel } from './ShareImage.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { getNotifications, getUnreadCount, markAllRead, clearAll, onNotificationsChange, notifyActivityAdded, syncFromBackend, markAllReadRemote, } from './NotificationsService.js';
@@ -778,7 +778,7 @@ export async function openActivityDetail(act, isOwn, actId) {
         : '';
     // Splits — author only, only when real laps exist
     let splitsHtml = '';
-    const lapsArr = rec.laps;
+    const lapsArr = (full.laps ?? rec.laps);
     if (isOwn && Array.isArray(lapsArr) && lapsArr.length > 0) {
         const laps = lapsArr;
         const slowest = Math.max(...laps.map(l => l.paceMinKm || 0)) || 1; // longest bar = slowest
@@ -845,8 +845,14 @@ export async function openActivityDetail(act, isOwn, actId) {
         <div class="ad-stat"><span class="ad-stat-v">${full.distanceKm.toFixed(2)}</span><span class="ad-stat-l">Dystans (km)</span></div>
         <div class="ad-stat"><span class="ad-stat-v">${timeFmt}</span><span class="ad-stat-l">Czas</span></div>
         <div class="ad-stat"><span class="ad-stat-v">${paceFmt}</span><span class="ad-stat-l">${isCycle ? 'Prędkość' : 'Tempo'} (${paceLbl})</span></div>
-        <div class="ad-stat"><span class="ad-stat-v">${kcal}</span><span class="ad-stat-l">Kalorie (szac.)</span></div>
+        <div class="ad-stat"><span class="ad-stat-v">${full.calories ?? kcal}</span><span class="ad-stat-l">${full.calories != null ? 'Kalorie' : 'Kalorie (szac.)'}</span></div>
+        ${full.avgHr != null ? `<div class="ad-stat"><span class="ad-stat-v">${full.avgHr}</span><span class="ad-stat-l">Śr. tętno (BPM)</span></div>` : ''}
+        ${full.maxHr != null ? `<div class="ad-stat"><span class="ad-stat-v">${full.maxHr}</span><span class="ad-stat-l">Maks. tętno (BPM)</span></div>` : ''}
       </div>
+      ${full.sourceName ? `<div class="ad-device">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="17" height="17"><rect x="7" y="5" width="10" height="14" rx="3"/><path d="M9 2h6M9 22h6"/></svg>
+        <span>${full.sourceName}</span>
+      </div>` : ''}
 
       ${photoHtml}
       ${splitsHtml}
@@ -1735,7 +1741,17 @@ export class HomeView {
         const workouts = await getImportableWorkouts(14);
         const demo = getHealthProviderKind() === 'mock';
         if (!workouts.length) {
-            list.innerHTML = '<p class="rwp-empty">No workouts in Health from the last 14 days.<br>Record one with your watch or phone and come back!</p>';
+            list.innerHTML = demo
+                ? '<p class="rwp-empty">No workouts in Health from the last 14 days.<br>Record one with your watch or phone and come back!</p>'
+                : `<p class="rwp-empty">No workouts found in Health Connect (last 14 days).</p>
+           <div class="hi-diag">
+             <p class="hi-diag__t">Most likely your fitness app isn't syncing to Health Connect yet:</p>
+             <p class="hi-diag__p"><b>Samsung Health / Strava / Garmin →</b> open its settings → <b>Health Connect</b> → turn on syncing for <b>Exercise, Distance, Heart rate</b>.</p>
+             <p class="hi-diag__p"><b>Check it worked:</b> Health Connect → <b>Data and access</b> should list "Exercise". If it only shows "Steps", the source isn't sharing workouts yet.</p>
+             <p class="hi-diag__p"><b>Tip:</b> very short workouts (under ~1 min) are often skipped. Record 5+ min with GPS on.</p>
+             <button class="hi-openhc" id="hiOpenHc">Open Health Connect</button>
+           </div>`;
+            ov.querySelector('#hiOpenHc')?.addEventListener('click', () => { void openHealthConnectSettings(); });
             return;
         }
         list.innerHTML = (demo ? '<p class="hi-demo">~ Demo data (web preview)</p>' : '') + workouts.map((w, i) => {
@@ -1787,6 +1803,7 @@ export class HomeView {
                     source: 'health_connect',
                     sourceId: w.sourceId,
                     sourceName: w.sourceName,
+                    laps: w.laps.length ? w.laps : enriched.laps,
                 };
                 await CS.saveEnrichedActivity(withHealth);
                 notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport);

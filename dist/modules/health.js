@@ -70,13 +70,13 @@ class MockHealthProvider {
                 sourceId: 'mock_run_1', sourceName: 'Demo Watch', sport: 'running',
                 startMs: y, endMs: y + 31 * 60000, durationSec: 31 * 60,
                 distanceKm: 5.21, calories: 402, avgHr: 152, maxHr: 176,
-                hrSeries: mkHr(31 * 60, 148, 12), coords: route,
+                hrSeries: mkHr(31 * 60, 148, 12), laps: [{ km: 1, durationSec: 352, paceMinKm: 352 / 60 }, { km: 2, durationSec: 341, paceMinKm: 341 / 60 }, { km: 3, durationSec: 366, paceMinKm: 366 / 60 }, { km: 4, durationSec: 349, paceMinKm: 349 / 60 }, { km: 5, durationSec: 338, paceMinKm: 338 / 60 }], coords: route,
             },
             {
                 sourceId: 'mock_gym_1', sourceName: 'Demo Watch', sport: 'strength',
                 startMs: y + 10 * 3600000, endMs: y + 10 * 3600000 + 45 * 60000, durationSec: 45 * 60,
                 distanceKm: null, calories: 310, avgHr: 121, maxHr: 149,
-                hrSeries: mkHr(45 * 60, 118, 16), coords: [],
+                hrSeries: mkHr(45 * 60, 118, 16), laps: [], coords: [],
             },
         ];
     }
@@ -162,12 +162,34 @@ class NativeHealthProvider {
         if (Number.isNaN(startMs) || Number.isNaN(endMs))
             return null;
         const durationSec = w.duration && w.duration > 0 ? Math.round(w.duration) : Math.round((endMs - startMs) / 1000);
-        const coords = (w.route ?? [])
+        const pts = (w.route ?? [])
             .map(pt => {
             const lat = pt.lat ?? pt.latitude, lng = pt.lng ?? pt.longitude;
-            return (typeof lat === 'number' && typeof lng === 'number') ? [lat, lng] : null;
+            if (typeof lat !== 'number' || typeof lng !== 'number')
+                return null;
+            const tMs = typeof pt.timestamp === 'number' ? pt.timestamp : pt.time ? Date.parse(pt.time) : NaN;
+            return { lat, lng, t: tMs };
         })
             .filter((c) => c !== null);
+        const coords = pts.map(p => [p.lat, p.lng]);
+        // Per-km splits when route points carry timestamps
+        const laps = [];
+        if (pts.length > 2 && pts.every(p => !Number.isNaN(p.t))) {
+            const R = 6371000, rad = Math.PI / 180;
+            let acc = 0, lapStartT = pts[0].t, km = 1;
+            for (let i = 1; i < pts.length; i++) {
+                const a = pts[i - 1], b = pts[i];
+                const dLat = (b.lat - a.lat) * rad, dLng = (b.lng - a.lng) * rad;
+                const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2;
+                acc += 2 * R * Math.asin(Math.sqrt(h));
+                if (acc >= km * 1000) {
+                    const durS = Math.max(1, Math.round((b.t - lapStartT) / 1000));
+                    laps.push({ km, durationSec: durS, paceMinKm: (durS / 60) });
+                    lapStartT = b.t;
+                    km++;
+                }
+            }
+        }
         const hrRaw = (w.heartRate ?? [])
             .map(h => {
             const bpm = h.bpm ?? h.value;
@@ -204,6 +226,7 @@ class NativeHealthProvider {
             avgHr: hrs.length ? Math.round(hrs.reduce((s, v) => s + v, 0) / hrs.length) : null,
             maxHr: hrs.length ? Math.round(Math.max(...hrs)) : null,
             hrSeries,
+            laps,
             coords,
         };
     }
@@ -323,5 +346,28 @@ export async function getImportableWorkouts(days = 14) {
     const list = await p.getWorkouts(now - days * DAY, now);
     const done = getImportedHealthIds();
     return list.map(w => ({ ...w, imported: done.has(w.sourceId) }));
+}
+/** Open the Health Connect settings screen (native only; no-op on web). */
+export async function openHealthConnectSettings() {
+    const cap = globalThis.Capacitor;
+    if (!cap?.isNativePlatform?.())
+        return;
+    const p = cap.Plugins?.['HealthPlugin'];
+    try {
+        if (p?.openHealthConnectSettings) {
+            await p.openHealthConnectSettings();
+            return;
+        }
+        if (p?.openHealthSettings) {
+            await p.openHealthSettings();
+            return;
+        }
+    }
+    catch { /* fall through */ }
+    // Fallback: Android intent URI understood by the WebView shell
+    try {
+        window.open('intent://#Intent;action=android.health.connect.action.HEALTH_HOME_SETTINGS;end', '_system');
+    }
+    catch { /* ignore */ }
 }
 //# sourceMappingURL=health.js.map
