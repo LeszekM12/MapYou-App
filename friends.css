@@ -446,3 +446,8 @@ body.light-mode .ff-card__stat-val { color: #111; }
 body.light-mode .ff-card__stat-lbl { color: #888; }
 body.light-mode .ff-empty { color: #aaa; }
 body.light-mode .ff-section-title { color: #555; }
+
+/* ── iOS SAFE AREA: panel live-share kończy się nad wyższą nawigacją ── */
+.fls-panel {
+  bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
+}

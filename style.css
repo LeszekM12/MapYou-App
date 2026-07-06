@@ -4027,3 +4027,20 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
         padding-top: env(safe-area-inset-top, 0px);
     }
 }
+
+/* ── Dolna nawigacja: wysokość rośnie o "brodę" iPhone'a (ikony wracają) ── */
+.bottom-nav {
+    height: calc(5.8rem + env(safe-area-inset-bottom, 0px));
+}
+.bottom-nav__icon { flex-shrink: 0; }
+
+/* Elementy zakotwiczone tuż nad nawigacją rosną razem z nią */
+.tab-panel {
+    bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
+}
+.tab-panel--tracker {
+    bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+.map-style-panel {
+    bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px));
+}
