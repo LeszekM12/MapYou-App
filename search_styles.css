@@ -511,3 +511,11 @@
   background: rgba(0,196,106,0.18) !important;
   transform: scale(0.98);
 }
+
+/* ═══ iOS SAFE AREA — widok szczegółów klubu ═══ */
+.sv2-club-detail__back {
+  top: calc(16px + env(safe-area-inset-top, 0px));
+}
+.sv2-club-detail__edit-banner {
+  top: calc(12px + env(safe-area-inset-top, 0px));
+}

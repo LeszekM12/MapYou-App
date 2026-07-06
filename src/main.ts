@@ -103,6 +103,13 @@ interface CommunityRoute {
 
 // ─── DOM refs (module-level, identical to script.js) ─────────────────────────
 
+// Migration promise — declared at module top so switchTab() (which may run
+// before the bootstrap code below) can safely reference it. Assigned later,
+// during startup. iOS Safari enforces the temporal-dead-zone strictly, so a
+// `const` declared further down would crash with "Cannot access before
+// initialization"; a hoisted `let` avoids that.
+let _migrationReady: Promise<void> = Promise.resolve();
+
 const form             = document.querySelector<HTMLFormElement>('.form')!;
 const containerWorkouts= document.querySelector<HTMLElement>('.workouts')!;
 const inputType        = document.querySelector<HTMLSelectElement>('.form__input--type')!;
@@ -3414,7 +3421,7 @@ window.app = new App();
       activeTab = tabId;
       if (tabId === 'tabStats') {
         document.getElementById('tabStats')?.classList.add('tab-panel--active');
-        void _migrationReady.then(() => statsView.init());
+        void _migrationReady.catch(() => {}).then(() => statsView.init());
       } else {
         document.getElementById('tabStats')?.classList.remove('tab-panel--active');
       }
@@ -3467,7 +3474,7 @@ window.app = new App();
     } else {
       hideMobileSearchTab();
     }
-    if (activeTab === 'tabStats') void _migrationReady.then(() => statsView.init());
+    if (activeTab === 'tabStats') void _migrationReady.catch(() => {}).then(() => statsView.init());
   }
 
   // mirrorWorkoutList replaced by StatsView
@@ -3625,7 +3632,7 @@ initUserProfile();
 // Migracja danych do unified workouts model
 // Remove old migration flag so re-migration runs on every start (safe — uses upsert)
 localStorage.removeItem('mapyou_unified_migrated');
-const _migrationReady = migrateToUnified();
+_migrationReady = migrateToUnified();
 
 // Pokaż modal imienia przy pierwszym uruchomieniu
 void showNameModalIfNeeded();

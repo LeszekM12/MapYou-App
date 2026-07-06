@@ -2657,3 +2657,8 @@ video.home-reel-viewer__media {
   border-radius: 50%;
   background: conic-gradient(rgba(255,255,255,0.25) 0deg 360deg);
 }
+
+/* ═══ iOS SAFE AREA — nagłówek Home poniżej zegara/wyspy ═══ */
+.home-greeting {
+  padding-top: calc(24px + env(safe-area-inset-top, 0px));
+}

@@ -110,10 +110,22 @@ export class StatsView {
         if (this._inited)
             return;
         this._inited = true;
-        await this.render();
+        try {
+            await this.render();
+        }
+        catch (e) {
+            this._inited = false; // allow retry on next tab tap
+            console.error('[StatsView] init failed:', e);
+        }
     }
     async render() {
-        this._workouts = await loadUnifiedWorkouts();
+        try {
+            this._workouts = await loadUnifiedWorkouts();
+        }
+        catch (e) {
+            console.error('[StatsView] loadUnifiedWorkouts failed:', e);
+            this._workouts = []; // render empty state instead of nothing
+        }
         this._renderShell();
         this._bindSubTabs();
         this._showSubTab(this._subTab);
