@@ -760,6 +760,80 @@ function openActivityOptionsMenu(
   });
 }
 
+
+// ── (e) Elevation profile — Open-Meteo Elevation API, cached on the record ───
+async function _fillElevation(root: HTMLElement, full: EnrichedActivity, canPersist: boolean): Promise<void> {
+  const slot = root.querySelector<HTMLElement>('#adElevSlot');
+  if (!slot) return;
+  const coords = (Array.isArray(full.coords) ? full.coords : []) as Array<[number, number]>;
+  if (coords.length < 5) return;
+
+  let series = (full.elevSeries ?? null) as Array<[number, number]> | null;
+  let gain = full.elevGain ?? null;
+
+  if (!series) {
+    // Sample route to ≤100 pts (API limit), compute cumulative distances
+    const step = Math.max(1, Math.ceil(coords.length / 100));
+    const pts: Array<[number, number]> = [];
+    for (let i = 0; i < coords.length; i += step) pts.push(coords[i]);
+    if (pts[pts.length - 1] !== coords[coords.length - 1]) pts.push(coords[coords.length - 1]);
+    const R = 6371000, rad = Math.PI / 180;
+    const dist: number[] = [0];
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      const dLat = (b[0] - a[0]) * rad, dLng = (b[1] - a[1]) * rad;
+      const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * rad) * Math.cos(b[0] * rad) * Math.sin(dLng / 2) ** 2;
+      dist.push(dist[i - 1] + 2 * R * Math.asin(Math.sqrt(h)));
+    }
+    try {
+      const url = `https://api.open-meteo.com/v1/elevation?latitude=${pts.map(p => p[0].toFixed(5)).join(',')}&longitude=${pts.map(p => p[1].toFixed(5)).join(',')}`;
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const d = await res.json() as { elevation?: number[] };
+      const elev = d.elevation ?? [];
+      if (elev.length !== pts.length) return;
+      // Light smoothing (moving average w=3) to tame DEM noise
+      const sm = elev.map((_, i) => {
+        const a = elev[Math.max(0, i - 1)], b = elev[i], c = elev[Math.min(elev.length - 1, i + 1)];
+        return (a + b + c) / 3;
+      });
+      series = sm.map((e, i) => [Math.round(dist[i]), Math.round(e * 10) / 10] as [number, number]);
+      let g = 0;
+      for (let i = 1; i < sm.length; i++) { const dv = sm[i] - sm[i - 1]; if (dv > 0) g += dv; }
+      gain = Math.round(g);
+      if (canPersist) {
+        try { await CS.saveEnrichedActivity({ ...full, elevSeries: series, elevGain: gain }); } catch { /* ignore */ }
+      }
+    } catch { return; }
+  }
+  if (!series || series.length < 3) return;
+
+  const W = 320, H = 130, padL = 32, padB = 16, padT = 6;
+  const dMax = Math.max(1, series[series.length - 1][0]);
+  const evs = series.map(x => x[1]);
+  const lo = Math.floor(Math.min(...evs) - 2), hi = Math.ceil(Math.max(...evs) + 2);
+  const X = (m: number): number => padL + (m / dMax) * (W - padL - 4);
+  const Y = (e: number): number => padT + (1 - (e - lo) / Math.max(1, hi - lo)) * (H - padT - padB);
+  const line = series.map(([m, e]) => `${X(m).toFixed(1)},${Y(e).toFixed(1)}`).join(' ');
+  const area = `${X(series[0][0]).toFixed(1)},${H - padB} ${line} ${X(dMax).toFixed(1)},${H - padB}`;
+  const yTicks = [0.5].map(f => { const e = Math.round(lo + (hi - lo) * f); const y = Y(e); return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${W - 4}" y2="${y.toFixed(1)}" class="adc-grid"/><text x="2" y="${(y + 3).toFixed(1)}" class="adc-y">${e}m</text>`; }).join('');
+  const kmTicks = [0.25, 0.5, 0.75].map(f => { const m = dMax * f; return `<text x="${X(m).toFixed(1)}" y="${H - 4}" class="adc-x">${(m / 1000).toFixed(1)}</text>`; }).join('');
+  const maxE = Math.round(Math.max(...evs));
+  slot.innerHTML = `<div class="ad-section">
+    <h3 class="ad-section-title">Wysokość</h3>
+    <svg class="ad-chart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+      ${yTicks}
+      <polygon points="${area}" class="adc-elev-area"/>
+      <polyline points="${line}" class="adc-elev-line"/>
+      ${kmTicks}
+    </svg>
+    <div class="adc-meta">
+      <span>Suma przewyższeń <b>${gain ?? '–'} m</b></span>
+      <span>Maks. wysokość <b>${maxE} m</b></span>
+    </div>
+  </div>`;
+}
+
 export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, actId?: string): Promise<void> {
   document.getElementById('activityDetailOverlay')?.remove();
   if (_adMap) { try { _adMap.remove(); } catch { /* ignore */ } _adMap = null; }
@@ -979,6 +1053,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
       ${splitsHtml}
       ${paceHtml}
       ${hrHtml}
+      <div id="adElevSlot"></div>
       ${notesHtml}
 
       <div class="home-card__footer ad-footer" style="border-top:1px solid var(--app-border)">
@@ -1010,6 +1085,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
     </div>`;
 
   document.body.appendChild(ov);
+  void _fillElevation(ov, full, isOwn);
 
   const close = () => {
     if (_adMap) { try { _adMap.remove(); } catch { /* ignore */ } _adMap = null; }

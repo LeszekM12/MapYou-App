@@ -3992,3 +3992,7 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
 .adz-fill { height: 100%; border-radius: 8px; }
 .adz-pct { font-size: 1.2rem; font-weight: 700; color: var(--app-text-primary, #fff); text-align: right; font-variant-numeric: tabular-nums; }
 .adz-range { font-size: 1.1rem; color: var(--app-text-tertiary, rgba(255,255,255,0.45)); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* elevation profile (grey, Strava-style) */
+.adc-elev-area { fill: rgba(148, 152, 158, 0.4); }
+.adc-elev-line { fill: none; stroke: rgba(122, 126, 132, 0.95); stroke-width: 1.6; stroke-linejoin: round; }
