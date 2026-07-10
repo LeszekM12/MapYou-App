@@ -3,6 +3,12 @@
 import { bgTracker } from './bgTracker.js';
 import { workoutNotification } from './workoutNotification.js';
 import { workoutLiveActivity } from './liveActivity.js';
+// Native-iOS detection — used to pick the GPS-speed auto-pause path there
+// (devicemotion is suspended by iOS whenever the screen locks).
+function isIosNative() {
+    const cap = globalThis.Capacitor;
+    return !!cap?.isNativePlatform?.() && cap?.getPlatform?.() === 'ios';
+}
 export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'];
 export const ALL_SPORTS = [
     // Foot
@@ -356,7 +362,11 @@ export class Tracker {
     setAutoPause(on) {
         this._autoPauseOn = on;
         // Foot sports → accelerometer (like Strava running); others → GPS speed (like Strava cycling)
-        this._useMotionAP = on && Tracker.MOTION_SPORTS.includes(this.sport);
+        // EXCEPT native iOS: the web devicemotion API is suspended the moment the
+        // screen locks, which killed auto-pause in the background. Native GPS fixes
+        // (with coords.speed) keep flowing while locked, so iOS uses the GPS path
+        // for every sport.
+        this._useMotionAP = on && Tracker.MOTION_SPORTS.includes(this.sport) && !isIosNative();
         if (this._active && this._useMotionAP)
             this._startMotion();
         else
@@ -678,6 +688,7 @@ export class Tracker {
     _liveStats(stats) {
         const isSpeedSport = this.sport === 'cycling' || this.sport === 'ebike' ||
             this.sport === 'skiing' || this.sport === 'snowboard';
+        const paused = this._paused || this._autoPaused;
         return {
             time: formatDuration(stats.durationSec),
             dist: `${stats.distanceKm.toFixed(2)} km`,
@@ -686,6 +697,12 @@ export class Tracker {
                 : `${formatPace(stats.paceMinKm)} /km`,
             thirdLabel: isSpeedSport ? 'SPEED' : 'PACE',
             state: this._autoPaused ? 'Auto-paused' : (this._paused ? 'Paused' : ''),
+            // Anchor for the native ticking timer: (now − timerRef) = active elapsed.
+            // pausedTime grows on every resume, pushing the anchor forward so pauses
+            // are excluded. While paused the timer is hidden (opacity), so the
+            // momentarily-stale anchor is never visible.
+            timerRef: this.startTime + this.pausedTime,
+            paused,
         };
     }
     _buildStats() {

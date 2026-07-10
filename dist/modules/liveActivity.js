@@ -41,6 +41,27 @@ function systemPalette() {
 const ISLAND_ACCENT = '#4ade80';
 const ISLAND_TEXT = '#ffffff';
 const ISLAND_MUTED = '#9ca3af';
+function laData(s) {
+    return {
+        time: s.time, dist: s.dist, third: s.third, thirdLabel: s.thirdLabel,
+        state: s.state, timerRef: s.timerRef,
+        runOp: s.paused ? 0 : 1, // opacity of the ticking native timer
+        pauseOp: s.paused ? 1 : 0, // opacity of the frozen time text
+    };
+}
+/** TIME cell: native self-ticking timer overlaid (stack) with a frozen text.
+ *  Data-bound opacities decide which one is visible — running vs paused. */
+function timeStack(fontSize, color) {
+    const base = [{ fontSize }, { fontWeight: 'bold' }, { color }, { monospacedDigit: true }];
+    return {
+        type: 'container',
+        properties: [{ direction: 'stack' }],
+        children: [
+            { type: 'timer', properties: [{ endTime: '{{timerRef}}' }, { style: 'timer' }, ...base, { opacity: '{{runOp}}' }] },
+            { type: 'text', properties: [{ text: '{{time}}' }, ...base, { opacity: '{{pauseOp}}' }] },
+        ],
+    };
+}
 const UPDATE_MS = 1000; // tracker ticks at 1 s — push every tick, no faster
 function statCol(valueKey, label, valueColor, p) {
     return {
@@ -73,7 +94,12 @@ function lockLayout(sport, sportLabel, p) {
                 type: 'container',
                 properties: [{ direction: 'horizontal' }, { spacing: 24 }],
                 children: [
-                    statCol('time', 'TIME', p.text, p),
+                    { type: 'container',
+                        properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
+                        children: [
+                            timeStack(22, p.text),
+                            { type: 'text', properties: [{ text: 'TIME' }, { fontSize: 11 }, { color: p.muted }] },
+                        ] },
                     statCol('dist', 'DISTANCE', p.accent, p),
                     { type: 'container',
                         properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
@@ -90,11 +116,11 @@ function islandLayout(sport, sportLabel) {
     const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ISLAND_ACCENT }] };
     return {
         compactLeading: icon,
-        compactTrailing: { type: 'text', properties: [{ text: '{{time}}' }, { color: ISLAND_ACCENT }, { monospacedDigit: true }] },
+        compactTrailing: timeStack(14, ISLAND_ACCENT),
         minimal: icon,
         expanded: {
             leading: { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_ACCENT }] },
-            trailing: { type: 'text', properties: [{ text: '{{time}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_TEXT }, { monospacedDigit: true }] },
+            trailing: timeStack(16, ISLAND_TEXT),
             bottom: { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: ISLAND_MUTED }] },
         },
     };
@@ -133,7 +159,7 @@ class WorkoutLiveActivity {
             const res = await p.startActivity({
                 layout: lockLayout(sportKey, sportLabel, pal),
                 dynamicIslandLayout: islandLayout(sportKey, sportLabel),
-                data: { time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '' },
+                data: laData({ time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '', timerRef: Date.now(), paused: false }),
                 behavior: { systemActionForegroundColor: pal.accent, keyLineTint: pal.accent },
             });
             this._id = res?.activityId ?? null;
@@ -154,7 +180,7 @@ class WorkoutLiveActivity {
             return;
         this._lastPush = now;
         try {
-            await p.updateActivity({ activityId: this._id, data: { ...s } });
+            await p.updateActivity({ activityId: this._id, data: laData(s) });
         }
         catch { /* non-critical */ }
     }
@@ -170,7 +196,7 @@ class WorkoutLiveActivity {
         try {
             await p.endActivity({
                 activityId: id,
-                ...(final ? { data: { ...final, state: 'Finished' } } : {}),
+                ...(final ? { data: laData({ ...final, state: 'Finished', paused: true }) } : {}),
             });
         }
         catch { /* non-critical */ }
