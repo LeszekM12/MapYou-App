@@ -41,24 +41,33 @@ function systemPalette() {
 const ISLAND_ACCENT = '#4ade80';
 const ISLAND_TEXT = '#ffffff';
 const ISLAND_MUTED = '#9ca3af';
-function laData(s) {
+function laData(s, pal) {
+    const paused = s.paused;
     return {
         time: s.time, dist: s.dist, third: s.third, thirdLabel: s.thirdLabel,
         state: s.state, timerRef: s.timerRef,
-        runOp: s.paused ? 0 : 1, // opacity of the ticking native timer
-        pauseOp: s.paused ? 1 : 0, // opacity of the frozen time text
+        // Visibility — TWO independent mechanisms (belt & braces, both data-bound):
+        // 1) opacity as STRINGS "1"/"0" (numeric 0/1 can be mis-decoded as Bool
+        //    by the widget's JSON layer and then silently ignored),
+        // 2) color swapped to the parser's 'clear' keyword when hidden.
+        runOp: paused ? '0' : '1',
+        pauseOp: paused ? '1' : '0',
+        lockT: paused ? 'clear' : pal.text, lockF: paused ? pal.text : 'clear',
+        cmpT: paused ? 'clear' : ISLAND_ACCENT, cmpF: paused ? ISLAND_ACCENT : 'clear',
+        expT: paused ? 'clear' : ISLAND_TEXT, expF: paused ? ISLAND_TEXT : 'clear',
     };
 }
 /** TIME cell: native self-ticking timer overlaid (stack) with a frozen text.
- *  Data-bound opacities decide which one is visible — running vs paused. */
-function timeStack(fontSize, color) {
-    const base = [{ fontSize }, { fontWeight: 'bold' }, { color }, { monospacedDigit: true }];
+ *  Data-bound opacity AND color decide which is visible — running vs paused.
+ *  colorKeys: 'lock' | 'cmp' | 'exp' (per-placement visible colors in data). */
+function timeStack(fontSize, colorKey) {
+    const base = [{ fontSize }, { fontWeight: 'bold' }, { monospacedDigit: true }];
     return {
         type: 'container',
         properties: [{ direction: 'stack' }],
         children: [
-            { type: 'timer', properties: [{ endTime: '{{timerRef}}' }, { style: 'timer' }, ...base, { opacity: '{{runOp}}' }] },
-            { type: 'text', properties: [{ text: '{{time}}' }, ...base, { opacity: '{{pauseOp}}' }] },
+            { type: 'timer', properties: [{ endTime: '{{timerRef}}' }, { style: 'timer' }, ...base, { color: `{{${colorKey}T}}` }, { opacity: '{{runOp}}' }] },
+            { type: 'text', properties: [{ text: '{{time}}' }, ...base, { color: `{{${colorKey}F}}` }, { opacity: '{{pauseOp}}' }] },
         ],
     };
 }
@@ -97,7 +106,7 @@ function lockLayout(sport, sportLabel, p) {
                     { type: 'container',
                         properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
                         children: [
-                            timeStack(22, p.text),
+                            timeStack(22, 'lock'),
                             { type: 'text', properties: [{ text: 'TIME' }, { fontSize: 11 }, { color: p.muted }] },
                         ] },
                     statCol('dist', 'DISTANCE', p.accent, p),
@@ -116,11 +125,11 @@ function islandLayout(sport, sportLabel) {
     const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ISLAND_ACCENT }] };
     return {
         compactLeading: icon,
-        compactTrailing: timeStack(14, ISLAND_ACCENT),
+        compactTrailing: timeStack(14, 'cmp'),
         minimal: icon,
         expanded: {
             leading: { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_ACCENT }] },
-            trailing: timeStack(16, ISLAND_TEXT),
+            trailing: timeStack(16, 'exp'),
             bottom: { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: ISLAND_MUTED }] },
         },
     };
@@ -145,6 +154,12 @@ class WorkoutLiveActivity {
             writable: true,
             value: 0
         });
+        Object.defineProperty(this, "_pal", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: DARK_P
+        }); // chosen at start(), reused by update/end
     }
     isAvailable() { return laPlugin() !== null; }
     get active() { return this._id !== null; }
@@ -156,10 +171,11 @@ class WorkoutLiveActivity {
         this._starting = true;
         try {
             const pal = systemPalette();
+            this._pal = pal;
             const res = await p.startActivity({
                 layout: lockLayout(sportKey, sportLabel, pal),
                 dynamicIslandLayout: islandLayout(sportKey, sportLabel),
-                data: laData({ time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '', timerRef: Date.now(), paused: false }),
+                data: laData({ time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '', timerRef: Date.now(), paused: false }, pal),
                 behavior: { systemActionForegroundColor: pal.accent, keyLineTint: pal.accent },
             });
             this._id = res?.activityId ?? null;
@@ -180,7 +196,7 @@ class WorkoutLiveActivity {
             return;
         this._lastPush = now;
         try {
-            await p.updateActivity({ activityId: this._id, data: laData(s) });
+            await p.updateActivity({ activityId: this._id, data: laData(s, this._pal) });
         }
         catch { /* non-critical */ }
     }
@@ -196,7 +212,7 @@ class WorkoutLiveActivity {
         try {
             await p.endActivity({
                 activityId: id,
-                ...(final ? { data: laData({ ...final, state: 'Finished', paused: true }) } : {}),
+                ...(final ? { data: laData({ ...final, state: 'Finished', paused: true }, this._pal) } : {}),
             });
         }
         catch { /* non-critical */ }
