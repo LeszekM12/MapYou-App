@@ -54,7 +54,9 @@ class BgTracker {
                 backgroundMessage: notif.message,
                 requestPermissions: true, // shows the location permission popup on first use
                 stale: false,
-                distanceFilter: 5, // metres — good balance of detail vs battery
+                distanceFilter: 0, // every fix (~1 Hz) — keeps Live Activity
+                // ticking on the lock screen; route/distance
+                // noise is filtered in Tracker (MIN_STEP_M)
             }, (loc, err) => {
                 if (err) {
                     onError?.(err.code ?? 'error');

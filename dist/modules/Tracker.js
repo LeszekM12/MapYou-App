@@ -552,14 +552,22 @@ export class Tracker {
         if (this._autoPaused) {
             if (this.dotMarker)
                 this.dotMarker.setLatLng([lat, lng]);
-            this.onUpdate(this._buildStats());
+            const apStats = this._buildStats();
+            this.onUpdate(apStats);
+            this._updateNotification(apStats); // keep the Live Activity fresh ("Auto-paused" + frozen time)
             return;
         }
+        // Accept a new route point only after real movement (≥ MIN_STEP_M from the
+        // last accepted point). GPS now delivers ~1 fix/s (distanceFilter: 0 keeps
+        // the Live Activity ticking in the background), so without this gate the
+        // stationary jitter would inflate distance and bloat the route.
+        const MIN_STEP_M = 3;
+        let accepted = true;
         if (this.coords.length > 0) {
             const prev = this.coords[this.coords.length - 1];
             const dist = L.latLng(prev[0], prev[1]).distanceTo(L.latLng(lat, lng));
-            // Filtruj skoki GPS > 50m/s (błędy GPS)
-            if (dist < 50)
+            accepted = dist >= MIN_STEP_M && dist < 50; // jitter floor + GPS-jump ceiling
+            if (accepted)
                 this.distanceM += dist;
         }
         // Record per-km splits (laps) as each kilometre boundary is crossed
@@ -570,8 +578,10 @@ export class Tracker {
             this._lastLapSec = cumSec;
             this._laps.push({ km: this._laps.length + 1, durationSec: lapSec, paceMinKm: lapSec / 60 });
         }
-        this.coords.push(newCoord);
-        this.polyline?.addLatLng(L.latLng(lat, lng));
+        if (accepted) {
+            this.coords.push(newCoord);
+            this.polyline?.addLatLng(L.latLng(lat, lng));
+        }
         if (this.dotMarker) {
             this.dotMarker.setLatLng([lat, lng]);
         }
@@ -593,6 +603,7 @@ export class Tracker {
         this._autoPaused = true;
         this._autoPauseStart = Date.now();
         this.onUpdate(this._buildStats());
+        void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
     }
     _exitAutoPause() {
         if (!this._autoPaused)
@@ -600,6 +611,7 @@ export class Tracker {
         this.pausedTime += Date.now() - this._autoPauseStart; // freeze elapsed
         this._autoPaused = false;
         this.onUpdate(this._buildStats());
+        void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
     }
     // ── Accelerometer-based rest detection (foot sports, like Strava running) ──
     _startMotion() {
