@@ -2,6 +2,7 @@
 // src/modules/Tracker.ts
 import { bgTracker } from './bgTracker.js';
 import { workoutNotification } from './workoutNotification.js';
+import { workoutLiveActivity } from './liveActivity.js';
 export const BUILTIN_SPORTS = ['running', 'walking', 'cycling'];
 export const ALL_SPORTS = [
     // Foot
@@ -384,6 +385,7 @@ export class Tracker {
         this._startGPS();
         if (this._autoPauseOn && this._useMotionAP)
             this._startMotion();
+        void workoutLiveActivity.start(this.sport, getSportLabel(this.sport));
         this.timerInterval = setInterval(() => {
             if (!this._paused) {
                 const stats = this._buildStats();
@@ -403,6 +405,8 @@ export class Tracker {
         // Clear any in-progress auto-pause (manual pause takes over)
         this._autoPaused = false;
         this._belowSince = null;
+        // Ticks freeze while paused — push the "Paused" state to the island now.
+        void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
     }
     // ── Resume ──────────────────────────────────────────────────────────────────
     resume() {
@@ -414,6 +418,7 @@ export class Tracker {
         if (this._autoPauseOn && this._useMotionAP)
             this._startMotion();
         this.onUpdate(this._buildStats());
+        void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
     }
     // ── Stop ────────────────────────────────────────────────────────────────────
     stop() {
@@ -433,6 +438,7 @@ export class Tracker {
             this.dotMarker = null;
         }
         const stats = this._buildStats();
+        void workoutLiveActivity.end(this._liveStats(stats));
         const now = new Date().toISOString();
         const months = ['January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'];
@@ -455,6 +461,7 @@ export class Tracker {
         this._stopGPS();
         this._stopMotion();
         void workoutNotification.clear();
+        void workoutLiveActivity.end();
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;
@@ -650,13 +657,24 @@ export class Tracker {
         const title = this._autoPaused
             ? `MapYou · ${label} (auto-paused)`
             : `MapYou · ${label}`;
+        const la = this._liveStats(stats);
+        const body = `${stats.distanceKm.toFixed(2)} km · ${formatDuration(stats.durationSec)} · ${la.third}`;
+        void workoutNotification.update(title, body);
+        void workoutLiveActivity.update(la);
+    }
+    // Shared formatter for the iOS Live Activity (lock screen + Dynamic Island).
+    _liveStats(stats) {
         const isSpeedSport = this.sport === 'cycling' || this.sport === 'ebike' ||
             this.sport === 'skiing' || this.sport === 'snowboard';
-        const third = isSpeedSport
-            ? `${stats.speedKmH.toFixed(1)} km/h`
-            : `${formatPace(stats.paceMinKm)} /km`;
-        const body = `${stats.distanceKm.toFixed(2)} km · ${formatDuration(stats.durationSec)} · ${third}`;
-        void workoutNotification.update(title, body);
+        return {
+            time: formatDuration(stats.durationSec),
+            dist: `${stats.distanceKm.toFixed(2)} km`,
+            third: isSpeedSport
+                ? `${stats.speedKmH.toFixed(1)} km/h`
+                : `${formatPace(stats.paceMinKm)} /km`,
+            thirdLabel: isSpeedSport ? 'SPEED' : 'PACE',
+            state: this._autoPaused ? 'Auto-paused' : (this._paused ? 'Paused' : ''),
+        };
     }
     _buildStats() {
         const durationSec = Math.floor(this._elapsedSec());
