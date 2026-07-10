@@ -12,6 +12,11 @@ function lnPlugin() {
     const cap = globalThis.Capacitor;
     if (!cap?.isNativePlatform?.())
         return null;
+    // iOS has no Android-style silent "ongoing" notifications — re-posting there
+    // banners/stacks every update. On iOS the Live Activity (liveActivity.ts)
+    // carries the lock-screen stats instead, so this module is Android-only.
+    if (cap.getPlatform?.() === 'ios')
+        return null;
     return cap.Plugins?.['LocalNotifications'] ?? null;
 }
 const NOTIF_ID = 4242;

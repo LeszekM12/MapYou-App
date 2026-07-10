@@ -27,51 +27,59 @@ const SF_ICONS = {
     swimming: 'figure.pool.swim',
 };
 function sfIcon(sport) { return SF_ICONS[sport] ?? 'figure.run'; }
-// Theme (MapYou dark)
-const BG = '#141417';
-const ACCENT = '#4ade80';
-const TEXT = '#ffffff';
-const MUTED = '#9ca3af';
-const WARN = '#fbbf24';
+const DARK_P = { bg: '#141417', text: '#ffffff', muted: '#9ca3af', accent: '#4ade80', warn: '#fbbf24' };
+const LIGHT_P = { bg: '#ffffff', text: '#111114', muted: '#6b7280', accent: '#16a34a', warn: '#d97706' };
+function systemPalette() {
+    try {
+        return globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches ? DARK_P : LIGHT_P;
+    }
+    catch {
+        return DARK_P;
+    }
+}
+// Island palette (fixed — the island pill is always dark)
+const ISLAND_ACCENT = '#4ade80';
+const ISLAND_TEXT = '#ffffff';
+const ISLAND_MUTED = '#9ca3af';
 const UPDATE_MS = 1000; // tracker ticks at 1 s — push every tick, no faster
-function statCol(valueKey, label, valueColor) {
+function statCol(valueKey, label, valueColor, p) {
     return {
         type: 'container',
         properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
         children: [
             { type: 'text', properties: [{ text: `{{${valueKey}}}` }, { fontSize: 22 }, { fontWeight: 'bold' }, { color: valueColor }, { monospacedDigit: true }] },
-            { type: 'text', properties: [{ text: label }, { fontSize: 11 }, { color: MUTED }] },
+            { type: 'text', properties: [{ text: label }, { fontSize: 11 }, { color: p.muted }] },
         ],
     };
 }
-function lockLayout(sport, sportLabel) {
+function lockLayout(sport, sportLabel, p) {
     return {
         type: 'container',
         properties: [
             { direction: 'vertical' }, { spacing: 10 }, { padding: 14 },
-            { backgroundColor: BG }, { cornerRadius: 16 },
+            { backgroundColor: p.bg }, { cornerRadius: 16 },
         ],
         children: [
             {
                 type: 'container',
                 properties: [{ direction: 'horizontal' }, { spacing: 8 }],
                 children: [
-                    { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ACCENT }, { width: 18 }, { height: 18 }] },
-                    { type: 'text', properties: [{ text: `MapYou · ${sportLabel}` }, { fontSize: 14 }, { fontWeight: 'semibold' }, { color: TEXT }] },
-                    { type: 'text', properties: [{ text: '{{state}}' }, { fontSize: 12 }, { color: WARN }] },
+                    { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: p.accent }, { width: 18 }, { height: 18 }] },
+                    { type: 'text', properties: [{ text: `MapYou · ${sportLabel}` }, { fontSize: 14 }, { fontWeight: 'semibold' }, { color: p.text }] },
+                    { type: 'text', properties: [{ text: '{{state}}' }, { fontSize: 12 }, { color: p.warn }] },
                 ],
             },
             {
                 type: 'container',
                 properties: [{ direction: 'horizontal' }, { spacing: 24 }],
                 children: [
-                    statCol('time', 'TIME', TEXT),
-                    statCol('dist', 'DISTANCE', ACCENT),
+                    statCol('time', 'TIME', p.text, p),
+                    statCol('dist', 'DISTANCE', p.accent, p),
                     { type: 'container',
                         properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
                         children: [
-                            { type: 'text', properties: [{ text: '{{third}}' }, { fontSize: 22 }, { fontWeight: 'bold' }, { color: TEXT }, { monospacedDigit: true }] },
-                            { type: 'text', properties: [{ text: '{{thirdLabel}}' }, { fontSize: 11 }, { color: MUTED }] },
+                            { type: 'text', properties: [{ text: '{{third}}' }, { fontSize: 22 }, { fontWeight: 'bold' }, { color: p.text }, { monospacedDigit: true }] },
+                            { type: 'text', properties: [{ text: '{{thirdLabel}}' }, { fontSize: 11 }, { color: p.muted }] },
                         ] },
                 ],
             },
@@ -79,15 +87,15 @@ function lockLayout(sport, sportLabel) {
     };
 }
 function islandLayout(sport, sportLabel) {
-    const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ACCENT }] };
+    const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ISLAND_ACCENT }] };
     return {
         compactLeading: icon,
-        compactTrailing: { type: 'text', properties: [{ text: '{{time}}' }, { color: ACCENT }, { monospacedDigit: true }] },
+        compactTrailing: { type: 'text', properties: [{ text: '{{time}}' }, { color: ISLAND_ACCENT }, { monospacedDigit: true }] },
         minimal: icon,
         expanded: {
-            leading: { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ACCENT }] },
-            trailing: { type: 'text', properties: [{ text: '{{time}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: TEXT }, { monospacedDigit: true }] },
-            bottom: { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: MUTED }] },
+            leading: { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_ACCENT }] },
+            trailing: { type: 'text', properties: [{ text: '{{time}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_TEXT }, { monospacedDigit: true }] },
+            bottom: { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: ISLAND_MUTED }] },
         },
     };
 }
@@ -121,11 +129,12 @@ class WorkoutLiveActivity {
             return;
         this._starting = true;
         try {
+            const pal = systemPalette();
             const res = await p.startActivity({
-                layout: lockLayout(sportKey, sportLabel),
+                layout: lockLayout(sportKey, sportLabel, pal),
                 dynamicIslandLayout: islandLayout(sportKey, sportLabel),
                 data: { time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '' },
-                behavior: { systemActionForegroundColor: ACCENT, keyLineTint: ACCENT },
+                behavior: { systemActionForegroundColor: pal.accent, keyLineTint: pal.accent },
             });
             this._id = res?.activityId ?? null;
         }

@@ -39,12 +39,23 @@ const SF_ICONS: Record<string, string> = {
 };
 function sfIcon(sport: string): string { return SF_ICONS[sport] ?? 'figure.run'; }
 
-// Theme (MapYou dark)
-const BG      = '#141417';
-const ACCENT  = '#4ade80';
-const TEXT    = '#ffffff';
-const MUTED   = '#9ca3af';
-const WARN    = '#fbbf24';
+// Theme — resolved at activity start. The WebView's prefers-color-scheme
+// mirrors the iOS system appearance, so the lock-screen card matches the
+// phone's theme. (Layout ships at start, so a theme change applies from the
+// next workout.) The Dynamic Island is always black glass — it keeps the
+// dark palette regardless of theme.
+interface Palette { bg: string; text: string; muted: string; accent: string; warn: string; }
+const DARK_P:  Palette = { bg: '#141417', text: '#ffffff', muted: '#9ca3af', accent: '#4ade80', warn: '#fbbf24' };
+const LIGHT_P: Palette = { bg: '#ffffff', text: '#111114', muted: '#6b7280', accent: '#16a34a', warn: '#d97706' };
+function systemPalette(): Palette {
+  try {
+    return globalThis.matchMedia?.('(prefers-color-scheme: dark)').matches ? DARK_P : LIGHT_P;
+  } catch { return DARK_P; }
+}
+// Island palette (fixed — the island pill is always dark)
+const ISLAND_ACCENT = '#4ade80';
+const ISLAND_TEXT   = '#ffffff';
+const ISLAND_MUTED  = '#9ca3af';
 
 /** Live values pushed on every update. All pre-formatted strings. */
 export interface LiveStats {
@@ -57,45 +68,45 @@ export interface LiveStats {
 
 const UPDATE_MS = 1000; // tracker ticks at 1 s — push every tick, no faster
 
-function statCol(valueKey: string, label: string, valueColor: string) {
+function statCol(valueKey: string, label: string, valueColor: string, p: Palette) {
   return {
     type: 'container',
     properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
     children: [
       { type: 'text', properties: [{ text: `{{${valueKey}}}` }, { fontSize: 22 }, { fontWeight: 'bold' }, { color: valueColor }, { monospacedDigit: true }] },
-      { type: 'text', properties: [{ text: label }, { fontSize: 11 }, { color: MUTED }] },
+      { type: 'text', properties: [{ text: label }, { fontSize: 11 }, { color: p.muted }] },
     ],
   };
 }
 
-function lockLayout(sport: string, sportLabel: string) {
+function lockLayout(sport: string, sportLabel: string, p: Palette) {
   return {
     type: 'container',
     properties: [
       { direction: 'vertical' }, { spacing: 10 }, { padding: 14 },
-      { backgroundColor: BG }, { cornerRadius: 16 },
+      { backgroundColor: p.bg }, { cornerRadius: 16 },
     ],
     children: [
       { // header: icon · "MapYou · Running" · state (right)
         type: 'container',
         properties: [{ direction: 'horizontal' }, { spacing: 8 }],
         children: [
-          { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ACCENT }, { width: 18 }, { height: 18 }] },
-          { type: 'text',  properties: [{ text: `MapYou · ${sportLabel}` }, { fontSize: 14 }, { fontWeight: 'semibold' }, { color: TEXT }] },
-          { type: 'text',  properties: [{ text: '{{state}}' }, { fontSize: 12 }, { color: WARN }] },
+          { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: p.accent }, { width: 18 }, { height: 18 }] },
+          { type: 'text',  properties: [{ text: `MapYou · ${sportLabel}` }, { fontSize: 14 }, { fontWeight: 'semibold' }, { color: p.text }] },
+          { type: 'text',  properties: [{ text: '{{state}}' }, { fontSize: 12 }, { color: p.warn }] },
         ],
       },
       { // stats row: TIME · DISTANCE · PACE/SPEED
         type: 'container',
         properties: [{ direction: 'horizontal' }, { spacing: 24 }],
         children: [
-          statCol('time',  'TIME',            TEXT),
-          statCol('dist',  'DISTANCE',        ACCENT),
+          statCol('time',  'TIME',            p.text,   p),
+          statCol('dist',  'DISTANCE',        p.accent, p),
           { type: 'container',
             properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
             children: [
-              { type: 'text', properties: [{ text: '{{third}}' }, { fontSize: 22 }, { fontWeight: 'bold' }, { color: TEXT }, { monospacedDigit: true }] },
-              { type: 'text', properties: [{ text: '{{thirdLabel}}' }, { fontSize: 11 }, { color: MUTED }] },
+              { type: 'text', properties: [{ text: '{{third}}' }, { fontSize: 22 }, { fontWeight: 'bold' }, { color: p.text }, { monospacedDigit: true }] },
+              { type: 'text', properties: [{ text: '{{thirdLabel}}' }, { fontSize: 11 }, { color: p.muted }] },
             ] },
         ],
       },
@@ -104,15 +115,15 @@ function lockLayout(sport: string, sportLabel: string) {
 }
 
 function islandLayout(sport: string, sportLabel: string) {
-  const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ACCENT }] };
+  const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ISLAND_ACCENT }] };
   return {
     compactLeading:  icon,
-    compactTrailing: { type: 'text', properties: [{ text: '{{time}}' }, { color: ACCENT }, { monospacedDigit: true }] },
+    compactTrailing: { type: 'text', properties: [{ text: '{{time}}' }, { color: ISLAND_ACCENT }, { monospacedDigit: true }] },
     minimal:         icon,
     expanded: {
-      leading:  { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ACCENT }] },
-      trailing: { type: 'text', properties: [{ text: '{{time}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: TEXT }, { monospacedDigit: true }] },
-      bottom:   { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: MUTED }] },
+      leading:  { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_ACCENT }] },
+      trailing: { type: 'text', properties: [{ text: '{{time}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_TEXT }, { monospacedDigit: true }] },
+      bottom:   { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: ISLAND_MUTED }] },
     },
   };
 }
@@ -131,11 +142,12 @@ class WorkoutLiveActivity {
     if (!p || this._id || this._starting) return;
     this._starting = true;
     try {
+      const pal = systemPalette();
       const res = await p.startActivity({
-        layout: lockLayout(sportKey, sportLabel),
+        layout: lockLayout(sportKey, sportLabel, pal),
         dynamicIslandLayout: islandLayout(sportKey, sportLabel),
         data: { time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '' },
-        behavior: { systemActionForegroundColor: ACCENT, keyLineTint: ACCENT },
+        behavior: { systemActionForegroundColor: pal.accent, keyLineTint: pal.accent },
       });
       this._id = res?.activityId ?? null;
     } catch (e) {
