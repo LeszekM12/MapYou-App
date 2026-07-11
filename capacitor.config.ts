@@ -7,6 +7,12 @@ const config: CapacitorConfig = {
   // For fast dev you can point the native shell at your live PWA instead of a
   // bundled copy. Comment out `server` to ship the bundled www/.
   server: { url: 'https://leszekm12.github.io/MapYou-App', cleartext: false },
+  plugins: {
+    FirebaseMessaging: {
+      // Show pushes even while the app is in the foreground (iOS)
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+  },
 };
 
 export default config;

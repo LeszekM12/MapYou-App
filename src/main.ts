@@ -37,6 +37,7 @@ import {
   sendWeatherPush,
   syncLocationToBackend,
 } from './modules/PushNotifications.js';
+import { initNativePush, nativePushAvailable } from './modules/nativePush.js';
 import { Tracker, type SportType, type ActivityRecord, formatDuration, formatPace, formatDistance, SPORT_COLORS, isTrackable, getAllSports, getCustomSports, saveCustomSport, deleteCustomSport, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
 import { getSavedRoutes, saveRoute, unsaveRoute, type SavedRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
@@ -49,7 +50,7 @@ import { openSportPicker } from './modules/SportPicker.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
-import { showNameModalIfNeeded, openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal } from './modules/UserName.js';
+import { showNameModalIfNeeded, openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal, showRestoreAccountModal } from './modules/UserName.js';
 import { initUserProfile, loadProfileFromLocal } from './modules/UserProfile.js';
 import { syncToMongoIfNeeded } from './modules/syncToMongo.js';
 import { CS, encodePolyline, decodePolyline } from './modules/cloudSync.js';
@@ -415,8 +416,10 @@ class App {
       this.#recenterTimer = setTimeout(() => { this.#userTouchingMap = false; }, 5000);
     });
     // Przy każdym starcie wyślij subskrypcję do backendu (naprawia reset MemoryDB)
-    void resubscribeIfNeeded();
-    void initPushNotifications().then(async () => {
+    // Native shells (Android/iOS) use FCM via nativePush; browser/PWA keeps the
+    // service-worker web push. Exactly one path runs — no duplicate deliveries.
+    if (!nativePushAvailable()) void resubscribeIfNeeded();
+    void (nativePushAvailable() ? initNativePush() : initPushNotifications()).then(async () => {
       // Persist location for server-side scheduled weather pushes
       void syncLocationToBackend();
       // longBreak ma priorytet — jeśli wysłany, pomijamy welcomeBack
@@ -3646,6 +3649,11 @@ document.getElementById('btnChangeName')?.addEventListener('click', () => {
 document.getElementById('settingRecovery')?.addEventListener('click', () => {
   const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
   if (userId) void showRecoveryCodeModal(userId);
+});
+
+// ─── Przywracanie konta z kodu (Settings) ────────────────────────────────────
+document.getElementById('settingRestore')?.addEventListener('click', () => {
+  showRestoreAccountModal();
 });
 
 // ─── Sync to cloud button (Settings) ─────────────────────────────────────────

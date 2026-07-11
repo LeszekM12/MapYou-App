@@ -207,7 +207,7 @@ export function showNameModal(prefill?: string): Promise<void> {
 
 // ── Restore panel ─────────────────────────────────────────────────────────────
 
-function _showRestorePanel(modal: HTMLElement, resolve: () => void): void {
+function _showRestorePanel(modal: HTMLElement, resolve: () => void, backToNameSetup = true): void {
   const card = modal.querySelector<HTMLElement>('.name-modal__card')!;
   card.innerHTML = `
     <div class="name-modal__icon">🔑</div>
@@ -226,7 +226,7 @@ function _showRestorePanel(modal: HTMLElement, resolve: () => void): void {
     />
     <div class="name-modal__restore-status" id="restoreStatus" style="color:#ef4444;font-size:13px;min-height:20px;margin-bottom:8px"></div>
     <button class="name-modal__btn" id="restoreSubmit">Restore account 🔑</button>
-    <button class="name-modal__recover-link" id="restoreBack">← Back</button>`;
+    <button class="name-modal__recover-link" id="restoreBack">${backToNameSetup ? '← Back' : 'Cancel'}</button>`;
 
   const input = card.querySelector<HTMLInputElement>('#restoreCodeInput')!;
   const status = card.querySelector<HTMLElement>('#restoreStatus')!;
@@ -234,7 +234,8 @@ function _showRestorePanel(modal: HTMLElement, resolve: () => void): void {
 
   card.querySelector('#restoreBack')?.addEventListener('click', () => {
     modal.remove();
-    void showNameModal();
+    if (backToNameSetup) void showNameModal();
+    else resolve();
   });
 
   const doRestore = async () => {
@@ -264,6 +265,8 @@ function _showRestorePanel(modal: HTMLElement, resolve: () => void): void {
     // Wyczyść flagę syncu żeby hydratacja pobrała dane
     localStorage.removeItem('mapyou_mongo_synced');
     localStorage.removeItem('mapyou_hydrated_at');
+    // Wymuś ponowną rejestrację push pod NOWYM userId (web push i FCM)
+    localStorage.removeItem('mapyou_fcm_token');
     // Ustaw flagę że imię jest ustawione (zostało przywrócone)
     localStorage.setItem('mapyou_nameSet', '1');
 
@@ -283,6 +286,21 @@ function _showRestorePanel(modal: HTMLElement, resolve: () => void): void {
 }
 
 // ── Settings integration ──────────────────────────────────────────────────────
+
+/** Restore-account modal opened from Settings (switch this device to an
+ *  existing account by entering its 6-digit recovery code). Reuses the same
+ *  panel as the first-run flow; "Cancel" just closes instead of returning to
+ *  name setup. On success the panel swaps both identity keys, resets sync
+ *  flags and push-token cache, then reloads the app. */
+export function showRestoreAccountModal(): void {
+  document.getElementById('restoreAccountModal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'restoreAccountModal';
+  modal.className = 'name-modal';
+  modal.innerHTML = `<div class="name-modal__card"></div>`;
+  document.body.appendChild(modal);
+  _showRestorePanel(modal, () => {}, /* backToNameSetup */ false);
+}
 
 export function openChangeNameModal(): void {
   void showNameModal(getUserName());
