@@ -89,9 +89,14 @@ function laData(s: LiveStats, pal: Palette): Record<string, unknown> {
 
 /** TIME cell: native self-ticking timer overlaid (stack) with a frozen text.
  *  Data-bound opacity AND color decide which is visible — running vs paused.
- *  colorKeys: 'lock' | 'cmp' | 'exp' (per-placement visible colors in data). */
-function timeStack(fontSize: number, colorKey: 'lock' | 'cmp' | 'exp') {
-  const base = [{ fontSize }, { fontWeight: 'bold' }, { monospacedDigit: true }];
+ *  Apple's Text(.timer) is width-greedy and left-aligned, which shoved the
+ *  lock-screen value sideways and inflated the Dynamic Island pill — hence
+ *  the FIXED width + centered alignment on both layers. */
+function timeStack(fontSize: number, colorKey: 'lock' | 'cmp' | 'exp', width: number) {
+  const base = [
+    { fontSize }, { fontWeight: 'bold' }, { monospacedDigit: true },
+    { width }, { alignment: 'center' },
+  ];
   return {
     type: 'container',
     properties: [{ direction: 'stack' }],
@@ -139,7 +144,7 @@ function lockLayout(sport: string, sportLabel: string, p: Palette) {
           { type: 'container',
             properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
             children: [
-              timeStack(22, 'lock'),
+              timeStack(22, 'lock', 96),
               { type: 'text', properties: [{ text: 'TIME' }, { fontSize: 11 }, { color: p.muted }] },
             ] },
           statCol('dist',  'DISTANCE',        p.accent, p),
@@ -159,11 +164,11 @@ function islandLayout(sport: string, sportLabel: string) {
   const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ISLAND_ACCENT }] };
   return {
     compactLeading:  icon,
-    compactTrailing: timeStack(14, 'cmp'),
+    compactTrailing: timeStack(13, 'cmp', 50),
     minimal:         icon,
     expanded: {
       leading:  { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_ACCENT }] },
-      trailing: timeStack(16, 'exp'),
+      trailing: timeStack(16, 'exp', 64),
       bottom:   { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: ISLAND_MUTED }] },
     },
   };

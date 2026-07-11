@@ -314,6 +314,12 @@ export class Tracker {
             writable: true,
             value: null
         }); // ms since speed dropped below threshold (GPS path)
+        Object.defineProperty(this, "_apAnchor", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        }); // anchor for stationary detection (null-speed iOS path)
         // Per-km splits (laps)
         Object.defineProperty(this, "_laps", {
             enumerable: true,
@@ -386,6 +392,7 @@ export class Tracker {
         this.startTime = Date.now();
         this._autoPaused = false;
         this._belowSince = null;
+        this._apAnchor = null;
         this._laps = [];
         this._lastLapSec = 0;
         const color = getColor(this.sport);
@@ -415,6 +422,7 @@ export class Tracker {
         // Clear any in-progress auto-pause (manual pause takes over)
         this._autoPaused = false;
         this._belowSince = null;
+        this._apAnchor = null;
         // Ticks freeze while paused — push the "Paused" state to the island now.
         void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
     }
@@ -490,6 +498,7 @@ export class Tracker {
         this._paused = false;
         this._autoPaused = false;
         this._belowSince = null;
+        this._apAnchor = null;
         this._laps = [];
         this._lastLapSec = 0;
     }
@@ -539,14 +548,30 @@ export class Tracker {
         // ── Auto-pause (GPS path): for cycling/other sports, like Strava cycling ──
         if (this._autoPauseOn && !this._useMotionAP) {
             const THRESH_MS = 0.28; // 1 km/h in m/s — "completely stopped"
-            let spd = pos.coords.speed != null && !Number.isNaN(pos.coords.speed)
-                ? pos.coords.speed : NaN;
-            if (Number.isNaN(spd) && this.coords.length > 0) {
-                const prev = this.coords[this.coords.length - 1];
-                spd = L.latLng(prev[0], prev[1]).distanceTo(L.latLng(lat, lng)) / 2; // ~per 2s
-            }
+            const STILL_RADIUS_M = 8; // stationary GPS jitter stays inside this circle
             const now = Date.now();
-            if (spd < THRESH_MS) {
+            const spd = pos.coords.speed;
+            let stationary;
+            if (spd != null && !Number.isNaN(spd) && spd >= 0) {
+                // Valid Doppler speed — reliable while actually moving.
+                stationary = spd < THRESH_MS;
+            }
+            else {
+                // iOS quirk: a stationary device reports speed −1 and the native
+                // plugin serialises that as null. Deriving speed from fix-to-fix
+                // distance is useless then (1 Hz jitter looks like 0.5–2 m/s of
+                // permanent "movement" — auto-pause never fired). Anchor-dwell
+                // instead: as long as fixes stay within STILL_RADIUS_M of the
+                // anchor point, we are standing still; escaping it means motion.
+                if (!this._apAnchor)
+                    this._apAnchor = [lat, lng];
+                const drift = L.latLng(this._apAnchor[0], this._apAnchor[1])
+                    .distanceTo(L.latLng(lat, lng));
+                stationary = drift <= STILL_RADIUS_M;
+                if (!stationary)
+                    this._apAnchor = [lat, lng]; // escaped → re-anchor
+            }
+            if (stationary) {
                 if (this._belowSince == null)
                     this._belowSince = now;
                 if (!this._autoPaused && now - this._belowSince > 5000)
@@ -554,6 +579,7 @@ export class Tracker {
             }
             else {
                 this._belowSince = null;
+                this._apAnchor = [lat, lng];
                 if (this._autoPaused)
                     this._exitAutoPause();
             }
