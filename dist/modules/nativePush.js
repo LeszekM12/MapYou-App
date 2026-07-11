@@ -36,20 +36,31 @@ export function nativePushAvailable() {
 }
 // ── Token registration ────────────────────────────────────────────────────────
 const LS_FCM_TOKEN = 'mapyou_fcm_token';
+/** The identity the backend routes notifications by. MapYou has two id keys:
+ *  the social/profile id (mapyou_userId_profile — used by friends, feed and
+ *  every pushToUser call) and the legacy per-device push uuid (mapty_userId).
+ *  Tokens MUST be registered under the social id, otherwise notifications
+ *  addressed to it never find this device. Fallback covers first-run before
+ *  the profile id exists. */
+function pushUserId() {
+    return localStorage.getItem('mapyou_userId_profile') ?? getUserId();
+}
 async function registerToken(token) {
     if (!token)
         return;
-    if (localStorage.getItem(LS_FCM_TOKEN) === token)
-        return; // already registered
+    const userId = pushUserId();
+    const cacheKey = `${userId}:${token}`; // re-register when EITHER changes
+    if (localStorage.getItem(LS_FCM_TOKEN) === cacheKey)
+        return;
     try {
         const res = await fetch(`${BACKEND_URL}/push/subscribe-fcm`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId: getUserId(), deviceId: getDeviceId(), fcmToken: token }),
+            body: JSON.stringify({ userId, deviceId: getDeviceId(), fcmToken: token }),
         });
         if (res.ok) {
-            localStorage.setItem(LS_FCM_TOKEN, token);
-            console.log('[NativePush] FCM token registered.');
+            localStorage.setItem(LS_FCM_TOKEN, cacheKey);
+            console.log(`[NativePush] FCM token registered for ${userId}.`);
         }
         else {
             console.warn('[NativePush] subscribe-fcm failed:', res.status);
