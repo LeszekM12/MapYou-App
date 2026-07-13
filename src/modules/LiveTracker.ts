@@ -116,9 +116,10 @@ export class LiveTracker {
     // Zacznij śledzenie GPS
     this._startGPS();
 
-    // Wysyłaj pozycję co INTERVAL_MS
+    // Wysyłaj pozycję co INTERVAL_MS (web/PWA; na iOS przy blokadzie ticki śpią,
+    // wtedy pozycje dowozi feedPosition() z natywnego GPS Trackera)
     this._interval = setInterval(() => {
-      if (!this._paused && this._lastPos) void this._sendPosition();
+      if (!this._paused && this._lastPos) void this._maybeSend();
     }, INTERVAL_MS);
 
     // Zapisz token przy wszystkich znajomych — żeby pojawił się przycisk Watch
@@ -189,6 +190,30 @@ export class LiveTracker {
   }
 
   // ── Private ────────────────────────────────────────────────────────────────
+
+  private _lastSendAt = 0;
+
+  /** Feed a fresh position from the Tracker's native GPS pipeline.
+   *  On iOS the lock screen suspends JS timers AND web watchers, so the
+   *  interval below (and _startGPS) go silent — but native GPS callbacks in
+   *  Tracker._onPosition keep flowing. This keeps the friend's live view
+   *  moving with the screen locked. Sends share one throttle (INTERVAL_MS)
+   *  with the interval path, so the rate never doubles in the foreground. */
+  feedPosition(lat: number, lng: number, speedMs?: number | null): void {
+    if (!this._active) return;
+    this._lastPos = {
+      coords: { latitude: lat, longitude: lng, speed: speedMs ?? null },
+      timestamp: Date.now(),
+    } as GeolocationPosition;
+    if (!this._paused) void this._maybeSend();
+  }
+
+  private async _maybeSend(): Promise<void> {
+    const now = Date.now();
+    if (now - this._lastSendAt < INTERVAL_MS) return;
+    this._lastSendAt = now;
+    await this._sendPosition();
+  }
 
   private _startGPS(): void {
     this._watchId = navigator.geolocation.watchPosition(

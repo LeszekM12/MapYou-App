@@ -5,6 +5,7 @@ import type { Coords } from '../types/index.js';
 import { bgTracker } from './bgTracker.js';
 import { workoutNotification } from './workoutNotification.js';
 import { workoutLiveActivity, type LiveStats } from './liveActivity.js';
+import { liveTracker } from './LiveTracker.js';
 
 // Native-iOS detection — used to pick the GPS-speed auto-pause path there
 // (devicemotion is suspended by iOS whenever the screen locks).
@@ -485,6 +486,7 @@ export class Tracker {
       const apStats = this._buildStats();
       this.onUpdate(apStats);
       this._updateNotification(apStats);  // keep the Live Activity fresh ("Auto-paused" + frozen time)
+      liveTracker.feedPosition(lat, lng, pos.coords.speed);
       return;
     }
 
@@ -528,6 +530,7 @@ export class Tracker {
     const _st = this._buildStats();
     this.onUpdate(_st);
     this._updateNotification(_st);   // GPS fixes keep arriving in bg even if the JS timer sleeps
+    liveTracker.feedPosition(lat, lng, pos.coords.speed);  // friend's live view — same survival path
   }
 
   // ── Auto-pause shared logic (freeze time/distance, keep sensors running) ──

@@ -77,6 +77,13 @@ export class LiveTracker {
             writable: true,
             value: null
         });
+        // ── Private ────────────────────────────────────────────────────────────────
+        Object.defineProperty(this, "_lastSendAt", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: 0
+        });
     }
     get token() { return this._token; }
     setSport(sport) { this._sport = sport; }
@@ -137,10 +144,11 @@ export class LiveTracker {
         }
         // Zacznij śledzenie GPS
         this._startGPS();
-        // Wysyłaj pozycję co INTERVAL_MS
+        // Wysyłaj pozycję co INTERVAL_MS (web/PWA; na iOS przy blokadzie ticki śpią,
+        // wtedy pozycje dowozi feedPosition() z natywnego GPS Trackera)
         this._interval = setInterval(() => {
             if (!this._paused && this._lastPos)
-                void this._sendPosition();
+                void this._maybeSend();
         }, INTERVAL_MS);
         // Zapisz token przy wszystkich znajomych — żeby pojawił się przycisk Watch
         for (const f of friends) {
@@ -206,7 +214,29 @@ export class LiveTracker {
         console.log(`[LiveTracker] Finished: ${this._token}`);
         this._token = null;
     }
-    // ── Private ────────────────────────────────────────────────────────────────
+    /** Feed a fresh position from the Tracker's native GPS pipeline.
+     *  On iOS the lock screen suspends JS timers AND web watchers, so the
+     *  interval below (and _startGPS) go silent — but native GPS callbacks in
+     *  Tracker._onPosition keep flowing. This keeps the friend's live view
+     *  moving with the screen locked. Sends share one throttle (INTERVAL_MS)
+     *  with the interval path, so the rate never doubles in the foreground. */
+    feedPosition(lat, lng, speedMs) {
+        if (!this._active)
+            return;
+        this._lastPos = {
+            coords: { latitude: lat, longitude: lng, speed: speedMs ?? null },
+            timestamp: Date.now(),
+        };
+        if (!this._paused)
+            void this._maybeSend();
+    }
+    async _maybeSend() {
+        const now = Date.now();
+        if (now - this._lastSendAt < INTERVAL_MS)
+            return;
+        this._lastSendAt = now;
+        await this._sendPosition();
+    }
     _startGPS() {
         this._watchId = navigator.geolocation.watchPosition(pos => { this._lastPos = pos; }, err => console.warn('[LiveTracker] GPS:', err), { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 });
     }
