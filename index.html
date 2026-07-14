@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
     <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
     <script>Chart.defaults.color = "rgba(255,255,255,0.5)"; Chart.defaults.borderColor = "rgba(255,255,255,0.06)";</script>
     <link rel="stylesheet" href="stats_styles.css"/>
     <link rel="stylesheet" href="profile_styles.css"/>
@@ -137,6 +138,14 @@
         <div class="settings-item__text">
             <div class="settings-item__label">Recovery code</div>
             <div class="settings-item__sub">Save your code to recover data</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingStravaImport">
+        <span class="settings-item__icon">🧳</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Import from Strava</div>
+            <div class="settings-item__sub">Move your whole Strava history into MapYou</div>
         </div>
         <span class="settings-item__arrow">›</span>
     </div>

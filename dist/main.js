@@ -29,6 +29,7 @@ import { getIPLocation, requestGPSPermission, subscribeToPermissionChanges, hasG
 import { loadWorkoutsFromDB, clearAllWorkoutsFromDB, migrateLocalStorageToIndexedDB, } from './modules/db.js';
 import { initPushNotifications, resubscribeIfNeeded, sendWorkoutAddedPush, sendWorkoutDeletedPush, sendWelcomeBackPush, sendLongBreakPush, sendArrivedAtDestinationPush, sendWeatherPush, syncLocationToBackend, } from './modules/PushNotifications.js';
 import { initNativePush, nativePushAvailable } from './modules/nativePush.js';
+import { showStravaImportModal } from './modules/stravaImport.js';
 import { Tracker, formatDuration, formatPace, formatDistance, isTrackable, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
 import { getSavedRoutes, saveRoute, unsaveRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, ActivityHistoryPanel } from './modules/ActivityView.js';
@@ -3940,6 +3941,10 @@ document.getElementById('settingRecovery')?.addEventListener('click', () => {
 // ─── Przywracanie konta z kodu (Settings) ────────────────────────────────────
 document.getElementById('settingRestore')?.addEventListener('click', () => {
     showRestoreAccountModal();
+});
+// ─── Import archiwum Strava (Settings) ───────────────────────────────────────
+document.getElementById('settingStravaImport')?.addEventListener('click', () => {
+    showStravaImportModal();
 });
 // ─── Sync to cloud button (Settings) ─────────────────────────────────────────
 document.getElementById('settingSync')?.addEventListener('click', async () => {

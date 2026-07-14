@@ -38,6 +38,7 @@ import {
   syncLocationToBackend,
 } from './modules/PushNotifications.js';
 import { initNativePush, nativePushAvailable } from './modules/nativePush.js';
+import { showStravaImportModal } from './modules/stravaImport.js';
 import { Tracker, type SportType, type ActivityRecord, formatDuration, formatPace, formatDistance, SPORT_COLORS, isTrackable, getAllSports, getCustomSports, saveCustomSport, deleteCustomSport, getColor, getSportLabel, getIcon } from './modules/Tracker.js';
 import { getSavedRoutes, saveRoute, unsaveRoute, type SavedRoute } from './modules/SavedRoutes.js';
 import { showGoodJobSplash, showActivitySummary, ActivityHistoryPanel } from './modules/ActivityView.js';
@@ -3654,6 +3655,11 @@ document.getElementById('settingRecovery')?.addEventListener('click', () => {
 // ─── Przywracanie konta z kodu (Settings) ────────────────────────────────────
 document.getElementById('settingRestore')?.addEventListener('click', () => {
   showRestoreAccountModal();
+});
+
+// ─── Import archiwum Strava (Settings) ───────────────────────────────────────
+document.getElementById('settingStravaImport')?.addEventListener('click', () => {
+  showStravaImportModal();
 });
 
 // ─── Sync to cloud button (Settings) ─────────────────────────────────────────
