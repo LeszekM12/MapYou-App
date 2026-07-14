@@ -3946,6 +3946,10 @@ document.getElementById('settingRestore')?.addEventListener('click', () => {
 document.getElementById('settingStravaImport')?.addEventListener('click', () => {
     showStravaImportModal();
 });
+// ─── Polityka prywatności (Settings) ─────────────────────────────────────────
+document.getElementById('settingPrivacy')?.addEventListener('click', () => {
+    window.open('https://leszekm12.github.io/MapYou-App/privacy.html', '_blank');
+});
 // ─── Sync to cloud button (Settings) ─────────────────────────────────────────
 document.getElementById('settingSync')?.addEventListener('click', async () => {
     localStorage.removeItem('mapyou_mongo_synced');
