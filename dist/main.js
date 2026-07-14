@@ -383,6 +383,42 @@ class App {
                 void clearAllWorkoutsFromDB().then(() => location.reload());
             }
         });
+        // Recovery / Restore / Strava import / Privacy — bound HERE (inside the
+        // guaranteed-to-run _initSettings) rather than at module top-level. On
+        // native iOS a startup exception earlier in the module could abort before
+        // top-level bindings ran, leaving these rows dead. Delegated + direct
+        // binding here is robust to that and to any DOM rebuild.
+        document.getElementById('settingRecovery')?.addEventListener('click', () => {
+            const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+            if (userId)
+                void showRecoveryCodeModal(userId);
+        });
+        document.getElementById('settingRestore')?.addEventListener('click', () => {
+            showRestoreAccountModal();
+        });
+        document.getElementById('settingStravaImport')?.addEventListener('click', () => {
+            showStravaImportModal();
+        });
+        document.getElementById('settingPrivacy')?.addEventListener('click', () => {
+            window.open('https://leszekm12.github.io/MapYou-App/privacy.html', '_blank');
+        });
+        // Easter egg: tap the "Settings" title 7× to reveal the hidden
+        // "Sync to cloud" row (kept out of sight for regular users).
+        const settingsTitle = document.querySelector('.settings-panel__title');
+        const syncRow = document.getElementById('settingSync');
+        let _tapCount = 0;
+        let _tapTimer = null;
+        settingsTitle?.addEventListener('click', () => {
+            _tapCount++;
+            if (_tapTimer)
+                clearTimeout(_tapTimer);
+            _tapTimer = setTimeout(() => { _tapCount = 0; }, 1500); // reset if too slow
+            if (_tapCount >= 7) {
+                _tapCount = 0;
+                if (syncRow)
+                    syncRow.style.display = '';
+            }
+        });
         itemInstall?.addEventListener('click', () => {
             if (__classPrivateFieldGet(this, _App_deferredInstallPrompt, "f")) {
                 void __classPrivateFieldGet(this, _App_deferredInstallPrompt, "f").prompt();
@@ -3932,24 +3968,9 @@ void showNameModalIfNeeded();
 document.getElementById('btnChangeName')?.addEventListener('click', () => {
     openChangeNameModal();
 });
-// ─── Kod odzyskiwania (Settings) ─────────────────────────────────────────────
-document.getElementById('settingRecovery')?.addEventListener('click', () => {
-    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
-    if (userId)
-        void showRecoveryCodeModal(userId);
-});
-// ─── Przywracanie konta z kodu (Settings) ────────────────────────────────────
-document.getElementById('settingRestore')?.addEventListener('click', () => {
-    showRestoreAccountModal();
-});
-// ─── Import archiwum Strava (Settings) ───────────────────────────────────────
-document.getElementById('settingStravaImport')?.addEventListener('click', () => {
-    showStravaImportModal();
-});
-// ─── Polityka prywatności (Settings) ─────────────────────────────────────────
-document.getElementById('settingPrivacy')?.addEventListener('click', () => {
-    window.open('https://leszekm12.github.io/MapYou-App/privacy.html', '_blank');
-});
+// ─── Kod odzyskiwania / Restore / Strava / Privacy ──────────────────────────
+// (podpięte w _initSettings — patrz tam; tu było wcześniej, ale top-level
+//  potrafił nie dobiec na natywnym iOS)
 // ─── Sync to cloud button (Settings) ─────────────────────────────────────────
 document.getElementById('settingSync')?.addEventListener('click', async () => {
     localStorage.removeItem('mapyou_mongo_synced');
