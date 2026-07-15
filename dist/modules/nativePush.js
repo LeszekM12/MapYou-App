@@ -35,7 +35,6 @@ export function nativePushAvailable() {
     return fmPlugin() !== null;
 }
 // ── Token registration ────────────────────────────────────────────────────────
-const LS_FCM_TOKEN = 'mapyou_fcm_token';
 /** The identity the backend routes notifications by. MapYou has two id keys:
  *  the social/profile id (mapyou_userId_profile — used by friends, feed and
  *  every pushToUser call) and the legacy per-device push uuid (mapty_userId).
@@ -45,21 +44,29 @@ const LS_FCM_TOKEN = 'mapyou_fcm_token';
 function pushUserId() {
     return localStorage.getItem('mapyou_userId_profile') ?? getUserId();
 }
+/** Register (or refresh) this device's FCM token on the backend.
+ *  Deliberately NOT cached in localStorage: the POST is tiny, runs once per
+ *  app start, and makes the client self-healing — if a token rotates or a
+ *  server-side record is lost/rebuilt, the next launch silently repairs it.
+ *  (A cache here previously masked a server bug for days: registration looked
+ *  successful client-side while the token was never actually stored.) */
 async function registerToken(token) {
     if (!token)
         return;
     const userId = pushUserId();
-    const cacheKey = `${userId}:${token}`; // re-register when EITHER changes
-    if (localStorage.getItem(LS_FCM_TOKEN) === cacheKey)
-        return;
+    const cap = capGlobal();
     try {
         const res = await fetch(`${BACKEND_URL}/push/subscribe-fcm`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, deviceId: getDeviceId(), fcmToken: token }),
+            body: JSON.stringify({
+                userId,
+                deviceId: getDeviceId(),
+                fcmToken: token,
+                platform: cap?.getPlatform?.() ?? 'native',
+            }),
         });
         if (res.ok) {
-            localStorage.setItem(LS_FCM_TOKEN, cacheKey);
             console.log(`[NativePush] FCM token registered for ${userId}.`);
         }
         else {
