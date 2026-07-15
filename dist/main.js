@@ -3953,9 +3953,17 @@ const friendsView = new FriendsView();
 let friendsViewInited = false;
 let homeViewInited = false;
 // Inicjalizuj FriendsView od razu — polling statusu znajomych musi działać
-// niezależnie od tego czy użytkownik wszedł w zakładkę Friends
-friendsView.init();
-friendsViewInited = true;
+// niezależnie od tego czy użytkownik wszedł w zakładkę Friends.
+// try/catch celowo: to jest top-level modułu, więc wyjątek stąd przerwałby
+// WSZYSTKO poniżej (initUserProfile, migrateToUnified, resztę startu apki).
+// Tak właśnie umierał start na natywnym iOS przez navigator.serviceWorker.
+try {
+    friendsView.init();
+    friendsViewInited = true;
+}
+catch (e) {
+    console.error('[main] friendsView.init() failed — continuing startup:', e);
+}
 // Inicjalizuj profil użytkownika (userId + avatar w UI)
 initUserProfile();
 // Migracja danych do unified workouts model

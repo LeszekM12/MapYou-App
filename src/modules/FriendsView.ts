@@ -80,8 +80,13 @@ export class FriendsView {
     // Polling statusu znajomych co 30s
     this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
 
-    // Odbieraj wiadomości z Service Workera
-    navigator.serviceWorker.addEventListener('message', (e: MessageEvent) => {
+    // Odbieraj wiadomości z Service Workera.
+    // UWAGA: `navigator.serviceWorker` NIE ISTNIEJE w natywnym WKWebView (iOS) —
+    // service workery działają tylko w Safari/PWA. Bez tego guarda leciał tu
+    // TypeError, który przerywał wykonanie CAŁEGO modułu main.ts (init() jest
+    // wołany z jego top-levelu) — a więc initUserProfile(), migrateToUnified()
+    // i cała reszta inicjalizacji poniżej nigdy się nie uruchamiały.
+    navigator.serviceWorker?.addEventListener('message', (e: MessageEvent) => {
       if (e.data?.type === 'OPEN_LIVE') {
         if (e.data.silent) {
           void this._saveLiveTokenFromUrl(e.data.url as string);
