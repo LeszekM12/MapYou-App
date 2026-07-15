@@ -3666,6 +3666,25 @@ let   homeViewInited    = false;
 // try/catch celowo: to jest top-level modułu, więc wyjątek stąd przerwałby
 // WSZYSTKO poniżej (initUserProfile, migrateToUnified, resztę startu apki).
 // Tak właśnie umierał start na natywnym iOS przez navigator.serviceWorker.
+// ─── Martwe media (404 z Cloudinary) ─────────────────────────────────────────
+// Rekordy mogą wskazywać na pliki usunięte z CDN — przeglądarka rysuje wtedy
+// pustą ramkę z „?". Zdarzenie `error` z <img>/<video> nie bąbelkuje, więc
+// łapiemy je w fazie przechwytywania (capture) na całym dokumencie i chowamy
+// element wraz z jego kafelkiem-kontenerem.
+document.addEventListener('error', (ev) => {
+  const el = ev.target as HTMLElement | null;
+  if (!el || (el.tagName !== 'IMG' && el.tagName !== 'VIDEO')) return;
+  const src = (el as HTMLImageElement | HTMLVideoElement).src ?? '';
+  if (!src || src.startsWith('data:')) return;          // placeholdery zostawiamy
+  el.style.display = 'none';
+  // Ukryj też pusty kafelek siatki, żeby nie zostawiać dziury w layoucie
+  const tile = el.closest<HTMLElement>(
+    '.pv-photo-viewer__grid-item, .pv-photo-viewer__list-item, .reel-thumb, .post-media',
+  );
+  if (tile) tile.style.display = 'none';
+  console.warn('[Media] missing asset hidden:', src);
+}, true);
+
 try {
   friendsView.init();
   friendsViewInited = true;

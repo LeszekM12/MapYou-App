@@ -661,3 +661,8 @@
   margin: 0 16px 16px; background: var(--app-bg-card, rgba(255,255,255,0.03));
   border-radius: 12px; padding: 12px; overflow: hidden;
 }
+
+/* ═══ iOS SAFE AREA — pełnoekranowa przeglądarka zdjęć (X · Grid/List) ═══ */
+.pv-photo-viewer__header {
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+}
