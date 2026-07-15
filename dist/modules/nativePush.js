@@ -108,11 +108,28 @@ export async function initNativePush() {
         console.warn('[NativePush] requestPermissions failed:', e);
         return;
     }
-    // Android: channel used by the backend for silent pushes
-    // (channelId: 'silent' in the FCM payload). Importance LOW = no sound/heads-up.
+    // Android: notification channels. Importance is FROZEN by the system when a
+    // channel is first created — it can never be raised in code afterwards, only
+    // by the user in system settings. That's why loud pushes use a dedicated
+    // channel id (not the FCM default, which a silent message may already have
+    // "christened" as quiet): sound + heads-up are guaranteed from the start.
     if (capGlobal()?.getPlatform?.() === 'android') {
         try {
-            await p.createChannel({ id: 'silent', name: 'Ciche powiadomienia', importance: 2 });
+            await p.createChannel({
+                id: 'mapyou_alerts', name: 'Powiadomienia MapYou',
+                description: 'Polubienia, obserwacje, komentarze i aktywność znajomych',
+                importance: 5, // MAX — heads-up banner + system default sound.
+                // NOTE: no `sound` field on purpose — it expects a
+                // file name in res/raw; pointing it at a missing
+                // resource silently yields a SILENT channel.
+                visibility: 1, vibration: true, lights: true,
+            });
+            await p.createChannel({
+                id: 'silent', name: 'Ciche powiadomienia',
+                description: 'Pogoda i przypomnienia — bez dźwięku',
+                importance: 2, // LOW — status bar only, no sound
+                visibility: 1, vibration: false,
+            });
         }
         catch { /* exists or unsupported — fine */ }
     }
