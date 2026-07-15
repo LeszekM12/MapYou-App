@@ -7,6 +7,7 @@
 import { BACKEND_URL } from '../config.js';
 
 const LS_KEY = 'mapyou_notifications';
+const LS_CLEARED_AT = 'mapyou_notifs_cleared_at';
 const LS_SEEN = 'mapyou_notifications_seen';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -105,6 +106,11 @@ export function markRead(id: string): void {
 }
 
 export function clearAll(): void {
+  // Zapamiętaj MOMENT czyszczenia. Backend nadal trzyma te powiadomienia
+  // (kolekcja serwerowa jest współdzielona i nie kasujemy jej stąd), a
+  // syncFromBackend() zaciągał je z powrotem od razu po wyjściu i wejściu
+  // w dzwoneczek. Znacznik działa jak "przeczytane do tego momentu".
+  localStorage.setItem(LS_CLEARED_AT, String(Date.now()));
   _save([]);
   _notifyListeners();
 }
@@ -154,8 +160,10 @@ export async function syncFromBackend(userId: string): Promise<void> {
     if (j.status !== 'ok' || !Array.isArray(j.data)) return;
     const local = _load();
     const localIds = new Set(local.map(n => n.id));
+    // Nie wskrzeszaj powiadomień skasowanych przez użytkownika (patrz clearAll)
+    const clearedAt = Number(localStorage.getItem(LS_CLEARED_AT) ?? 0);
     const incoming: AppNotification[] = j.data
-      .filter(b => b.notifId && !localIds.has(b.notifId))
+      .filter(b => b.notifId && !localIds.has(b.notifId) && b.timestamp > clearedAt)
       .map(b => ({
         id:        b.notifId,
         type:      (b.type as NotifType),

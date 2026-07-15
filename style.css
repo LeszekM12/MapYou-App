@@ -4050,13 +4050,13 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
    sticky/fixed nagłówek musi sam zarezerwować sobie górny margines.
    Na Androidzie/desktopie env() = 0 → zero zmian. */
 
-/* Przełącznik Home | Explore (sticky na górze feedu) */
-.home-switcher {
-    top: env(safe-area-inset-top, 0px);
-    padding-top: calc(10px + env(safe-area-inset-top, 0px));
-}
-
 /* Nagłówek trybu Recording (Track) — status + przycisk minimalizacji */
 .trk-expanded__header {
     padding-top: calc(2.4rem + env(safe-area-inset-top, 0px));
+}
+
+/* Przycisk minimalizacji w Recording — pozycjonowany absolutnie, więc padding
+   nagłówka go nie przesuwa; potrzebuje własnego offsetu od wyspy. */
+.trk-expanded__collapse {
+    top: calc(2rem + env(safe-area-inset-top, 0px));
 }

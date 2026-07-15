@@ -617,6 +617,20 @@ export async function hydrate() {
         }
         if (serverProfile) {
             await saveProfileToDB(serverProfile);
+            // Trofea (Weekly Goal Cups, Streak Records) są czytane przez ProfileView
+            // z localStorage, a _pushMissingToAtlas wysyła je do /users — brakowało
+            // drogi POWROTNEJ. Bez tego po przywróceniu konta na nowym urządzeniu
+            // wszystkie puchary są zablokowane, choć w chmurze są poprawne wartości.
+            // Bierzemy MAX(serwer, lokalne), żeby nigdy nie cofnąć osiągnięcia.
+            const sp = serverProfile;
+            if (typeof sp.weeklyWins === 'number') {
+                const local = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
+                localStorage.setItem('mapyou_weekly_wins', String(Math.max(sp.weeklyWins, local)));
+            }
+            if (typeof sp.bestStreak === 'number') {
+                const local = parseInt(localStorage.getItem('mapyou_best_streak') ?? '0', 10);
+                localStorage.setItem('mapyou_best_streak', String(Math.max(sp.bestStreak, local)));
+            }
         }
         localStorage.setItem(LS_HYDRATED_KEY, String(Date.now()));
         console.log(`[CloudSync] ✅ Hydrated ${count} records from Atlas`);
