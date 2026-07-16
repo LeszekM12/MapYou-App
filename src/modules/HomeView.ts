@@ -3613,7 +3613,11 @@ export class HomeView {
       const sw = document.getElementById('homeSwitcher');
       if (!sw) return;
       const y = scroll.scrollTop;
-      const stuck = sw.getBoundingClientRect().top <= scroll.getBoundingClientRect().top + 1;
+      // Sticky offset paska (na iOS to env(safe-area-inset-top) ≈ 59 px — pasek
+      // klei się POD wyspą). Stara detekcja zakładała top:0, więc `stuck` nigdy
+      // nie było prawdą na iOS i pasek nigdy się nie chował.
+      const stickyTop = parseFloat(getComputedStyle(sw).top) || 0;
+      const stuck = sw.getBoundingClientRect().top <= scroll.getBoundingClientRect().top + stickyTop + 1;
       if (!stuck) {
         sw.classList.remove('home-switcher--hidden');          // natural spot under streak → always visible
       } else if (y > lastY + 6 && y > 120) {
