@@ -29,6 +29,7 @@ interface FMPlugin {
   requestPermissions(): Promise<{ receive: string }>;
   getToken(): Promise<{ token: string }>;
   createChannel(options: Record<string, unknown>): Promise<void>;
+  deleteChannel(options: { id: string }): Promise<void>;
   addListener(eventName: string, listenerFunc: (event: unknown) => void): Promise<unknown>;
 }
 
@@ -129,8 +130,14 @@ export async function initNativePush(): Promise<void> {
   // "christened" as quiet): sound + heads-up are guaranteed from the start.
   if (capGlobal()?.getPlatform?.() === 'android') {
     try {
+      // Android FREEZES a channel's settings at creation — code can never make
+      // an existing channel louder. Early builds created 'mapyou_alerts' with a
+      // broken `sound` value (nonexistent res/raw file → permanently silent
+      // channel). The only fix that reaches every affected install: delete the
+      // frozen channel and recreate under a NEW id. Backend sends to the v2 id.
+      try { await p.deleteChannel({ id: 'mapyou_alerts' }); } catch { /* absent — fine */ }
       await p.createChannel({
-        id: 'mapyou_alerts', name: 'Powiadomienia MapYou',
+        id: 'mapyou_alerts_v2', name: 'Powiadomienia MapYou',
         description: 'Polubienia, obserwacje, komentarze i aktywność znajomych',
         importance: 5,          // MAX — heads-up banner + system default sound.
                                 // NOTE: no `sound` field on purpose — it expects a
