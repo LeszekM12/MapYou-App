@@ -4050,11 +4050,17 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
    sticky/fixed nagłówek musi sam zarezerwować sobie górny margines.
    Na Androidzie/desktopie env() = 0 → zero zmian. */
 
-/* Przełącznik Home | Explore — przykleja się POD wyspą/zegarem.
-   Tylko `top`: dodanie tu padding-top rozdmuchuje pasek (ma własne tło),
-   co daje szary blok i psuje animację chowania na scroll. */
+/* Przełącznik Home | Explore — same przyciski, bez paska.
+   1) top: przykleja się POD wyspą/zegarem (na Androidzie env()=0 → jak było),
+   2) background: transparent — szary pas znika, zostają przyciski,
+   3) --hidden: musi pokonać także offset safe-area, inaczej na iOS
+      "chowa się" o wysokość paska i zatrzymuje wciąż na ekranie. */
 .home-switcher {
     top: env(safe-area-inset-top, 0px);
+    background: transparent;
+}
+.home-switcher--hidden {
+    transform: translateY(calc(-120% - env(safe-area-inset-top, 0px)));
 }
 
 /* Nagłówek trybu Recording (Track) — status + przycisk minimalizacji */
