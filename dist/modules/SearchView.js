@@ -7,6 +7,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
+import { renderEventsSection, openCreateEventModal } from './clubEvents.js';
 // ── Line icons (Strava-like clarity) — single stroke, currentColor.
 //    Emoji were inconsistent across platforms and made the header noisy.
 const svg = (d, extra = '') => `<svg class="sv2-cd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}${extra}</svg>`;
@@ -22,6 +23,7 @@ const ICO = {
     check: svg('<path d="M20 6L9 17l-5-5"/>'),
     clock: svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
     feed: svg('<path d="M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 11-5.8-1.6"/>'),
+    events: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/><path d="M12 15l1.2 2.4 2.6.4-1.9 1.8.4 2.6-2.3-1.2-2.3 1.2.4-2.6L8.2 17.8l2.6-.4z"/>'),
 };
 const act = (id, ico, label, variant = '') => `
   <button class="sv2-cd-act${variant ? ' sv2-cd-act--' + variant : ''}" id="${id}">
@@ -865,21 +867,32 @@ export class SearchView {
             ${act('cdbPrivacy', club.isPrivate ? ICO.lock : ICO.globe, club.isPrivate ? 'Private' : 'Public')}
             ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
             ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
+            ${act('cdbTabEvents', ICO.events, 'Events', tab === 'events' ? 'active' : '')}
             ${act('cdbShare', ICO.share, 'Share')}
             ${act('cdbDelete', ICO.trash, 'Delete', 'danger')}` : `
             ${act('cdbJoin', isMember ? ICO.check : getPendingClubs().includes(club.id) ? ICO.clock : ICO.plus, isMember ? 'Joined' : getPendingClubs().includes(club.id) ? 'Pending'
                 : (club.isPrivate ? 'Request' : 'Join'), isMember ? 'active' : 'primary')}
             ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
             ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
+            ${act('cdbTabEvents', ICO.events, 'Events', tab === 'events' ? 'active' : '')}
             ${act('cdbShare', ICO.share, 'Share')}`}
         </div>
 
         ${isMember ? `
         <div class="sv2-club-detail__actions" style="padding:14px 0 2px">
-          <button id="cdbAddPost">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
-            Add Post to Club
-          </button>
+          <div class="cdb-add">
+            <button id="cdbAddPost" class="cdb-add__main">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
+              Add Post to Club
+            </button>
+            <button id="cdbAddMore" class="cdb-add__more" aria-label="More">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="cdb-add__menu" id="cdbAddMenu" hidden>
+              <button data-add="event"><span>🏁</span> Create a challenge</button>
+              <button data-add="poll" disabled><span>📊</span> Poll <em>soon</em></button>
+            </div>
+          </div>
         </div>` : ''}
 
         <!-- Feed tab -->
@@ -888,6 +901,12 @@ export class SearchView {
           <div class="sv2-club-detail__feed" id="cdbFeed">
             <div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>
           </div>
+        </div>
+
+        <!-- Events tab -->
+        <div id="cdbEventsSection" style="${tab === 'events' ? '' : 'display:none'}">
+          <div class="sv2-club-detail__section-title">CHALLENGES</div>
+          <div class="ev-list" id="cdbEvents"></div>
         </div>
 
         <!-- Members + Stats tab -->
@@ -912,9 +931,28 @@ export class SearchView {
                 renderModal('members');
                 loadMembersAndStats();
             });
+            modal.querySelector('#cdbTabEvents')?.addEventListener('click', () => renderModal('events'));
+            // Rozwijane menu przy „Add Post"
+            const addMenu = modal.querySelector('#cdbAddMenu');
+            modal.querySelector('#cdbAddMore')?.addEventListener('click', e => {
+                e.stopPropagation();
+                if (addMenu)
+                    addMenu.hidden = !addMenu.hidden;
+            });
+            document.addEventListener('click', () => { if (addMenu)
+                addMenu.hidden = true; }, { once: true });
+            addMenu?.querySelector('[data-add="event"]')?.addEventListener('click', () => {
+                addMenu.hidden = true;
+                openCreateEventModal(club.id, () => renderModal('events'));
+            });
             // Load feed if on feed tab
             if (tab === 'feed')
                 loadFeed();
+            if (tab === 'events') {
+                const host = modal.querySelector('#cdbEvents');
+                if (host)
+                    void renderEventsSection(host, club.id, isMember);
+            }
             if (tab === 'members')
                 loadMembersAndStats();
             // Banner/logo upload

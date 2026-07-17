@@ -9,6 +9,7 @@
 
 import { BACKEND_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
+import { renderEventsSection, openCreateEventModal } from './clubEvents.js';
 
 // ── Line icons (Strava-like clarity) — single stroke, currentColor.
 //    Emoji were inconsistent across platforms and made the header noisy.
@@ -26,6 +27,7 @@ const ICO = {
   check:  svg('<path d="M20 6L9 17l-5-5"/>'),
   clock:  svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
   feed:   svg('<path d="M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 11-5.8-1.6"/>'),
+  events: svg('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/><path d="M12 15l1.2 2.4 2.6.4-1.9 1.8.4 2.6-2.3-1.2-2.3 1.2.4-2.6L8.2 17.8l2.6-.4z"/>'),
 };
 /** Circular action button with a label underneath (Strava layout).
  *  variant: '' neutral · 'primary' filled green (main CTA: Join/Request)
@@ -807,7 +809,7 @@ export class SearchView {
 
     // Pobierz świeże dane klubu z backendu (isPrivate, memberCount, avatar, baner).
     // Wydzielone do funkcji — używa tego zarówno start widoku, jak i pull-to-refresh.
-    const fetchClub = async (tab: 'feed'|'members' = 'feed'): Promise<void> => {
+    const fetchClub = async (tab: 'feed'|'members'|'events' = 'feed'): Promise<void> => {
       try {
         const r = await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { cache: 'no-store' });
         const d = await r.json() as { status: string; data: Record<string,unknown> };
@@ -832,7 +834,7 @@ export class SearchView {
     };
     void fetchClub('feed');
 
-    const renderModal = (tab: 'feed'|'members' = 'feed') => {
+    const renderModal = (tab: 'feed'|'members'|'events' = 'feed') => {
       const isMember = club.joined || club.isOwner;
       modal.innerHTML = `
         <div class="sv2-club-detail__banner" style="${club.bannerB64 ? `background:url('${club.bannerB64}') center/cover` : `background:linear-gradient(135deg,${color}33,${color}11)`}">
@@ -865,6 +867,7 @@ export class SearchView {
                   (club as unknown as Record<string,unknown>).isPrivate ? 'Private' : 'Public')}
             ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
             ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
+            ${act('cdbTabEvents', ICO.events, 'Events', tab === 'events' ? 'active' : '')}
             ${act('cdbShare', ICO.share, 'Share')}
             ${act('cdbDelete', ICO.trash, 'Delete', 'danger')}` : `
             ${act('cdbJoin',
@@ -874,15 +877,25 @@ export class SearchView {
                   isMember ? 'active' : 'primary')}
             ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
             ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
+            ${act('cdbTabEvents', ICO.events, 'Events', tab === 'events' ? 'active' : '')}
             ${act('cdbShare', ICO.share, 'Share')}`}
         </div>
 
         ${isMember ? `
         <div class="sv2-club-detail__actions" style="padding:14px 0 2px">
-          <button id="cdbAddPost">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
-            Add Post to Club
-          </button>
+          <div class="cdb-add">
+            <button id="cdbAddPost" class="cdb-add__main">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
+              Add Post to Club
+            </button>
+            <button id="cdbAddMore" class="cdb-add__more" aria-label="More">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="cdb-add__menu" id="cdbAddMenu" hidden>
+              <button data-add="event"><span>🏁</span> Create a challenge</button>
+              <button data-add="poll" disabled><span>📊</span> Poll <em>soon</em></button>
+            </div>
+          </div>
         </div>` : ''}
 
         <!-- Feed tab -->
@@ -891,6 +904,12 @@ export class SearchView {
           <div class="sv2-club-detail__feed" id="cdbFeed">
             <div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>
           </div>
+        </div>
+
+        <!-- Events tab -->
+        <div id="cdbEventsSection" style="${tab === 'events' ? '' : 'display:none'}">
+          <div class="sv2-club-detail__section-title">CHALLENGES</div>
+          <div class="ev-list" id="cdbEvents"></div>
         </div>
 
         <!-- Members + Stats tab -->
@@ -918,9 +937,26 @@ export class SearchView {
         renderModal('members');
         loadMembersAndStats();
       });
+      modal.querySelector('#cdbTabEvents')?.addEventListener('click', () => renderModal('events'));
+
+      // Rozwijane menu przy „Add Post"
+      const addMenu = modal.querySelector<HTMLElement>('#cdbAddMenu');
+      modal.querySelector('#cdbAddMore')?.addEventListener('click', e => {
+        e.stopPropagation();
+        if (addMenu) addMenu.hidden = !addMenu.hidden;
+      });
+      document.addEventListener('click', () => { if (addMenu) addMenu.hidden = true; }, { once: true });
+      addMenu?.querySelector('[data-add="event"]')?.addEventListener('click', () => {
+        addMenu.hidden = true;
+        openCreateEventModal(club.id, () => renderModal('events'));
+      });
 
       // Load feed if on feed tab
       if (tab === 'feed') loadFeed();
+      if (tab === 'events') {
+        const host = modal.querySelector<HTMLElement>('#cdbEvents');
+        if (host) void renderEventsSection(host, club.id, isMember);
+      }
       if (tab === 'members') loadMembersAndStats();
 
       // Banner/logo upload
