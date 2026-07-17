@@ -798,6 +798,13 @@ export class SearchView {
     modal.id = 'clubDetailModal';
     modal.className = 'sv2-club-detail-overlay';
 
+    // Wskaźnik pull-to-refresh — ten sam co w Home (klasy home-ptr).
+    // Tworzony TU, bo renderModal() nadpisuje innerHTML modala i skasowałby go;
+    // dlatego każdy render wstawia go z powrotem (patrz koniec renderModal).
+    const ptr = document.createElement('div');
+    ptr.className = 'home-ptr sv2-ptr-pos';
+    ptr.innerHTML = '<div class="home-ptr__spinner"></div>';
+
     // Pobierz świeże dane klubu z backendu (isPrivate, memberCount, avatar, baner).
     // Wydzielone do funkcji — używa tego zarówno start widoku, jak i pull-to-refresh.
     const fetchClub = async (tab: 'feed'|'members' = 'feed'): Promise<void> => {
@@ -851,8 +858,13 @@ export class SearchView {
         <!-- Action buttons row — Strava style -->
         <div class="sv2-club-detail__action-row">
           ${club.isOwner ? `
-            ${act('cdbPrivacy', (club as unknown as Record<string,unknown>).isPrivate ? ICO.globe : ICO.lock,
-                  (club as unknown as Record<string,unknown>).isPrivate ? 'Public' : 'Private')}
+            ${/* Etykieta pokazuje STAN AKTUALNY (nie akcję) — tak czyta to każdy:
+                  klub publiczny → kula ziemska „Public". Klik = zmiana, z potwierdzeniem. */''}
+            ${act('cdbPrivacy',
+                  (club as unknown as Record<string,unknown>).isPrivate ? ICO.lock : ICO.globe,
+                  (club as unknown as Record<string,unknown>).isPrivate ? 'Private' : 'Public')}
+            ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
+            ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
             ${act('cdbShare', ICO.share, 'Share')}
             ${act('cdbDelete', ICO.trash, 'Delete', 'danger')}` : `
             ${act('cdbJoin',
@@ -860,9 +872,9 @@ export class SearchView {
                   isMember ? 'Joined' : getPendingClubs().includes(club.id) ? 'Pending'
                     : ((club as unknown as Record<string,unknown>).isPrivate ? 'Request' : 'Join'),
                   isMember ? 'active' : 'primary')}
+            ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
+            ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
             ${act('cdbShare', ICO.share, 'Share')}`}
-          ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
-          ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
         </div>
 
         ${isMember ? `
@@ -893,6 +905,9 @@ export class SearchView {
           <div class="sv2-club-detail__section-title" id="cdbPendingTitle" style="display:none">JOIN REQUESTS</div>
           <div id="cdbPending"></div>` : ''}
         </div>`;
+
+      // innerHTML wymiótł spinner pull-to-refresh — wstaw go z powrotem
+      modal.appendChild(ptr);
 
       // Back
       modal.querySelector('#cdbBack')?.addEventListener('click', close);
@@ -958,6 +973,12 @@ export class SearchView {
       // Privacy toggle
       modal.querySelector('#cdbPrivacy')?.addEventListener('click', async () => {
         const nowPrivate = !(club as unknown as Record<string,unknown>).isPrivate;
+        // Zmiana widoczności ma realne skutki (prywatny = tylko członkowie widzą
+        // klub i feed), więc wymaga świadomego potwierdzenia.
+        const q = nowPrivate
+          ? `Zmienić „${club.name}" na PRYWATNY?\n\nKlub zniknie z wyszukiwarki, a nowi członkowie będą musieli wysłać prośbę o dołączenie.`
+          : `Zmienić „${club.name}" na PUBLICZNY?\n\nKlub będzie widoczny w wyszukiwarce i każdy będzie mógł dołączyć bez zgody.`;
+        if (!confirm(q)) return;
         (club as unknown as Record<string,unknown>).isPrivate = nowPrivate;
         const lcs = loadClubs(); const lc = lcs.find(c => c.id === club.id);
         if (lc) { (lc as unknown as Record<string,unknown>).isPrivate = nowPrivate; saveClubs(lcs); }
@@ -1479,10 +1500,7 @@ export class SearchView {
     // Własna implementacja, bo overlay ma swój scroll (natywny bounce iOS jest
     // wyłączony przez position:fixed). Ciągnięcie liczy się tylko przy
     // scrollTop === 0; opór (0.45) daje gumowy feel zamiast skoku.
-    const spinner = document.createElement('div');
-    spinner.className = 'sv2-ptr';
-    spinner.innerHTML = '<div class="sv2-ptr__circle"></div>';
-    modal.appendChild(spinner);
+    const spinner = ptr;   // utworzony wyżej, re-wstawiany przez renderModal
 
     let ptrStartY = 0, ptrPull = 0, ptrActive = false, ptrBusy = false;
     const PTR_TRIGGER = 70;
@@ -1510,14 +1528,14 @@ export class SearchView {
         return;
       }
       ptrBusy = true;
-      spinner.classList.add('sv2-ptr--spinning');
+      spinner.classList.add('home-ptr--active');
       spinner.style.transform = `translateX(-50%) translateY(${PTR_TRIGGER}px)`;
       const activeTab: 'feed'|'members' =
         modal.querySelector<HTMLElement>('#cdbMembersSection')?.style.display === 'none' ? 'feed' : 'members';
       void (async () => {
         await fetchClub(activeTab);   // dane klubu + re-render
         loadFeed();                   // i świeże posty (renderModal je czyści)
-        spinner.classList.remove('sv2-ptr--spinning');
+        spinner.classList.remove('home-ptr--active');
         spinner.style.transform = ''; spinner.style.opacity = '0';
         ptrBusy = false;
       })();

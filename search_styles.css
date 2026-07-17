@@ -312,7 +312,7 @@
 .sv2-club-detail-overlay--visible { opacity: 1; pointer-events: all; }
 
 .sv2-club-detail__banner {
-  height: 190px;
+  height: 230px;   /* jak u Stravy — zdjęcie ma oddychać */
   position: relative;
   display: flex;
   align-items: flex-end;
@@ -535,25 +535,13 @@
 }
 
 /* ── Pull-to-refresh (widok klubu) ──────────────────────────────────────────
-   Overlay ma własny scroll, więc natywny bounce iOS tu nie zadziała —
-   spinner jest sterowany gestem z JS. */
-.sv2-ptr {
+   Używamy wskaźnika z Home (.home-ptr / .home-ptr__spinner — style w style.css),
+   żeby gest wyglądał identycznie w całej apce. Tu tylko korekta pozycji:
+   overlay klubu sam jest kontenerem scrolla, więc spinner musi startować nad
+   banerem i być ponad nim w stosie. */
+.sv2-club-detail-overlay .home-ptr.sv2-ptr-pos {
   position: absolute;
-  top: calc(8px + env(safe-area-inset-top, 0px)); left: 50%;
-  transform: translateX(-50%);
-  opacity: 0;
-  z-index: 10;
-  pointer-events: none;
-  transition: opacity 0.2s, transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  top: 0; left: 50%;
+  margin-top: calc(env(safe-area-inset-top, 0px) + 6px);
+  z-index: 30;
 }
-.sv2-ptr__circle {
-  width: 30px; height: 30px;
-  border-radius: 50%;
-  border: 2.5px solid var(--app-border);
-  border-top-color: var(--color-brand--2, #00c46a);
-  background: var(--app-bg-card);
-  box-shadow: 0 3px 12px rgba(0,0,0,0.3);
-}
-/* Podczas odświeżania spinner kręci się w kółko */
-.sv2-ptr--spinning .sv2-ptr__circle { animation: sv2-ptr-spin 0.7s linear infinite; }
-@keyframes sv2-ptr-spin { to { transform: rotate(360deg); } }
