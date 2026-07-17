@@ -208,8 +208,16 @@ export const SPORT_COLORS_U = {
 // determined attacker editing IndexedDB. The tamper-proof anchor is the
 // server-side live-tracking session (/live/start → /live/finish), which a
 // tracked workout leaves behind — that check belongs on the backend.
+const MIN_ROUTE_POINTS = 10; // musi zgadzać się z backendem (clubEvents.ts)
 export function isVerifiedWorkout(w) {
-    return w.source === 'tracking';
+    if (w.source === 'tracking')
+        return true;
+    // Zegarek (Health Connect / Apple Health) liczy się, ale tylko ze śladem GPS —
+    // gołej liczby z Health nie da się odróżnić od wpisanej z palca. Ręczny wpis
+    // miewa JEDNĄ współrzędną (pinezka na mapie), nigdy przebiegu trasy.
+    if (w.source === 'health')
+        return (w.coords?.length ?? 0) >= MIN_ROUTE_POINTS;
+    return false;
 }
 /** Workouts that may count toward goals, trophies and events. */
 export function verifiedOnly(list) {

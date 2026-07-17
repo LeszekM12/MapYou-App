@@ -2032,7 +2032,9 @@ export class HomeView {
                 await CS.saveUnifiedWorkout({
                     id: enriched.id,
                     type: enriched.sport,
-                    source: 'manual',
+                    // 'health' (nie 'manual'): trening z zegarka. Liczy się do celów
+                    // i eventów TYLKO gdy niesie trasę GPS — patrz brama w clubEvents.ts.
+                    source: 'health',
                     date: new Date(enriched.date).toISOString(),
                     distanceKm: enriched.distanceKm,
                     durationSec: enriched.durationSec,

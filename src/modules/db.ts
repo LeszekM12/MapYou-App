@@ -64,7 +64,7 @@ export interface UnifiedWorkout {
   id:          string;
   type:        'running' | 'walking' | 'cycling';
   sport?:      string;        // original sport (gym, tennis...) — type is a 3-value fallback
-  source:      'manual' | 'tracking';
+  source:      'manual' | 'tracking' | 'health';   // health = zegarek/Health import
   date:        string;
   distanceKm:  number;
   durationSec: number;
