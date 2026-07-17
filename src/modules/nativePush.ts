@@ -17,7 +17,7 @@
 // '/?reels=abc' or '/#club_open=xyz'). The app already interprets those at
 // startup (main.ts reels param, FriendsView/HomeView hash handlers), so a tap
 // simply navigates the WebView there — the existing handlers do the rest.
-// This covers cold starts too: the tap launches the app, the plugin replays
+// This covers cold starts too: the tap launches the app the plugin replays
 // the event once our listener is attached, and we navigate.
 
 import { BACKEND_URL } from '../config.js';
