@@ -1504,21 +1504,36 @@ function _parseActivityDeepLink(url: string): { id: string; userId?: string } | 
   return { id: decodeURIComponent(m[1]), userId: u ? decodeURIComponent(u[1]) : undefined };
 }
 
-// Push deep-links for activities: SW message (app open) + cold-start hash. Bound once.
+// Parse a deep-link URL/hash into a routing target.
+// Supported: #activity=ID[&u=AUTHOR]  ·  #profile=USER_ID
+// (reels `?reels=` and `#club_open=` are handled by main.ts / SearchView.)
+function _parseDeepLink(url: string): NotifTarget | null {
+  const act = _parseActivityDeepLink(url);
+  if (act) return { kind: 'activity', id: act.id, userId: act.userId };
+  const prof = url.match(/[#&?]profile=([^&]+)/);
+  if (prof) {
+    const id = decodeURIComponent(prof[1]);
+    return { kind: 'profile', id, userId: id };
+  }
+  return null;
+}
+
+// Push deep-links: SW message (app open, web/PWA) + cold-start hash (native).
+// Native shells navigate the WebView to the URL (nativePush.ts), so the hash
+// branch below covers taps on Android/iOS too. Bound once.
 if (typeof window !== 'undefined' && !(window as unknown as Record<string, unknown>).__activityDeepLinkBound) {
   (window as unknown as Record<string, unknown>).__activityDeepLinkBound = true;
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', e => {
-      if ((e as MessageEvent).data?.type === 'OPEN_ACTIVITY') {
-        const dl = _parseActivityDeepLink((e as MessageEvent).data.url as string);
-        if (dl) void _routeNotifTarget({ kind: 'activity', id: dl.id, userId: dl.userId });
-      }
-    });
-  }
-  const dl = _parseActivityDeepLink(window.location.hash);
-  if (dl) {
+  // Service worker exists only in Safari/PWA — never in the native WKWebView.
+  navigator.serviceWorker?.addEventListener('message', e => {
+    if ((e as MessageEvent).data?.type === 'OPEN_ACTIVITY') {
+      const t = _parseDeepLink((e as MessageEvent).data.url as string);
+      if (t) void _routeNotifTarget(t);
+    }
+  });
+  const t = _parseDeepLink(window.location.hash);
+  if (t) {
     history.replaceState(null, '', window.location.pathname);
-    setTimeout(() => void _routeNotifTarget({ kind: 'activity', id: dl.id, userId: dl.userId }), 600);
+    setTimeout(() => void _routeNotifTarget(t), 600);
   }
 }
 
