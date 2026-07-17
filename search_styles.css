@@ -312,11 +312,18 @@
 .sv2-club-detail-overlay--visible { opacity: 1; pointer-events: all; }
 
 .sv2-club-detail__banner {
-  height: 180px;
+  height: 190px;
   position: relative;
   display: flex;
   align-items: flex-end;
-  padding: 16px;
+  padding: 16px 20px;
+  margin-bottom: 6px;
+}
+/* Przyciemnienie u dołu — logo i strzałka czytelne na każdym zdjęciu */
+.sv2-club-detail__banner::after {
+  content: ''; position: absolute; inset: auto 0 0 0; height: 60%;
+  background: linear-gradient(to top, rgba(0,0,0,0.45), transparent);
+  pointer-events: none;
 }
 .sv2-club-detail__back {
   position: absolute; top: 16px; left: 16px;
@@ -327,25 +334,33 @@
   backdrop-filter: blur(4px);
 }
 .sv2-club-detail__logo {
-  width: 80px; height: 80px;
-  border-radius: 20px;
+  width: 84px; height: 84px;
+  border-radius: 18px;
   display: flex; align-items: center; justify-content: center;
   background: var(--app-surface-2);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.35);
+  outline: 3px solid var(--app-bg-card);   /* karta „wycięta" z tła — jak u Stravy */
+  margin-bottom: -26px;                    /* nachodzi na treść pod banerem */
+  z-index: 2;
 }
-.sv2-club-detail__info { padding: 16px 20px 0; }
+.sv2-club-detail__info { padding: 34px 20px 16px; }
 .sv2-club-detail__name {
-  font-size: 2.2rem; font-weight: 900; color: var(--app-text-primary); margin: 0 0 8px;
+  font-size: 2.4rem; font-weight: 900; letter-spacing: -0.4px;
+  color: var(--app-text-primary); margin: 0 0 10px;
 }
 .sv2-club-detail__meta {
-  display: flex; flex-wrap: wrap; gap: 10px;
-  font-size: 1.2rem; color: var(--app-text-tertiary);
-  margin-bottom: 10px;
+  display: flex; flex-wrap: wrap;
+  align-items: center; gap: 6px 16px;
+  font-size: 1.3rem; color: var(--app-text-tertiary);
+  margin-bottom: 6px;
 }
+.sv2-cd-meta__item { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sv2-cd-ico { width: 16px; height: 16px; flex: 0 0 16px; opacity: 0.9; }
 .sv2-club-detail__desc {
-  font-size: 1.3rem; color: rgba(255,255,255,0.6);
-  line-height: 1.5; margin: 0 0 16px;
+  font-size: 1.35rem; color: var(--app-text-secondary, var(--app-text-tertiary));
+  line-height: 1.55; margin: 10px 0 0;
 }
-.sv2-club-detail__actions { margin-bottom: 20px; }
+.sv2-club-detail__actions { margin-bottom: 4px; }
 
 .sv2-club-action {
   width: 100%;
@@ -360,11 +375,11 @@
 .sv2-club-action--owner { background: var(--app-surface-1); color: var(--app-text-tertiary); cursor: default; }
 
 .sv2-club-detail__section-title {
-  font-size: 1.05rem; font-weight: 700;
+  font-size: 1.1rem; font-weight: 800;
   color: var(--app-text-muted);
-  text-transform: uppercase; letter-spacing: 0.7px;
-  padding: 16px 20px 8px;
-  border: 1px solid var(--app-border);
+  text-transform: uppercase; letter-spacing: 0.8px;
+  padding: 18px 20px 10px;
+  border-top: 1px solid var(--app-border);   /* była pełna ramka dookoła */
 }
 .sv2-club-detail__feed { padding: 0 16px 16px; }
 .sv2-club-detail__feed-empty {
@@ -433,59 +448,58 @@
 }
 
 /* ── Club detail action row ─────────────────────────────────────────────── */
+/* ── Club actions — okrągłe ikony z podpisem (układ jak Strava) ─────────────
+   Wiersz nie ma już ramki dookoła (były dwa zdublowane `border`), tylko
+   delikatną linię u dołu — dzięki temu nagłówek klubu czyta się jako jeden
+   ciąg: hero → tytuł → meta → akcje → feed. */
 .sv2-club-detail__action-row {
   display: flex;
-  gap: 8px;
-  padding: 12px 16px 16px;
+  gap: 4px;
+  padding: 18px 12px 16px;
   overflow-x: auto;
   scrollbar-width: none;
-  background: rgba(255,255,255,0.02);
-  border: 1px solid var(--app-border);
-  border: 1px solid var(--app-border);
+  border-bottom: 1px solid var(--app-border);
 }
 .sv2-club-detail__action-row::-webkit-scrollbar { display: none; }
 
-.sv2-club-detail__action-btn {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  padding: 10px 6px;
+.sv2-cd-act {
+  flex: 1 0 auto;
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  min-width: 68px; padding: 0 4px;
+  background: none; border: none; font-family: inherit; cursor: pointer;
+  color: var(--app-text-tertiary);
+  transition: color 0.15s;
+}
+.sv2-cd-act__circle {
+  width: 52px; height: 52px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
   background: var(--app-surface-1);
   border: 1px solid var(--app-border);
-  border-radius: 14px;
-  color: rgba(255,255,255,0.55);
-  font-size: 1.05rem;
-  font-weight: 600;
-  font-family: inherit;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-  min-width: 56px;
+  transition: background 0.15s, border-color 0.15s, transform 0.12s;
 }
-.sv2-club-detail__action-btn > span:first-child {
-  font-size: 1.5rem;
-  line-height: 1;
+.sv2-cd-act__circle .sv2-cd-ico { width: 22px; height: 22px; flex: 0 0 22px; opacity: 1; }
+.sv2-cd-act__label {
+  font-size: 1.15rem; font-weight: 600; white-space: nowrap;
 }
-.sv2-club-detail__action-btn:active {
-  background: var(--app-surface-2);
-  transform: scale(0.97);
+.sv2-cd-act:active .sv2-cd-act__circle { transform: scale(0.92); }
+
+/* Primary (Join/Request) — wypełniony zielony akcent MapYou */
+.sv2-cd-act--primary { color: var(--color-brand--2, #00c46a); }
+.sv2-cd-act--primary .sv2-cd-act__circle {
+  background: var(--color-brand--2, #00c46a);
+  border-color: var(--color-brand--2, #00c46a);
+  color: #06281a;
 }
-.sv2-club-detail__action-btn--active {
-  color: #00c46a;
-  background: rgba(0,196,106,0.1);
-  border-color: rgba(0,196,106,0.3);
+/* Aktywna zakładka (Feed/Members) lub stan Joined */
+.sv2-cd-act--active { color: var(--color-brand--2, #00c46a); }
+.sv2-cd-act--active .sv2-cd-act__circle {
+  background: rgba(0,196,106,0.12);
+  border-color: rgba(0,196,106,0.35);
 }
-/* Delete button red tint */
-.sv2-club-detail__action-btn[id="cdbDelete"] {
-  color: rgba(248,113,113,0.7);
-  border-color: rgba(248,113,113,0.15);
-}
-.sv2-club-detail__action-btn[id="cdbDelete"]:active {
-  background: rgba(248,113,113,0.1);
-}
+/* Delete */
+.sv2-cd-act--danger { color: #f87171; }
+.sv2-cd-act--danger .sv2-cd-act__circle { border-color: rgba(248,113,113,0.28); }
+.sv2-cd-act--danger:active .sv2-cd-act__circle { background: rgba(248,113,113,0.12); }
 
 /* ── Add Post button ─────────────────────────────────────────────────────── */
 #cdbAddPost {

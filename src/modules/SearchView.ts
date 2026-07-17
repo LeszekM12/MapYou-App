@@ -10,6 +10,33 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
 
+// ── Line icons (Strava-like clarity) — single stroke, currentColor.
+//    Emoji were inconsistent across platforms and made the header noisy.
+const svg = (d: string, extra = '') =>
+  `<svg class="sv2-cd-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}${extra}</svg>`;
+const ICO = {
+  sport:  svg('<circle cx="5.5" cy="17.5" r="3.5"/><circle cx="18.5" cy="17.5" r="3.5"/><path d="M15 6a1 1 0 100-2 1 1 0 000 2zM12 17.5V14l-3-3 4-3 3 3h3"/>'),
+  people: svg('<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>'),
+  globe:  svg('<circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>'),
+  lock:   svg('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/>'),
+  pin:    svg('<path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>'),
+  share:  svg('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/>'),
+  trash:  svg('<path d="M3 6h18M8 6V4a1 1 0 011-1h6a1 1 0 011 1v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>'),
+  plus:   svg('<path d="M12 5v14M5 12h14"/>'),
+  check:  svg('<path d="M20 6L9 17l-5-5"/>'),
+  clock:  svg('<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>'),
+  feed:   svg('<path d="M3 11l18-5v12L3 14v-3zM11.6 16.8a3 3 0 11-5.8-1.6"/>'),
+};
+/** Circular action button with a label underneath (Strava layout).
+ *  variant: '' neutral · 'primary' filled green (main CTA: Join/Request)
+ *           'active' tinted (current tab / Joined) · 'danger' red. */
+export type ActVariant = '' | 'primary' | 'active' | 'danger';
+const act = (id: string, ico: string, label: string, variant: ActVariant = '') => `
+  <button class="sv2-cd-act${variant ? ' sv2-cd-act--' + variant : ''}" id="${id}">
+    <span class="sv2-cd-act__circle">${ico}</span>
+    <span class="sv2-cd-act__label">${label}</span>
+  </button>`;
+
 const LS_CLUBS         = 'mapyou_local_clubs';
 const LS_FRIENDS       = 'mapyou_local_friends';
 const LS_PENDING_CLUBS = 'mapyou_pending_clubs'; // clubIds user has requested to join
@@ -803,44 +830,33 @@ export class SearchView {
         <div class="sv2-club-detail__info">
           <h2 class="sv2-club-detail__name">${club.name}</h2>
           <div class="sv2-club-detail__meta">
-            <span>${icon} ${club.sport}</span>
-            <span>👥 ${club.memberCount} members</span>
-            <span>${(club as unknown as Record<string,unknown>).isPrivate ? '🔒 Private' : '🌐 Public'}</span>
-            <span>📍 ${club.location}</span>
+            <span class="sv2-cd-meta__item">${ICO.sport}${club.sport}</span>
+            <span class="sv2-cd-meta__item">${ICO.people}${club.memberCount} members</span>
+            <span class="sv2-cd-meta__item">${(club as unknown as Record<string,unknown>).isPrivate ? ICO.lock + 'Private' : ICO.globe + 'Public'}</span>
           </div>
+          ${club.location ? `<div class="sv2-club-detail__meta"><span class="sv2-cd-meta__item">${ICO.pin}${club.location}</span></div>` : ''}
           <p class="sv2-club-detail__desc">${club.description || ''}</p>
         </div>
 
         <!-- Action buttons row — Strava style -->
         <div class="sv2-club-detail__action-row">
           ${club.isOwner ? `
-            <button class="sv2-club-detail__action-btn" id="cdbPrivacy">
-              <span>${(club as unknown as Record<string,unknown>).isPrivate ? '🌐' : '🔒'}</span>
-              <span>${(club as unknown as Record<string,unknown>).isPrivate ? 'Public' : 'Private'}</span>
-            </button>
-            <button class="sv2-club-detail__action-btn" id="cdbShare">
-              <span>🔗</span><span>Share</span>
-            </button>
-            <button class="sv2-club-detail__action-btn" id="cdbDelete" style="color:#f87171">
-              <span>🗑</span><span>Delete</span>
-            </button>` : `
-            <button class="sv2-club-detail__action-btn ${isMember ? 'sv2-club-detail__action-btn--active' : ''}" id="cdbJoin">
-              <span>${isMember ? '✓' : getPendingClubs().includes(club.id) ? '⏳' : '+'}</span>
-              <span>${isMember ? 'Joined' : getPendingClubs().includes(club.id) ? 'Pending' : ((club as unknown as Record<string,unknown>).isPrivate ? 'Request' : 'Join')}</span>
-            </button>
-            <button class="sv2-club-detail__action-btn" id="cdbShare">
-              <span>🔗</span><span>Share</span>
-            </button>`}
-          <button class="sv2-club-detail__action-btn ${tab === 'feed' ? 'sv2-club-detail__action-btn--active' : ''}" id="cdbTabFeed">
-            <span>📢</span><span>Feed</span>
-          </button>
-          <button class="sv2-club-detail__action-btn ${tab === 'members' ? 'sv2-club-detail__action-btn--active' : ''}" id="cdbTabMembers">
-            <span>👥</span><span>Members</span>
-          </button>
+            ${act('cdbPrivacy', (club as unknown as Record<string,unknown>).isPrivate ? ICO.globe : ICO.lock,
+                  (club as unknown as Record<string,unknown>).isPrivate ? 'Public' : 'Private')}
+            ${act('cdbShare', ICO.share, 'Share')}
+            ${act('cdbDelete', ICO.trash, 'Delete', 'danger')}` : `
+            ${act('cdbJoin',
+                  isMember ? ICO.check : getPendingClubs().includes(club.id) ? ICO.clock : ICO.plus,
+                  isMember ? 'Joined' : getPendingClubs().includes(club.id) ? 'Pending'
+                    : ((club as unknown as Record<string,unknown>).isPrivate ? 'Request' : 'Join'),
+                  isMember ? 'active' : 'primary')}
+            ${act('cdbShare', ICO.share, 'Share')}`}
+          ${act('cdbTabFeed', ICO.feed, 'Feed', tab === 'feed' ? 'active' : '')}
+          ${act('cdbTabMembers', ICO.people, 'Members', tab === 'members' ? 'active' : '')}
         </div>
 
         ${isMember ? `
-        <div class="sv2-club-detail__actions" style="padding:0 16px 12px">
+        <div class="sv2-club-detail__actions" style="padding:14px 0 2px">
           <button id="cdbAddPost">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M12 5v14M5 12h14"/></svg>
             Add Post to Club
