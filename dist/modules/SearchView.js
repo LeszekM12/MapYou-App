@@ -791,11 +791,14 @@ export class SearchView {
         const modal = document.createElement('div');
         modal.id = 'clubDetailModal';
         modal.className = 'sv2-club-detail-overlay';
-        // Fetch fresh club data from backend (to get isPrivate, memberCount, avatarB64)
-        void fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { cache: 'no-store' })
-            .then(r => r.json())
-            .then((d) => {
-            if (d.status === 'ok' && d.data) {
+        // Pobierz świeże dane klubu z backendu (isPrivate, memberCount, avatar, baner).
+        // Wydzielone do funkcji — używa tego zarówno start widoku, jak i pull-to-refresh.
+        const fetchClub = async (tab = 'feed') => {
+            try {
+                const r = await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { cache: 'no-store' });
+                const d = await r.json();
+                if (d.status !== 'ok' || !d.data)
+                    return;
                 startFeedPolling();
                 const fresh = d.data;
                 if (fresh.isPrivate !== undefined)
@@ -806,12 +809,25 @@ export class SearchView {
                     club.logoB64 = fresh.avatarB64;
                 if (fresh.bannerUrl)
                     club.bannerB64 = fresh.bannerUrl;
-                // Check if user is member
                 if (fresh.members)
                     club.joined = fresh.members.includes(myUserId);
-                renderModal('feed');
+                // Utrwal lokalnie, żeby baner/logo były od razu przy kolejnym otwarciu
+                const clubs = loadClubs();
+                const c = clubs.find(x => x.id === club.id);
+                if (c) {
+                    if (club.bannerB64)
+                        c.bannerB64 = club.bannerB64;
+                    if (club.logoB64)
+                        c.logoB64 = club.logoB64;
+                    c.memberCount = club.memberCount;
+                    c.joined = club.joined;
+                    saveClubs(clubs);
+                }
+                renderModal(tab);
             }
-        }).catch(() => { });
+            catch { /* offline — zostaje wersja lokalna */ }
+        };
+        void fetchClub('feed');
         const renderModal = (tab = 'feed') => {
             const isMember = club.joined || club.isOwner;
             modal.innerHTML = `
@@ -1500,6 +1516,64 @@ export class SearchView {
         modal.innerHTML = '<div style="padding:40px;text-align:center;color:rgba(255,255,255,0.3)">Loading…</div>';
         document.body.appendChild(modal);
         requestAnimationFrame(() => modal.classList.add('sv2-club-detail-overlay--visible'));
+        // ── Pull-to-refresh ────────────────────────────────────────────────────
+        // Własna implementacja, bo overlay ma swój scroll (natywny bounce iOS jest
+        // wyłączony przez position:fixed). Ciągnięcie liczy się tylko przy
+        // scrollTop === 0; opór (0.45) daje gumowy feel zamiast skoku.
+        const spinner = document.createElement('div');
+        spinner.className = 'sv2-ptr';
+        spinner.innerHTML = '<div class="sv2-ptr__circle"></div>';
+        modal.appendChild(spinner);
+        let ptrStartY = 0, ptrPull = 0, ptrActive = false, ptrBusy = false;
+        const PTR_TRIGGER = 70;
+        modal.addEventListener('touchstart', ev => {
+            if (ptrBusy || modal.scrollTop > 0) {
+                ptrActive = false;
+                return;
+            }
+            ptrActive = true;
+            ptrStartY = ev.touches[0].clientY;
+            ptrPull = 0;
+        }, { passive: true });
+        modal.addEventListener('touchmove', ev => {
+            if (!ptrActive || ptrBusy)
+                return;
+            ptrPull = (ev.touches[0].clientY - ptrStartY) * 0.45; // opór
+            if (ptrPull <= 0) {
+                spinner.style.transform = '';
+                spinner.style.opacity = '0';
+                return;
+            }
+            if (modal.scrollTop > 0) {
+                ptrActive = false;
+                return;
+            }
+            const d = Math.min(ptrPull, PTR_TRIGGER + 30);
+            spinner.style.opacity = String(Math.min(1, d / PTR_TRIGGER));
+            spinner.style.transform = `translateX(-50%) translateY(${d}px) rotate(${d * 4}deg)`;
+        }, { passive: true });
+        modal.addEventListener('touchend', () => {
+            if (!ptrActive || ptrBusy)
+                return;
+            ptrActive = false;
+            if (ptrPull < PTR_TRIGGER) { // za mało — cofnij
+                spinner.style.transform = '';
+                spinner.style.opacity = '0';
+                return;
+            }
+            ptrBusy = true;
+            spinner.classList.add('sv2-ptr--spinning');
+            spinner.style.transform = `translateX(-50%) translateY(${PTR_TRIGGER}px)`;
+            const activeTab = modal.querySelector('#cdbMembersSection')?.style.display === 'none' ? 'feed' : 'members';
+            void (async () => {
+                await fetchClub(activeTab); // dane klubu + re-render
+                loadFeed(); // i świeże posty (renderModal je czyści)
+                spinner.classList.remove('sv2-ptr--spinning');
+                spinner.style.transform = '';
+                spinner.style.opacity = '0';
+                ptrBusy = false;
+            })();
+        }, { passive: true });
         // renderModal is called by the fresh-fetch callback above
         // Fallback: if fetch fails or takes too long, render anyway after 1s
         setTimeout(() => { if (!modal.querySelector('.sv2-club-detail__action-row'))
