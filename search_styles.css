@@ -683,3 +683,7 @@
 .ev-bar { height: 5px; border-radius: 3px; background: var(--app-surface-2); overflow: hidden; }
 .ev-bar__fill { height: 100%; background: var(--app-text-muted); border-radius: 3px; transition: width 0.4s; }
 .ev-bar__fill--done { background: var(--color-brand--2, #00c46a); }
+.ev-btn--danger {
+  background: rgba(248,113,113,0.12); color: #f87171;
+  border: 1.5px solid rgba(248,113,113,0.3);
+}

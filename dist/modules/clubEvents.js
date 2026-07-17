@@ -57,6 +57,18 @@ async function fetchEventDetail(eventId) {
         return null;
     }
 }
+async function deleteEvent(eventId) {
+    try {
+        const r = await fetch(`${BACKEND_URL}/events/${encodeURIComponent(eventId)}`, {
+            method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: getUserId() }),
+        });
+        return r.ok;
+    }
+    catch {
+        return false;
+    }
+}
 async function joinEvent(eventId, leave = false) {
     try {
         const r = await fetch(`${BACKEND_URL}/events/${encodeURIComponent(eventId)}/${leave ? 'leave' : 'join'}`, {
@@ -295,8 +307,24 @@ export function openEventDetail(eventId, onChange) {
       </div>
 
       <p class="ev-note">Only Track workouts (and watch imports with a GPS route) count here.</p>
+      ${ev.creatorId === me ? `<button class="ev-btn ev-btn--danger" id="evDelete">Delete challenge</button>` : ''}
       <button class="ev-btn ev-btn--ghost" id="evClose">Close</button>`;
         card.querySelector('#evClose')?.addEventListener('click', close);
+        card.querySelector('#evDelete')?.addEventListener('click', async () => {
+            if (!confirm(`Delete „${ev.title}"?\n\nThis removes the challenge for everyone. Workouts are not affected.`))
+                return;
+            const b = card.querySelector('#evDelete');
+            b.disabled = true;
+            b.textContent = 'Deleting…';
+            if (await deleteEvent(eventId)) {
+                close();
+                onChange?.();
+            }
+            else {
+                b.disabled = false;
+                b.textContent = 'Delete challenge';
+            }
+        });
         card.querySelector('#evJoin')?.addEventListener('click', async () => {
             const b = card.querySelector('#evJoin');
             b.disabled = true;

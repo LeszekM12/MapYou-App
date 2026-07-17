@@ -1012,8 +1012,8 @@ export class SearchView {
         // Zmiana widoczności ma realne skutki (prywatny = tylko członkowie widzą
         // klub i feed), więc wymaga świadomego potwierdzenia.
         const q = nowPrivate
-          ? `Zmienić „${club.name}" na PRYWATNY?\n\nKlub zniknie z wyszukiwarki, a nowi członkowie będą musieli wysłać prośbę o dołączenie.`
-          : `Zmienić „${club.name}" na PUBLICZNY?\n\nKlub będzie widoczny w wyszukiwarce i każdy będzie mógł dołączyć bez zgody.`;
+          ? `Zmienić „${club.name}" na PRYWATNY?\n\nKlub nadal będzie widoczny w wyszukiwarce, ale nowi członkowie nie dołączą od razu — będą musieli wysłać prośbę, którą zaakceptujesz.`
+          : `Zmienić „${club.name}" na PUBLICZNY?\n\nKażdy będzie mógł dołączyć od razu, bez Twojej zgody.`;
         if (!confirm(q)) return;
         (club as unknown as Record<string,unknown>).isPrivate = nowPrivate;
         const lcs = loadClubs(); const lc = lcs.find(c => c.id === club.id);
@@ -1536,7 +1536,11 @@ export class SearchView {
     // Własna implementacja, bo overlay ma swój scroll (natywny bounce iOS jest
     // wyłączony przez position:fixed). Ciągnięcie liczy się tylko przy
     // scrollTop === 0; opór (0.45) daje gumowy feel zamiast skoku.
-    const spinner = ptr;   // utworzony wyżej, re-wstawiany przez renderModal
+    // Wzorzec z Home: KONTENER przesuwamy (translateY), a KRĘCI SIĘ DZIECKO.
+    // Rotacja kontenera nadpisywała inline'owym transformem animację hptrspin
+    // z klasy .home-ptr--active — stąd „zacinanie" zamiast obrotu.
+    const spinner = ptr;
+    const spinDot = ptr.querySelector<HTMLElement>('.home-ptr__spinner')!;
 
     let ptrStartY = 0, ptrPull = 0, ptrActive = false, ptrBusy = false;
     const PTR_TRIGGER = 70;
@@ -1549,30 +1553,33 @@ export class SearchView {
     modal.addEventListener('touchmove', ev => {
       if (!ptrActive || ptrBusy) return;
       ptrPull = (ev.touches[0].clientY - ptrStartY) * 0.45;   // opór
-      if (ptrPull <= 0) { spinner.style.transform = ''; spinner.style.opacity = '0'; return; }
+      if (ptrPull <= 0) { spinner.style.transform = ''; spinner.style.opacity = '0'; spinDot.style.transform = ''; return; }
       if (modal.scrollTop > 0) { ptrActive = false; return; }
       const d = Math.min(ptrPull, PTR_TRIGGER + 30);
       spinner.style.opacity   = String(Math.min(1, d / PTR_TRIGGER));
-      spinner.style.transform = `translateX(-50%) translateY(${d}px) rotate(${d * 4}deg)`;
+      spinner.style.transform = `translateX(-50%) translateY(${d}px)`;
+      spinDot.style.transform = `rotate(${d * 4}deg)`;   // obrót TYLKO na dziecku
     }, { passive: true });
 
     modal.addEventListener('touchend', () => {
       if (!ptrActive || ptrBusy) return;
       ptrActive = false;
       if (ptrPull < PTR_TRIGGER) {                       // za mało — cofnij
-        spinner.style.transform = ''; spinner.style.opacity = '0';
+        spinner.style.transform = ''; spinner.style.opacity = '0'; spinDot.style.transform = '';
         return;
       }
       ptrBusy = true;
       spinner.classList.add('home-ptr--active');
       spinner.style.transform = `translateX(-50%) translateY(${PTR_TRIGGER}px)`;
+      spinner.style.opacity   = '1';
+      spinDot.style.transform = '';   // oddaj kontrolę animacji hptrspin
       const activeTab: 'feed'|'members' =
         modal.querySelector<HTMLElement>('#cdbMembersSection')?.style.display === 'none' ? 'feed' : 'members';
       void (async () => {
         await fetchClub(activeTab);   // dane klubu + re-render
         loadFeed();                   // i świeże posty (renderModal je czyści)
         spinner.classList.remove('home-ptr--active');
-        spinner.style.transform = ''; spinner.style.opacity = '0';
+        spinner.style.transform = ''; spinner.style.opacity = '0'; spinDot.style.transform = '';
         ptrBusy = false;
       })();
     }, { passive: true });
