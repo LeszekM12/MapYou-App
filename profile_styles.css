@@ -5,7 +5,9 @@
 .pv-overlay {
   position: fixed;
   inset: 0;
-  z-index: 5000;
+  /* 7500: profil MUSI być nad overlayem klubu (7000) — inaczej otwarty
+     z listy członków chowa się pod nim. Poniżej modali wyzwań (8000). */
+  z-index: 7500;
   background: rgba(0,0,0,0);
   display: flex;
   align-items: flex-end;

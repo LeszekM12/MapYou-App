@@ -10,6 +10,7 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
 import { renderEventsSection, openCreateEventModal } from './clubEvents.js';
+import { renderMembersSection } from './clubMembers.js';
 
 // ── Line icons (Strava-like clarity) — single stroke, currentColor.
 //    Emoji were inconsistent across platforms and made the header noisy.
@@ -914,12 +915,8 @@ export class SearchView {
 
         <!-- Members + Stats tab -->
         <div id="cdbMembersSection" style="${tab === 'members' ? '' : 'display:none'}">
-          <div class="sv2-club-detail__section-title">STATISTICS</div>
-          <div id="cdbStats" style="padding:0 16px 8px;color:rgba(255,255,255,0.5);font-size:1.2rem">Loading…</div>
           <div class="sv2-club-detail__section-title">MEMBERS</div>
-          <div class="sv2-club-detail__members" id="cdbMembers">
-            <div style="padding:16px;color:rgba(255,255,255,0.3)">Loading…</div>
-          </div>
+          <div class="cm-list" id="cdbMembers"></div>
           ${club.isOwner ? `
           <div class="sv2-club-detail__section-title" id="cdbPendingTitle" style="display:none">JOIN REQUESTS</div>
           <div id="cdbPending"></div>` : ''}
@@ -933,10 +930,7 @@ export class SearchView {
 
       // Tab switching
       modal.querySelector('#cdbTabFeed')?.addEventListener('click', () => renderModal('feed'));
-      modal.querySelector('#cdbTabMembers')?.addEventListener('click', () => {
-        renderModal('members');
-        loadMembersAndStats();
-      });
+      modal.querySelector('#cdbTabMembers')?.addEventListener('click', () => renderModal('members'));
       modal.querySelector('#cdbTabEvents')?.addEventListener('click', () => renderModal('events'));
 
       // Rozwijane menu przy „Add Post"
@@ -957,7 +951,10 @@ export class SearchView {
         const host = modal.querySelector<HTMLElement>('#cdbEvents');
         if (host) void renderEventsSection(host, club.id, isMember);
       }
-      if (tab === 'members') loadMembersAndStats();
+      if (tab === 'members') {
+        const host = modal.querySelector<HTMLElement>('#cdbMembers');
+        if (host) void renderMembersSection(host, club.id);
+      }
 
       // Banner/logo upload
       const uploadToCloud = async (file: File): Promise<string | null> => {
