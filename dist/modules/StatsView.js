@@ -8,6 +8,7 @@ import { loadUnifiedWorkouts, deleteUnifiedWorkout, markWorkoutDeleted, formatDu
 import { getColor as _svColor, getIcon as _svIcon, getSportLabel as _svLabel } from './Tracker.js';
 import { CS } from './cloudSync.js';
 import { recordWeeklyGoalWin, getBestStreak } from './ProfileView.js';
+import { verifiedOnly } from './UnifiedWorkout.js';
 import { notifyWeeklyGoal } from './NotificationsService.js';
 // homeView imported lazily to avoid circular deps
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -284,9 +285,16 @@ export class StatsView {
             const d = new Date(w.date);
             return d >= mon && d <= sun;
         });
-        const wKm = week.reduce((s, w) => s + w.distanceKm, 0);
-        const wSec = week.reduce((s, w) => s + w.durationSec, 0);
-        const wCnt = week.length;
+        // Cel tygodniowy = OSIĄGNIĘCIE, więc liczą się tylko treningi z Track.
+        // Ręcznie dodany trening przyjmuje dowolne liczby (klasyczna dziura, którą
+        // ma też Strava: „800 km w 10 minut"), a nagroda możliwa do zdobycia
+        // wpisaniem liczby nic nie znaczy. Import (Strava/Health) też nie liczy —
+        // dane mogą być uczciwe, ale MapYou nie ma jak ich zweryfikować.
+        // Historia i statystyki nadal pokazują wszystko — patrz `week` niżej.
+        const weekVerified = verifiedOnly(week);
+        const wKm = weekVerified.reduce((s, w) => s + w.distanceKm, 0);
+        const wSec = weekVerified.reduce((s, w) => s + w.durationSec, 0);
+        const wCnt = weekVerified.length;
         const goalKm = +(localStorage.getItem('goalKm') ?? 35);
         const goalMin = +(localStorage.getItem('goalTime') ?? 300);
         const goalCnt = +(localStorage.getItem('goalCount') ?? 7);

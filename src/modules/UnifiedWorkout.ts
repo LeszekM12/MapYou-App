@@ -208,3 +208,29 @@ export const SPORT_ICONS_U: Record<WorkoutType, string> = {
 export const SPORT_COLORS_U: Record<WorkoutType, string> = {
   running: '#00c46a', walking: '#5badea', cycling: '#ffb545',
 };
+
+// ─── ACHIEVEMENT ELIGIBILITY (anti-cheat) ────────────────────────────────────
+// Single gate for every competitive feature: weekly goals, trophies, streaks,
+// club events/challenges — and anything added later.
+//
+// Rationale: a manually added workout accepts ANY numbers ("800 km in 10 min"),
+// so counting it toward rewards makes those rewards meaningless — this is the
+// exact loophole Strava has. Imports (Strava archive, Health Connect, Apple
+// Health) are treated the same way: the data may be honest, but MapYou cannot
+// verify it, and an unverifiable achievement is not an achievement.
+//
+// Manual/imported workouts still show up everywhere else — history, stats,
+// profile, feed. They just don't unlock anything.
+//
+// NOTE: `source` is set client-side, so this stops casual cheating, not a
+// determined attacker editing IndexedDB. The tamper-proof anchor is the
+// server-side live-tracking session (/live/start → /live/finish), which a
+// tracked workout leaves behind — that check belongs on the backend.
+export function isVerifiedWorkout(w: { source?: string }): boolean {
+  return w.source === 'tracking';
+}
+
+/** Workouts that may count toward goals, trophies and events. */
+export function verifiedOnly<T extends { source?: string }>(list: T[]): T[] {
+  return list.filter(isVerifiedWorkout);
+}

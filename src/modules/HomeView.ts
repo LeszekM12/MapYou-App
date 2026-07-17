@@ -20,7 +20,7 @@ import { profileView, updateBestStreak } from './ProfileView.js';
 import { searchView } from './SearchView.js';
 import { openPostModal } from './PostModal.js';
 import { openSaveActivityModal } from './SaveActivityModal.js';
-import { loadUnifiedWorkouts, saveUnifiedWorkout, type UnifiedWorkout } from './UnifiedWorkout.js';
+import { loadUnifiedWorkouts, saveUnifiedWorkout, isVerifiedWorkout, type UnifiedWorkout } from './UnifiedWorkout.js';
 import { statsView } from './StatsView.js';
 import { loadPosts, savePost, deletePost, type PostRecord } from './db.js';
 import { CS } from './cloudSync.js';
@@ -2043,15 +2043,23 @@ export class HomeView {
       activeKeys.add(k);
       if (!dayMeta.has(k)) dayMeta.set(k, { icon: getIcon(a.sport), color: getColor(a.sport) });
     }
+    // activeKeys → kółka dni w kalendarzu: pokazują KAŻDY trening (także ręczny
+    // i zaimportowany) — to widok historii, nie nagroda.
+    // verifiedKeys → streak, który odblokowuje trofeum, więc liczy wyłącznie
+    // treningi z Track (patrz isVerifiedWorkout — inaczej rekord serii dałoby
+    // się „dopisać" wstecz ręcznymi wpisami).
+    const verifiedKeys = new Set<number>();
     for (const w of this._workouts) {
-      activeKeys.add(dayKey(typeof w.date === 'number' ? w.date : Date.parse(w.date as unknown as string)));
+      const k = dayKey(typeof w.date === 'number' ? w.date : Date.parse(w.date as unknown as string));
+      activeKeys.add(k);
+      if (isVerifiedWorkout(w)) verifiedKeys.add(k);
     }
 
-    // Streak (consecutive days up to today)
+    // Streak (consecutive days up to today) — tylko treningi z Track
     let streak = 0;
     for (let i = 0; i < 365; i++) {
       const d = new Date(today); d.setDate(today.getDate() - i);
-      if (activeKeys.has(d.getTime())) streak++; else break;
+      if (verifiedKeys.has(d.getTime())) streak++; else break;
     }
     updateBestStreak(streak);
 
