@@ -168,9 +168,19 @@ async function renderTemplate(ctx, tpl, act, statKeys) {
         scrim.addColorStop(1, 'rgba(0,0,0,0.85)');
         ctx.fillStyle = scrim;
         ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
-        // Small route chip top-right if we have a track.
-        if ((act.coords?.length ?? 0) > 1) {
-            await drawRoute(ctx, act, CANVAS_W - 360, 80, 280, 280, color, false);
+        // Route centred over the photo, NO map/background box — otherwise a blue
+        // sky behind a blue line makes the track vanish. White casing under the
+        // coloured line keeps it readable on any photo. Drop shadow lifts it off.
+        const coords = (act.coords ?? []);
+        if (coords.length > 1) {
+            const rW = 620, rH = 620, rX = (CANVAS_W - rW) / 2, rY = 260;
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.55)';
+            ctx.shadowBlur = 24;
+            _drawRouteFallback(ctx, coords, 'rgba(255,255,255,0.95)', rX, rY, rW, rH);
+            ctx.shadowBlur = 0;
+            _drawRouteFallback(ctx, coords, color, rX + 4, rY + 4, rW - 8, rH - 8);
+            ctx.restore();
         }
         ctx.textAlign = 'left';
         ctx.font = '800 68px Manrope, system-ui, sans-serif';
@@ -199,7 +209,7 @@ async function renderTemplate(ctx, tpl, act, statKeys) {
         if ((act.coords?.length ?? 0) > 1) {
             await drawRoute(ctx, act, 90, 360, CANVAS_W - 180, 760, color, true);
         }
-        drawStatsBlock(ctx, act, statKeys, 90, 1320, CANVAS_W - 180, color, false);
+        drawStatsBlock(ctx, act, statKeys, 90, 1300, CANVAS_W - 180, color, false);
         drawBrandMark(ctx, 90, CANVAS_H - 90, false);
         return;
     }
@@ -254,7 +264,7 @@ async function renderTemplate(ctx, tpl, act, statKeys) {
         ctx.fillText(icon, CANVAS_W / 2, 850);
         ctx.textAlign = 'left';
     }
-    drawStatsBlock(ctx, act, statKeys, 90, 1440, CANVAS_W - 180, color, true);
+    drawStatsBlock(ctx, act, statKeys, 90, 1410, CANVAS_W - 180, color, true);
     drawBrandMark(ctx, 90, CANVAS_H - 90, true);
 }
 // ── Studio UI ────────────────────────────────────────────────────────────────
@@ -408,42 +418,58 @@ export function openShareStudio(act) {
         await renderTemplate(c.getContext('2d'), templates[current].id, act, statKeys);
         return new Promise(res => c.toBlob(b => res(b), 'image/png', 0.95));
     };
-    // The Strava flow: hand the IMAGE to the OS share sheet. Critically, "Save
-    // image" shares ONLY the file — no title/text/url. iOS shows "Save Image"
-    // (→ Photos) for a lone image/png; add a url/text and it treats the payload
-    // as a document (Copy/Print, no Save). That mismatch is why the earlier
-    // version reached a sheet with nowhere to save.
+    // "Save image" — Strava behaviour: write straight to the photo library with
+    // a permission prompt, no intermediate sheet. Uses @capacitor-community/media
+    // when present (native apk/ipa). If the plugin isn't installed yet, or on the
+    // web, it falls back to the OS share sheet / a direct download so the button
+    // is never dead.
+    const dataUrlFromBlob = (blob) => new Promise(res => { const r = new FileReader(); r.onloadend = () => res(r.result); r.readAsDataURL(blob); });
     const saveImage = async () => {
         const blob = await exportBlob();
-        const nav = navigator;
-        if (blob) {
-            const file = new File([blob], `MapYou-${act.sport}.png`, { type: 'image/png' });
-            if (nav.canShare?.({ files: [file] })) {
-                try {
-                    await navigator.share({ files: [file] });
-                    return;
-                }
-                catch (e) {
-                    if (e.name === 'AbortError')
-                        return;
-                }
+        if (!blob)
+            return 'fail';
+        // 1) Native gallery save (preferred — one tap, lands in Photos/Gallery).
+        const cap = window.Capacitor;
+        const Media = cap?.Plugins?.Media;
+        if (cap?.isNativePlatform?.() && Media?.savePhoto) {
+            try {
+                const dataUrl = await dataUrlFromBlob(blob);
+                await Media.savePhoto({ path: dataUrl });
+                return 'saved';
             }
-            // Desktop fallback: direct download.
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `MapYou-${act.sport}-${act.id}.png`;
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            catch { /* fall through to share */ }
         }
+        // 2) Web Share with a lone image file → iOS offers "Save Image".
+        const nav = navigator;
+        const file = new File([blob], `MapYou-${act.sport}.png`, { type: 'image/png' });
+        if (nav.canShare?.({ files: [file] })) {
+            try {
+                await navigator.share({ files: [file] });
+                return 'shared';
+            }
+            catch (e) {
+                if (e.name === 'AbortError')
+                    return 'shared';
+            }
+        }
+        // 3) Desktop fallback: download.
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `MapYou-${act.sport}-${act.id}.png`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        return 'downloaded';
     };
     ov.querySelector('#ssDownload')?.addEventListener('click', async () => {
         const lbl = ov.querySelector('#ssDownload span:last-child');
-        lbl.textContent = 'Preparing…';
-        await saveImage();
-        lbl.textContent = 'Save image';
+        lbl.textContent = 'Saving…';
+        const r = await saveImage();
+        lbl.textContent = r === 'saved' ? 'Saved ✓' : 'Save image';
+        if (r === 'saved')
+            setTimeout(() => { lbl.textContent = 'Save image'; }, 1800);
     });
     ov.querySelector('#ssShare')?.addEventListener('click', async () => {
         // Same image share, but if the platform can't do files, fall back to a

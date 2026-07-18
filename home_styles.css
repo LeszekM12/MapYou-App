@@ -2690,11 +2690,12 @@ video.home-reel-viewer__media {
 .ss-title { font-size: 1.7rem; font-weight: 800; color: var(--app-text-primary, #111); }
 
 /* Swipe stage */
-.ss-stage { overflow: hidden; padding: 4px 0 12px; }
-.ss-track { display: flex; transition: transform 0.32s cubic-bezier(0.32,0.72,0,1); will-change: transform; }
-.ss-slide { flex: 0 0 100%; display: flex; justify-content: center; padding: 0 40px; }
+.ss-stage { overflow: hidden; padding: 4px 0 12px; height: 52vh; max-height: 460px; }
+.ss-track { display: flex; height: 100%; transition: transform 0.32s cubic-bezier(0.32,0.72,0,1); will-change: transform; }
+.ss-slide { flex: 0 0 100%; display: flex; align-items: center; justify-content: center; padding: 0 40px; }
 .ss-canvas {
-  width: 100%; max-width: 300px; height: auto; aspect-ratio: 1080 / 1920;
+  height: 100%; width: auto; max-width: calc(100% - 80px);
+  aspect-ratio: 1080 / 1920;
   border-radius: 18px; box-shadow: 0 12px 40px rgba(0,0,0,0.35);
   background: #12171b;
 }
