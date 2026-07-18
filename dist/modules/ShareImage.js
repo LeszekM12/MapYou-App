@@ -13,7 +13,7 @@ function _latToTileY(lat, zoom) {
     const r = Math.PI / 180;
     return Math.floor((1 - Math.log(Math.tan(lat * r) + 1 / Math.cos(lat * r)) / Math.PI) / 2 * Math.pow(2, zoom));
 }
-function _latLngToPixel(lat, lng, zoom) {
+export function _latLngToPixel(lat, lng, zoom) {
     const n = Math.pow(2, zoom);
     const x = ((lng + 180) / 360) * n * 256;
     const r = Math.PI / 180;
@@ -29,7 +29,7 @@ async function _loadImage(url) {
         img.src = url;
     });
 }
-async function _drawMapTiles(ctx, coords, canvasX, canvasY, canvasW, canvasH) {
+export async function _drawMapTiles(ctx, coords, canvasX, canvasY, canvasW, canvasH) {
     if (!coords.length)
         return null;
     const lats = coords.map(c => c[0]);
@@ -102,7 +102,7 @@ async function _drawMapTiles(ctx, coords, canvasX, canvasY, canvasW, canvasH) {
         toCanvasY: (lat) => canvasY + (_latLngToPixel(lat, 0, zoom).y - srcY),
     };
 }
-function _drawRouteFallback(ctx, coords, color, mapX, mapY, mapW, mapH) {
+export function _drawRouteFallback(ctx, coords, color, mapX, mapY, mapW, mapH) {
     const lats = coords.map(c => c[0]);
     const lngs = coords.map(c => c[1]);
     const minLat = Math.min(...lats), maxLat = Math.max(...lats);
@@ -136,7 +136,7 @@ function _drawRouteFallback(ctx, coords, color, mapX, mapY, mapW, mapH) {
     ctx.fill();
 }
 // ── Rounded rect helper ───────────────────────────────────────────────────────
-function roundRect(ctx, x, y, w, h, r) {
+export function roundRect(ctx, x, y, w, h, r) {
     const rctx = ctx;
     ctx.beginPath();
     if (rctx.roundRect)

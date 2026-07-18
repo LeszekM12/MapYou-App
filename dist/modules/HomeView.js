@@ -1234,13 +1234,7 @@ export async function openActivityDetail(act, isOwn, actId) {
                 openCommentsView(sheetEl, itemId);
             }
             if (action === 'share') {
-                const existing = sheetEl.querySelector('.home-card__share-panel');
-                if (existing) {
-                    existing.classList.remove('home-card__share-panel--open');
-                    setTimeout(() => existing.remove(), 280);
-                }
-                else
-                    openSharePanel(sheetEl, full);
+                void import('./ShareStudio.js').then(m => isOwn ? m.openShareStudio(full) : m.openShareActions(full));
             }
         });
     });
@@ -1419,14 +1413,7 @@ export function buildCard(act) {
                 }
             }
             if (action === 'share') {
-                const existing = card.querySelector('.home-card__share-panel');
-                if (existing) {
-                    existing.classList.remove('home-card__share-panel--open');
-                    setTimeout(() => existing.remove(), 280);
-                }
-                else {
-                    openSharePanel(card, act);
-                }
+                void import('./ShareStudio.js').then(m => m.openShareStudio(act));
             }
         });
     });

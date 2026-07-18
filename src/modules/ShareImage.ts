@@ -20,7 +20,7 @@ function _latToTileY(lat: number, zoom: number): number {
     (1 - Math.log(Math.tan(lat * r) + 1 / Math.cos(lat * r)) / Math.PI) / 2 * Math.pow(2, zoom),
   );
 }
-function _latLngToPixel(lat: number, lng: number, zoom: number): { x: number; y: number } {
+export function _latLngToPixel(lat: number, lng: number, zoom: number): { x: number; y: number } {
   const n = Math.pow(2, zoom);
   const x = ((lng + 180) / 360) * n * 256;
   const r = Math.PI / 180;
@@ -37,7 +37,7 @@ async function _loadImage(url: string): Promise<HTMLImageElement | null> {
   });
 }
 
-async function _drawMapTiles(
+export async function _drawMapTiles(
   ctx: CanvasRenderingContext2D,
   coords: [number, number][],
   canvasX: number, canvasY: number,
@@ -119,7 +119,7 @@ async function _drawMapTiles(
   };
 }
 
-function _drawRouteFallback(
+export function _drawRouteFallback(
   ctx: CanvasRenderingContext2D,
   coords: [number, number][],
   color: string,
@@ -154,7 +154,7 @@ function _drawRouteFallback(
 
 // ── Rounded rect helper ───────────────────────────────────────────────────────
 
-function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
+export function roundRect(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, r: number): void {
   const rctx = ctx as CanvasRenderingContext2D & { roundRect?(x:number,y:number,w:number,h:number,r:number): void };
   ctx.beginPath();
   if (rctx.roundRect) rctx.roundRect(x, y, w, h, r);
