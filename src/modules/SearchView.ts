@@ -11,6 +11,7 @@ import { BACKEND_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
 import { renderEventsSection, openCreateEventModal } from './clubEvents.js';
 import { renderMembersSection } from './clubMembers.js';
+import { renderPolls, openCreatePollModal } from './clubPolls.js';
 
 // ── Line icons (Strava-like clarity) — single stroke, currentColor.
 //    Emoji were inconsistent across platforms and made the header noisy.
@@ -894,7 +895,7 @@ export class SearchView {
             </button>
             <div class="cdb-add__menu" id="cdbAddMenu" hidden>
               <button data-add="event"><span>🏁</span> Create a challenge</button>
-              <button data-add="poll" disabled><span>📊</span> Poll <em>soon</em></button>
+              <button data-add="poll"><span>📊</span> Create a poll</button>
             </div>
           </div>
         </div>` : ''}
@@ -902,6 +903,7 @@ export class SearchView {
         <!-- Feed tab -->
         <div id="cdbFeedSection" style="${tab === 'feed' ? '' : 'display:none'}">
           <div class="sv2-club-detail__section-title">CLUB FEED</div>
+          <div class="pl-list" id="cdbPolls"></div>
           <div class="sv2-club-detail__feed" id="cdbFeed">
             <div class="sv2-club-detail__feed-empty"><span>⏳</span><p>Loading…</p></div>
           </div>
@@ -944,9 +946,17 @@ export class SearchView {
         addMenu.hidden = true;
         openCreateEventModal(club.id, () => renderModal('events'));
       });
+      addMenu?.querySelector('[data-add="poll"]')?.addEventListener('click', () => {
+        addMenu.hidden = true;
+        openCreatePollModal(club.id, () => renderModal('feed'));
+      });
 
       // Load feed if on feed tab
-      if (tab === 'feed') loadFeed();
+      if (tab === 'feed') {
+        loadFeed();
+        const ph = modal.querySelector<HTMLElement>('#cdbPolls');
+        if (ph) void renderPolls(ph, club.id);
+      }
       if (tab === 'events') {
         const host = modal.querySelector<HTMLElement>('#cdbEvents');
         if (host) void renderEventsSection(host, club.id, isMember);

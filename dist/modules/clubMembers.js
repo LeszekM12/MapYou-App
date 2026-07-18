@@ -1,10 +1,11 @@
 // ─── CLUB MEMBERS — leaderboard ──────────────────────────────────────────────
 // Stats come from GET /clubs/:id/members, aggregated server-side over each
-// member's WHOLE account (not just activities shared to this club) and gated
-// exactly like challenges: Track workouts always count, watch/Health imports
-// only with a GPS route, manual entries and archive imports never. A club
-// leaderboard is a competition, so it has to obey the same rules — otherwise
-// the top spot is a text field.
+// member's WHOLE account (not just activities shared to this club).
+//
+// Deliberately NOT gated by the anti-cheat rule: this is a member card ("how
+// much have they done, ever"), not a contest — a Strava archive or a watch
+// import is real history and belongs here. The gate applies where something is
+// WON: challenges, weekly goals, trophies.
 import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
 import { openPublicProfile } from './PublicProfile.js';
@@ -59,7 +60,7 @@ export async function renderMembersSection(host, clubId) {
     const note = document.createElement('p');
     note.className = 'ev-note';
     note.style.padding = '0 4px';
-    note.textContent = 'Totals count Track workouts and watch imports with a GPS route.';
+    note.textContent = 'Lifetime totals across all workouts — tracked, imported and manual.';
     host.appendChild(note);
 }
 //# sourceMappingURL=clubMembers.js.map
