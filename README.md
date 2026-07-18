@@ -51,3 +51,7 @@ MapYou has no ads and does not sell data. See the full
 ## Author
 
 Built by **Leszek Mikrut** — solo project.
+
+## License
+
+This project is licensed under the **Business Source License 1.1** (converting to *Apache License 2.0* on January 1, 2029). For more details, please see the full [LICENSE](LICENSE) file.
