@@ -1309,6 +1309,19 @@ export class SearchView {
                                 }
                             });
                         }
+                        // Activity cards → open activity detail. (Post cards already get
+                        // their tap handler from buildPostCard, which opens PostDetail —
+                        // adding it here too would double-fire.)
+                        if (f.kind === 'activity') {
+                            card.style.cursor = 'pointer';
+                            card.addEventListener('click', () => {
+                                void import('./HomeView.js').then(async (hv) => {
+                                    const fn = hv.openActivityDetail;
+                                    if (fn)
+                                        await fn({ ...d, id: itemId, coords: [] }, d.userId === myUserId, itemId);
+                                });
+                            });
+                        }
                         feedEl.appendChild(card);
                         // Render minimap if activity has coordsEnc
                         const enc = d.coordsEnc;

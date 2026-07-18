@@ -668,3 +668,84 @@
 .pv-photo-viewer__header {
   padding-top: calc(14px + env(safe-area-inset-top, 0px));
 }
+
+/* ═══ POST DETAIL (X-style) ══════════════════════════════════════════════════ */
+.pd-overlay {
+  position: fixed; inset: 0; z-index: 7600;   /* nad klubem (7000), pod menu adm */
+  background: rgba(0,0,0,0.5);
+  display: flex; justify-content: center; align-items: flex-end;
+  opacity: 0; pointer-events: none; transition: opacity 0.24s;
+}
+.pd-overlay--visible { opacity: 1; pointer-events: all; }
+.pd-sheet {
+  width: 100%; max-width: 600px; height: 92dvh;
+  background: var(--app-bg-card); border-radius: 20px 20px 0 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  transform: translateY(100%); transition: transform 0.28s cubic-bezier(0.32,0.72,0,1);
+}
+.pd-overlay--visible .pd-sheet { transform: translateY(0); }
+
+.pd-head {
+  display: flex; align-items: center; gap: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 12px 12px;
+  border-bottom: 1px solid var(--app-border); flex-shrink: 0;
+}
+.pd-back, .pd-opts {
+  width: 36px; height: 36px; border: none; background: none;
+  font-size: 1.9rem; color: var(--app-text-primary); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; border-radius: 50%;
+}
+.pd-opts { font-size: 2.2rem; }
+.pd-head__title { flex: 1; font-size: 1.6rem; font-weight: 800; color: var(--app-text-primary); }
+
+.pd-scroll { flex: 1; overflow-y: auto; }
+.pd-loading, .pd-empty { padding: 40px; text-align: center; color: var(--app-text-muted); }
+.pd-empty span { font-size: 2.6rem; display: block; margin-bottom: 6px; opacity: 0.5; }
+.pd-empty--sm { padding: 20px; }
+
+.pd-post { padding: 16px; border-bottom: 8px solid var(--app-bg-elevated, var(--app-surface-1)); }
+.pd-post__author { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.pd-post__avatar, .pd-comment__avatar {
+  width: 44px; height: 44px; border-radius: 50%; overflow: hidden;
+  background: var(--app-surface-2); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+}
+.pd-comment__avatar { width: 38px; height: 38px; font-size: 1.5rem; }
+.pd-post__avatar img, .pd-comment__avatar img { width: 100%; height: 100%; object-fit: cover; }
+.pd-post__meta { display: flex; flex-direction: column; }
+.pd-post__name { font-size: 1.5rem; font-weight: 800; color: var(--app-text-primary); }
+.pd-post__time { font-size: 1.2rem; color: var(--app-text-muted); }
+.pd-post__title { font-size: 1.7rem; font-weight: 700; color: var(--app-text-primary); margin-bottom: 6px; }
+.pd-post__text { font-size: 1.5rem; line-height: 1.5; color: var(--app-text-primary); white-space: pre-wrap; }
+.pd-post__photo { width: 100%; border-radius: 16px; margin-top: 12px; display: block; }
+
+.pd-comments { padding: 8px 16px 20px; }
+.pd-comments-title { font-size: 1.2rem; font-weight: 700; color: var(--app-text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin: 8px 0; }
+.pd-comment {
+  display: flex; gap: 10px; width: 100%; text-align: left;
+  padding: 10px 0; background: none; border: none; cursor: pointer;
+  border-bottom: 1px solid var(--app-border); font-family: inherit;
+}
+.pd-comment__body { flex: 1; min-width: 0; }
+.pd-comment__top { display: flex; align-items: baseline; gap: 8px; }
+.pd-comment__name { font-size: 1.35rem; font-weight: 700; color: var(--app-text-primary); }
+.pd-comment__time { font-size: 1.15rem; color: var(--app-text-muted); }
+.pd-comment__text { display: block; font-size: 1.4rem; line-height: 1.45; color: var(--app-text-primary); margin-top: 2px; white-space: pre-wrap; word-break: break-word; }
+
+.pd-composer {
+  display: flex; gap: 8px; align-items: center;
+  padding: 10px 12px calc(env(safe-area-inset-bottom, 0px) + 10px);
+  border-top: 1px solid var(--app-border); flex-shrink: 0;
+  background: var(--app-bg-card);
+}
+.pd-composer input {
+  flex: 1; padding: 11px 14px; border-radius: 999px;
+  background: var(--app-surface-1); border: 1px solid var(--app-border);
+  color: var(--app-text-primary); font-size: 1.4rem; font-family: inherit;
+}
+.pd-send {
+  padding: 10px 18px; border-radius: 999px; border: none;
+  background: var(--color-brand--2, #00c46a); color: #06281a;
+  font-weight: 800; font-size: 1.35rem; font-family: inherit; cursor: pointer;
+}
+.pd-send:active { opacity: 0.85; }

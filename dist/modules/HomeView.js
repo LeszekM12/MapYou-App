@@ -531,6 +531,13 @@ export function buildPostCard(post, onRefresh) {
         e.stopPropagation();
         void profileView.open();
     });
+    // Tap the card body → post detail (comments, reply, options). Interactive
+    // children (menu, read-more, media, avatar) stopPropagation, so they win.
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', () => {
+        void import('./PostDetail.js').then(m => m.openPostDetail(post.id, () => void onRefresh()));
+    });
+    card.querySelector('.home-card__photo')?.addEventListener('click', e => e.stopPropagation());
     return card;
 }
 // ── Edit post modal ───────────────────────────────────────────────────────────
@@ -1492,6 +1499,10 @@ async function _routeNotifTarget(t) {
         else if (t.kind === 'profile') {
             openPublicProfile(t.userId ?? t.id);
         }
+        else if (t.kind === 'post') {
+            const m = await import('./PostDetail.js');
+            await m.openPostDetail(t.id);
+        }
     }
     catch { /* ignore routing errors */ }
 }
@@ -1515,6 +1526,9 @@ function _parseDeepLink(url) {
         const id = decodeURIComponent(prof[1]);
         return { kind: 'profile', id, userId: id };
     }
+    const post = url.match(/[#&?]post=([^&]+)/);
+    if (post)
+        return { kind: 'post', id: decodeURIComponent(post[1]) };
     return null;
 }
 // Push deep-links: SW message (app open, web/PWA) + cold-start hash (native).
