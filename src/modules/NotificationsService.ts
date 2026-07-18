@@ -29,7 +29,7 @@ export type NotifType =
 
 /** Deep-link target: tapping a notification jumps straight to this content. */
 export interface NotifTarget {
-  kind:    'activity' | 'reel' | 'live' | 'profile' | 'post';
+  kind:    'activity' | 'reel' | 'live' | 'profile' | 'post' | 'weather';
   id:      string;    // activityId | live token | userId (profile)
   userId?: string;    // whose content (reel / live / profile)
   name?:   string;    // optional display name (e.g. live tracking title)

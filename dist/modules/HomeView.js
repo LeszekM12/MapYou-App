@@ -18,6 +18,7 @@ import { loadUnifiedWorkouts, isVerifiedWorkout } from './UnifiedWorkout.js';
 import { statsView } from './StatsView.js';
 import { loadPosts } from './db.js';
 import { CS } from './cloudSync.js';
+import { wmoInfo } from './WeatherService.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // Tap-to-zoom for activity photos (Stats detail + activity detail). Delegated, bound once.
 if (typeof document !== 'undefined' && !window.__photoZoomBound) {
@@ -735,6 +736,73 @@ function openActivityOptionsMenu(ov, itemId, visibility, muted, closeDetail) {
         })();
     });
 }
+// ── (d) Weather at workout time — Open-Meteo ARCHIVE API, cached on the record ─
+// Strava-style "conditions" section: the weather the workout was done in. We
+// query the historical archive for the START point and the workout's hour, then
+// store it on the record so it's fetched only once. Works for the viewer too —
+// the coords come decoded from coordsEnc when `full.coords` is empty.
+async function _fillWeather(root, full, friendCoords, canPersist) {
+    const slot = root.querySelector('#adWeatherSlot');
+    if (!slot)
+        return;
+    const coords = (Array.isArray(full.coords) && full.coords.length > 0)
+        ? full.coords
+        : (friendCoords ?? []);
+    const start = coords[0];
+    let temp = full.wxTemp ?? null, code = full.wxCode ?? null;
+    let wind = full.wxWind ?? null, humid = full.wxHumidity ?? null;
+    if (temp == null && !full.wxFetched && start) {
+        try {
+            const d = new Date(full.date);
+            const day = d.toISOString().slice(0, 10); // YYYY-MM-DD
+            const hour = d.getHours();
+            const url = `https://archive-api.open-meteo.com/v1/archive`
+                + `?latitude=${start[0].toFixed(4)}&longitude=${start[1].toFixed(4)}`
+                + `&start_date=${day}&end_date=${day}`
+                + `&hourly=temperature_2m,weathercode,windspeed_10m,relativehumidity_2m`
+                + `&timezone=auto`;
+            const res = await fetch(url);
+            if (res.ok) {
+                const j = await res.json();
+                const h = j.hourly;
+                if (h?.temperature_2m?.length) {
+                    const i = Math.min(hour, h.temperature_2m.length - 1);
+                    temp = Math.round(h.temperature_2m[i]);
+                    code = h.weathercode?.[i] ?? null;
+                    wind = h.windspeed_10m?.[i] != null ? Math.round(h.windspeed_10m[i]) : null;
+                    humid = h.relativehumidity_2m?.[i] ?? null;
+                    if (canPersist) {
+                        try {
+                            await CS.saveEnrichedActivity({
+                                ...full, wxTemp: temp, wxCode: code, wxWind: wind, wxHumidity: humid, wxFetched: true,
+                            });
+                        }
+                        catch { /* ignore */ }
+                    }
+                }
+            }
+        }
+        catch { /* offline — just skip the section */ }
+    }
+    if (temp == null)
+        return; // nothing to show
+    const info = wmoInfo(code ?? 0);
+    const iconHtml = info.icon.startsWith('<') ? info.icon : `<span class="adw-emoji">${info.icon}</span>`;
+    slot.innerHTML = `<div class="ad-section">
+    <h3 class="ad-section-title">Pogoda</h3>
+    <div class="adw">
+      <div class="adw__main">
+        <div class="adw__icon">${iconHtml}</div>
+        <div class="adw__temp">${temp}°</div>
+        <div class="adw__desc">${info.description}</div>
+      </div>
+      <div class="adw__grid">
+        ${wind != null ? `<div class="adw__cell"><span class="adw__k">Wiatr</span><span class="adw__v">${wind} km/h</span></div>` : ''}
+        ${humid != null ? `<div class="adw__cell"><span class="adw__k">Wilgotność</span><span class="adw__v">${humid}%</span></div>` : ''}
+      </div>
+    </div>
+  </div>`;
+}
 // ── (e) Elevation profile — Open-Meteo Elevation API, cached on the record ───
 async function _fillElevation(root, full, canPersist) {
     const slot = root.querySelector('#adElevSlot');
@@ -1039,6 +1107,7 @@ export async function openActivityDetail(act, isOwn, actId) {
       ${splitsHtml}
       ${paceHtml}
       ${hrHtml}
+      <div id="adWeatherSlot"></div>
       <div id="adElevSlot"></div>
       ${notesHtml}
 
@@ -1070,7 +1139,14 @@ export async function openActivityDetail(act, isOwn, actId) {
       </div>
     </div>`;
     document.body.appendChild(ov);
-    void _fillElevation(ov, full, isOwn);
+    // Elevation needs a coordinate array. The viewer's `full.coords` is empty
+    // (only coordsEnc is sent), which is exactly why the chart was missing for
+    // other people — feed a decoded copy so it renders for everyone.
+    const elevActivity = (Array.isArray(full.coords) && full.coords.length >= 5)
+        ? full
+        : (friendCoords && friendCoords.length >= 5 ? { ...full, coords: friendCoords } : full);
+    void _fillElevation(ov, elevActivity, isOwn);
+    void _fillWeather(ov, full, friendCoords, isOwn);
     const close = () => {
         if (_adMap) {
             try {
@@ -1490,6 +1566,10 @@ async function _routeNotifTarget(t) {
             const m = await import('./PostDetail.js');
             await m.openPostDetail(t.id);
         }
+        else if (t.kind === 'weather') {
+            const m = await import('./initWeatherComponents.js');
+            m.openWeatherModal();
+        }
     }
     catch { /* ignore routing errors */ }
 }
@@ -1516,6 +1596,8 @@ function _parseDeepLink(url) {
     const post = url.match(/[#&?]post=([^&]+)/);
     if (post)
         return { kind: 'post', id: decodeURIComponent(post[1]) };
+    if (/[#&?]weather\b/.test(url))
+        return { kind: 'weather', id: '' };
     return null;
 }
 // Push deep-links: SW message (app open, web/PWA) + cold-start hash (native).

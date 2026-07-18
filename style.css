@@ -4073,3 +4073,21 @@ body.light-mode .rca-opt--active { background: var(--color-brand--2, #00c46a); c
 .trk-expanded__collapse {
     top: calc(2rem + env(safe-area-inset-top, 0px));
 }
+
+/* ── Weather section (activity detail) — Strava-style conditions ────────────── */
+.adw {
+  display: flex; align-items: center; gap: 1.4rem;
+  background: var(--app-surface-1, rgba(255,255,255,0.04));
+  border: 1px solid var(--app-border, rgba(255,255,255,0.08));
+  border-radius: 16px; padding: 1.2rem 1.4rem;
+}
+.adw__main { display: flex; flex-direction: column; align-items: center; gap: 0.1rem; min-width: 92px; }
+.adw__icon { font-size: 2.6rem; line-height: 1; }
+.adw__icon img { width: 42px; height: 42px; }
+.adw__emoji { font-size: 2.6rem; }
+.adw__temp { font-size: 2.4rem; font-weight: 800; color: var(--app-text-primary, #fff); }
+.adw__desc { font-size: 1.15rem; color: var(--app-text-muted, rgba(255,255,255,0.55)); text-align: center; }
+.adw__grid { display: flex; gap: 1.8rem; flex: 1; flex-wrap: wrap; }
+.adw__cell { display: flex; flex-direction: column; gap: 0.15rem; }
+.adw__k { font-size: 1.1rem; color: var(--app-text-muted, rgba(255,255,255,0.5)); text-transform: uppercase; letter-spacing: 0.4px; }
+.adw__v { font-size: 1.5rem; font-weight: 700; color: var(--app-text-primary, #fff); }

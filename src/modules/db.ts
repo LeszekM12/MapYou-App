@@ -54,6 +54,13 @@ export interface EnrichedActivity {
   calories?:   number | null;
   elevGain?:   number | null;                  // metres climbed
   elevSeries?: Array<[number, number]> | null; // [distanceM, elevM] downsampled
+  // Weather at the time & place of the workout — fetched once from Open-Meteo
+  // archive on first open, then cached here so we don't refetch.
+  wxTemp?:     number | null;   // °C
+  wxCode?:     number | null;   // WMO weather code
+  wxWind?:     number | null;   // km/h
+  wxHumidity?: number | null;   // %
+  wxFetched?:  boolean;         // true once we've tried (even if it failed)
   source?:     'in_app' | 'manual' | 'apple_health' | 'health_connect' | null;
   sourceId?:   string | null;                  // health-store UUID (dedup)
   sourceName?: string | null;                  // recording device/app, e.g. "Garmin Forerunner 255"
