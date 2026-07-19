@@ -91,7 +91,7 @@ export async function _drawMapTiles(
       const tx = txMin + Math.floor(idx / rows);
       const ty = tyMin + (idx % rows);
       const sub = subs[(((tx + ty) % 3) + 3) % 3];
-      const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
+      const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
       return _loadImage(url).then(img => {
         if (img) tctx.drawImage(img, (tx - txMin) * 256, (ty - tyMin) * 256, 256, 256);
       });

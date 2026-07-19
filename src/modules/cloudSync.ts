@@ -371,7 +371,7 @@ function renderMinimapCanvas(
       const px = (tx - cTx) * 256 + W / 2;
       const py = (ty - cTy) * 256 + H / 2;
       const sub = SUBS[(tx + ty) % 3];
-      const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
+      const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
       tilePromises.push(new Promise(resolve => {
         const img = new Image();
         img.crossOrigin = 'anonymous';

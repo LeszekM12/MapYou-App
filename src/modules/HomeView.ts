@@ -403,7 +403,7 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
   const photoHtml = post.photoUrl
     ? _postIsVideo
       ? `<div class="home-card__photo"><video src="${post.photoUrl}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
-      : `<div class="home-card__photo" data-photosrc="${post.photoUrl}"><img src="${post.photoUrl}" alt="" loading="lazy"/></div>`
+      : `<div class="home-card__photo" data-photosrc="${post.photoUrl}"><img src="${post.photoUrl}" alt="" loading="lazy" decoding="async"/></div>`
     : '';
 
   // Truncate body at 250 chars
@@ -1280,24 +1280,48 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   setTimeout(() => {
     const mapEl = document.getElementById('adHeroMap');
     if (!mapEl) return;
-    if (ownCoords) {
+    // Viewer gets the SAME interactive map as the author — previously friends'
+    // activities fell back to a static canvas, which is why the map couldn't
+    // be panned on other people's workouts.
+    const routePts: Array<[number, number]> =
+      ownCoords ? (full.coords as Array<[number, number]>) : (friendCoords ?? []);
+    if (routePts.length > 0) {
       _adMap = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: true });
-      L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(_adMap);
-      const pts = full.coords.map(c => L.latLng(c[0], c[1]));
+      // CARTO Voyager — ta sama „standardowa" warstwa co bazowa mapa w zakładce Map,
+      // żeby szczegóły nie wyglądały jak inna aplikacja (HOT OSM był dużo gęstszy).
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(_adMap);
+      const pts = routePts.map(c => L.latLng(c[0], c[1]));
       if (pts.length === 1) {
         _adMap.setView(pts[0], 15);
         L.circleMarker(pts[0], { radius: 7, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(_adMap);
       } else {
-        const line = L.polyline(pts, { color, weight: 4, opacity: 0.95 }).addTo(_adMap);
-        // Push the route into the visible area above the sheet
-        _adMap.fitBounds(line.getBounds(), { paddingTopLeft: [28, 28], paddingBottomRight: [28, sheetPx] });
+        // Fit to the FULL route first (ghost line sets the bounds), then play a
+        // Strava-style reveal: the line draws itself with a runner dot ahead.
+        const ghost = L.polyline(pts, { color, weight: 4, opacity: 0.18 }).addTo(_adMap);
+        _adMap.fitBounds(ghost.getBounds(), { paddingTopLeft: [28, 28], paddingBottomRight: [28, sheetPx] });
         L.circleMarker(pts[0], { radius: 6, color: '#fff', weight: 2, fillColor: color, fillOpacity: 1 }).addTo(_adMap);
-        L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#e74c3c', fillOpacity: 1 }).addTo(_adMap);
+
+        const live   = L.polyline([pts[0]], { color, weight: 4, opacity: 0.95 }).addTo(_adMap);
+        const runner = L.circleMarker(pts[0], { radius: 7, color: '#fff', weight: 2.5, fillColor: color, fillOpacity: 1 }).addTo(_adMap);
+
+        const DURATION = 2600;   // ms — long enough to read, short enough not to annoy
+        const t0 = performance.now();
+        const step = (now: number): void => {
+          if (!_adMap) return;   // detail closed mid-animation
+          const k = Math.min(1, (now - t0) / DURATION);
+          // easeOutQuad — fast start, gentle landing (reads like a replay)
+          const e = 1 - (1 - k) * (1 - k);
+          const idx = Math.max(1, Math.round(e * (pts.length - 1)));
+          live.setLatLngs(pts.slice(0, idx + 1));
+          runner.setLatLng(pts[idx]);
+          if (k < 1) { requestAnimationFrame(step); return; }
+          // Landing: finish marker replaces the runner emphasis
+          L.circleMarker(pts[pts.length - 1], { radius: 6, color: '#fff', weight: 2, fillColor: '#e74c3c', fillOpacity: 1 }).addTo(_adMap!);
+        };
+        requestAnimationFrame(step);
       }
       // Leaflet renders blank if created before the container settled — force a resize pass
       setTimeout(() => { try { _adMap?.invalidateSize(); } catch { /* ignore */ } }, 250);
-    } else if (friendCoords && friendCoords.length > 0) {
-      renderMinimapCanvas(mapEl, friendCoords, full.sport);
     }
   }, 320);
 
@@ -1376,7 +1400,7 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
   const photoHtml = act.photoUrl
     ? _actIsVideo
       ? `<div class="home-card__photo"><video src="${act.photoUrl}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
-      : `<div class="home-card__photo" data-photosrc="${act.photoUrl}"><img src="${act.photoUrl}" alt="Activity photo" loading="lazy"/></div>`
+      : `<div class="home-card__photo" data-photosrc="${act.photoUrl}"><img src="${act.photoUrl}" alt="Activity photo" loading="lazy" decoding="async"/></div>`
     : '';
 
   const notesHtml = act.notes
@@ -1755,6 +1779,31 @@ export class HomeView {
   private _impFlushBound:  boolean                 = false;
   private _feedLoading:  boolean                   = false;
   private _feedObserver: IntersectionObserver|null = null;
+
+  // Shared lazy-minimap observer: a card's map renders only when the card is
+  // within ~200px of the viewport, then unobserves itself. One observer for
+  // all cards — creating one per card would defeat the purpose.
+  private _miniObserver: IntersectionObserver | null = null;
+  private _observeMinimap(mapEl: HTMLElement, coordsEnc: string, sport: string): void {
+    if (!this._miniObserver) {
+      this._miniObserver = new IntersectionObserver(entries => {
+        for (const e of entries) {
+          if (!e.isIntersecting) continue;
+          const el = e.target as HTMLElement;
+          this._miniObserver?.unobserve(el);
+          const enc = el.dataset.minimapEnc; const sp = el.dataset.minimapSport ?? 'running';
+          if (!enc) continue;
+          try {
+            el.style.display = 'block';
+            renderMinimapCanvas(el, decodePolyline(enc), sp);
+          } catch { /* bad polyline — leave hidden */ }
+        }
+      }, { rootMargin: '200px' });
+    }
+    mapEl.dataset.minimapEnc = coordsEnc;
+    mapEl.dataset.minimapSport = sport;
+    this._miniObserver.observe(mapEl);
+  }
 
   init(): void {
     this.container = document.querySelector('#tabHome .home-scroll');
@@ -2481,7 +2530,7 @@ export class HomeView {
       const item = document.createElement('div');
       item.className = 'home-reel-item';
       const avatarContent = u.avatarB64
-        ? `<img src="${u.avatarB64}" class="home-reel-avatar__img" alt="${u.authorName}"/>`
+        ? `<img src="${u.avatarB64}" class="home-reel-avatar__img" alt="${u.authorName}" loading="lazy" decoding="async"/>`
         : `<div class="home-reel-avatar__placeholder">${u.authorName[0] ?? '?'}</div>`;
       item.innerHTML = `
         <div class="home-reel-avatar ${u.hasUnseen ? 'home-reel-avatar--active' : 'home-reel-avatar--seen'}">
@@ -3417,7 +3466,15 @@ export class HomeView {
         return;
       }
 
-      feed.forEach((item, idx) => {
+      // ── Chunked paint ────────────────────────────────────────────────────
+      // Building every card in one synchronous loop produced a single long
+      // main-thread task (DOM construction × N cards), during which taps were
+      // silently dropped — that was the "app frozen until reels load" feeling
+      // (reels merely finished around the same moment). First batch paints
+      // immediately for instant content; the rest streams in rAF batches, so
+      // the thread breathes between chunks and the UI answers taps at once.
+      const FIRST_BATCH = 6, BATCH = 6;
+      const buildOne = (item: FeedItem, idx: number): void => {
       const isOwn = (item.data.userId === userId) || !!item.isLocal;
       let card: HTMLElement;
 
@@ -3470,23 +3527,31 @@ export class HomeView {
 
       const actId = (item.data.activityId ?? item.data.id) as string;
       if (item.kind === 'activity') {
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            const coordsEnc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? null) as string | null;
-            const localAct = activities.find(a => a.id === actId);
-            const enc = coordsEnc ?? null;
-            if (enc) {
-              const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
-              if (mapEl) {
-                mapEl.style.display = 'block';
-                const coords = decodePolyline(enc);
-                renderMinimapCanvas(mapEl, coords, (item.data.sport ?? localAct?.sport ?? 'running') as string);
-              }
-            }
-          }, 80 + idx * 30);
-        });
+        // Minimap only when the card approaches the viewport. Eager rendering
+        // (even staggered) meant N canvases + N tile fetches up front — the
+        // network and main thread were busy for seconds on long feeds.
+        const mapEl = card.querySelector<HTMLElement>('.home-card__map-wrap--canvas, .home-card__map-wrap');
+        const coordsEnc = (item.data._coordsEncResolved ?? item.data.coordsEnc ?? null) as string | null;
+        if (mapEl && coordsEnc) {
+          const sport = (item.data.sport ?? activities.find(a => a.id === actId)?.sport ?? 'running') as string;
+          this._observeMinimap(mapEl, coordsEnc, sport);
+        }
       }
-    });
+      };   // ── end buildOne ──
+
+      // First batch synchronously (content above the fold appears instantly),
+      // the rest in rAF-sized chunks so taps are handled between batches.
+      feed.slice(0, FIRST_BATCH).forEach((it, i) => buildOne(it, i));
+      let next = FIRST_BATCH;
+      const pump = (): void => {
+        if (next >= feed.length) return;
+        if (!feedList.isConnected) return;   // view re-rendered — stop streaming
+        const end = Math.min(next + BATCH, feed.length);
+        for (let i = next; i < end; i++) buildOne(feed[i], i);
+        next = end;
+        requestAnimationFrame(pump);
+      };
+      requestAnimationFrame(pump);
 
       const friendsFeedEl = document.getElementById('friendsFeed');
       if (friendsFeedEl) friendsFeedEl.innerHTML = '';
