@@ -27,8 +27,10 @@ export async function ensureRecoveryCode(userId: string): Promise<string | null>
       signal:  AbortSignal.timeout(8000),
     });
     if (!res.ok) return null;
-    const data = await res.json() as { status: string; code: string };
-    if (data.status === 'ok') {
+    const data = await res.json() as { status: string; code: string | null };
+    // Backend zwraca kod tylko przy pierwszym utworzeniu. Jeśli kod już istnieje,
+    // przychodzi code:null (nie ujawniamy istniejącego kodu po publicznym userId).
+    if (data.status === 'ok' && data.code) {
       localStorage.setItem(LS_RECOVERY_KEY, data.code);
       return data.code;
     }

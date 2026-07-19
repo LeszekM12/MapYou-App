@@ -24,7 +24,9 @@ export async function ensureRecoveryCode(userId) {
         if (!res.ok)
             return null;
         const data = await res.json();
-        if (data.status === 'ok') {
+        // Backend zwraca kod tylko przy pierwszym utworzeniu. Jeśli kod już istnieje,
+        // przychodzi code:null (nie ujawniamy istniejącego kodu po publicznym userId).
+        if (data.status === 'ok' && data.code) {
             localStorage.setItem(LS_RECOVERY_KEY, data.code);
             return data.code;
         }
