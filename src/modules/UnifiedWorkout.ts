@@ -228,12 +228,16 @@ export const SPORT_COLORS_U: Record<WorkoutType, string> = {
 // tracked workout leaves behind — that check belongs on the backend.
 const MIN_ROUTE_POINTS = 10;   // musi zgadzać się z backendem (clubEvents.ts)
 
-export function isVerifiedWorkout(w: { source?: string; coords?: unknown[] }): boolean {
+export function isVerifiedWorkout(w: { source?: string; coords?: unknown[]; coordsCount?: number }): boolean {
   if (w.source === 'tracking') return true;
   // Zegarek (Health Connect / Apple Health) liczy się, ale tylko ze śladem GPS —
   // gołej liczby z Health nie da się odróżnić od wpisanej z palca. Ręczny wpis
   // miewa JEDNĄ współrzędną (pinezka na mapie), nigdy przebiegu trasy.
-  if (w.source === 'health') return (w.coords?.length ?? 0) >= MIN_ROUTE_POINTS;
+  // coordsCount jako fallback: po restore konta serwer zwraca coords wycięte
+  // (oszczędność miejsca), ale licznik punktów przeżywa podróż.
+  if (w.source === 'health') {
+    return Math.max(w.coords?.length ?? 0, w.coordsCount ?? 0) >= MIN_ROUTE_POINTS;
+  }
   return false;
 }
 

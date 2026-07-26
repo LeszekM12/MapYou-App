@@ -2064,6 +2064,7 @@ export class HomeView {
             // 'health' (nie 'manual'): trening z zegarka. Liczy się do celów
             // i eventów TYLKO gdy niesie trasę GPS — patrz brama w clubEvents.ts.
             source:      'health',
+            coordsCount: (w.coords?.length ?? 0),
             date:        new Date(enriched.date).toISOString(),
             distanceKm:  enriched.distanceKm,
             durationSec: enriched.durationSec,

@@ -72,6 +72,7 @@ export interface UnifiedWorkout {
   type:        'running' | 'walking' | 'cycling';
   sport?:      string;        // original sport (gym, tennis...) — type is a 3-value fallback
   source:      'manual' | 'tracking' | 'health';   // health = zegarek/Health import
+  coordsCount?: number;   // liczba punktów trasy — przetrwa restore (serwer wycina coords)
   date:        string;
   distanceKm:  number;
   durationSec: number;

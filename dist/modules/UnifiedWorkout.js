@@ -215,8 +215,11 @@ export function isVerifiedWorkout(w) {
     // Zegarek (Health Connect / Apple Health) liczy się, ale tylko ze śladem GPS —
     // gołej liczby z Health nie da się odróżnić od wpisanej z palca. Ręczny wpis
     // miewa JEDNĄ współrzędną (pinezka na mapie), nigdy przebiegu trasy.
-    if (w.source === 'health')
-        return (w.coords?.length ?? 0) >= MIN_ROUTE_POINTS;
+    // coordsCount jako fallback: po restore konta serwer zwraca coords wycięte
+    // (oszczędność miejsca), ale licznik punktów przeżywa podróż.
+    if (w.source === 'health') {
+        return Math.max(w.coords?.length ?? 0, w.coordsCount ?? 0) >= MIN_ROUTE_POINTS;
+    }
     return false;
 }
 /** Workouts that may count toward goals, trophies and events. */
