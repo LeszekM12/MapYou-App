@@ -7,6 +7,9 @@
 
 
 import { BACKEND_URL } from './config.js';
+// ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──
+import { installAuthFetch } from './modules/authFetch.js';
+installAuthFetch();
 import { installNativeGeolocation } from './modules/nativeGeo.js';
 import { initBgTrackingGuide } from './modules/bgGuide.js';
 // Swap navigator.geolocation for the native Capacitor implementation ASAP,
@@ -3699,8 +3702,13 @@ initUserProfile();
 localStorage.removeItem('mapyou_unified_migrated');
 _migrationReady = migrateToUnified();
 
-// Pokaż modal imienia przy pierwszym uruchomieniu
-void showNameModalIfNeeded();
+// Faza 3: najpierw logowanie (Google/Apple + pomost migracyjny),
+// dopiero potem ewentualny modal imienia dla świeżych kont.
+import('./modules/authGate.js').then(async ({ ensureAuthenticated }) => {
+  await ensureAuthenticated();
+  await showNameModalIfNeeded();
+  initUserProfile(); // odśwież UI profilu po ustaleniu tożsamości
+});
 
 // Przycisk „Change name" w Settings
 document.getElementById('btnChangeName')?.addEventListener('click', () => {

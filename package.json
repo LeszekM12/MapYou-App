@@ -7,19 +7,21 @@
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
     "dev": "http-server .",
-    "build:app": "tsc && node scripts/assemble-www.mjs",
+    "build:app": "tsc && node scripts/assemble-www.mjs && node scripts/bundle-app.mjs",
     "android": "npm run build:app && npx cap copy android && npx cap open android",
     "android:patch": "node scripts/patch-android.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",
     "@types/leaflet": "^1.9.0",
+    "esbuild": "^0.28.1",
     "http-server": "^14.1.1",
     "typescript": "^5.4.0"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
     "@capacitor-community/media": "^9.1.0",
+    "@capacitor-firebase/authentication": "^8.3.0",
     "@capacitor-firebase/messaging": "^8.3.0",
     "@capacitor/android": "^8.4.1",
     "@capacitor/core": "^8.4.1",
@@ -27,6 +29,7 @@
     "@capacitor/ios": "^8.4.1",
     "@capacitor/local-notifications": "^8.2.0",
     "capacitor-health": "^8.1.2",
-    "capacitor-live-activities": "^8.0.0"
+    "capacitor-live-activities": "^8.0.0",
+    "firebase": "^12.16.0"
   }
 }

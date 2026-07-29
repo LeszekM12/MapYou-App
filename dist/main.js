@@ -16,6 +16,9 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 };
 var _a, _App_map, _App_ghostRoute, _App_createActive, _App_createWaypoints, _App_createMarkers, _App_createLine, _App_createSport, _App_createDistanceKm, _App_createCoords, _App_createClickHandler, _App_tileLayer, _App_mapZoomLevel, _App_mapEvent, _App_workouts, _App_routeMode, _App_routeStep, _App_routePointA, _App_routePointB, _App_routeLine, _App_routeMarkerA, _App_routeMarkerB, _App_routeActivityMode, _App_routeCoords, _App_routeTotalDist, _App_progressLine, _App_progressWatchId, _App_coveredUpToIndex, _App_arrivedShown, _App_nearDestCount, _App_ARRIVAL_CONSEC, _App_ARRIVAL_DIST, _App_voiceKmAnnounced, _App_voiceStartTime, _App_voiceDistCovered, _App_trackingActive, _App_watchId, _App_trackingMarker, _App_trackingCoords, _App_prevTrackingCoords, _App_userTouchingMap, _App_recenterTimer, _App_tracker, _App_trackSport, _App_timerActive, _App_timerPaused, _App_timerStartMs, _App_timerAccumSec, _App_timerInterval, _App_lastAnnouncedKm, _App_wasAutoPaused, _App_lastLapCount, _App_clockInterval, _App_historyPanel, _App_nightMode, _App_wakeLock, _App_deferredInstallPrompt, _App_markers, _App_clusterGroup, _App_clusterEnabled, _App_activeRoute, _App_unifiedMarkers, _App_refreshing, _App_poiMarkers, _App_userCoords, _App_autocompleteTimer, _App_filterDrag, _App_activitySpeeds, _App_activeWorkoutId, _App_workoutRouteLayer, _App_customFilters, _App_pinnedCoord, _App_goalKm, _App_goalTime, _App_goalCount, _App_statsExpanded, _App_statsWeekOffset, _App_statsSelectedDay, _App_statsPrevGoalReached;
 import { BACKEND_URL } from './config.js';
+// ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──
+import { installAuthFetch } from './modules/authFetch.js';
+installAuthFetch();
 import { installNativeGeolocation } from './modules/nativeGeo.js';
 import { initBgTrackingGuide } from './modules/bgGuide.js';
 // Swap navigator.geolocation for the native Capacitor implementation ASAP,
@@ -3989,8 +3992,13 @@ initUserProfile();
 // Remove old migration flag so re-migration runs on every start (safe — uses upsert)
 localStorage.removeItem('mapyou_unified_migrated');
 _migrationReady = migrateToUnified();
-// Pokaż modal imienia przy pierwszym uruchomieniu
-void showNameModalIfNeeded();
+// Faza 3: najpierw logowanie (Google/Apple + pomost migracyjny),
+// dopiero potem ewentualny modal imienia dla świeżych kont.
+import('./modules/authGate.js').then(async ({ ensureAuthenticated }) => {
+    await ensureAuthenticated();
+    await showNameModalIfNeeded();
+    initUserProfile(); // odśwież UI profilu po ustaleniu tożsamości
+});
 // Przycisk „Change name" w Settings
 document.getElementById('btnChangeName')?.addEventListener('click', () => {
     openChangeNameModal();

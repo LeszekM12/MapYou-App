@@ -12,6 +12,13 @@ const config: CapacitorConfig = {
       // Show pushes even while the app is in the foreground (iOS)
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    FirebaseAuthentication: {
+      // Faza 3: natywne logowanie. skipNativeAuth=false → plugin sam loguje
+      // do natywnego SDK; credential i tak wstrzykujemy też do web SDK
+      // (authService.ts), żeby JS miał getIdToken() dla authFetch.
+      skipNativeAuth: false,
+      providers: ['google.com', 'apple.com'],
+    },
   },
 };
 
