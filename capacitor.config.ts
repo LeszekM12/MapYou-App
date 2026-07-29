@@ -6,7 +6,8 @@ const config: CapacitorConfig = {
   webDir: 'www',
   // For fast dev you can point the native shell at your live PWA instead of a
   // bundled copy. Comment out `server` to ship the bundled www/.
-  server: { url: 'https://leszekm12.github.io/MapYou-App', cleartext: false },
+  // WYŁĄCZONE (Faza 3): apka używa lokalnego www/, czyli tego, co budujesz.
+  // server: { url: 'https://leszekm12.github.io/MapYou-App', cleartext: false },
   plugins: {
     FirebaseMessaging: {
       // Show pushes even while the app is in the foreground (iOS)
