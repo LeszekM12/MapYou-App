@@ -3702,19 +3702,22 @@ initUserProfile();
 localStorage.removeItem('mapyou_unified_migrated');
 _migrationReady = migrateToUnified();
 
-// Faza 3: najpierw logowanie (Google/Apple + pomost migracyjny),
-// dopiero potem ewentualny modal imienia dla świeżych kont.
-// UWAGA: .catch() jest OBOWIĄZKOWY — bez niego każdy błąd bramki jest
-// niewidoczny (odrzucona obietnica bez obsługi), a apka startuje bez tożsamości.
-import('./modules/authGate.js')
-  .then(async ({ ensureAuthenticated }) => {
-    await ensureAuthenticated();
+// Faza 3: apka startuje BEZ wymuszania logowania.
+// Gość korzysta normalnie (treningi lokalnie w Dexie), a loguje się z Profilu
+// wtedy, kiedy zechce — wówczas jego lokalne dane zostają przypisane do konta
+// (backend: tryb 'claimed'). Tu tylko cicho przywracamy sesję, jeśli istnieje.
+import('./modules/AccountUI.js')
+  .then(async ({ initAccountSilent, onAccountChange }) => {
+    await initAccountSilent();
+    // Po zalogowaniu/wylogowaniu odśwież UI profilu.
+    onAccountChange(() => { try { initUserProfile(); } catch { /* noop */ } });
     await showNameModalIfNeeded();
-    initUserProfile(); // odśwież UI profilu po ustaleniu tożsamości
+    initUserProfile();
   })
   .catch(err => {
-    console.error('[AuthGate] KRYTYCZNY błąd bramki logowania:', err);
-    alert('Nie udało się uruchomić logowania. Szczegóły w logu aplikacji.');
+    console.error('[Account] błąd inicjalizacji konta:', err);
+    // Apka musi działać nawet gdy warstwa konta padnie — gość korzysta lokalnie.
+    void showNameModalIfNeeded();
   });
 
 // Przycisk „Change name" w Settings

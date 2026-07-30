@@ -18,6 +18,7 @@ import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
 import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
+import { isSignedIn, signInPromptHtml, bindSignInPrompts } from './AccountUI.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 
@@ -142,9 +143,20 @@ export class FriendsView {
   // ── Render friends list ────────────────────────────────────────────────────
 
   async render(): Promise<void> {
-    const friends = await getAllFriends();
-    const list    = document.getElementById('friendsList');
+    const list = document.getElementById('friendsList');
     if (!list) return;
+
+    // Faza 3: bez konta funkcje spolecznosciowe nie dzialaja (backend wymaga
+    // tokena). Pokazujemy kartę zachęty zamiast pustej listy — wariant A.
+    if (!isSignedIn()) {
+      list.innerHTML = signInPromptHtml('znajomych');
+      bindSignInPrompts(list, () => { void this.render(); });
+      const feedEl = document.getElementById('friendsFeed');
+      if (feedEl) feedEl.innerHTML = '';
+      return;
+    }
+
+    const friends = await getAllFriends();
 
     if (friends.length === 0) {
       list.innerHTML = `

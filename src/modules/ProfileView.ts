@@ -9,6 +9,7 @@
 
 import { loadUnifiedWorkouts, type UnifiedWorkout, SPORT_ICONS_U, SPORT_COLORS_U, formatDurSec } from './UnifiedWorkout.js';
 import { getIcon as _getIcon, getColor as _getColor, getSportLabel as _getSportLabel } from './Tracker.js';
+import { renderAccountCard, bindAccountCard } from './AccountUI.js';
 import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId, type ProfileData } from './UserProfile.js';
 import type { ProfileRecord } from './db.js';
@@ -978,6 +979,8 @@ async function _openSettingsModal(parent: HTMLElement, userId: string): Promise<
         </div>
         <div style="overflow-y:auto;padding:16px 20px 40px">
           ${activeTab === 'profile' ? `
+          <!-- Konto (Faza 3) -->
+          ${renderAccountCard()}
           <!-- Privacy -->
           <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
             <div>
@@ -995,6 +998,9 @@ async function _openSettingsModal(parent: HTMLElement, userId: string): Promise<
           ${_buildPushTogglesHtml(settings, togId)}`}
         </div>
       </div>`;
+
+    // Konto (Faza 3) — przerysuj modal po zmianie stanu konta
+    bindAccountCard(modal, () => renderModal());
 
     modal.querySelector('#pvSetClose')?.addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
