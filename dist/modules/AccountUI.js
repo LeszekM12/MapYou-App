@@ -154,8 +154,8 @@ export function showAuthModal() {
         // ---- widok główny ----
         const renderMain = () => {
             modal.innerHTML = `
-        <div class="name-modal__card">
-          <button id="authClose" aria-label="Zamknij" style="position:absolute;top:10px;right:14px;background:none;border:none;color:rgba(255,255,255,0.45);font-size:26px;line-height:1;cursor:pointer">×</button>
+        <div class="name-modal__card" style="position:relative">
+          <button id="authClose" aria-label="Zamknij" style="position:absolute;top:4px;right:4px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;background:none;border:none;color:rgba(150,150,150,0.9);font-size:30px;line-height:1;cursor:pointer;z-index:2">×</button>
           <div class="name-modal__icon">🏃</div>
           <h2 class="name-modal__title">Zaloguj się lub zarejestruj</h2>
           <p class="name-modal__sub">
@@ -232,7 +232,7 @@ export function showAuthModal() {
             catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
                 // Backend mówi: to userId ma już konto → potrzebny kod odzyskiwania
-                if (/NEEDS_RECOVERY_CODE|kod odzyskiwania/i.test(msg)) {
+                if (/NEEDS_RECOVERY_CODE/i.test(msg) || /kod odzyskiwania/i.test(msg)) {
                     renderCode('To konto istnieje już na serwerze. Podaj kod odzyskiwania, aby połączyć je z tym logowaniem.');
                 }
                 else {

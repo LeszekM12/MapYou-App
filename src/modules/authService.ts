@@ -1,34 +1,29 @@
 // ─── AUTH SERVICE (Faza 3) ───────────────────────────────────────────────────
 // src/modules/authService.ts
 //
-// Tożsamość MapYou oparta o Firebase Authentication.
+// ARCHITEKTURA: na iOS/Androidzie źródłem prawdy jest NATYWNA wtyczka
+// @capacitor-firebase/authentication — logowanie, token, stan sesji, wylogowanie.
+// Webowe SDK Firebase jest używane WYŁĄCZNIE w przeglądarce (dev).
 //
-//  - Na iOS/Android logowanie idzie przez NATYWNY plugin
-//    @capacitor-firebase/authentication (systemowe okno Google/Apple),
-//    a uzyskany credential jest wstrzykiwany do webowego SDK Firebase,
-//    żeby JS miał dostęp do getIdToken() dla authFetch.
-//  - Na webie (dev) — signInWithPopup.
+// Dlaczego tak, a nie „wtyczka do logowania + web SDK do tokenów":
+// pod pochodzeniem `capacitor://localhost` webowe SDK Firebase Auth zachowuje
+// się zawodnie — znane i udokumentowane problemy:
+//   • signInWithCredential() nigdy nie rozwiązuje obietnicy (wisi bez błędu),
+//   • onAuthStateChanged() nie odpala (u nas: „stan sesji ustalony (timeout)"),
+//   • żądania wewnętrzne SDK wpadają na CORS.
+// Wtyczka natywna nie ma tych problemów, bo działa poza WebView.
 //
-// Po zalogowaniu wołamy POST /auth/session (wymiana tokena na sesję MapYou):
-//  - konto dowiązane → mode 'login'  → dostajemy nasze userId
-//  - stare konto + kod recovery → mode 'linked' → dopięcie i to samo userId
-//  - świeży użytkownik → mode 'created' → nowe userId z serwera
-//
-// userId ląduje w localStorage pod TYM SAMYM kluczem co dotychczas
-// ('mapyou_userId_profile'), więc reszta apki działa bez zmian.
+// Wtyczkę i Capacitora bierzemy z globala (globalThis.Capacitor) — projekt nie
+// ma bundlera dla warstwy natywnej, tak samo robi nativeGeo.ts.
 
-// UWAGA: ten projekt nie ma bundlera (build = czysty `tsc`), więc NIE wolno
-// tu importować pakietów npm po nazwie — WebView by ich nie rozwiązał.
-// Capacitor i jego pluginy bierzemy z globala (tak jak nativeGeo.ts),
-// a Firebase SDK z CDN przez <script type="importmap"> w index.html.
 import { initializeApp, getApps } from 'firebase/app';
 import {
   getAuth, initializeAuth,
   indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence,
   browserPopupRedirectResolver,
   GoogleAuthProvider, OAuthProvider,
-  signInWithCredential, signInWithPopup, onAuthStateChanged,
-  signOut as webSignOut, type User, type Auth,
+  signInWithPopup, onAuthStateChanged,
+  signOut as webSignOut, type Auth,
 } from 'firebase/auth';
 import { BACKEND_URL, FIREBASE_CONFIG } from '../config.js';
 import { setTokenProvider } from './authFetch.js';
@@ -36,12 +31,20 @@ import { setTokenProvider } from './authFetch.js';
 const LS_USER_ID      = 'mapyou_userId_profile';
 const LS_RECOVERY_KEY = 'mapyou_recovery_code';
 
-// ── Capacitor z globala (bez importu npm) ─────────────────────────────────────
+// ── Capacitor + wtyczka z globala ─────────────────────────────────────────────
 
-interface CapCredential { idToken?: string; nonce?: string }
+export interface AccountUser {
+  uid:          string;
+  email:        string | null;
+  displayName:  string | null;
+}
+
+interface PluginUser { uid: string; email?: string | null; displayName?: string | null }
 interface FirebaseAuthPlugin {
-  signInWithGoogle(opts?: { skipNativeAuth?: boolean }): Promise<{ credential?: CapCredential }>;
-  signInWithApple(opts?: { skipNativeAuth?: boolean }):  Promise<{ credential?: CapCredential }>;
+  signInWithGoogle(opts?: { skipNativeAuth?: boolean }): Promise<{ user?: PluginUser | null }>;
+  signInWithApple(opts?: { skipNativeAuth?: boolean }):  Promise<{ user?: PluginUser | null }>;
+  getCurrentUser(): Promise<{ user?: PluginUser | null }>;
+  getIdToken(opts?: { forceRefresh?: boolean }): Promise<{ token: string }>;
   signOut(): Promise<void>;
 }
 interface CapGlobal {
@@ -59,26 +62,21 @@ export function isNativePlatform(): boolean {
 export function getPlatform(): string {
   return cap()?.getPlatform?.() ?? 'web';
 }
-function nativeAuthPlugin(): FirebaseAuthPlugin | undefined {
+function plugin(): FirebaseAuthPlugin | undefined {
   return cap()?.Plugins?.FirebaseAuthentication as FirebaseAuthPlugin | undefined;
 }
+/** Czy działamy na natywnej wtyczce (iOS/Android z zainstalowanym pluginem). */
+function useNative(): boolean {
+  return isNativePlatform() && !!plugin();
+}
 
-// ── Init ──────────────────────────────────────────────────────────────────────
+// ── Webowe SDK (tylko przeglądarka) ───────────────────────────────────────────
 
 function app() {
   return getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
 }
 
 let _auth: Auth | null = null;
-
-/** Auth z JAWNIE ustawioną pamięcią sesji.
- *
- *  Dlaczego nie samo getAuth(): w WKWebView pod pochodzeniem
- *  `capacitor://localhost` domyślna pamięć Firebase potrafi się nie
- *  zainicjalizować — wtedy onAuthStateChanged NIGDY nie odpala, a bramka
- *  logowania wisi bez błędu (ekran się nie pokazuje). Lista kolejnych
- *  wariantów: IndexedDB → localStorage → pamięć ulotna. Ostatni zawsze
- *  działa, choć sesja nie przetrwa restartu apki. */
 function auth(): Auth {
   if (_auth) return _auth;
   try {
@@ -86,104 +84,112 @@ function auth(): Auth {
       persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence],
       popupRedirectResolver: browserPopupRedirectResolver,
     });
-    console.log('[Auth] initializeAuth OK');
-  } catch (e) {
-    // Już zainicjalizowane (np. drugie wywołanie) — pobierz istniejącą instancję.
-    console.warn('[Auth] initializeAuth fallback -> getAuth:', e instanceof Error ? e.message : e);
+  } catch {
     _auth = getAuth(app());
   }
   return _auth;
 }
 
-/** Poczekaj, aż Firebase odtworzy zapisaną sesję.
- *  Z twardym limitem czasu — bez niego awaria pamięci sesji zawiesza
- *  cały start apki i nic się nie wyświetla. */
-function waitForAuthReady(timeoutMs = 6000): Promise<User | null> {
-  return new Promise(resolve => {
-    let settled = false;
-    const finish = (u: User | null, why: string) => {
-      if (settled) return;
-      settled = true;
-      console.log(`[Auth] stan sesji ustalony (${why}):`, u ? u.uid : 'brak użytkownika');
-      resolve(u);
-    };
+// ── Token dla authFetch ───────────────────────────────────────────────────────
 
-    const timer = setTimeout(() => finish(null, 'timeout'), timeoutMs);
-
-    try {
-      const off = onAuthStateChanged(
-        auth(),
-        user => { clearTimeout(timer); off(); finish(user, 'onAuthStateChanged'); },
-        err => {
-          clearTimeout(timer);
-          console.warn('[Auth] onAuthStateChanged błąd:', err);
-          finish(null, 'błąd obserwatora');
-        },
-      );
-    } catch (e) {
-      clearTimeout(timer);
-      console.warn('[Auth] onAuthStateChanged rzucił wyjątek:', e);
-      finish(null, 'wyjątek');
-    }
-  });
-}
-
-/** Podłącz źródło tokenów do authFetch. Wywołaj raz, jak najwcześniej. */
 export function initAuthTokenProvider(): void {
   setTokenProvider(async () => {
+    if (useNative()) {
+      try {
+        const { token } = await plugin()!.getIdToken();
+        return token || null;
+      } catch {
+        return null;   // nikt nie jest zalogowany
+      }
+    }
     const u = auth().currentUser;
     if (!u) return null;
     try { return await u.getIdToken(); } catch { return null; }
   });
 }
 
-// ── Providers ─────────────────────────────────────────────────────────────────
+// ── Stan sesji ────────────────────────────────────────────────────────────────
+
+/** Kto jest zalogowany (null = nikt). Na natywnym pyta wtyczkę — bez czekania
+ *  na obserwatora webowego SDK, który pod capacitor:// nie odpala. */
+export async function getSignedInUser(): Promise<AccountUser | null> {
+  if (useNative()) {
+    try {
+      const { user } = await plugin()!.getCurrentUser();
+      if (!user) { console.log('[Auth] natywnie: brak zalogowanego użytkownika'); return null; }
+      console.log('[Auth] natywnie: zalogowany', user.uid);
+      return { uid: user.uid, email: user.email ?? null, displayName: user.displayName ?? null };
+    } catch (e) {
+      console.warn('[Auth] getCurrentUser błąd:', e instanceof Error ? e.message : e);
+      return null;
+    }
+  }
+
+  // Przeglądarka: obserwator z limitem czasu (na wypadek awarii pamięci sesji)
+  return new Promise(resolve => {
+    let settled = false;
+    const finish = (u: AccountUser | null) => { if (!settled) { settled = true; resolve(u); } };
+    const timer = setTimeout(() => finish(null), 6000);
+    try {
+      const off = onAuthStateChanged(auth(), u => {
+        clearTimeout(timer); off();
+        finish(u ? { uid: u.uid, email: u.email, displayName: u.displayName } : null);
+      }, () => { clearTimeout(timer); finish(null); });
+    } catch { clearTimeout(timer); finish(null); }
+  });
+}
+
+// ── Logowanie ─────────────────────────────────────────────────────────────────
 
 export async function signInWithGoogle(): Promise<void> {
-  const plugin = nativeAuthPlugin();
-  if (isNativePlatform() && plugin) {
-    const result = await plugin.signInWithGoogle();
-    const idToken = result.credential?.idToken;
-    if (!idToken) throw new Error('Brak credential z natywnego logowania Google');
-    await signInWithCredential(auth(), GoogleAuthProvider.credential(idToken));
-  } else {
-    await signInWithPopup(auth(), new GoogleAuthProvider());
+  if (useNative()) {
+    // Natywne okno systemowe. NIE wstrzykujemy credentiala do webowego SDK —
+    // signInWithCredential() pod capacitor:// potrafi nigdy nie zwrócić.
+    const res = await plugin()!.signInWithGoogle();
+    if (!res.user) throw new Error('Logowanie Google anulowane');
+    return;
   }
+  await signInWithPopup(auth(), new GoogleAuthProvider());
 }
 
 export async function signInWithApple(): Promise<void> {
-  const plugin = nativeAuthPlugin();
-  if (isNativePlatform() && plugin) {
-    const result   = await plugin.signInWithApple({ skipNativeAuth: false });
-    const idToken  = result.credential?.idToken;
-    const rawNonce = result.credential?.nonce;
-    if (!idToken) throw new Error('Brak credential z natywnego logowania Apple');
-    const provider = new OAuthProvider('apple.com');
-    await signInWithCredential(auth(), provider.credential({ idToken, rawNonce }));
-  } else {
-    await signInWithPopup(auth(), new OAuthProvider('apple.com'));
+  if (useNative()) {
+    const res = await plugin()!.signInWithApple();
+    if (!res.user) throw new Error('Logowanie Apple anulowane');
+    return;
   }
+  await signInWithPopup(auth(), new OAuthProvider('apple.com'));
 }
 
 export async function signOutEverywhere(): Promise<void> {
-  try { await nativeAuthPlugin()?.signOut(); } catch { /* ignore */ }
+  if (useNative()) {
+    try { await plugin()!.signOut(); } catch { /* noop */ }
+    return;
+  }
   await webSignOut(auth());
 }
 
-// ── Session exchange ──────────────────────────────────────────────────────────
+// ── Wymiana sesji na sesję MapYou ─────────────────────────────────────────────
 
 export interface SessionResult {
-  mode:   'login' | 'linked' | 'created';
+  mode:   'login' | 'linked' | 'claimed' | 'created';
   userId: string;
   name?:  string;
 }
 
-/** Wymień Firebase ID token na sesję MapYou.
- *  extraRecoveryCode — kod wpisany ręcznie (świeży telefon / brak cache). */
+/** Wymień token tożsamości na sesję MapYou.
+ *  extraRecoveryCode — kod wpisany ręcznie (migracja starego konta). */
 export async function exchangeSession(extraRecoveryCode?: string): Promise<SessionResult> {
-  const user = auth().currentUser;
-  if (!user) throw new Error('Not signed in');
-  const idToken = await user.getIdToken();
+  let idToken: string;
+  if (useNative()) {
+    const r = await plugin()!.getIdToken();
+    idToken = r.token;
+  } else {
+    const u = auth().currentUser;
+    if (!u) throw new Error('Not signed in');
+    idToken = await u.getIdToken();
+  }
+  if (!idToken) throw new Error('Not signed in');
 
   const deviceUserId = localStorage.getItem(LS_USER_ID) ?? undefined;
   const recoveryCode = extraRecoveryCode
@@ -197,15 +203,15 @@ export async function exchangeSession(extraRecoveryCode?: string): Promise<Sessi
       'Authorization': `Bearer ${idToken}`,
     },
     body: JSON.stringify({ deviceUserId, recoveryCode }),
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(15000),
   });
 
-  const data = await res.json() as SessionResult & { status: string; message?: string };
+  const data = await res.json() as SessionResult & { status: string; message?: string; code?: string };
   if (!res.ok || data.status !== 'ok') {
-    throw new Error(data.message ?? `Session exchange failed (${res.status})`);
+    // Zachowujemy kod błędu w treści — AccountUI rozpoznaje NEEDS_RECOVERY_CODE
+    throw new Error(data.code ? `${data.code}: ${data.message ?? ''}` : (data.message ?? `Blad ${res.status}`));
   }
 
-  // Zapisz tożsamość pod dotychczasowym kluczem — reszta apki bez zmian
   localStorage.setItem(LS_USER_ID, data.userId);
   if (data.name && !localStorage.getItem('mapyou_userName')) {
     localStorage.setItem('mapyou_userName', data.name);
@@ -213,15 +219,8 @@ export async function exchangeSession(extraRecoveryCode?: string): Promise<Sessi
   return { mode: data.mode, userId: data.userId, name: data.name };
 }
 
-// ── Stan sesji ────────────────────────────────────────────────────────────────
+// ── Pomocnicze ────────────────────────────────────────────────────────────────
 
-/** Czy urządzenie ma zalogowaną sesję Firebase (po restore z persist). */
-export async function getSignedInUser(): Promise<User | null> {
-  return waitForAuthReady();
-}
-
-/** Czy to urządzenie ma „stare" konto sprzed migracji (userId bez pewności,
- *  że jest dowiązane) — używane przez LoginScreen do pomostu migracyjnego. */
 export function getDeviceLegacyState(): { deviceUserId: string | null; cachedCode: string | null } {
   return {
     deviceUserId: localStorage.getItem(LS_USER_ID),
