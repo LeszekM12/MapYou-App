@@ -43,6 +43,10 @@ export async function initAccountSilent() {
         const session = await exchangeSession();
         _signedIn = true;
         console.log(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
+        // Jesli backend wlasnie dopial/utworzyl konto (nie zwykle 'login'),
+        // trzeba jeszcze zsynchronizowac dane w odpowiednim kierunku.
+        if (session.mode !== 'login')
+            void syncAfterSignIn(session.mode);
     }
     catch (e) {
         _signedIn = false;
@@ -133,6 +137,9 @@ export function showAuthModal() {
         const modal = document.createElement('div');
         modal.id = 'authModal';
         modal.className = 'name-modal';
+        // .name-modal ma z-index 5000, a nakladka profilu 7500 i modal ustawien 9800 —
+        // bez tego okno logowania schowaloby sie POD kartami profilu.
+        modal.style.zIndex = '10000';
         document.body.appendChild(modal);
         let transferCode = null;
         let done = false;
@@ -181,6 +188,16 @@ export function showAuthModal() {
             const el = modal.querySelector('#authError');
             if (el) {
                 el.textContent = msg;
+                el.style.color = '#ef4444';
+                el.style.display = 'block';
+            }
+        };
+        /** Komunikat neutralny/pozytywny — NIE czerwony (kod zapisany itp.). */
+        const showInfo = (msg) => {
+            const el = modal.querySelector('#authError');
+            if (el) {
+                el.textContent = msg;
+                el.style.color = '#00c46a';
                 el.style.display = 'block';
             }
         };
@@ -205,9 +222,12 @@ export function showAuthModal() {
                 catch { /* noop */ }
                 console.log(`[Account] zalogowano (${session.mode}) userId=${session.userId}`);
                 emitChange();
-                // Po rejestracji/logowaniu wypchnij lokalne dane do chmury.
-                void pushLocalDataUp();
+                // Zaleznie od trybu: sciagnij konto z Atlasa albo wypchnij lokalne dane.
+                await syncAfterSignIn(session.mode);
                 finish(true);
+                // Przeladuj widok, zeby sciagniete treningi/znajomi pojawili sie od razu.
+                // Bez tego dane sa w Dexie, ale ekran pokazuje stan sprzed logowania.
+                setTimeout(() => window.location.reload(), 400);
             }
             catch (e) {
                 const msg = e instanceof Error ? e.message : String(e);
@@ -246,7 +266,7 @@ export function showAuthModal() {
                 }
                 transferCode = v;
                 renderMain();
-                showErr('Kod zapisany. Teraz zaloguj się swoim kontem Google lub Apple.');
+                showInfo('✓ Kod zapisany. Teraz kliknij „Kontynuuj z Google” lub „…z Apple”.');
             });
             modal.querySelector('#authCodeBack')?.addEventListener('click', () => renderMain());
         };
@@ -254,20 +274,37 @@ export function showAuthModal() {
     });
 }
 // ── Wypchnięcie lokalnych danych po zalogowaniu ───────────────────────────────
-/** Po zalogowaniu lokalne treningi należą już do konta (backend przejął
- *  etykietę userId), więc wystarczy uruchomić istniejącą synchronizację.
- *  resetSyncFlag() zdejmuje znacznik „już zsynchronizowane", bo w trybie
- *  gościa próby wysyłki kończyły się niepowodzeniem. Błędy nie są krytyczne —
- *  sync spróbuje ponownie przy następnym starcie apki. */
-async function pushLocalDataUp() {
+/** Po zalogowaniu trzeba zrobić DWIE różne rzeczy, w zależności od tego, co
+ *  się właśnie stało — i pomylenie ich było błędem:
+ *
+ *   login / linked   → konto ISTNIEJE na serwerze (przywrócenie, migracja).
+ *                      Trzeba ŚCIĄGNĄĆ dane z Atlasa do Dexie (hydrate).
+ *                      syncToMongoIfNeeded() tu NIE pomoże: gdy Atlas ma już
+ *                      rekordy, ta funkcja tylko stawia znacznik i wychodzi.
+ *
+ *   claimed / created → konto POWSTAJE z danych gościa.
+ *                      Trzeba WYPCHNĄĆ lokalne treningi w górę.
+ */
+async function syncAfterSignIn(mode) {
     try {
-        const { resetSyncFlag, syncToMongoIfNeeded } = await import('./syncToMongo.js');
-        resetSyncFlag();
-        await syncToMongoIfNeeded();
-        console.log('[Account] synchronizacja lokalnych danych uruchomiona');
+        if (mode === 'login' || mode === 'linked') {
+            // Zdejmij znacznik świeżej hydratacji — inaczej hydrate() uzna, że dane
+            // są aktualne (apka hydratowała na starcie pod etykietą gościa) i pominie
+            // ściąganie właśnie przywróconego konta.
+            localStorage.removeItem('mapyou_hydrated_at');
+            const { hydrate } = await import('./cloudSync.js');
+            await hydrate();
+            console.log('[Account] dane konta ściągnięte z Atlasa');
+        }
+        else {
+            const { resetSyncFlag, syncToMongoIfNeeded } = await import('./syncToMongo.js');
+            resetSyncFlag();
+            await syncToMongoIfNeeded();
+            console.log('[Account] lokalne treningi wysłane do chmury');
+        }
     }
     catch (e) {
-        console.warn('[Account] wysyłka lokalnych danych nieudana (spróbuję później):', e instanceof Error ? e.message : e);
+        console.warn('[Account] synchronizacja po zalogowaniu nieudana:', e instanceof Error ? e.message : e);
     }
 }
 // ── Util ──────────────────────────────────────────────────────────────────────

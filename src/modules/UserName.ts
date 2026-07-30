@@ -26,7 +26,14 @@ export async function ensureRecoveryCode(userId: string): Promise<string | null>
       body:    JSON.stringify({ userId }),
       signal:  AbortSignal.timeout(8000),
     });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      // Rozrozniamy powody — wczesniej KAZDY blad byl pokazywany jako
+      // „nieprawidlowy kod", co mylilo przy limicie zadan (429).
+      if (res.status === 429) { _lastRestoreError = 'Zbyt wiele prob. Odczekaj godzine i sprobuj ponownie.'; return null; }
+      if (res.status === 404) { _lastRestoreError = 'Nie znaleziono takiego kodu.'; return null; }
+      _lastRestoreError = `Blad serwera (${res.status}). Sprobuj ponownie.`;
+      return null;
+    }
     const data = await res.json() as { status: string; code: string | null };
     // Backend zwraca kod tylko przy pierwszym utworzeniu. Jeśli kod już istnieje,
     // przychodzi code:null (nie ujawniamy istniejącego kodu po publicznym userId).
@@ -68,11 +75,17 @@ export async function restoreAccountByCode(code: string): Promise<string | null>
     if (data.city)      localStorage.setItem('mapyou_city',     data.city);
     if (data.region)    localStorage.setItem('mapyou_region',   data.region);
 
+    _lastRestoreError = null;
     return data.userId;
   } catch {
+    _lastRestoreError = 'Brak polaczenia z serwerem.';
     return null;
   }
 }
+
+/** Powod ostatniego niepowodzenia restoreAccountByCode (do pokazania userowi). */
+let _lastRestoreError: string | null = null;
+export function lastRestoreError(): string | null { return _lastRestoreError; }
 
 /** Pokaż modal z kodem odzyskiwania */
 export async function showRecoveryCodeModal(userId: string): Promise<void> {
@@ -254,7 +267,7 @@ function _showRestorePanel(modal: HTMLElement, resolve: () => void, backToNameSe
 
     const userId = await restoreAccountByCode(code);
     if (!userId) {
-      status.textContent = 'Invalid code. Please try again.';
+      status.textContent = lastRestoreError() ?? 'Invalid code. Please try again.';
       btn.disabled = false;
       btn.textContent = 'Restore account 🔑';
       return;

@@ -44,7 +44,7 @@ import { openSportPicker } from './modules/SportPicker.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
 import { liveTracker } from './modules/LiveTracker.js';
 import { FriendsView } from './modules/FriendsView.js';
-import { showNameModalIfNeeded, openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal, showRestoreAccountModal } from './modules/UserName.js';
+import { openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal, showRestoreAccountModal } from './modules/UserName.js';
 import { initUserProfile, loadProfileFromLocal } from './modules/UserProfile.js';
 import { syncToMongoIfNeeded } from './modules/syncToMongo.js';
 import { CS, encodePolyline, decodePolyline } from './modules/cloudSync.js';
@@ -4004,14 +4004,16 @@ import('./modules/AccountUI.js')
         initUserProfile();
     }
     catch { /* noop */ } });
-    await showNameModalIfNeeded();
     initUserProfile();
 })
     .catch(err => {
     console.error('[Account] błąd inicjalizacji konta:', err);
     // Apka musi działać nawet gdy warstwa konta padnie — gość korzysta lokalnie.
-    void showNameModalIfNeeded();
 });
+// UWAGA: modal „podaj imię" NIE jest już pokazywany na starcie.
+// Gość widzi domyślne „Athlete" i może zmienić imię w Profilu, a po zalogowaniu
+// imię przychodzi automatycznie z konta Google/Apple. Wymuszanie go przy każdym
+// uruchomieniu było uciążliwe, zwłaszcza że konto jest teraz opcjonalne.
 // Przycisk „Change name" w Settings
 document.getElementById('btnChangeName')?.addEventListener('click', () => {
     openChangeNameModal();
@@ -4061,8 +4063,17 @@ void syncToMongoIfNeeded();
 // ─── Generuj kod odzyskiwania dyskretnie w tle ────────────────────────────────
 setTimeout(() => {
     const userId = localStorage.getItem('mapyou_userId_profile');
-    if (userId)
-        void ensureRecoveryCode(userId);
+    if (!userId)
+        return;
+    // Marker: probujemy tylko raz na urzadzenie. Bez tego kazdy start apki zjadal
+    // jedno z 10 dozwolonych zadan na godzine i blokowal odzyskiwanie konta.
+    const ASKED = 'mapyou_recovery_asked';
+    if (localStorage.getItem(ASKED) === 'true')
+        return;
+    if (localStorage.getItem('mapyou_recovery_code'))
+        return;
+    localStorage.setItem(ASKED, 'true');
+    void ensureRecoveryCode(userId);
 }, 3000);
 // ─── Hydratacja — pobierz dane z Atlas do IndexedDB jeśli puste ──────────────
 void CS.hydrate();
