@@ -151,6 +151,9 @@ export function showAuthModal() {
             modal.style.transition = 'opacity 0.25s';
             setTimeout(() => { modal.remove(); resolve(ok); }, 250);
         };
+        // Kliknięcie w ciemne tło poza kartą też zamyka — awaryjne wyjście.
+        modal.addEventListener('click', e => { if (e.target === modal)
+            finish(false); });
         // ---- widok główny ----
         const renderMain = () => {
             modal.innerHTML = `
@@ -202,16 +205,30 @@ export function showAuthModal() {
             }
         };
         const busy = (b) => {
-            modal.querySelectorAll('button').forEach(x => { x.disabled = b; });
+            modal.querySelectorAll('button').forEach(x => {
+                // Przycisk zamkniecia zostaje AKTYWNY zawsze. Gdy natywne logowanie
+                // zawiesi sie i nie zwroci ani wyniku, ani bledu, blok finally nigdy
+                // sie nie wykona — a wtedy uzytkownik zostawal uwieziony w modalu.
+                if (x.id === 'authClose')
+                    return;
+                x.disabled = b;
+            });
         };
         // ---- logowanie u dostawcy + wymiana sesji ----
         const run = async (provider) => {
             busy(true);
             try {
+                // Limit czasu: natywne okno moze dzialac dlugo (uzytkownik wpisuje
+                // haslo), ale nie w nieskonczonosc. Bez tego awaria wtyczki wiesza
+                // caly przeplyw bez zadnego komunikatu.
+                const withTimeout = (pr, ms) => Promise.race([
+                    pr,
+                    new Promise((_, rej) => setTimeout(() => rej(new Error('Logowanie nie odpowiada. Sprawdz konfiguracje natywna (Podfile / GoogleSignIn).')), ms)),
+                ]);
                 if (provider === 'google')
-                    await signInWithGoogle();
+                    await withTimeout(signInWithGoogle(), 120000);
                 else
-                    await signInWithApple();
+                    await withTimeout(signInWithApple(), 120000);
                 const { cachedCode } = getDeviceLegacyState();
                 const code = transferCode ?? cachedCode ?? undefined;
                 const session = await exchangeSession(code);
