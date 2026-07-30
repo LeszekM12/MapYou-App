@@ -3704,11 +3704,18 @@ _migrationReady = migrateToUnified();
 
 // Faza 3: najpierw logowanie (Google/Apple + pomost migracyjny),
 // dopiero potem ewentualny modal imienia dla świeżych kont.
-import('./modules/authGate.js').then(async ({ ensureAuthenticated }) => {
-  await ensureAuthenticated();
-  await showNameModalIfNeeded();
-  initUserProfile(); // odśwież UI profilu po ustaleniu tożsamości
-});
+// UWAGA: .catch() jest OBOWIĄZKOWY — bez niego każdy błąd bramki jest
+// niewidoczny (odrzucona obietnica bez obsługi), a apka startuje bez tożsamości.
+import('./modules/authGate.js')
+  .then(async ({ ensureAuthenticated }) => {
+    await ensureAuthenticated();
+    await showNameModalIfNeeded();
+    initUserProfile(); // odśwież UI profilu po ustaleniu tożsamości
+  })
+  .catch(err => {
+    console.error('[AuthGate] KRYTYCZNY błąd bramki logowania:', err);
+    alert('Nie udało się uruchomić logowania. Szczegóły w logu aplikacji.');
+  });
 
 // Przycisk „Change name" w Settings
 document.getElementById('btnChangeName')?.addEventListener('click', () => {

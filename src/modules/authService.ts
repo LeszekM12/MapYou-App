@@ -23,9 +23,12 @@
 // a Firebase SDK z CDN przez <script type="importmap"> w index.html.
 import { initializeApp, getApps } from 'firebase/app';
 import {
-  getAuth, GoogleAuthProvider, OAuthProvider,
+  getAuth, initializeAuth,
+  indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence,
+  browserPopupRedirectResolver,
+  GoogleAuthProvider, OAuthProvider,
   signInWithCredential, signInWithPopup, onAuthStateChanged,
-  signOut as webSignOut, type User,
+  signOut as webSignOut, type User, type Auth,
 } from 'firebase/auth';
 import { BACKEND_URL, FIREBASE_CONFIG } from '../config.js';
 import { setTokenProvider } from './authFetch.js';
@@ -65,14 +68,63 @@ function nativeAuthPlugin(): FirebaseAuthPlugin | undefined {
 function app() {
   return getApps().length ? getApps()[0] : initializeApp(FIREBASE_CONFIG);
 }
-function auth() {
-  return getAuth(app());
+
+let _auth: Auth | null = null;
+
+/** Auth z JAWNIE ustawioną pamięcią sesji.
+ *
+ *  Dlaczego nie samo getAuth(): w WKWebView pod pochodzeniem
+ *  `capacitor://localhost` domyślna pamięć Firebase potrafi się nie
+ *  zainicjalizować — wtedy onAuthStateChanged NIGDY nie odpala, a bramka
+ *  logowania wisi bez błędu (ekran się nie pokazuje). Lista kolejnych
+ *  wariantów: IndexedDB → localStorage → pamięć ulotna. Ostatni zawsze
+ *  działa, choć sesja nie przetrwa restartu apki. */
+function auth(): Auth {
+  if (_auth) return _auth;
+  try {
+    _auth = initializeAuth(app(), {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+    console.log('[Auth] initializeAuth OK');
+  } catch (e) {
+    // Już zainicjalizowane (np. drugie wywołanie) — pobierz istniejącą instancję.
+    console.warn('[Auth] initializeAuth fallback -> getAuth:', e instanceof Error ? e.message : e);
+    _auth = getAuth(app());
+  }
+  return _auth;
 }
 
-/** Poczekaj aż Firebase odtworzy zapisaną sesję (persist) — max 1 tick stanu. */
-function waitForAuthReady(): Promise<User | null> {
+/** Poczekaj, aż Firebase odtworzy zapisaną sesję.
+ *  Z twardym limitem czasu — bez niego awaria pamięci sesji zawiesza
+ *  cały start apki i nic się nie wyświetla. */
+function waitForAuthReady(timeoutMs = 6000): Promise<User | null> {
   return new Promise(resolve => {
-    const off = onAuthStateChanged(auth(), user => { off(); resolve(user); });
+    let settled = false;
+    const finish = (u: User | null, why: string) => {
+      if (settled) return;
+      settled = true;
+      console.log(`[Auth] stan sesji ustalony (${why}):`, u ? u.uid : 'brak użytkownika');
+      resolve(u);
+    };
+
+    const timer = setTimeout(() => finish(null, 'timeout'), timeoutMs);
+
+    try {
+      const off = onAuthStateChanged(
+        auth(),
+        user => { clearTimeout(timer); off(); finish(user, 'onAuthStateChanged'); },
+        err => {
+          clearTimeout(timer);
+          console.warn('[Auth] onAuthStateChanged błąd:', err);
+          finish(null, 'błąd obserwatora');
+        },
+      );
+    } catch (e) {
+      clearTimeout(timer);
+      console.warn('[Auth] onAuthStateChanged rzucił wyjątek:', e);
+      finish(null, 'wyjątek');
+    }
   });
 }
 
