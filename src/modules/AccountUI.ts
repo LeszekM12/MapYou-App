@@ -17,6 +17,7 @@ import {
   signInWithGoogle, signInWithApple, signOutEverywhere,
   exchangeSession, getSignedInUser, getPlatform, getDeviceLegacyState,
 } from './authService.js';
+import { setSessionReady } from './authFetch.js';
 
 
 
@@ -40,17 +41,19 @@ function emitChange(): void { _listeners.forEach(fn => { try { fn(); } catch { /
 export async function initAccountSilent(): Promise<void> {
   try {
     const user = await getSignedInUser();
-    if (!user) { _signedIn = false; _email = null; emitChange(); return; }
+    if (!user) { _signedIn = false; _email = null; setSessionReady(false); emitChange(); return; }
     _email = user.email ?? null;
     // Sesja Firebase jest — wymień na sesję MapYou (ustawia userId lokalnie)
     const session = await exchangeSession();
     _signedIn = true;
+    setSessionReady(true);   // dopiero teraz wolno dokladac token do zadan
     console.log(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
     // Jesli backend wlasnie dopial/utworzyl konto (nie zwykle 'login'),
     // trzeba jeszcze zsynchronizowac dane w odpowiednim kierunku.
     if (session.mode !== 'login') void syncAfterSignIn(session.mode);
   } catch (e) {
     _signedIn = false;
+    setSessionReady(false);
     console.warn('[Account] brak sesji:', e instanceof Error ? e.message : e);
   }
   emitChange();
@@ -100,6 +103,7 @@ export function bindAccountCard(root: ParentNode, onChanged?: () => void): void 
       if (!confirm('Wylogować? Treningi zostaną na tym telefonie, ale utracisz dostęp do znajomych i chmury do ponownego zalogowania.')) return;
       try { await signOutEverywhere(); } catch { /* noop */ }
       _signedIn = false; _email = null;
+      setSessionReady(false);
       emitChange();
       onChanged?.();
     })();
@@ -239,6 +243,7 @@ export function showAuthModal(): Promise<boolean> {
 
         const session = await exchangeSession(code);
         _signedIn = true;
+        setSessionReady(true);
         try { _email = (await getSignedInUser())?.email ?? null; } catch { /* noop */ }
         console.log(`[Account] zalogowano (${session.mode}) userId=${session.userId}`);
         emitChange();

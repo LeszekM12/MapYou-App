@@ -23,6 +23,14 @@ let _getToken: TokenProvider = async () => null;
 let _installed = false;
 let _onUnauthorized: (() => void) | null = null;
 
+// Czy sesja MapYou jest GOTOWA (po udanym POST /auth/session).
+// Samo zalogowanie u Google to za malo: token jest juz wazny, ale konto na
+// naszym serwerze nie jest jeszcze powiazane z firebaseUid. Zadania w tle
+// (sync, push, hydratacja) ruszaja natychmiast i dostawaly wtedy 403
+// „Account not linked". Do czasu ustawienia tej flagi traktujemy ruch jak
+// w trybie goscia.
+let _sessionReady = false;
+
 /** Ścieżki działające bez konta (tryb gościa). Wszystko inne jest blokowane
  *  lokalnie, dopóki użytkownik się nie zaloguje. */
 const GUEST_ALLOWED = [
@@ -41,6 +49,12 @@ function isGuestAllowed(url: string): boolean {
 /** authService rejestruje tu funkcję zwracającą świeży Firebase ID token. */
 export function setTokenProvider(fn: TokenProvider): void {
   _getToken = fn;
+}
+
+/** Ustaw po udanej wymianie /auth/session (i wyzeruj przy wylogowaniu). */
+export function setSessionReady(ready: boolean): void {
+  _sessionReady = ready;
+  console.log(`[authFetch] sesja MapYou ${ready ? 'gotowa' : 'niegotowa'}`);
 }
 
 /** Opcjonalny hook: co zrobić, gdy backend odpowie 401 mimo tokena. */
@@ -70,7 +84,10 @@ export function installAuthFetch(): void {
     // Tylko nasze API — reszta świata bez zmian (kafelki OSM, pogoda itd.)
     if (!url.startsWith(BACKEND_URL)) return original(input, init);
 
-    const token = await _getToken();
+    // Token dolaczamy dopiero, gdy sesja MapYou jest gotowa. Wczesniej
+    // zachowujemy sie jak gosc — inaczej chronione endpointy odrzucaja
+    // zadania z bledem „Account not linked".
+    const token = _sessionReady ? await _getToken() : null;
 
     // ── Tryb gościa ──────────────────────────────────────────────────────────
     if (!token) {

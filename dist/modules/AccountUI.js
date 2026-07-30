@@ -13,6 +13,7 @@
 // kiedy zechce — wtedy jego lokalne dane zostają przypisane do konta
 // (backend: tryb 'claimed' w POST /auth/session).
 import { signInWithGoogle, signInWithApple, signOutEverywhere, exchangeSession, getSignedInUser, getPlatform, getDeviceLegacyState, } from './authService.js';
+import { setSessionReady } from './authFetch.js';
 // ── Stan ──────────────────────────────────────────────────────────────────────
 let _signedIn = false;
 let _email = null;
@@ -35,6 +36,7 @@ export async function initAccountSilent() {
         if (!user) {
             _signedIn = false;
             _email = null;
+            setSessionReady(false);
             emitChange();
             return;
         }
@@ -42,6 +44,7 @@ export async function initAccountSilent() {
         // Sesja Firebase jest — wymień na sesję MapYou (ustawia userId lokalnie)
         const session = await exchangeSession();
         _signedIn = true;
+        setSessionReady(true); // dopiero teraz wolno dokladac token do zadan
         console.log(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
         // Jesli backend wlasnie dopial/utworzyl konto (nie zwykle 'login'),
         // trzeba jeszcze zsynchronizowac dane w odpowiednim kierunku.
@@ -50,6 +53,7 @@ export async function initAccountSilent() {
     }
     catch (e) {
         _signedIn = false;
+        setSessionReady(false);
         console.warn('[Account] brak sesji:', e instanceof Error ? e.message : e);
     }
     emitChange();
@@ -100,6 +104,7 @@ export function bindAccountCard(root, onChanged) {
             catch { /* noop */ }
             _signedIn = false;
             _email = null;
+            setSessionReady(false);
             emitChange();
             onChanged?.();
         })();
@@ -233,6 +238,7 @@ export function showAuthModal() {
                 const code = transferCode ?? cachedCode ?? undefined;
                 const session = await exchangeSession(code);
                 _signedIn = true;
+                setSessionReady(true);
                 try {
                     _email = (await getSignedInUser())?.email ?? null;
                 }
