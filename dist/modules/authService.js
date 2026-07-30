@@ -152,7 +152,7 @@ export async function signOutEverywhere() {
 }
 /** Wymień token tożsamości na sesję MapYou.
  *  extraRecoveryCode — kod wpisany ręcznie (migracja starego konta). */
-export async function exchangeSession(extraRecoveryCode) {
+export async function exchangeSession(extraRecoveryCode, opts) {
     let idToken;
     if (useNative()) {
         const r = await plugin().getIdToken();
@@ -176,7 +176,7 @@ export async function exchangeSession(extraRecoveryCode) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ deviceUserId, recoveryCode }),
+        body: JSON.stringify({ deviceUserId, recoveryCode, silentOnly: opts?.silentOnly === true }),
         signal: AbortSignal.timeout(15000),
     });
     const data = await res.json();

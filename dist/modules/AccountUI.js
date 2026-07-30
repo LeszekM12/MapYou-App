@@ -42,7 +42,10 @@ export async function initAccountSilent() {
         }
         _email = user.email ?? null;
         // Sesja Firebase jest — wymień na sesję MapYou (ustawia userId lokalnie)
-        const session = await exchangeSession();
+        // TRYB CICHY: przy starcie tylko PRZYWRACAMY istniejace powiazanie.
+        // Nigdy nie zakladamy ani nie przejmujemy konta w tle — to decyzja
+        // uzytkownika podejmowana swiadomie w oknie logowania.
+        const session = await exchangeSession(undefined, { silentOnly: true });
         _signedIn = true;
         setSessionReady(true); // dopiero teraz wolno dokladac token do zadan
         console.log(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);

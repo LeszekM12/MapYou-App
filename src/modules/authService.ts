@@ -179,7 +179,10 @@ export interface SessionResult {
 
 /** Wymień token tożsamości na sesję MapYou.
  *  extraRecoveryCode — kod wpisany ręcznie (migracja starego konta). */
-export async function exchangeSession(extraRecoveryCode?: string): Promise<SessionResult> {
+export async function exchangeSession(
+  extraRecoveryCode?: string,
+  opts?: { silentOnly?: boolean },
+): Promise<SessionResult> {
   let idToken: string;
   if (useNative()) {
     const r = await plugin()!.getIdToken();
@@ -202,7 +205,7 @@ export async function exchangeSession(extraRecoveryCode?: string): Promise<Sessi
       'Content-Type':  'application/json',
       'Authorization': `Bearer ${idToken}`,
     },
-    body: JSON.stringify({ deviceUserId, recoveryCode }),
+    body: JSON.stringify({ deviceUserId, recoveryCode, silentOnly: opts?.silentOnly === true }),
     signal: AbortSignal.timeout(15000),
   });
 
