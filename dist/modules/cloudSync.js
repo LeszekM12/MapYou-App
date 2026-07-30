@@ -65,19 +65,37 @@ async function apiDelete(path) {
     }
 }
 async function apiGet(path) {
-    if (!isOnline())
+    // DIAGNOSTYKA: ta funkcja polykala KAZDY blad (brak sieci, 401, 403, 500),
+    // przez co hydratacja konczyla sie cichym „Hydrated 0 records" i nie dalo
+    // sie odroznic pustego konta od odrzuconego zadania.
+    if (!isOnline()) {
+        console.warn(`[CS-GET] ${path} -> pominiete: navigator.onLine === false`);
         return null;
+    }
     try {
         const res = await fetch(`${BACKEND_URL}${path}`, {
             signal: AbortSignal.timeout(10000),
             cache: 'no-store',
         });
-        if (!res.ok || res.status === 304)
+        if (!res.ok || res.status === 304) {
+            let body = '';
+            try {
+                body = (await res.text()).slice(0, 120);
+            }
+            catch { /* noop */ }
+            console.warn(`[CS-GET] ${path} -> HTTP ${res.status} ${body}`);
             return null;
+        }
         const data = await res.json();
-        return data.status === 'ok' ? data.data : null;
+        if (data.status !== 'ok') {
+            console.warn(`[CS-GET] ${path} -> status=${data.status}`);
+            return null;
+        }
+        console.log(`[CS-GET] ${path} -> OK, ${data.data?.length ?? 0} rekordow`);
+        return data.data;
     }
-    catch {
+    catch (e) {
+        console.warn(`[CS-GET] ${path} -> wyjatek:`, e instanceof Error ? e.message : e);
         return null;
     }
 }
@@ -314,7 +332,7 @@ function renderMinimapCanvas(container, coords, sport) {
             const px = (tx - cTx) * 256 + W / 2;
             const py = (ty - cTy) * 256 + H / 2;
             const sub = SUBS[(tx + ty) % 3];
-            const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
+            const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
             tilePromises.push(new Promise(resolve => {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';

@@ -92,7 +92,8 @@ export function installAuthFetch(): void {
     // ── Tryb gościa ──────────────────────────────────────────────────────────
     if (!token) {
       if (isGuestAllowed(url)) return original(input, init);
-      return guestBlocked();   // cicho, bez sieci, bez spamu w logu
+      console.warn(`[authFetch] ODCIETE (brak sesji): ${url.slice(BACKEND_URL.length)}`);
+      return guestBlocked();
     }
 
     const headers = new Headers(

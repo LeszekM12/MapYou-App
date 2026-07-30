@@ -92,16 +92,33 @@ async function apiDelete(path: string): Promise<boolean> {
 }
 
 async function apiGet<T>(path: string): Promise<T[] | null> {
-  if (!isOnline()) return null;
+  // DIAGNOSTYKA: ta funkcja polykala KAZDY blad (brak sieci, 401, 403, 500),
+  // przez co hydratacja konczyla sie cichym „Hydrated 0 records" i nie dalo
+  // sie odroznic pustego konta od odrzuconego zadania.
+  if (!isOnline()) {
+    console.warn(`[CS-GET] ${path} -> pominiete: navigator.onLine === false`);
+    return null;
+  }
   try {
     const res = await fetch(`${BACKEND_URL}${path}`, {
       signal: AbortSignal.timeout(10_000),
       cache: 'no-store',
     });
-    if (!res.ok || res.status === 304) return null;
+    if (!res.ok || res.status === 304) {
+      let body = '';
+      try { body = (await res.text()).slice(0, 120); } catch { /* noop */ }
+      console.warn(`[CS-GET] ${path} -> HTTP ${res.status} ${body}`);
+      return null;
+    }
     const data = await res.json() as { status: string; data: T[] };
-    return data.status === 'ok' ? data.data : null;
-  } catch {
+    if (data.status !== 'ok') {
+      console.warn(`[CS-GET] ${path} -> status=${data.status}`);
+      return null;
+    }
+    console.log(`[CS-GET] ${path} -> OK, ${data.data?.length ?? 0} rekordow`);
+    return data.data;
+  } catch (e) {
+    console.warn(`[CS-GET] ${path} -> wyjatek:`, e instanceof Error ? e.message : e);
     return null;
   }
 }
@@ -371,7 +388,7 @@ function renderMinimapCanvas(
       const px = (tx - cTx) * 256 + W / 2;
       const py = (ty - cTy) * 256 + H / 2;
       const sub = SUBS[(tx + ty) % 3];
-      const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
+      const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
       tilePromises.push(new Promise(resolve => {
         const img = new Image();
         img.crossOrigin = 'anonymous';
