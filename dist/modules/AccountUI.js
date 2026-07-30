@@ -12,7 +12,7 @@
 // Gość korzysta normalnie (treningi lokalnie), a rejestruje się z Profilu,
 // kiedy zechce — wtedy jego lokalne dane zostają przypisane do konta
 // (backend: tryb 'claimed' w POST /auth/session).
-import { signInWithGoogle, signInWithApple, signOutEverywhere, exchangeSession, getSignedInUser, getPlatform, getDeviceLegacyState, } from './authService.js';
+import { signInWithGoogle, signInWithApple, signOutEverywhere, exchangeSession, getSignedInUser, getPlatform, getDeviceLegacyState, initAuthTokenProvider, } from './authService.js';
 import { setSessionReady } from './authFetch.js';
 // ── Stan ──────────────────────────────────────────────────────────────────────
 let _signedIn = false;
@@ -31,6 +31,11 @@ function emitChange() { _listeners.forEach(fn => { try {
 catch { /* noop */ } }); }
 /** Ustal stan konta bez pokazywania czegokolwiek. Wołane raz przy starcie. */
 export async function initAccountSilent() {
+    // KRYTYCZNE i pierwsze: bez tego authFetch nie ma skad wziac tokena
+    // i odcina KAZDE zadanie jako „gosc", mimo poprawnie zalogowanego konta.
+    // (Wywolanie zylo wczesniej w authGate.ts, usunietym przy przebudowie
+    //  na tryb goscia — i nie zostalo tu przeniesione.)
+    initAuthTokenProvider();
     try {
         const user = await getSignedInUser();
         if (!user) {
@@ -49,10 +54,10 @@ export async function initAccountSilent() {
         _signedIn = true;
         setSessionReady(true); // dopiero teraz wolno dokladac token do zadan
         console.log(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
-        // Jesli backend wlasnie dopial/utworzyl konto (nie zwykle 'login'),
-        // trzeba jeszcze zsynchronizowac dane w odpowiednim kierunku.
-        if (session.mode !== 'login')
-            void syncAfterSignIn(session.mode);
+        // ZAWSZE synchronizuj po ustaleniu sesji — takze przy zwyklym 'login'.
+        // Przy starcie apki hydratacja odpala sie ZANIM sesja jest gotowa, wiec
+        // leci w trybie goscia i wraca pusta. To jest ten drugi, poprawny przebieg.
+        void syncAfterSignIn(session.mode);
     }
     catch (e) {
         _signedIn = false;
@@ -68,12 +73,12 @@ export function renderAccountCard() {
       <div id="accCard" style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
           <div style="min-width:0">
-            <div style="font-weight:600;color:#fff;font-size:1.4rem">Konto połączone</div>
-            <div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+            <div style="font-weight:600;color:var(--f-text,#fff);font-size:1.4rem">Konto połączone</div>
+            <div style="color:var(--f-muted,rgba(128,128,128,0.9));font-size:1.2rem;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
               ${_email ? escapeHtml(_email) : 'Zalogowano'}
             </div>
           </div>
-          <button id="accSignOut" style="flex-shrink:0;padding:8px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.18);background:none;color:rgba(255,255,255,0.75);font-size:1.2rem;font-family:inherit;cursor:pointer">
+          <button id="accSignOut" style="flex-shrink:0;padding:8px 14px;border-radius:10px;border:1px solid rgba(128,128,128,0.45);background:none;color:var(--f-text,#fff);font-size:1.2rem;font-weight:600;font-family:inherit;cursor:pointer">
             Wyloguj
           </button>
         </div>
@@ -81,8 +86,8 @@ export function renderAccountCard() {
     }
     return `
     <div id="accCard" style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
-      <div style="font-weight:600;color:#fff;font-size:1.4rem">Nie masz jeszcze konta</div>
-      <div style="color:rgba(255,255,255,0.4);font-size:1.2rem;margin-top:2px;line-height:1.45">
+      <div style="font-weight:600;color:var(--f-text,#fff);font-size:1.4rem">Nie masz jeszcze konta</div>
+      <div style="color:var(--f-muted,rgba(128,128,128,0.9));font-size:1.2rem;margin-top:2px;line-height:1.45">
         Twoje treningi są zapisane tylko na tym telefonie. Zarejestruj się, aby
         mieć je w chmurze, na każdym urządzeniu, razem ze znajomymi i klubami.
       </div>
