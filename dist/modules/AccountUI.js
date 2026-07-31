@@ -104,7 +104,9 @@ export function bindAccountCard(root, onChanged) {
     });
     root.querySelector('#accSignOut')?.addEventListener('click', () => {
         void (async () => {
-            if (!confirm('Wylogować? Treningi zostaną na tym telefonie, ale utracisz dostęp do znajomych i chmury do ponownego zalogowania.'))
+            if (!confirm('Wylogować?\n\n' +
+                'Dane zostaną usunięte z tego telefonu i wrócą po ponownym zalogowaniu. ' +
+                'Nic nie tracisz — wszystko jest bezpieczne w chmurze.'))
                 return;
             try {
                 await signOutEverywhere();
@@ -113,8 +115,25 @@ export function bindAccountCard(root, onChanged) {
             _signedIn = false;
             _email = null;
             setSessionReady(false);
+            // Wyczysc dane konta z urzadzenia. Bez tego treningi, profil i znajomi
+            // poprzedniego uzytkownika zostawali w Dexie — a gdy na tym telefonie
+            // zalogowal sie ktos inny, widzialby cudze dane obok swoich.
+            try {
+                const [{ clearAccountDataLocally }, { clearFriendsLocally }] = await Promise.all([
+                    import('./db.js'),
+                    import('./FriendsDB.js'),
+                ]);
+                await clearAccountDataLocally();
+                await clearFriendsLocally();
+            }
+            catch (e) {
+                console.warn('[Account] czyszczenie danych nieudane:', e instanceof Error ? e.message : e);
+            }
             emitChange();
             onChanged?.();
+            // Przeladowanie: widoki trzymaja dane w pamieci, wiec bez tego pokazywalyby
+            // treningi, ktorych juz nie ma w bazie.
+            setTimeout(() => window.location.reload(), 200);
         })();
     });
 }

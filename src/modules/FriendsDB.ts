@@ -176,3 +176,15 @@ export function checkInviteInUrl(): string | null {
     return null;
   }
 }
+
+/** Usun wszystkich znajomych z urzadzenia (wylogowanie).
+ *  `mapyou_friends` to OSOBNA baza Dexie, wiec czyszczenie glownej bazy
+ *  jej nie obejmuje — bez tego znajomi poprzedniego uzytkownika zostawali. */
+export async function clearFriendsLocally(): Promise<void> {
+  try {
+    await friendsDb.friends.clear();
+    console.log('[FriendsDB] wyczyszczono liste znajomych');
+  } catch (err) {
+    console.warn('[FriendsDB] blad czyszczenia:', err);
+  }
+}

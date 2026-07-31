@@ -72,7 +72,6 @@ export interface UnifiedWorkout {
   type:        'running' | 'walking' | 'cycling';
   sport?:      string;        // original sport (gym, tennis...) — type is a 3-value fallback
   source:      'manual' | 'tracking' | 'health';   // health = zegarek/Health import
-  coordsCount?: number;   // liczba punktów trasy — przetrwa restore (serwer wycina coords)
   date:        string;
   distanceKm:  number;
   durationSec: number;
@@ -80,6 +79,10 @@ export interface UnifiedWorkout {
   speedKmH:    number;
   elevGain:    number;
   coords:      Array<[number, number]>;
+  /** Liczba punktow trasy. Router wycina tablice `coords` przy zapisie
+   *  (oszczednosc ~100KB/trening), wiec to jedyny nosnik informacji
+   *  „czy byl realny slad GPS" — uzywany przez bramke anty-cheatowa wyzwan. */
+  coordsCount?: number;
   name:        string;
   description: string;
   notes:       string;
@@ -472,4 +475,57 @@ export async function loadUnifiedWorkouts(): Promise<UnifiedWorkout[]> {
 
 export async function deleteUnifiedWorkout(id: string): Promise<void> {
   await db.unifiedWorkouts.delete(id);
+}
+
+// ── Czyszczenie danych konta (wylogowanie) ───────────────────────────────────
+
+/** Klucze localStorage, ktore NALEZA DO URZADZENIA, nie do konta — zostaja
+ *  po wylogowaniu, bo to preferencje, a nie cudze dane. */
+const KEEP_ON_LOGOUT = new Set([
+  'mapyou_dev',            // tryb deweloperski
+  'mapyou_voice_cues',     // komunikaty glosowe
+  'mapyou_search_city',    // ostatnio szukane miasto
+  'mapyou_custom_sports',  // wlasne dyscypliny
+]);
+
+/**
+ * Usun z urzadzenia WSZYSTKIE dane zwiazane z kontem.
+ *
+ * Wolane przy wylogowaniu. Bez tego treningi, profil i znajomi poprzedniego
+ * uzytkownika zostawali w Dexie — a gdy na tym samym telefonie zalogowal sie
+ * ktos inny, jego widoki mieszaly sie z cudzymi danymi.
+ *
+ * Dane NIE gina: wszystko jest w Atlasie i wraca przy ponownym zalogowaniu
+ * (hydratacja), dokladnie tak jak przy przenoszeniu konta na nowy telefon.
+ *
+ * Ustawienia urzadzenia (motyw, styl mapy, filtry) zostaja nietkniete.
+ */
+export async function clearAccountDataLocally(): Promise<void> {
+  // 1) Wszystkie tabele glownej bazy
+  try {
+    // Dexie jest globalem z CDN — minimalny typ lokalny zamiast namespace.
+    const tables = db.tables as unknown as Array<{ name: string; clear(): Promise<void> }>;
+    await Promise.all(tables.map(t => t.clear()));
+    console.log('[DB] wyczyszczono tabele:', tables.map(t => t.name).join(', '));
+  } catch (err) {
+    console.warn('[DB] blad czyszczenia bazy:', err);
+  }
+
+  // 2) Klucze localStorage nalezace do konta.
+  //    Podejscie odwrotne (usun wszystko z prefiksem OPROCZ allowlisty) jest
+  //    bezpieczniejsze niz lista do usuniecia — nowy klucz konta dodany
+  //    w przyszlosci zostanie wyczyszczony automatycznie.
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+      const isAccountKey = key.startsWith('mapyou_') || key.startsWith('mapty_');
+      if (isAccountKey && !KEEP_ON_LOGOUT.has(key)) toRemove.push(key);
+    }
+    toRemove.forEach(k => localStorage.removeItem(k));
+    console.log(`[DB] wyczyszczono ${toRemove.length} kluczy konta`);
+  } catch (err) {
+    console.warn('[DB] blad czyszczenia localStorage:', err);
+  }
 }
