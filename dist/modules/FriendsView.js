@@ -13,7 +13,7 @@ import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
 import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
-import { isSignedIn, signInPromptHtml, bindSignInPrompts } from './AccountUI.js';
+import { isSignedIn, signInPromptHtml, bindSignInPrompts, onAccountChange } from './AccountUI.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const STATUS_POLL_MS = 10000; // sprawdzaj status znajomych co 10s
 // ── FriendsView class ─────────────────────────────────────────────────────────
@@ -48,6 +48,14 @@ export class FriendsView {
             configurable: true,
             writable: true,
             value: null
+        });
+        // ── Render friends list ────────────────────────────────────────────────────
+        /** Czy podpieto juz nasluch zmian konta (jednorazowo na instancje). */
+        Object.defineProperty(this, "_accountHooked", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
         });
         // ── Share my invite link ───────────────────────────────────────────────────
         Object.defineProperty(this, "_cachedInviteLink", {
@@ -164,11 +172,16 @@ export class FriendsView {
             clearInterval(this._pollTimer);
         this._liveMap.stop();
     }
-    // ── Render friends list ────────────────────────────────────────────────────
     async render() {
         const list = document.getElementById('friendsList');
         if (!list)
             return;
+        // Po zalogowaniu/wylogowaniu odswiez widok automatycznie — bez tego
+        // zakladka zostawala na karcie „Zaloguj sie", mimo ze konto juz dzialalo.
+        if (!this._accountHooked) {
+            this._accountHooked = true;
+            onAccountChange(() => { void this.render(); });
+        }
         // Faza 3: bez konta funkcje spolecznosciowe nie dzialaja (backend wymaga
         // tokena). Pokazujemy kartę zachęty zamiast pustej listy — wariant A.
         if (!isSignedIn()) {

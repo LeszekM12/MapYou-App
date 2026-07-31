@@ -332,7 +332,9 @@ function renderMinimapCanvas(container, coords, sport) {
             const px = (tx - cTx) * 256 + W / 2;
             const py = (ty - cTy) * 256 + H / 2;
             const sub = SUBS[(tx + ty) % 3];
-            const url = `https://${sub}.tile.openstreetmap.fr/hot/${zoom}/${tx}/${ty}.png`;
+            // CARTO Voyager — ten sam styl co glowna mapa i backendowy /upload/tile.
+            // (Wczesniej OSM Hot, przez co minimapy wygladaly inaczej niz mapa.)
+            const url = `https://${sub}.basemaps.cartocdn.com/rastertiles/voyager/${zoom}/${tx}/${ty}.png`;
             tilePromises.push(new Promise(resolve => {
                 const img = new Image();
                 img.crossOrigin = 'anonymous';
@@ -564,7 +566,11 @@ export async function hydrate() {
             apiGet(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
             apiGet(`/unified-workouts?userId=${encodeURIComponent(userId)}`),
             apiGet(`/posts?userId=${encodeURIComponent(userId)}`),
-            fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, { signal: AbortSignal.timeout(10000) })
+            // WLASNY profil bierzemy z /auth/me, nie z /users/:id.
+            // Publiczny endpoint zwraca po Fazie 2 tylko name/bio/avatar i liczniki —
+            // brakuje w nim miasta, plci, wagi, daty urodzenia i trofeow, przez co
+            // po przywroceniu konta te dane znikaly.
+            fetch(`${BACKEND_URL}/auth/me`, { signal: AbortSignal.timeout(10000) })
                 .then(r => r.ok ? r.json() : null)
                 .then(d => d?.status === 'ok' ? d.data : null)
                 .catch(() => null),

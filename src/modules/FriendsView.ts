@@ -18,7 +18,7 @@ import { BACKEND_URL } from '../config.js';
 import { getUserName } from './LiveTracker.js';
 import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
-import { isSignedIn, signInPromptHtml, bindSignInPrompts } from './AccountUI.js';
+import { isSignedIn, signInPromptHtml, bindSignInPrompts, onAccountChange } from './AccountUI.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 
@@ -142,9 +142,19 @@ export class FriendsView {
 
   // ── Render friends list ────────────────────────────────────────────────────
 
+  /** Czy podpieto juz nasluch zmian konta (jednorazowo na instancje). */
+  private _accountHooked = false;
+
   async render(): Promise<void> {
     const list = document.getElementById('friendsList');
     if (!list) return;
+
+    // Po zalogowaniu/wylogowaniu odswiez widok automatycznie — bez tego
+    // zakladka zostawala na karcie „Zaloguj sie", mimo ze konto juz dzialalo.
+    if (!this._accountHooked) {
+      this._accountHooked = true;
+      onAccountChange(() => { void this.render(); });
+    }
 
     // Faza 3: bez konta funkcje spolecznosciowe nie dzialaja (backend wymaga
     // tokena). Pokazujemy kartę zachęty zamiast pustej listy — wariant A.
