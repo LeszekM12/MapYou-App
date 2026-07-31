@@ -18,6 +18,7 @@ import {
   exchangeSession, getSignedInUser, getPlatform, getDeviceLegacyState,
   initAuthTokenProvider,
 } from './authService.js';
+import type { AccountUser } from './authService.js';
 import { setSessionReady } from './authFetch.js';
 
 
@@ -61,7 +62,7 @@ export async function initAccountSilent(): Promise<void> {
     // ZAWSZE synchronizuj po ustaleniu sesji — takze przy zwyklym 'login'.
     // Przy starcie apki hydratacja odpala sie ZANIM sesja jest gotowa, wiec
     // leci w trybie goscia i wraca pusta. To jest ten drugi, poprawny przebieg.
-    void syncAfterSignIn(session.mode);
+    void syncAfterSignIn(session.mode).then(() => fillProfileFromProvider(user));
   } catch (e) {
     _signedIn = false;
     setSessionReady(false);
@@ -255,12 +256,15 @@ export function showAuthModal(): Promise<boolean> {
         const session = await exchangeSession(code);
         _signedIn = true;
         setSessionReady(true);
-        try { _email = (await getSignedInUser())?.email ?? null; } catch { /* noop */ }
+        let provUser: AccountUser | null = null;
+        try { provUser = await getSignedInUser(); _email = provUser?.email ?? null; } catch { /* noop */ }
         console.log(`[Account] zalogowano (${session.mode}) userId=${session.userId}`);
         emitChange();
 
         // Zaleznie od trybu: sciagnij konto z Atlasa albo wypchnij lokalne dane.
         await syncAfterSignIn(session.mode);
+        // Dopiero PO hydratacji — zeby nie nadpisac wlasnego zdjecia z serwera.
+        await fillProfileFromProvider(provUser);
 
         finish(true);
         // Przeladuj widok, zeby sciagniete treningi/znajomi pojawili sie od razu.
@@ -341,6 +345,49 @@ async function syncAfterSignIn(mode: 'login' | 'linked' | 'claimed' | 'created')
     }
   } catch (e) {
     console.warn('[Account] synchronizacja po zalogowaniu nieudana:', e instanceof Error ? e.message : e);
+  }
+}
+
+
+// ── Profil z konta Google / Apple ─────────────────────────────────────────────
+
+/** Uzupelnij imie i zdjecie z konta dostawcy — TYLKO gdy sa puste.
+ *  Nigdy nie nadpisujemy tego, co uzytkownik ustawil sam: zdjecie i imie
+ *  pozostaja w pelni edytowalne w Profilu, a ta funkcja jedynie daje
+ *  sensowny punkt startowy zaraz po rejestracji (tak dziala Strava i spolka). */
+async function fillProfileFromProvider(user: AccountUser | null): Promise<void> {
+  if (!user) return;
+  const { saveProfileToLocal } = await import('./UserProfile.js');
+  const patch: { name?: string; avatarB64?: string } = {};
+
+  const localName = (localStorage.getItem('mapyou_userName') ?? '').trim();
+  const isPlaceholder = !localName || localName === 'MapYou User' || localName === 'Athlete';
+  if (isPlaceholder && user.displayName) patch.name = user.displayName;
+
+  const hasAvatar = !!localStorage.getItem('mapyou_avatar');
+  if (!hasAvatar && user.photoUrl) {
+    try {
+      // Zdjecie zapisujemy jako base64, a nie URL — dzieki temu dziala offline
+      // i pasuje do formatu, ktorego uzywa reszta apki (avatarB64).
+      const res = await fetch(user.photoUrl.replace(/=s\d+-c$/, '=s256-c'));
+      if (res.ok) {
+        const blob = await res.blob();
+        patch.avatarB64 = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onload = () => resolve(String(r.result));
+          r.onerror = () => reject(new Error('read failed'));
+          r.readAsDataURL(blob);
+        });
+      }
+    } catch (e) {
+      console.warn('[Account] nie udalo sie pobrac zdjecia z Google:', e instanceof Error ? e.message : e);
+    }
+  }
+
+  if (Object.keys(patch).length) {
+    saveProfileToLocal(patch);   // zapisuje lokalnie i wysyla na serwer
+    console.log('[Account] profil uzupelniony z konta:', Object.keys(patch).join(', '));
+    emitChange();
   }
 }
 

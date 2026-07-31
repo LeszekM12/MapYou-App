@@ -641,6 +641,33 @@ export async function hydrate() {
         }
         if (serverProfile) {
             await saveProfileToDB(serverProfile);
+            // KRYTYCZNE: saveProfileToDB zapisuje TYLKO do Dexie, a caly interfejs
+            // (naglowek, ProfileView, avatar) czyta te pola z localStorage. Bez
+            // ponizszego przepisania przywrocony profil byl pobierany z serwera,
+            // ale nigdzie sie nie pokazywal — konto wygladalo na puste.
+            // Piszemy klucze wprost, zeby nie wywolywac zwrotnego zapisu na serwer.
+            const sv = serverProfile;
+            const put = (key, val) => {
+                if (val === undefined || val === null || val === '')
+                    return;
+                localStorage.setItem(key, String(val));
+            };
+            put('mapyou_userName', sv.name);
+            put('mapyou_bio', sv.bio);
+            put('mapyou_city', sv.city);
+            put('mapyou_region', sv.region);
+            put('mapyou_birthDate', sv.birthDate);
+            put('mapyou_gender', sv.gender);
+            put('mapyou_weightKg', sv.weightKg);
+            if (typeof sv.avatarB64 === 'string' && sv.avatarB64) {
+                localStorage.setItem('mapyou_avatar', sv.avatarB64);
+            }
+            // Odswiez widoczne miejsca z imieniem
+            if (typeof sv.name === 'string' && sv.name) {
+                document.querySelectorAll('[data-username]')
+                    .forEach(el => { el.textContent = sv.name; });
+            }
+            console.log('[CloudSync] ✅ Profil przywrocony z serwera');
             // Trofea (Weekly Goal Cups, Streak Records) są czytane przez ProfileView
             // z localStorage, a _pushMissingToAtlas wysyła je do /users — brakowało
             // drogi POWROTNEJ. Bez tego po przywróceniu konta na nowym urządzeniu

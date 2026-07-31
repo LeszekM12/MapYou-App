@@ -37,9 +37,10 @@ export interface AccountUser {
   uid:          string;
   email:        string | null;
   displayName:  string | null;
+  photoUrl:     string | null;
 }
 
-interface PluginUser { uid: string; email?: string | null; displayName?: string | null }
+interface PluginUser { uid: string; email?: string | null; displayName?: string | null; photoUrl?: string | null }
 interface FirebaseAuthPlugin {
   signInWithGoogle(opts?: { skipNativeAuth?: boolean }): Promise<{ user?: PluginUser | null }>;
   signInWithApple(opts?: { skipNativeAuth?: boolean }):  Promise<{ user?: PluginUser | null }>;
@@ -118,7 +119,12 @@ export async function getSignedInUser(): Promise<AccountUser | null> {
       const { user } = await plugin()!.getCurrentUser();
       if (!user) { console.log('[Auth] natywnie: brak zalogowanego użytkownika'); return null; }
       console.log('[Auth] natywnie: zalogowany', user.uid);
-      return { uid: user.uid, email: user.email ?? null, displayName: user.displayName ?? null };
+      return {
+        uid: user.uid,
+        email: user.email ?? null,
+        displayName: user.displayName ?? null,
+        photoUrl: user.photoUrl ?? null,
+      };
     } catch (e) {
       console.warn('[Auth] getCurrentUser błąd:', e instanceof Error ? e.message : e);
       return null;
@@ -133,7 +139,7 @@ export async function getSignedInUser(): Promise<AccountUser | null> {
     try {
       const off = onAuthStateChanged(auth(), u => {
         clearTimeout(timer); off();
-        finish(u ? { uid: u.uid, email: u.email, displayName: u.displayName } : null);
+        finish(u ? { uid: u.uid, email: u.email, displayName: u.displayName, photoUrl: u.photoURL } : null);
       }, () => { clearTimeout(timer); finish(null); });
     } catch { clearTimeout(timer); finish(null); }
   });

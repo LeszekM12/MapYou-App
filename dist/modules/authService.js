@@ -91,7 +91,12 @@ export async function getSignedInUser() {
                 return null;
             }
             console.log('[Auth] natywnie: zalogowany', user.uid);
-            return { uid: user.uid, email: user.email ?? null, displayName: user.displayName ?? null };
+            return {
+                uid: user.uid,
+                email: user.email ?? null,
+                displayName: user.displayName ?? null,
+                photoUrl: user.photoUrl ?? null,
+            };
         }
         catch (e) {
             console.warn('[Auth] getCurrentUser błąd:', e instanceof Error ? e.message : e);
@@ -110,7 +115,7 @@ export async function getSignedInUser() {
             const off = onAuthStateChanged(auth(), u => {
                 clearTimeout(timer);
                 off();
-                finish(u ? { uid: u.uid, email: u.email, displayName: u.displayName } : null);
+                finish(u ? { uid: u.uid, email: u.email, displayName: u.displayName, photoUrl: u.photoURL } : null);
             }, () => { clearTimeout(timer); finish(null); });
         }
         catch {
