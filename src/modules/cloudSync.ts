@@ -53,6 +53,7 @@ import {
 } from './db.js';
 import type { ActivityRecord } from './Tracker.js';
 import { getUserId } from './UserProfile.js';
+import { isSessionReady } from './authFetch.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -479,6 +480,15 @@ export async function pushNow(
 ): Promise<void> {
   if (!isOnline() || !userId) return;
 
+  // Bez gotowej sesji KAZDE zadanie zostanie odciete lokalnie (tryb goscia).
+  // Wczesniej apka mimo to przechodzila przez ~170 rekordow, logujac tyle samo
+  // ostrzezen — co realnie spowalnialo start i falszowalo licznik „Pushed".
+  // Wysylka i tak nastapi pozniej, gdy warstwa konta ustali sesje.
+  if (!isSessionReady()) {
+    console.log('[CloudSync] ⏳ pomijam wysylke — sesja jeszcze nie gotowa');
+    return;
+  }
+
   try {
     // Pobierz co już jest w Atlas
     const [atlasEnriched, atlasUnified, atlasPosts] = await Promise.all([
@@ -612,6 +622,13 @@ export async function pushNow(
 
 export async function hydrate(): Promise<void> {
   if (!isOnline()) return;
+
+  // To samo co w pushNow: bez sesji pobieranie wroci puste i tylko zamaze
+  // znacznik „hydrated_at", przez co prawdziwa hydratacja zostalaby pominieta.
+  if (!isSessionReady()) {
+    console.log('[CloudSync] ⏳ pomijam hydratacje — sesja jeszcze nie gotowa');
+    return;
+  }
 
   const userId = getUserId();
   const lastHydrated = Number(localStorage.getItem(LS_HYDRATED_KEY) ?? 0);

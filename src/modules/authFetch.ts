@@ -51,6 +51,10 @@ export function setTokenProvider(fn: TokenProvider): void {
   _getToken = fn;
 }
 
+/** Czy sesja MapYou jest gotowa — moduly synchronizacji sprawdzaja to,
+ *  zeby nie mielic setek rekordow, ktore i tak zostana odciete. */
+export function isSessionReady(): boolean { return _sessionReady; }
+
 /** Ustaw po udanej wymianie /auth/session (i wyzeruj przy wylogowaniu). */
 export function setSessionReady(ready: boolean): void {
   _sessionReady = ready;

@@ -17,6 +17,10 @@ import { setSessionReady } from './authFetch.js';
 // ── Stan ──────────────────────────────────────────────────────────────────────
 let _signedIn = false;
 let _email = null;
+/** Czy ustalono juz stan konta. Do czasu zakonczenia initAccountSilent()
+ *  NIE wiemy, czy uzytkownik jest zalogowany — i nie wolno zakladac, ze nie,
+ *  bo karta mignie przyciskiem „Zaloguj" komus, kto jest zalogowany. */
+let _resolved = false;
 const _listeners = new Set();
 export function isSignedIn() { return _signedIn; }
 export function accountEmail() { return _email; }
@@ -42,6 +46,7 @@ export async function initAccountSilent() {
             _signedIn = false;
             _email = null;
             setSessionReady(false);
+            _resolved = true;
             emitChange();
             return;
         }
@@ -64,10 +69,22 @@ export async function initAccountSilent() {
         setSessionReady(false);
         console.warn('[Account] brak sesji:', e instanceof Error ? e.message : e);
     }
+    _resolved = true;
     emitChange();
 }
 // ── Karta konta w Profilu ─────────────────────────────────────────────────────
 export function renderAccountCard() {
+    if (!_resolved) {
+        // Stan przejsciowy — bez przyciskow, zeby nie zachecac do logowania kogos,
+        // kto juz jest zalogowany. Karta odswiezy sie sama (onAccountChange).
+        return `
+      <div id="accCard" style="padding:14px 0;border-bottom:1px solid rgba(128,128,128,0.18)">
+        <div style="font-weight:600;color:var(--f-text,#fff);font-size:1.4rem">Konto</div>
+        <div style="color:var(--f-muted,rgba(128,128,128,0.9));font-size:1.2rem;margin-top:2px">
+          Sprawdzanie…
+        </div>
+      </div>`;
+    }
     if (_signedIn) {
         return `
       <div id="accCard" style="padding:14px 0;border-bottom:1px solid rgba(255,255,255,0.06)">
@@ -98,6 +115,18 @@ export function renderAccountCard() {
 }
 /** Podepnij zdarzenia karty. `onChanged` woła się po udanym logowaniu/wylogowaniu. */
 export function bindAccountCard(root, onChanged) {
+    // Gdy stan konta ustali sie JUZ PO otwarciu ustawien, przerysuj karte.
+    // Bez tego uzytkownik widzi „Zaloguj sie" mimo dzialajacego konta,
+    // dopoki nie zamknie i nie otworzy ustawien ponownie.
+    if (!_resolved) {
+        const off = onAccountChange(() => {
+            off();
+            // Modal moze byc juz zamkniety — wtedy nie ma czego odswiezac.
+            const stillOpen = root.isConnected !== false;
+            if (stillOpen)
+                onChanged?.();
+        });
+    }
     root.querySelector('#accSignIn')?.addEventListener('click', () => {
         void showAuthModal().then(ok => { if (ok)
             onChanged?.(); });

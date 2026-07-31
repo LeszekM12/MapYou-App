@@ -42,6 +42,9 @@ function isGuestAllowed(url) {
 export function setTokenProvider(fn) {
     _getToken = fn;
 }
+/** Czy sesja MapYou jest gotowa — moduly synchronizacji sprawdzaja to,
+ *  zeby nie mielic setek rekordow, ktore i tak zostana odciete. */
+export function isSessionReady() { return _sessionReady; }
 /** Ustaw po udanej wymianie /auth/session (i wyzeruj przy wylogowaniu). */
 export function setSessionReady(ready) {
     _sessionReady = ready;

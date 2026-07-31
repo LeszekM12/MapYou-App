@@ -15,6 +15,7 @@ import {
   type ProfileRecord,
 } from './db.js';
 import { getUserId } from './PushNotifications.js';
+import { isSessionReady } from './authFetch.js';
 
 const LS_SYNCED_KEY  = 'mapyou_mongo_synced';
 const LS_SYNC_FAILED = 'mapyou_mongo_sync_failed_at';
@@ -146,6 +147,13 @@ async function migratePhotos(
 // ── Główna funkcja ────────────────────────────────────────────────────────────
 
 export async function syncToMongoIfNeeded(): Promise<void> {
+  // Bez gotowej sesji wysylka i tak zostanie odcieta, a znacznik „zsynchronizowane"
+  // zostalby ustawiony falszywie — blokujac prawdziwa synchronizacje po zalogowaniu.
+  if (!isSessionReady()) {
+    console.log('[Sync] ⏳ pomijam — sesja jeszcze nie gotowa');
+    return;
+  }
+
   if (localStorage.getItem(LS_SYNCED_KEY) === 'true') return;
 
   const lastFailed = Number(localStorage.getItem(LS_SYNC_FAILED) ?? 0);

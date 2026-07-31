@@ -23,6 +23,7 @@
 import { BACKEND_URL } from '../config.js';
 import { saveWorkoutToDB, deleteWorkoutFromDB, loadWorkoutsFromDB, saveActivity, loadActivities, deleteActivity, saveEnrichedActivity, loadEnrichedActivities, deleteEnrichedActivity, saveUnifiedWorkout, loadUnifiedWorkouts, deleteUnifiedWorkout, savePost, loadPosts, deletePost, saveReel, loadReels, deleteReel, saveProfileToDB, } from './db.js';
 import { getUserId } from './UserProfile.js';
+import { isSessionReady } from './authFetch.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isOnline() {
     return navigator.onLine;
@@ -413,6 +414,14 @@ export { renderMinimapCanvas, encodePolyline, decodePolyline };
 export async function pushNow(userId, enriched, unified, posts) {
     if (!isOnline() || !userId)
         return;
+    // Bez gotowej sesji KAZDE zadanie zostanie odciete lokalnie (tryb goscia).
+    // Wczesniej apka mimo to przechodzila przez ~170 rekordow, logujac tyle samo
+    // ostrzezen — co realnie spowalnialo start i falszowalo licznik „Pushed".
+    // Wysylka i tak nastapi pozniej, gdy warstwa konta ustali sesje.
+    if (!isSessionReady()) {
+        console.log('[CloudSync] ⏳ pomijam wysylke — sesja jeszcze nie gotowa');
+        return;
+    }
     try {
         // Pobierz co już jest w Atlas
         const [atlasEnriched, atlasUnified, atlasPosts] = await Promise.all([
@@ -540,6 +549,12 @@ export async function pushNow(userId, enriched, unified, posts) {
 export async function hydrate() {
     if (!isOnline())
         return;
+    // To samo co w pushNow: bez sesji pobieranie wroci puste i tylko zamaze
+    // znacznik „hydrated_at", przez co prawdziwa hydratacja zostalaby pominieta.
+    if (!isSessionReady()) {
+        console.log('[CloudSync] ⏳ pomijam hydratacje — sesja jeszcze nie gotowa');
+        return;
+    }
     const userId = getUserId();
     const lastHydrated = Number(localStorage.getItem(LS_HYDRATED_KEY) ?? 0);
     // Sprawdź czy IndexedDB ma dane — jeśli tak i hydratacja była niedawno, skip
