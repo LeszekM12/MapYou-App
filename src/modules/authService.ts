@@ -38,13 +38,26 @@ export interface AccountUser {
   email:        string | null;
   displayName:  string | null;
   photoUrl:     string | null;
+  /** Dostawcy podpieci do TEGO konta, np. ['google.com', 'apple.com'].
+   *  Po polaczeniu tozsamosci Firebase zachowuje ten sam `uid`, wiec oba
+   *  logowania prowadza do jednego konta MapYou. */
+  providers:    string[];
 }
 
-interface PluginUser { uid: string; email?: string | null; displayName?: string | null; photoUrl?: string | null }
+interface PluginUserInfo { providerId?: string }
+interface PluginUser {
+  uid: string;
+  email?: string | null;
+  displayName?: string | null;
+  photoUrl?: string | null;
+  providerData?: PluginUserInfo[];
+}
 interface FirebaseAuthPlugin {
   signInWithGoogle(opts?: { skipNativeAuth?: boolean }): Promise<{ user?: PluginUser | null }>;
   signInWithApple(opts?: { skipNativeAuth?: boolean }):  Promise<{ user?: PluginUser | null }>;
   getCurrentUser(): Promise<{ user?: PluginUser | null }>;
+  linkWithApple(opts?: { skipNativeAuth?: boolean }):  Promise<{ user?: PluginUser | null }>;
+  linkWithGoogle(opts?: { skipNativeAuth?: boolean }): Promise<{ user?: PluginUser | null }>;
   getIdToken(opts?: { forceRefresh?: boolean }): Promise<{ token: string }>;
   signOut(): Promise<void>;
 }
@@ -124,6 +137,9 @@ export async function getSignedInUser(): Promise<AccountUser | null> {
         email: user.email ?? null,
         displayName: user.displayName ?? null,
         photoUrl: user.photoUrl ?? null,
+        providers: (user.providerData ?? [])
+          .map(p => p.providerId ?? '')
+          .filter(Boolean),
       };
     } catch (e) {
       console.warn('[Auth] getCurrentUser błąd:', e instanceof Error ? e.message : e);
@@ -139,7 +155,11 @@ export async function getSignedInUser(): Promise<AccountUser | null> {
     try {
       const off = onAuthStateChanged(auth(), u => {
         clearTimeout(timer); off();
-        finish(u ? { uid: u.uid, email: u.email, displayName: u.displayName, photoUrl: u.photoURL } : null);
+        finish(u ? {
+          uid: u.uid, email: u.email, displayName: u.displayName,
+          photoUrl: u.photoURL,
+          providers: u.providerData.map(p => p.providerId),
+        } : null);
       }, () => { clearTimeout(timer); finish(null); });
     } catch { clearTimeout(timer); finish(null); }
   });
@@ -165,6 +185,27 @@ export async function signInWithApple(): Promise<void> {
     return;
   }
   await signInWithPopup(auth(), new OAuthProvider('apple.com'));
+}
+
+/** Dopnij kolejnego dostawce do JUZ zalogowanego konta.
+ *
+ *  Firebase zachowuje przy tym ten sam `uid`, wiec po polaczeniu logowanie
+ *  Google i Apple prowadzi do tego samego konta MapYou — backend nie wymaga
+ *  zadnych zmian, bo nadal widzi jeden `firebaseUid`.
+ *
+ *  Typowe bledy, ktore warto pokazac uzytkownikowi wprost:
+ *   • credential-already-in-use — ta tozsamosc nalezy juz do INNEGO konta,
+ *   • provider-already-linked   — jest juz podpieta tutaj.
+ */
+export async function linkProvider(provider: 'apple' | 'google'): Promise<void> {
+  const p = plugin();
+  if (!useNative() || !p) {
+    throw new Error('Laczenie kont dziala tylko w aplikacji mobilnej.');
+  }
+  const res = provider === 'apple'
+    ? await p.linkWithApple()
+    : await p.linkWithGoogle();
+  if (!res.user) throw new Error('Laczenie anulowane.');
 }
 
 export async function signOutEverywhere(): Promise<void> {

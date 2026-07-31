@@ -12,11 +12,12 @@
 // Gość korzysta normalnie (treningi lokalnie), a rejestruje się z Profilu,
 // kiedy zechce — wtedy jego lokalne dane zostają przypisane do konta
 // (backend: tryb 'claimed' w POST /auth/session).
-import { signInWithGoogle, signInWithApple, signOutEverywhere, exchangeSession, getSignedInUser, getPlatform, getDeviceLegacyState, initAuthTokenProvider, } from './authService.js';
+import { signInWithGoogle, signInWithApple, signOutEverywhere, exchangeSession, getSignedInUser, getPlatform, getDeviceLegacyState, initAuthTokenProvider, linkProvider, } from './authService.js';
 import { setSessionReady } from './authFetch.js';
 // ── Stan ──────────────────────────────────────────────────────────────────────
 let _signedIn = false;
 let _email = null;
+let _providers = [];
 /** Czy ustalono juz stan konta. Do czasu zakonczenia initAccountSilent()
  *  NIE wiemy, czy uzytkownik jest zalogowany — i nie wolno zakladac, ze nie,
  *  bo karta mignie przyciskiem „Zaloguj" komus, kto jest zalogowany. */
@@ -51,6 +52,7 @@ export async function initAccountSilent() {
             return;
         }
         _email = user.email ?? null;
+        _providers = user.providers ?? [];
         // Sesja Firebase jest — wymień na sesję MapYou (ustawia userId lokalnie)
         // TRYB CICHY: przy starcie tylko PRZYWRACAMY istniejace powiazanie.
         // Nigdy nie zakladamy ani nie przejmujemy konta w tle — to decyzja
@@ -99,6 +101,7 @@ export function renderAccountCard() {
             Wyloguj
           </button>
         </div>
+        ${renderProviderRow()}
       </div>`;
     }
     return `
@@ -111,6 +114,48 @@ export function renderAccountCard() {
       <button id="accSignIn" style="margin-top:12px;width:100%;padding:13px;border:none;border-radius:12px;background:#00c46a;color:#fff;font-size:1.35rem;font-weight:700;font-family:inherit;cursor:pointer">
         Zaloguj się / Zarejestruj
       </button>
+    </div>`;
+}
+/** Sekcja „sposoby logowania" — pokazuje podpiete tozsamosci i pozwala dodac
+ *  brakujaca. Po polaczeniu OBA logowania prowadza do TEGO SAMEGO konta,
+ *  bo Firebase zachowuje wspolny `uid`. */
+function renderProviderRow() {
+    const hasGoogle = _providers.includes('google.com');
+    const hasApple = _providers.includes('apple.com');
+    const isIOS = getPlatform() === 'ios';
+    const chip = (label, on) => `
+    <span style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;
+                 border-radius:999px;font-size:1.1rem;
+                 border:1px solid rgba(128,128,128,0.35);
+                 color:${on ? '#00c46a' : 'var(--f-muted,rgba(128,128,128,0.9))'}">
+      ${on ? '\u2713' : '\u25CB'} ${label}
+    </span>`;
+    // Apple proponujemy wylacznie na iOS — na Androidzie wymagaloby to
+    // konfiguracji Service ID po stronie Apple Developer i flow przegladarkowego.
+    let missing = null;
+    if (!hasGoogle)
+        missing = 'google';
+    else if (isIOS && !hasApple)
+        missing = 'apple';
+    const btn = missing ? `
+    <button class="accLinkBtn" data-prov="${missing}"
+      style="margin-top:10px;width:100%;padding:10px;border-radius:10px;
+             border:1px solid rgba(128,128,128,0.45);background:none;
+             color:var(--f-text,#fff);font-size:1.2rem;font-weight:600;
+             font-family:inherit;cursor:pointer">
+      + Dodaj logowanie ${missing === 'apple' ? 'Apple' : 'Google'}
+    </button>` : '';
+    return `
+    <div style="margin-top:12px">
+      <div style="color:var(--f-muted,rgba(128,128,128,0.9));font-size:1.1rem;margin-bottom:6px">
+        Sposoby logowania
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        ${chip('Google', hasGoogle)}
+        ${(isIOS || hasApple) ? chip('Apple', hasApple) : ''}
+      </div>
+      ${btn}
+      <div class="accLinkMsg" style="display:none;font-size:1.1rem;margin-top:8px;line-height:1.4"></div>
     </div>`;
 }
 /** Podepnij zdarzenia karty. `onChanged` woła się po udanym logowaniu/wylogowaniu. */
@@ -131,6 +176,49 @@ export function bindAccountCard(root, onChanged) {
         void showAuthModal().then(ok => { if (ok)
             onChanged?.(); });
     });
+    root.querySelectorAll('.accLinkBtn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const prov = (btn.dataset.prov === 'apple' ? 'apple' : 'google');
+            const msg = root.querySelector('.accLinkMsg');
+            const say = (text, ok) => {
+                if (!msg)
+                    return;
+                msg.textContent = text;
+                msg.style.color = ok ? '#00c46a' : '#ef4444';
+                msg.style.display = 'block';
+            };
+            void (async () => {
+                btn.disabled = true;
+                try {
+                    await linkProvider(prov);
+                    const u = await getSignedInUser();
+                    _providers = u?.providers ?? _providers;
+                    say('\u2713 Polaczono. Mozesz teraz logowac sie obiema metodami.', true);
+                    emitChange();
+                    setTimeout(() => onChanged?.(), 900);
+                }
+                catch (e) {
+                    const raw = e instanceof Error ? e.message : String(e);
+                    // Komunikaty Firebase sa techniczne — tlumaczymy je na jezyk uzytkownika.
+                    if (/credential-already-in-use|already in use/i.test(raw)) {
+                        say('To konto jest juz powiazane z innym profilem MapYou.', false);
+                    }
+                    else if (/provider-already-linked|already linked/i.test(raw)) {
+                        say('To logowanie jest juz dodane.', false);
+                    }
+                    else if (/cancel|anulowan/i.test(raw)) {
+                        say('Anulowano.', false);
+                    }
+                    else {
+                        say(raw || 'Nie udalo sie polaczyc konta.', false);
+                    }
+                }
+                finally {
+                    btn.disabled = false;
+                }
+            })();
+        });
+    });
     root.querySelector('#accSignOut')?.addEventListener('click', () => {
         void (async () => {
             if (!confirm('Wylogować?\n\n' +
@@ -143,6 +231,7 @@ export function bindAccountCard(root, onChanged) {
             catch { /* noop */ }
             _signedIn = false;
             _email = null;
+            _providers = [];
             setSessionReady(false);
             // Wyczysc dane konta z urzadzenia. Bez tego treningi, profil i znajomi
             // poprzedniego uzytkownika zostawali w Dexie — a gdy na tym telefonie
@@ -299,6 +388,7 @@ export function showAuthModal() {
                 try {
                     provUser = await getSignedInUser();
                     _email = provUser?.email ?? null;
+                    _providers = provUser?.providers ?? [];
                 }
                 catch { /* noop */ }
                 console.log(`[Account] zalogowano (${session.mode}) userId=${session.userId}`);

@@ -96,6 +96,9 @@ export async function getSignedInUser() {
                 email: user.email ?? null,
                 displayName: user.displayName ?? null,
                 photoUrl: user.photoUrl ?? null,
+                providers: (user.providerData ?? [])
+                    .map(p => p.providerId ?? '')
+                    .filter(Boolean),
             };
         }
         catch (e) {
@@ -115,7 +118,11 @@ export async function getSignedInUser() {
             const off = onAuthStateChanged(auth(), u => {
                 clearTimeout(timer);
                 off();
-                finish(u ? { uid: u.uid, email: u.email, displayName: u.displayName, photoUrl: u.photoURL } : null);
+                finish(u ? {
+                    uid: u.uid, email: u.email, displayName: u.displayName,
+                    photoUrl: u.photoURL,
+                    providers: u.providerData.map(p => p.providerId),
+                } : null);
             }, () => { clearTimeout(timer); finish(null); });
         }
         catch {
@@ -144,6 +151,27 @@ export async function signInWithApple() {
         return;
     }
     await signInWithPopup(auth(), new OAuthProvider('apple.com'));
+}
+/** Dopnij kolejnego dostawce do JUZ zalogowanego konta.
+ *
+ *  Firebase zachowuje przy tym ten sam `uid`, wiec po polaczeniu logowanie
+ *  Google i Apple prowadzi do tego samego konta MapYou — backend nie wymaga
+ *  zadnych zmian, bo nadal widzi jeden `firebaseUid`.
+ *
+ *  Typowe bledy, ktore warto pokazac uzytkownikowi wprost:
+ *   • credential-already-in-use — ta tozsamosc nalezy juz do INNEGO konta,
+ *   • provider-already-linked   — jest juz podpieta tutaj.
+ */
+export async function linkProvider(provider) {
+    const p = plugin();
+    if (!useNative() || !p) {
+        throw new Error('Laczenie kont dziala tylko w aplikacji mobilnej.');
+    }
+    const res = provider === 'apple'
+        ? await p.linkWithApple()
+        : await p.linkWithGoogle();
+    if (!res.user)
+        throw new Error('Laczenie anulowane.');
 }
 export async function signOutEverywhere() {
     if (useNative()) {
