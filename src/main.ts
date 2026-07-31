@@ -486,8 +486,16 @@ class App {
     document.getElementById('settingStravaImport')?.addEventListener('click', () => {
       showStravaImportModal();
     });
+    // Dokumenty prawne. Adres trzymamy w jednej stalej, bo po przejsciu na
+    // wlasna subdomene (mapyou.natours-mikrut.com) zmienia sie tylko ta linia,
+    // a nie kazde wystapienie z osobna. Sklepy i ekran zgody Google wymagaja,
+    // zeby oba dokumenty byly dostepne z poziomu aplikacji.
+    const LEGAL_BASE = 'https://leszekm12.github.io/MapYou-App';
     document.getElementById('settingPrivacy')?.addEventListener('click', () => {
-      window.open('https://leszekm12.github.io/MapYou-App/privacy.html', '_blank');
+      window.open(`${LEGAL_BASE}/privacy.html`, '_blank');
+    });
+    document.getElementById('settingTerms')?.addEventListener('click', () => {
+      window.open(`${LEGAL_BASE}/terms.html`, '_blank');
     });
 
     // Easter egg: tap the "Settings" title 7× to reveal the hidden

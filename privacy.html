@@ -90,6 +90,7 @@
     margin-bottom: 18px;
   }
   .card.summary { border-left: 4px solid var(--accent); }
+  .card.warn    { border-left: 4px solid #f59e0b; }
   h2 {
     display: flex; align-items: center; gap: 10px;
     font-size: 1.08rem; margin: 0 0 12px; letter-spacing: -.2px;
@@ -99,8 +100,9 @@
     background: rgba(0, 196, 106, .12); color: var(--accent);
     display: grid; place-items: center; font-size: 16px;
   }
-  p, li { color: var(--ink-soft); font-size: .95rem; }
-  p b, li b { color: var(--ink); }
+  h3 { font-size: .95rem; margin: 18px 0 6px; color: var(--ink); }
+  p, li, td, th { color: var(--ink-soft); font-size: .95rem; }
+  p b, li b, td b { color: var(--ink); }
   ul { margin: 8px 0 0; padding-left: 18px; }
   li { margin: 7px 0; }
   li::marker { color: var(--accent); }
@@ -108,12 +110,20 @@
   a:hover { text-decoration: underline; }
   .muted { color: var(--ink-soft); font-size: .84rem; }
 
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: .9rem; }
+  th { text-align: left; font-weight: 700; color: var(--ink); padding: 8px 10px; border-bottom: 2px solid var(--line); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+
   .processors { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin-top: 12px; }
   .proc {
     border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px;
     font-size: .86rem; color: var(--ink-soft); background: color-mix(in srgb, var(--card) 70%, transparent);
   }
   .proc b { display: block; color: var(--ink); margin-bottom: 2px; }
+
+  .toc { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 6px 14px; margin-top: 8px; }
+  .toc a { font-size: .88rem; font-weight: 500; }
 
   footer {
     max-width: 820px; margin: 10px auto 0; padding: 18px;
@@ -154,6 +164,7 @@
       <span class="badge"><b>0</b> reklam · ads</span>
       <span class="badge"><b>0</b> sprzedanych danych · data sold</span>
       <span class="badge"><b>0</b> trackerów analitycznych · trackers</span>
+      <span class="badge"><b>0</b> profilowania · profiling</span>
     </div>
   </div>
 </header>
@@ -163,188 +174,662 @@
 <!-- ═══════════════ POLSKI ═══════════════ -->
 <div class="pl">
   <div class="card summary">
-    <p style="margin:0"><b>W skrócie:</b> MapYou nie wyświetla reklam, nie sprzedaje danych
-    i nie używa narzędzi śledzących. Dane treningowe żyją przede wszystkim na Twoim
-    urządzeniu, a Ty kontrolujesz widoczność każdej aktywności.
-    <span class="muted">Ostatnia aktualizacja: 12 lipca 2026</span></p>
+    <p style="margin:0 0 10px"><b>W skrócie:</b> MapYou nie wyświetla reklam, nie sprzedaje danych
+    i nie używa narzędzi śledzących ani analitycznych. Dane treningowe żyją przede wszystkim na Twoim
+    urządzeniu, a Ty kontrolujesz widoczność każdej aktywności. Konto możesz w każdej chwili
+    trwale usunąć bezpośrednio w aplikacji.</p>
+    <p class="muted" style="margin:0">Wersja 2.0 · obowiązuje od 31 lipca 2026 ·
+    poprzednia wersja: 1.0 (12 lipca 2026)</p>
   </div>
 
   <div class="card">
+    <h2><span class="ico">🧭</span>Spis treści</h2>
+    <div class="toc">
+      <a href="#pl1">1 · Administrator i kontakt</a>
+      <a href="#pl2">2 · Zakres dokumentu</a>
+      <a href="#pl3">3 · Jakie dane przetwarzamy</a>
+      <a href="#pl4">4 · Podstawy prawne</a>
+      <a href="#pl5">5 · Konto i logowanie</a>
+      <a href="#pl6">6 · Dane zdrowotne</a>
+      <a href="#pl7">7 · Gdzie dane są przechowywane</a>
+      <a href="#pl8">8 · Transfery poza EOG</a>
+      <a href="#pl9">9 · Okresy przechowywania</a>
+      <a href="#pl10">10 · Komu dane są widoczne</a>
+      <a href="#pl11">11 · Usuwanie konta i danych</a>
+      <a href="#pl12">12 · Twoje prawa (RODO)</a>
+      <a href="#pl13">13 · Bezpieczeństwo</a>
+      <a href="#pl14">14 · Pamięć lokalna</a>
+      <a href="#pl15">15 · Brak profilowania</a>
+      <a href="#pl16">16 · Dzieci</a>
+      <a href="#pl17">17 · Naruszenia danych</a>
+      <a href="#pl18">18 · Zmiany polityki</a>
+    </div>
+  </div>
+
+  <div class="card" id="pl1">
     <h2><span class="ico">👤</span>1 · Administrator i kontakt</h2>
-    <p>Administratorem danych jest twórca aplikacji MapYou — <b>Leszek Mikrut</b>.
-    Kontakt we wszystkich sprawach dotyczących prywatności:
-    <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a> lub przez
-    <a href="https://github.com/leszekm12/MapYou-App/issues">GitHub</a>.</p>
+    <p>Administratorem Twoich danych osobowych w rozumieniu RODO jest twórca aplikacji
+    MapYou — <b>Leszek Mikrut</b>, działający jako osoba fizyczna, Polska.</p>
+    <p>Kontakt we wszystkich sprawach dotyczących prywatności i ochrony danych:
+    <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>.
+    Odpowiadamy najpóźniej w ciągu <b>30 dni</b>, a w sprawach pilnych — niezwłocznie.</p>
+    <p>Ze względu na skalę i charakter przetwarzania nie mamy obowiązku powołania
+    inspektora ochrony danych (IOD). Wszystkie zgłoszenia trafiają bezpośrednio
+    do administratora.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">📦</span>2 · Jakie dane przetwarzamy i po co</h2>
+  <div class="card" id="pl2">
+    <h2><span class="ico">📄</span>2 · Zakres dokumentu</h2>
+    <p>Polityka dotyczy aplikacji mobilnej MapYou (iOS, Android), serwisu
+    <b>mapyou.natours-mikrut.com</b> oraz powiązanych usług serwerowych.</p>
+    <p>MapYou jest aplikacją treningową: rejestruje trasy GPS, prowadzi statystyki,
+    umożliwia dzielenie się aktywnościami ze znajomymi, udział w klubach i wyzwaniach
+    oraz publikowanie zdjęć i krótkich materiałów wideo.</p>
+    <p>Polityka <b>nie obejmuje</b> usług podmiotów trzecich, do których możesz przejść
+    z aplikacji (np. Google, Apple, OpenStreetMap). Rządzą się one własnymi zasadami.</p>
+  </div>
+
+  <div class="card" id="pl3">
+    <h2><span class="ico">📦</span>3 · Jakie dane przetwarzamy i po co</h2>
+
+    <h3>Dane konta</h3>
+    <ul>
+      <li><b>Identyfikator konta</b> — losowy ciąg generowany na urządzeniu
+        (np. <code>user_1a2b3c4d</code>). Jest widoczny publicznie w linkach
+        zapraszających, ale sam z siebie nie ujawnia Twojej tożsamości.</li>
+      <li><b>Adres e-mail</b> — otrzymywany od Google lub Apple przy logowaniu.
+        Jeśli korzystasz z opcji Apple „Ukryj mój adres", otrzymujemy wyłącznie
+        adres przekaźnikowy <code>@privaterelay.appleid.com</code> i nie znamy
+        Twojego prawdziwego adresu.</li>
+      <li><b>Identyfikator uwierzytelnienia</b> — techniczny identyfikator nadany
+        przez Firebase Authentication, wiążący Twoje logowanie z kontem.</li>
+      <li><b>Profil</b> — nazwa, zdjęcie, opis, miasto, płeć, waga, data urodzenia.
+        Wszystkie te pola są <b>dobrowolne</b> i możesz je w każdej chwili zmienić
+        lub usunąć. Waga i data urodzenia służą wyłącznie dokładniejszemu
+        szacowaniu spalonych kalorii.</li>
+    </ul>
+
+    <h3>Dane aktywności</h3>
     <ul>
       <li><b>Lokalizacja (GPS)</b> — wyłącznie do rejestrowania trasy treningu,
         auto-pauzy oraz — jeśli sam ją włączysz — udostępniania pozycji na żywo
         wybranym osobom. Lokalizacja w tle działa <b>tylko podczas aktywnego
-        treningu</b>, aby trasa nagrywała się przy zablokowanym ekranie.
-        Przybliżona lokalizacja może być zapisana do wysyłania prognozy pogody,
+        treningu</b>, aby trasa nagrywała się przy zablokowanym ekranie, i kończy
+        się automatycznie wraz z zakończeniem treningu. Przybliżona lokalizacja
+        (na poziomie miasta) może być zapisana do wysyłania prognozy pogody,
         jeśli włączysz powiadomienia pogodowe.</li>
-      <li><b>Dane zdrowotne</b> (kroki, treningi, tętno, kalorie) — odczytywane z
-        Health Connect (Android) lub Apple Health (iOS) wyłącznie za Twoją zgodą
-        w systemowym oknie i wyłącznie po to, by pokazać Twoje statystyki i
-        zaimportować treningi. <b>Nigdy</b> nie są używane do reklam ani
-        przekazywane podmiotom trzecim w celach marketingowych.</li>
-      <li><b>Profil</b> — nazwa, zdjęcie, opis, miasto: podajesz je dobrowolnie.
-        Konto nie wymaga adresu e-mail ani numeru telefonu.</li>
-      <li><b>Treningi i media</b> — trasy, statystyki, zdjęcia/filmy dodawane do
-        aktywności i reels. Widoczność każdej aktywności ustalasz sam
-        (wszyscy / znajomi / tylko ja).</li>
-      <li><b>Token powiadomień</b> — techniczny identyfikator (FCM / Web Push)
+      <li><b>Treningi i statystyki</b> — dystans, czas, tempo, przewyższenia,
+        typ aktywności, notatki.</li>
+      <li><b>Zdjęcia i filmy</b> — dodawane przez Ciebie do aktywności, postów
+        i materiałów znikających (reels). Pliki mogą zawierać metadane EXIF;
+        usuwamy z nich dane lokalizacyjne przed publikacją.</li>
+    </ul>
+
+    <h3>Dane społecznościowe</h3>
+    <ul>
+      <li><b>Relacje</b> — lista obserwowanych i obserwujących, zaproszenia.</li>
+      <li><b>Kluby i wyzwania</b> — członkostwa, wyniki, głosy w ankietach.</li>
+      <li><b>Interakcje</b> — polubienia i komentarze pod aktywnościami.</li>
+    </ul>
+
+    <h3>Dane techniczne</h3>
+    <ul>
+      <li><b>Token powiadomień</b> — identyfikator urządzenia (FCM / APNs)
         do doręczania powiadomień; możesz je wyłączyć w ustawieniach systemu.</li>
+      <li><b>Adres IP</b> — przetwarzany przejściowo przez serwer w celu obsługi
+        połączenia, ochrony przed nadużyciami i limitowania liczby żądań.
+        Nie budujemy z niego profili ani historii.</li>
+      <li><b>Dzienniki serwera</b> — techniczne zapisy błędów, przechowywane
+        krótkoterminowo wyłącznie do diagnostyki.</li>
+    </ul>
+
+    <p class="muted" style="margin-top:14px"><b>Czego NIE zbieramy:</b> listy kontaktów,
+    zawartości innych aplikacji, historii przeglądania, identyfikatorów reklamowych
+    (IDFA / GAID), danych biometrycznych ani nagrań dźwięku.</p>
+  </div>
+
+  <div class="card" id="pl4">
+    <h2><span class="ico">⚖️</span>4 · Podstawy prawne przetwarzania</h2>
+    <table>
+      <tr><th>Cel</th><th>Podstawa prawna (RODO)</th></tr>
+      <tr><td>Prowadzenie konta i świadczenie usługi</td><td>art. 6 ust. 1 lit. b — wykonanie umowy</td></tr>
+      <tr><td>Rejestrowanie tras i statystyk</td><td>art. 6 ust. 1 lit. b — wykonanie umowy</td></tr>
+      <tr><td>Dane zdrowotne z Health Connect / Apple Health</td><td>art. 9 ust. 2 lit. a — <b>wyraźna zgoda</b></td></tr>
+      <tr><td>Udostępnianie pozycji na żywo</td><td>art. 6 ust. 1 lit. a — zgoda (każdorazowo)</td></tr>
+      <tr><td>Powiadomienia push</td><td>art. 6 ust. 1 lit. a — zgoda</td></tr>
+      <tr><td>Bezpieczeństwo, przeciwdziałanie nadużyciom</td><td>art. 6 ust. 1 lit. f — uzasadniony interes</td></tr>
+      <tr><td>Rozpatrywanie reklamacji i zgłoszeń</td><td>art. 6 ust. 1 lit. c oraz lit. f</td></tr>
+    </table>
+    <p class="muted" style="margin-top:10px">Każdą zgodę możesz wycofać w dowolnym
+    momencie — w ustawieniach aplikacji lub systemu. Wycofanie zgody nie wpływa na
+    zgodność z prawem przetwarzania sprzed jej wycofania.</p>
+  </div>
+
+  <div class="card" id="pl5">
+    <h2><span class="ico">🔐</span>5 · Konto i logowanie</h2>
+    <p>MapYou <b>nie przechowuje haseł</b>. Logowanie odbywa się wyłącznie przez
+    zewnętrznych dostawców tożsamości:</p>
+    <ul>
+      <li><b>Zaloguj się przez Google</b> — otrzymujemy Twój adres e-mail, imię
+        i zdjęcie profilowe, jeśli je udostępnisz.</li>
+      <li><b>Zaloguj się przez Apple</b> — otrzymujemy adres e-mail (prawdziwy lub
+        przekaźnikowy, zależnie od Twojego wyboru) oraz imię wyłącznie przy
+        pierwszym logowaniu.</li>
+    </ul>
+    <p>Uwierzytelnianiem zarządza <b>Firebase Authentication</b> (Google Ireland Ltd.).
+    Nasz serwer nigdy nie widzi Twojego hasła do konta Google ani Apple — otrzymuje
+    wyłącznie krótkotrwały token potwierdzający tożsamość.</p>
+    <p>Możesz połączyć oba sposoby logowania z jednym kontem MapYou. Wówczas logowanie
+    Google i Apple prowadzi do tych samych danych.</p>
+    <p><b>Korzystanie bez konta:</b> aplikacji można używać jako gość — treningi
+    zapisują się wtedy wyłącznie lokalnie na urządzeniu i nie trafiają na serwer.
+    Po rejestracji dotychczasowe dane zostają przypisane do nowo utworzonego konta.</p>
+  </div>
+
+  <div class="card warn" id="pl6">
+    <h2><span class="ico">❤️</span>6 · Dane zdrowotne — zasady szczególne</h2>
+    <p>Dane o kondycji i zdrowiu (kroki, treningi, tętno, spalone kalorie) należą do
+    <b>szczególnych kategorii danych</b> w rozumieniu art. 9 RODO i traktujemy je
+    ze szczególną ostrożnością.</p>
+    <ul>
+      <li>Odczytujemy je z <b>Apple HealthKit</b> (iOS) lub <b>Health Connect</b>
+        (Android) wyłącznie po udzieleniu przez Ciebie zgody w oknie systemowym.</li>
+      <li>Służą wyłącznie prezentacji Twoich statystyk, importowi treningów
+        i obliczaniu postępów w wyzwaniach.</li>
+      <li><b>Nigdy</b> nie są wykorzystywane do reklam, marketingu, oceny
+        zdolności kredytowej, ubezpieczeń ani przekazywane brokerom danych.</li>
+      <li>Nie są udostępniane innym użytkownikom, chyba że sam opublikujesz
+        aktywność, która je zawiera.</li>
+      <li>Zgodę możesz wycofać w każdej chwili w ustawieniach systemu; aplikacja
+        przestanie wówczas odczytywać nowe dane.</li>
     </ul>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">☁️</span>3 · Gdzie dane są przechowywane</h2>
+  <div class="card" id="pl7">
+    <h2><span class="ico">☁️</span>7 · Gdzie dane są przechowywane</h2>
     <p>Dane treningowe żyją przede wszystkim <b>na Twoim urządzeniu</b> (baza
     IndexedDB). Kopia synchronizuje się do chmury, aby działały funkcje
-    społecznościowe i odzyskiwanie konta. Podmioty przetwarzające:</p>
+    społecznościowe i dostęp z wielu urządzeń. Podmioty przetwarzające:</p>
     <div class="processors">
       <div class="proc"><b>Fly.io</b>serwer aplikacji · Amsterdam (UE)</div>
-      <div class="proc"><b>MongoDB Atlas</b>baza danych w chmurze</div>
+      <div class="proc"><b>MongoDB Atlas</b>baza danych · region UE</div>
       <div class="proc"><b>Cloudinary</b>zdjęcia i filmy</div>
-      <div class="proc"><b>Firebase / APNs</b>doręczanie powiadomień</div>
+      <div class="proc"><b>Google Firebase</b>uwierzytelnianie i powiadomienia</div>
+      <div class="proc"><b>Apple APNs</b>powiadomienia na iOS</div>
       <div class="proc"><b>Open-Meteo</b>pogoda (przybliżone współrzędne)</div>
-      <div class="proc"><b>OpenStreetMap</b>kafelki map (przez nasz serwer)</div>
+      <div class="proc"><b>CARTO / OpenStreetMap</b>kafelki map</div>
+      <div class="proc"><b>Mapbox</b>wyznaczanie tras A→B</div>
     </div>
+    <p class="muted" style="margin-top:12px">Z każdym podmiotem przetwarzającym łączy
+    nas umowa powierzenia przetwarzania danych. Nie korzystamy z żadnych narzędzi
+    analitycznych ani reklamowych.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">👁️</span>4 · Komu dane są widoczne</h2>
+  <div class="card" id="pl8">
+    <h2><span class="ico">🌍</span>8 · Transfery poza EOG</h2>
+    <p>Serwer aplikacji i baza danych znajdują się w Unii Europejskiej. Część
+    podmiotów przetwarzających (Google, Apple, Cloudinary) to firmy amerykańskie,
+    co może wiązać się z przekazaniem danych poza Europejski Obszar Gospodarczy.</p>
+    <p>Takie transfery odbywają się na podstawie <b>standardowych klauzul umownych</b>
+    zatwierdzonych przez Komisję Europejską oraz — w przypadku dostawców
+    certyfikowanych — <b>Data Privacy Framework</b> UE–USA.</p>
+  </div>
+
+  <div class="card" id="pl9">
+    <h2><span class="ico">⏳</span>9 · Jak długo przechowujemy dane</h2>
+    <table>
+      <tr><th>Kategoria</th><th>Okres</th></tr>
+      <tr><td>Konto i profil</td><td>do usunięcia konta przez Ciebie</td></tr>
+      <tr><td>Treningi, trasy, statystyki</td><td>do usunięcia przez Ciebie lub wraz z kontem</td></tr>
+      <tr><td>Zdjęcia i filmy</td><td>do usunięcia przez Ciebie lub wraz z kontem</td></tr>
+      <tr><td>Materiały znikające (reels)</td><td>24 godziny, następnie automatyczne usunięcie</td></tr>
+      <tr><td>Sesje udostępniania na żywo</td><td>usuwane po zakończeniu treningu</td></tr>
+      <tr><td>Tokeny powiadomień</td><td>do wyłączenia powiadomień lub dezaktywacji tokenu</td></tr>
+      <tr><td>Dzienniki serwera</td><td>do 30 dni</td></tr>
+      <tr><td>Kopie zapasowe</td><td>do 30 dni od usunięcia danych</td></tr>
+    </table>
+  </div>
+
+  <div class="card" id="pl10">
+    <h2><span class="ico">👁️</span>10 · Komu dane są widoczne</h2>
     <p>Twoje aktywności widzą wyłącznie osoby zgodne z ustawioną przez Ciebie
-    widocznością. Udostępnianie pozycji na żywo działa tylko po Twoim ręcznym
-    uruchomieniu, tylko dla zaproszonych osób i kończy się wraz z treningiem.
-    Nie sprzedajemy danych i nie przekazujemy ich reklamodawcom.</p>
+    widocznością (wszyscy / obserwujący / tylko ja). Profil prywatny sprawia, że
+    Twoje aktywności widzą wyłącznie zatwierdzeni obserwujący.</p>
+    <p>Udostępnianie pozycji na żywo działa tylko po Twoim ręcznym uruchomieniu,
+    tylko dla osób z linkiem, i kończy się wraz z treningiem.</p>
+    <p>Publicznie widoczne pozostają zawsze: nazwa, zdjęcie profilowe, opis oraz
+    liczba obserwujących — jest to niezbędne do działania funkcji społecznościowych.</p>
+    <p><b>Nie sprzedajemy danych, nie udostępniamy ich reklamodawcom ani brokerom
+    danych.</b> Dane możemy ujawnić wyłącznie uprawnionym organom na podstawie
+    ważnego żądania prawnego.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">🗑️</span>5 · Przechowywanie i usuwanie danych</h2>
+  <div class="card" id="pl11">
+    <h2><span class="ico">🗑️</span>11 · Usuwanie konta i danych</h2>
     <ul>
-      <li>W aplikacji: <b>Ustawienia → Clear all workouts</b> usuwa historię
-        treningów z urządzenia i chmury.</li>
-      <li>Pełne usunięcie konta i wszystkich danych: napisz na
-        <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a> — realizacja w ciągu 30 dni.</li>
-      <li>Dane techniczne (np. nieaktywne tokeny powiadomień) usuwamy automatycznie.</li>
+      <li><b>Usunięcie pojedynczych treningów</b> — przesunięcie karty treningu
+        w bok lub menu aktywności.</li>
+      <li><b>Wyczyszczenie historii</b> — Ustawienia → „Clear all workouts":
+        usuwa treningi z urządzenia i z chmury, konto pozostaje.</li>
+      <li><b>Trwałe usunięcie konta</b> — Profil → Ustawienia → „Usuń konto".
+        Operacja usuwa nieodwracalnie: profil, wszystkie treningi i trasy, zdjęcia
+        i filmy, członkostwa w klubach, relacje, komentarze oraz powiązanie
+        z kontem Google/Apple. Dane znikają z serwera natychmiast, a z kopii
+        zapasowych w ciągu 30 dni.</li>
+      <li><b>Wylogowanie</b> — usuwa dane z urządzenia, ale zachowuje konto
+        w chmurze; po ponownym zalogowaniu wszystko wraca.</li>
     </ul>
+    <p class="muted">Jeśli utracisz dostęp do aplikacji, konto możesz usunąć
+    także pisząc na <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>
+    — realizacja do 30 dni.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">⚖️</span>6 · Twoje prawa (RODO)</h2>
-    <p>Masz prawo dostępu do danych, ich sprostowania, usunięcia, ograniczenia
-    przetwarzania, przenoszenia oraz sprzeciwu — wystarczy kontakt (pkt 1).
-    Masz też prawo wnieść skargę do Prezesa UODO.</p>
+  <div class="card" id="pl12">
+    <h2><span class="ico">📜</span>12 · Twoje prawa (RODO)</h2>
+    <p>Przysługuje Ci prawo do:</p>
+    <ul>
+      <li><b>dostępu</b> do danych i uzyskania ich kopii,</li>
+      <li><b>sprostowania</b> danych nieprawidłowych,</li>
+      <li><b>usunięcia</b> danych („prawo do bycia zapomnianym"),</li>
+      <li><b>ograniczenia</b> przetwarzania,</li>
+      <li><b>przenoszenia</b> danych w formacie nadającym się do odczytu maszynowego,</li>
+      <li><b>sprzeciwu</b> wobec przetwarzania opartego na uzasadnionym interesie,</li>
+      <li><b>wycofania zgody</b> w dowolnym momencie.</li>
+    </ul>
+    <p>Aby skorzystać z tych praw, napisz na
+    <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>.
+    Odpowiadamy w ciągu 30 dni; w złożonych sprawach termin może zostać przedłużony
+    o kolejne 60 dni, o czym Cię poinformujemy.</p>
+    <p>Masz również prawo wnieść skargę do organu nadzorczego — w Polsce jest to
+    <b>Prezes Urzędu Ochrony Danych Osobowych</b>, ul. Stawki 2, 00-193 Warszawa.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">🧒</span>7 · Dzieci</h2>
-    <p>Aplikacja nie jest kierowana do dzieci poniżej 13. roku życia i świadomie
-    nie zbieramy ich danych.</p>
+  <div class="card" id="pl13">
+    <h2><span class="ico">🛡️</span>13 · Bezpieczeństwo</h2>
+    <ul>
+      <li>Cała komunikacja z serwerem odbywa się przez <b>szyfrowane połączenie
+        HTTPS/TLS</b>.</li>
+      <li>Każde żądanie do serwera wymaga <b>ważnego tokenu uwierzytelniającego</b>
+        — nie da się odczytać ani zmienić cudzych danych, znając jedynie
+        identyfikator konta.</li>
+      <li>Nie przechowujemy haseł — uwierzytelnianiem zarządzają Google i Apple.</li>
+      <li>Dostęp do serwera i bazy danych ma wyłącznie administrator.</li>
+      <li>Stosujemy ograniczenia liczby żądań, chroniące przed automatycznymi
+        nadużyciami.</li>
+      <li>Aplikacja weryfikuje, czy żądania pochodzą z autentycznej instalacji
+        (mechanizm atestacji urządzenia).</li>
+    </ul>
+    <p class="muted">Żadne zabezpieczenie nie daje stuprocentowej gwarancji.
+    Jeśli zauważysz podatność, napisz na
+    <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>
+    — reagujemy niezwłocznie i nie kierujemy roszczeń wobec osób zgłaszających
+    błędy w dobrej wierze.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">🔁</span>8 · Zmiany polityki</h2>
-    <p>O istotnych zmianach poinformujemy w aplikacji. Aktualna wersja zawsze
-    znajduje się pod tym adresem.</p>
+  <div class="card" id="pl14">
+    <h2><span class="ico">🍪</span>14 · Pamięć lokalna zamiast plików cookie</h2>
+    <p>Aplikacja mobilna <b>nie używa plików cookie</b>. Korzysta z pamięci lokalnej
+    urządzenia (localStorage, IndexedDB) wyłącznie do przechowywania Twoich danych
+    treningowych, ustawień i sesji logowania. Nie są to narzędzia śledzące i nie
+    przekazują niczego podmiotom trzecim.</p>
+  </div>
+
+  <div class="card" id="pl15">
+    <h2><span class="ico">🤖</span>15 · Brak profilowania i decyzji automatycznych</h2>
+    <p>Nie stosujemy profilowania ani zautomatyzowanego podejmowania decyzji
+    wywołujących wobec Ciebie skutki prawne. Statystyki i wykresy w aplikacji
+    są prostym przetworzeniem Twoich własnych danych i służą wyłącznie Tobie.</p>
+  </div>
+
+  <div class="card" id="pl16">
+    <h2><span class="ico">🧒</span>16 · Dzieci</h2>
+    <p>Aplikacja nie jest kierowana do dzieci poniżej <b>13. roku życia</b> i świadomie
+    nie zbieramy ich danych. Osoby poniżej 16. roku życia powinny korzystać
+    z aplikacji za zgodą opiekuna prawnego.</p>
+    <p>Jeśli dowiemy się, że konto założyło dziecko poniżej 13 lat, usuniemy je
+    wraz z danymi. Opiekun może zgłosić taką sytuację na adres kontaktowy.</p>
+  </div>
+
+  <div class="card" id="pl17">
+    <h2><span class="ico">🚨</span>17 · Naruszenia ochrony danych</h2>
+    <p>W razie naruszenia ochrony danych osobowych, które może powodować wysokie
+    ryzyko dla Twoich praw, poinformujemy Cię bez zbędnej zwłoki — w aplikacji
+    lub na adres e-mail powiązany z kontem. Naruszenie zgłosimy również Prezesowi
+    UODO w ciągu 72 godzin od jego stwierdzenia.</p>
+  </div>
+
+  <div class="card" id="pl18">
+    <h2><span class="ico">🔁</span>18 · Zmiany polityki</h2>
+    <p>O istotnych zmianach poinformujemy w aplikacji z co najmniej
+    <b>14-dniowym wyprzedzeniem</b>. Aktualna wersja zawsze znajduje się
+    pod tym adresem, wraz z datą obowiązywania.</p>
+    <p class="muted">Historia wersji: 2.0 (31 lipca 2026) — dodano sekcje
+    o logowaniu, danych zdrowotnych, transferach, przechowywaniu i usuwaniu
+    konta w aplikacji · 1.0 (12 lipca 2026) — wersja pierwotna.</p>
   </div>
 </div>
 
 <!-- ═══════════════ ENGLISH ═══════════════ -->
 <div class="en">
   <div class="card summary">
-    <p style="margin:0"><b>In short:</b> MapYou shows no ads, sells no data and uses no
-    tracking analytics. Workout data lives primarily on your device, and you
-    control the visibility of every activity.
-    <span class="muted">Last updated: July 12, 2026</span></p>
+    <p style="margin:0 0 10px"><b>In short:</b> MapYou shows no ads, sells no data and uses no
+    tracking or analytics tools. Workout data lives primarily on your device, and you
+    control the visibility of every activity. You can permanently delete your account
+    at any time directly in the app.</p>
+    <p class="muted" style="margin:0">Version 2.0 · effective 31 July 2026 ·
+    previous version: 1.0 (12 July 2026)</p>
   </div>
 
   <div class="card">
-    <h2><span class="ico">👤</span>1 · Data controller & contact</h2>
-    <p>The data controller is the creator of MapYou — <b>Leszek Mikrut</b>.
-    For any privacy matter contact <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>
-    or use <a href="https://github.com/leszekm12/MapYou-App/issues">GitHub</a>.</p>
-  </div>
-
-  <div class="card">
-    <h2><span class="ico">📦</span>2 · What we process and why</h2>
-    <ul>
-      <li><b>Location (GPS)</b> — solely to record your workout route,
-        auto-pause and — only if you enable it — live position sharing with
-        people you choose. Background location runs <b>only during an active
-        workout</b> so the route keeps recording with the screen locked.
-        An approximate location may be stored to deliver weather forecasts if
-        you enable weather notifications.</li>
-      <li><b>Health data</b> (steps, workouts, heart rate, calories) — read from
-        Health Connect (Android) or Apple Health (iOS) only with your explicit
-        system-level consent, only to show your stats and import workouts.
-        <b>Never</b> used for advertising or shared with third parties for
-        marketing.</li>
-      <li><b>Profile</b> — name, photo, bio, city: provided voluntarily.
-        No e-mail or phone number is required.</li>
-      <li><b>Workouts & media</b> — routes, stats, photos/videos you attach.
-        You set each activity's visibility (everyone / friends / only me).</li>
-      <li><b>Push token</b> — a technical identifier (FCM / Web Push) used to
-        deliver notifications; you can disable them in system settings.</li>
-    </ul>
-  </div>
-
-  <div class="card">
-    <h2><span class="ico">☁️</span>3 · Where data is stored</h2>
-    <p>Workout data lives primarily <b>on your device</b> (IndexedDB). A copy
-    syncs to the cloud to enable social features and account recovery.
-    Processors:</p>
-    <div class="processors">
-      <div class="proc"><b>Fly.io</b>app server · Amsterdam (EU)</div>
-      <div class="proc"><b>MongoDB Atlas</b>cloud database</div>
-      <div class="proc"><b>Cloudinary</b>photos & videos</div>
-      <div class="proc"><b>Firebase / APNs</b>notification delivery</div>
-      <div class="proc"><b>Open-Meteo</b>weather (approx. coordinates)</div>
-      <div class="proc"><b>OpenStreetMap</b>map tiles (via our proxy)</div>
+    <h2><span class="ico">🧭</span>Contents</h2>
+    <div class="toc">
+      <a href="#en1">1 · Controller & contact</a>
+      <a href="#en2">2 · Scope</a>
+      <a href="#en3">3 · What we process</a>
+      <a href="#en4">4 · Legal bases</a>
+      <a href="#en5">5 · Account & sign-in</a>
+      <a href="#en6">6 · Health data</a>
+      <a href="#en7">7 · Where data is stored</a>
+      <a href="#en8">8 · International transfers</a>
+      <a href="#en9">9 · Retention</a>
+      <a href="#en10">10 · Who can see your data</a>
+      <a href="#en11">11 · Deleting your account</a>
+      <a href="#en12">12 · Your rights (GDPR)</a>
+      <a href="#en13">13 · Security</a>
+      <a href="#en14">14 · Local storage</a>
+      <a href="#en15">15 · No profiling</a>
+      <a href="#en16">16 · Children</a>
+      <a href="#en17">17 · Data breaches</a>
+      <a href="#en18">18 · Changes</a>
     </div>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">👁️</span>4 · Who can see your data</h2>
-    <p>Your activities are visible only according to the visibility you set.
-    Live sharing works only after you start it manually, only for invited
-    people, and ends with the workout. We never sell data or share it with
-    advertisers.</p>
+  <div class="card" id="en1">
+    <h2><span class="ico">👤</span>1 · Data controller & contact</h2>
+    <p>The data controller under the GDPR is the creator of MapYou —
+    <b>Leszek Mikrut</b>, acting as a natural person, Poland.</p>
+    <p>For any privacy or data-protection matter, contact
+    <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>.
+    We reply within <b>30 days</b> at the latest, and immediately for urgent matters.</p>
+    <p>Given the scale and nature of processing, we are not required to appoint a
+    Data Protection Officer. All requests go directly to the controller.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">🗑️</span>5 · Retention & deletion</h2>
+  <div class="card" id="en2">
+    <h2><span class="ico">📄</span>2 · Scope</h2>
+    <p>This policy covers the MapYou mobile app (iOS, Android), the
+    <b>mapyou.natours-mikrut.com</b> website and the related server services.</p>
+    <p>MapYou is a fitness app: it records GPS routes, keeps statistics, lets you
+    share activities with friends, join clubs and challenges, and post photos and
+    short videos.</p>
+    <p>This policy does <b>not</b> cover third-party services you may open from the
+    app (e.g. Google, Apple, OpenStreetMap). Those have their own terms.</p>
+  </div>
+
+  <div class="card" id="en3">
+    <h2><span class="ico">📦</span>3 · What we process and why</h2>
+
+    <h3>Account data</h3>
     <ul>
-      <li>In-app: <b>Settings → Clear all workouts</b> removes your history
-        from the device and the cloud.</li>
-      <li>Full account deletion: write to
-        <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a> — completed within 30 days.</li>
-      <li>Technical data (e.g. dead push tokens) is removed automatically.</li>
+      <li><b>Account identifier</b> — a random string generated on your device
+        (e.g. <code>user_1a2b3c4d</code>). It appears publicly in invite links but
+        does not by itself reveal your identity.</li>
+      <li><b>E-mail address</b> — received from Google or Apple at sign-in. If you
+        use Apple's "Hide My Email", we only receive a relay address
+        <code>@privaterelay.appleid.com</code> and never learn your real one.</li>
+      <li><b>Authentication identifier</b> — a technical ID issued by Firebase
+        Authentication that links your sign-in to your account.</li>
+      <li><b>Profile</b> — name, photo, bio, city, gender, weight, date of birth.
+        All of these are <b>optional</b> and can be changed or removed at any time.
+        Weight and date of birth are used solely to estimate burned calories
+        more accurately.</li>
+    </ul>
+
+    <h3>Activity data</h3>
+    <ul>
+      <li><b>Location (GPS)</b> — solely to record your workout route, auto-pause
+        and — only if you enable it — live position sharing with people you choose.
+        Background location runs <b>only during an active workout</b> so the route
+        keeps recording with the screen locked, and stops automatically when the
+        workout ends. An approximate location (city level) may be stored to deliver
+        weather forecasts if you enable weather notifications.</li>
+      <li><b>Workouts & statistics</b> — distance, time, pace, elevation, activity
+        type, notes.</li>
+      <li><b>Photos & videos</b> — attached by you to activities, posts and
+        ephemeral reels. Files may contain EXIF metadata; we strip location data
+        before publishing.</li>
+    </ul>
+
+    <h3>Social data</h3>
+    <ul>
+      <li><b>Relationships</b> — followers, following, invitations.</li>
+      <li><b>Clubs & challenges</b> — memberships, results, poll votes.</li>
+      <li><b>Interactions</b> — likes and comments on activities.</li>
+    </ul>
+
+    <h3>Technical data</h3>
+    <ul>
+      <li><b>Push token</b> — a device identifier (FCM / APNs) used to deliver
+        notifications; you can disable them in system settings.</li>
+      <li><b>IP address</b> — processed transiently by the server to handle the
+        connection, prevent abuse and rate-limit requests. We do not build profiles
+        or histories from it.</li>
+      <li><b>Server logs</b> — technical error records, kept briefly for diagnostics.</li>
+    </ul>
+
+    <p class="muted" style="margin-top:14px"><b>What we do NOT collect:</b> your contacts,
+    the contents of other apps, browsing history, advertising identifiers
+    (IDFA / GAID), biometric data or audio recordings.</p>
+  </div>
+
+  <div class="card" id="en4">
+    <h2><span class="ico">⚖️</span>4 · Legal bases for processing</h2>
+    <table>
+      <tr><th>Purpose</th><th>Legal basis (GDPR)</th></tr>
+      <tr><td>Running your account and providing the service</td><td>Art. 6(1)(b) — performance of a contract</td></tr>
+      <tr><td>Recording routes and statistics</td><td>Art. 6(1)(b) — performance of a contract</td></tr>
+      <tr><td>Health data from Health Connect / Apple Health</td><td>Art. 9(2)(a) — <b>explicit consent</b></td></tr>
+      <tr><td>Live position sharing</td><td>Art. 6(1)(a) — consent (each time)</td></tr>
+      <tr><td>Push notifications</td><td>Art. 6(1)(a) — consent</td></tr>
+      <tr><td>Security and abuse prevention</td><td>Art. 6(1)(f) — legitimate interest</td></tr>
+      <tr><td>Handling complaints and requests</td><td>Art. 6(1)(c) and (f)</td></tr>
+    </table>
+    <p class="muted" style="margin-top:10px">You may withdraw any consent at any time
+    in app or system settings. Withdrawal does not affect the lawfulness of processing
+    carried out before it.</p>
+  </div>
+
+  <div class="card" id="en5">
+    <h2><span class="ico">🔐</span>5 · Account & sign-in</h2>
+    <p>MapYou <b>stores no passwords</b>. Sign-in happens exclusively through external
+    identity providers:</p>
+    <ul>
+      <li><b>Sign in with Google</b> — we receive your e-mail address, name and
+        profile photo if you share them.</li>
+      <li><b>Sign in with Apple</b> — we receive an e-mail address (real or relay,
+        depending on your choice) and your name only on first sign-in.</li>
+    </ul>
+    <p>Authentication is handled by <b>Firebase Authentication</b> (Google Ireland Ltd.).
+    Our server never sees your Google or Apple password — only a short-lived token
+    confirming your identity.</p>
+    <p>You may link both sign-in methods to a single MapYou account. Google and Apple
+    sign-in then lead to the same data.</p>
+    <p><b>Using the app without an account:</b> you can use MapYou as a guest —
+    workouts are then stored only locally on your device and never reach our server.
+    After signing up, your existing data is attached to the newly created account.</p>
+  </div>
+
+  <div class="card warn" id="en6">
+    <h2><span class="ico">❤️</span>6 · Health data — special rules</h2>
+    <p>Fitness and health data (steps, workouts, heart rate, calories) are
+    <b>special categories of data</b> under Art. 9 GDPR and we treat them with
+    particular care.</p>
+    <ul>
+      <li>We read them from <b>Apple HealthKit</b> (iOS) or <b>Health Connect</b>
+        (Android) only after you grant consent in the system dialog.</li>
+      <li>They are used solely to display your statistics, import workouts and
+        compute challenge progress.</li>
+      <li>They are <b>never</b> used for advertising, marketing, credit scoring or
+        insurance, and never shared with data brokers.</li>
+      <li>They are not shared with other users unless you publish an activity that
+        contains them.</li>
+      <li>You may withdraw consent at any time in system settings; the app will then
+        stop reading new data.</li>
     </ul>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">⚖️</span>6 · Your rights (GDPR)</h2>
-    <p>You have the right to access, rectify, erase, restrict, port and object —
-    just contact us (section 1). You may also lodge a complaint with your
-    supervisory authority.</p>
+  <div class="card" id="en7">
+    <h2><span class="ico">☁️</span>7 · Where data is stored</h2>
+    <p>Workout data lives primarily <b>on your device</b> (IndexedDB). A copy syncs to
+    the cloud to enable social features and multi-device access. Processors:</p>
+    <div class="processors">
+      <div class="proc"><b>Fly.io</b>app server · Amsterdam (EU)</div>
+      <div class="proc"><b>MongoDB Atlas</b>cloud database · EU region</div>
+      <div class="proc"><b>Cloudinary</b>photos & videos</div>
+      <div class="proc"><b>Google Firebase</b>authentication & notifications</div>
+      <div class="proc"><b>Apple APNs</b>notifications on iOS</div>
+      <div class="proc"><b>Open-Meteo</b>weather (approx. coordinates)</div>
+      <div class="proc"><b>CARTO / OpenStreetMap</b>map tiles</div>
+      <div class="proc"><b>Mapbox</b>A→B route planning</div>
+    </div>
+    <p class="muted" style="margin-top:12px">We have a data processing agreement with
+    each processor. We use no analytics or advertising tools whatsoever.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">🧒</span>7 · Children</h2>
-    <p>The app is not directed at children under 13 and we do not knowingly
-    collect their data.</p>
+  <div class="card" id="en8">
+    <h2><span class="ico">🌍</span>8 · International transfers</h2>
+    <p>The app server and database are located in the European Union. Some processors
+    (Google, Apple, Cloudinary) are US companies, which may involve transfers outside
+    the European Economic Area.</p>
+    <p>Such transfers rely on <b>Standard Contractual Clauses</b> approved by the
+    European Commission and — for certified providers — the EU–US
+    <b>Data Privacy Framework</b>.</p>
   </div>
 
-  <div class="card">
-    <h2><span class="ico">🔁</span>8 · Changes</h2>
-    <p>We will announce material changes in the app. The current version always
-    lives at this address.</p>
+  <div class="card" id="en9">
+    <h2><span class="ico">⏳</span>9 · How long we keep data</h2>
+    <table>
+      <tr><th>Category</th><th>Period</th></tr>
+      <tr><td>Account and profile</td><td>until you delete your account</td></tr>
+      <tr><td>Workouts, routes, statistics</td><td>until deleted by you or with the account</td></tr>
+      <tr><td>Photos and videos</td><td>until deleted by you or with the account</td></tr>
+      <tr><td>Ephemeral reels</td><td>24 hours, then deleted automatically</td></tr>
+      <tr><td>Live sharing sessions</td><td>deleted when the workout ends</td></tr>
+      <tr><td>Push tokens</td><td>until notifications are disabled or the token expires</td></tr>
+      <tr><td>Server logs</td><td>up to 30 days</td></tr>
+      <tr><td>Backups</td><td>up to 30 days after deletion</td></tr>
+    </table>
+  </div>
+
+  <div class="card" id="en10">
+    <h2><span class="ico">👁️</span>10 · Who can see your data</h2>
+    <p>Your activities are visible only according to the visibility you set
+    (everyone / followers / only me). A private profile means only approved
+    followers can see your activities.</p>
+    <p>Live sharing works only after you start it manually, only for people with the
+    link, and ends with the workout.</p>
+    <p>Always publicly visible: your name, profile photo, bio and follower count —
+    this is necessary for social features to work.</p>
+    <p><b>We never sell data, nor share it with advertisers or data brokers.</b>
+    We may disclose data only to authorised authorities upon a valid legal request.</p>
+  </div>
+
+  <div class="card" id="en11">
+    <h2><span class="ico">🗑️</span>11 · Deleting your account and data</h2>
+    <ul>
+      <li><b>Delete individual workouts</b> — swipe a workout card or use the
+        activity menu.</li>
+      <li><b>Clear history</b> — Settings → "Clear all workouts": removes workouts
+        from the device and the cloud; the account remains.</li>
+      <li><b>Permanently delete your account</b> — Profile → Settings → "Delete
+        account". This irreversibly removes: your profile, all workouts and routes,
+        photos and videos, club memberships, relationships, comments and the link
+        to your Google/Apple account. Data disappears from the server immediately
+        and from backups within 30 days.</li>
+      <li><b>Sign out</b> — removes data from the device but keeps your cloud
+        account; everything returns when you sign in again.</li>
+    </ul>
+    <p class="muted">If you lose access to the app, you can also request deletion at
+    <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>
+    — completed within 30 days.</p>
+  </div>
+
+  <div class="card" id="en12">
+    <h2><span class="ico">📜</span>12 · Your rights (GDPR)</h2>
+    <p>You have the right to:</p>
+    <ul>
+      <li><b>access</b> your data and obtain a copy,</li>
+      <li><b>rectify</b> inaccurate data,</li>
+      <li><b>erase</b> your data ("right to be forgotten"),</li>
+      <li><b>restrict</b> processing,</li>
+      <li><b>port</b> your data in a machine-readable format,</li>
+      <li><b>object</b> to processing based on legitimate interest,</li>
+      <li><b>withdraw consent</b> at any time.</li>
+    </ul>
+    <p>To exercise these rights, write to
+    <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>.
+    We reply within 30 days; for complex requests this may be extended by a further
+    60 days, and we will tell you if that happens.</p>
+    <p>You also have the right to lodge a complaint with a supervisory authority —
+    in Poland this is the <b>President of the Personal Data Protection Office</b>,
+    ul. Stawki 2, 00-193 Warsaw.</p>
+  </div>
+
+  <div class="card" id="en13">
+    <h2><span class="ico">🛡️</span>13 · Security</h2>
+    <ul>
+      <li>All communication with the server uses <b>encrypted HTTPS/TLS</b>.</li>
+      <li>Every server request requires a <b>valid authentication token</b> — knowing
+        someone's account identifier is not enough to read or change their data.</li>
+      <li>We store no passwords — authentication is handled by Google and Apple.</li>
+      <li>Only the administrator has access to the server and database.</li>
+      <li>Rate limiting protects against automated abuse.</li>
+      <li>The app verifies that requests come from a genuine installation
+        (device attestation).</li>
+    </ul>
+    <p class="muted">No safeguard is ever absolute. If you find a vulnerability,
+    write to <a href="mailto:hello.leszek.mikrut@gmail.com">hello.leszek.mikrut@gmail.com</a>
+    — we respond promptly and will not pursue claims against good-faith reporters.</p>
+  </div>
+
+  <div class="card" id="en14">
+    <h2><span class="ico">🍪</span>14 · Local storage instead of cookies</h2>
+    <p>The mobile app uses <b>no cookies</b>. It uses local device storage
+    (localStorage, IndexedDB) solely to keep your workout data, settings and sign-in
+    session. These are not tracking technologies and send nothing to third parties.</p>
+  </div>
+
+  <div class="card" id="en15">
+    <h2><span class="ico">🤖</span>15 · No profiling or automated decisions</h2>
+    <p>We do not carry out profiling or automated decision-making producing legal
+    effects concerning you. Statistics and charts in the app are a simple processing
+    of your own data, for your eyes only.</p>
+  </div>
+
+  <div class="card" id="en16">
+    <h2><span class="ico">🧒</span>16 · Children</h2>
+    <p>The app is not directed at children under <b>13</b> and we do not knowingly
+    collect their data. People under 16 should use the app with the consent of a
+    legal guardian.</p>
+    <p>If we learn that an account was created by a child under 13, we will delete it
+    along with the data. A guardian may report such a case to our contact address.</p>
+  </div>
+
+  <div class="card" id="en17">
+    <h2><span class="ico">🚨</span>17 · Data breaches</h2>
+    <p>In the event of a personal data breach likely to result in a high risk to your
+    rights, we will inform you without undue delay — in the app or at the e-mail
+    address linked to your account. We will also report the breach to the supervisory
+    authority within 72 hours of becoming aware of it.</p>
+  </div>
+
+  <div class="card" id="en18">
+    <h2><span class="ico">🔁</span>18 · Changes to this policy</h2>
+    <p>We will announce material changes in the app at least <b>14 days</b> in advance.
+    The current version always lives at this address, together with its effective date.</p>
+    <p class="muted">Version history: 2.0 (31 July 2026) — added sections on sign-in,
+    health data, transfers, retention and in-app account deletion ·
+    1.0 (12 July 2026) — initial version.</p>
   </div>
 </div>
 
@@ -353,7 +838,7 @@
 <footer>
   <span>© 2026 MapYou · Leszek Mikrut</span>
   <span>
-    <a href="https://leszekm12.github.io/MapYou-App/">Aplikacja / App</a> ·
+    <a href="./terms.html">Regulamin / Terms</a> ·
     <a href="https://github.com/leszekm12/MapYou-App">GitHub</a>
   </span>
 </footer>
