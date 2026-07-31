@@ -116,6 +116,32 @@ export function renderAccountCard() {
       </button>
     </div>`;
 }
+/** Czy blad oznacza, ze uzytkownik po prostu zamknal okno logowania.
+ *
+ *  Apple nie zwraca slowa „cancel" — podaje kod numeryczny:
+ *    1001 = canceled, 1000 = unknown, 1004 = failed.
+ *  Bez tego zamkniecie okna Apple wygladalo jak awaria
+ *  („The operation couldn't be completed... error 1001").
+ */
+function isUserCancellation(raw) {
+    return /AuthorizationError error 1001|ERROR_ABORTED|cancell?ed|anulowan|user_cancel|12501|SIGN_IN_CANCELLED/i.test(raw);
+}
+/** Zamien techniczny komunikat na zdanie zrozumiale dla uzytkownika. */
+function humanAuthError(raw) {
+    if (/credential-already-in-use|already in use/i.test(raw)) {
+        return 'To konto jest juz powiazane z innym profilem MapYou.';
+    }
+    if (/provider-already-linked|already linked/i.test(raw)) {
+        return 'To logowanie jest juz dodane.';
+    }
+    if (/AuthorizationError error 100[04]/i.test(raw)) {
+        return 'Apple nie zdolalo dokonczyc logowania. Sprobuj ponownie.';
+    }
+    if (/network|timeout|Load failed/i.test(raw)) {
+        return 'Brak polaczenia z siecia. Sprobuj ponownie.';
+    }
+    return raw || 'Nie udalo sie. Sprobuj ponownie.';
+}
 /** Sekcja „sposoby logowania" — pokazuje podpiete tozsamosci i pozwala dodac
  *  brakujaca. Po polaczeniu OBA logowania prowadza do TEGO SAMEGO konta,
  *  bo Firebase zachowuje wspolny `uid`. */
@@ -188,7 +214,11 @@ export function bindAccountCard(root, onChanged) {
                 msg.style.display = 'block';
             };
             void (async () => {
+                const original = btn.textContent ?? '';
                 btn.disabled = true;
+                btn.textContent = 'Laczenie\u2026'; // Apple potrafi mielic kilka sekund
+                if (msg)
+                    msg.style.display = 'none';
                 try {
                     await linkProvider(prov);
                     const u = await getSignedInUser();
@@ -199,22 +229,18 @@ export function bindAccountCard(root, onChanged) {
                 }
                 catch (e) {
                     const raw = e instanceof Error ? e.message : String(e);
-                    // Komunikaty Firebase sa techniczne — tlumaczymy je na jezyk uzytkownika.
-                    if (/credential-already-in-use|already in use/i.test(raw)) {
-                        say('To konto jest juz powiazane z innym profilem MapYou.', false);
-                    }
-                    else if (/provider-already-linked|already linked/i.test(raw)) {
-                        say('To logowanie jest juz dodane.', false);
-                    }
-                    else if (/cancel|anulowan/i.test(raw)) {
-                        say('Anulowano.', false);
+                    // Zamkniecie okna to nie awaria — nie strasz uzytkownika czerwonym tekstem.
+                    if (isUserCancellation(raw)) {
+                        if (msg)
+                            msg.style.display = 'none';
                     }
                     else {
-                        say(raw || 'Nie udalo sie polaczyc konta.', false);
+                        say(humanAuthError(raw), false);
                     }
                 }
                 finally {
                     btn.disabled = false;
+                    btn.textContent = original;
                 }
             })();
         });
@@ -290,6 +316,14 @@ export function showAuthModal() {
         // .name-modal ma z-index 5000, a nakladka profilu 7500 i modal ustawien 9800 —
         // bez tego okno logowania schowaloby sie POD kartami profilu.
         modal.style.zIndex = '10000';
+        // Klatki animacji spinnera — wstrzykiwane raz, bo modal korzysta ze stylow
+        // inline i nie ma wlasnego arkusza.
+        if (!document.getElementById('accSpinKeyframes')) {
+            const st = document.createElement('style');
+            st.id = 'accSpinKeyframes';
+            st.textContent = '@keyframes accspin{to{transform:rotate(360deg)}}';
+            document.head.appendChild(st);
+        }
         document.body.appendChild(modal);
         let transferCode = null;
         let done = false;
@@ -366,6 +400,20 @@ export function showAuthModal() {
         };
         // ---- logowanie u dostawcy + wymiana sesji ----
         const run = async (provider) => {
+            // Wskaznik postepu na klikniętym przycisku. Logowanie Apple bywa
+            // wyraznie wolniejsze od Google (kilka sekund), a bez informacji
+            // zwrotnej wyglada, jakby apka zawisla — uzytkownik zamyka okno
+            // w polowie procesu i widzi „blad", ktory jest tylko anulowaniem.
+            const clicked = modal.querySelector(provider === 'google' ? '#authGoogle' : '#authApple');
+            const originalHtml = clicked?.innerHTML ?? '';
+            if (clicked) {
+                clicked.innerHTML =
+                    '<span style="display:inline-flex;align-items:center;gap:8px">' +
+                        '<span class="accSpin" style="width:16px;height:16px;border:2px solid currentColor;' +
+                        'border-top-color:transparent;border-radius:50%;display:inline-block;' +
+                        'animation:accspin 0.8s linear infinite"></span>' +
+                        'Logowanie\u2026</span>';
+            }
             busy(true);
             try {
                 // Limit czasu: natywne okno moze dzialac dlugo (uzytkownik wpisuje
@@ -408,12 +456,17 @@ export function showAuthModal() {
                 if (/NEEDS_RECOVERY_CODE/i.test(msg) || /kod odzyskiwania/i.test(msg)) {
                     renderCode('To konto istnieje już na serwerze. Podaj kod odzyskiwania, aby połączyć je z tym logowaniem.');
                 }
+                else if (isUserCancellation(msg)) {
+                    // Uzytkownik zamknal okno dostawcy — bez czerwonego komunikatu.
+                }
                 else {
-                    showErr(msg || 'Logowanie nie powiodło się. Spróbuj ponownie.');
+                    showErr(humanAuthError(msg));
                 }
             }
             finally {
                 busy(false);
+                if (clicked)
+                    clicked.innerHTML = originalHtml;
             }
         };
         // ---- widok z kodem odzyskiwania ----
