@@ -532,6 +532,11 @@ export class Tracker {
         }
         const stats = this._buildStats();
         void workoutLiveActivity.end(this._liveStats(stats));
+        // Migawke kasujemy TU, przed zbudowaniem wyniku. Wczesniej stalo to na
+        // koncu metody — czyli PO `return` — wiec nigdy sie nie wykonywalo.
+        // Skutek: apka odtwarzala zakonczony trening przy kazdym uruchomieniu
+        // i wpadala w petle z Live Activity.
+        void clearSession();
         const now = new Date().toISOString();
         const months = ['January', 'February', 'March', 'April', 'May', 'June',
             'July', 'August', 'September', 'October', 'November', 'December'];
@@ -548,8 +553,6 @@ export class Tracker {
             description: `${getIcon(this.sport)} ${getSportLabel(this.sport)} on ${months[d.getMonth()]} ${d.getDate()}`,
             laps: [...this._laps],
         };
-        // Sesja zamknieta — kasujemy migawke, zeby nie odtworzyla sie przy starcie.
-        void clearSession();
     }
     // ── Reset ───────────────────────────────────────────────────────────────────
     reset() {
@@ -557,6 +560,9 @@ export class Tracker {
         this._stopMotion();
         void workoutNotification.clear();
         void workoutLiveActivity.end();
+        // Odrzucenie treningu tez konczy sesje — bez tego odrzucony trening
+        // wracalby przy nastepnym uruchomieniu apki.
+        void clearSession();
         if (this.timerInterval) {
             clearInterval(this.timerInterval);
             this.timerInterval = null;

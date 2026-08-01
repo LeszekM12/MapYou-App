@@ -50,6 +50,24 @@ interface CoordRow { seq?: number; lat: number; lng: number; t: number }
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const t = (name: string): any => (db as any)[name];
 
+// ── Diagnostyka ──────────────────────────────────────────────────────────────
+// Pierwsza wersja tego modulu polykala KAZDY blad po cichu. Zalozenie bylo
+// dobre (zapis nie moze przerwac treningu), ale skutek fatalny: gdy tabele
+// nie powstaly — bo Dexie nie przeszedl na wersje 8 — trening po prostu nie
+// zapisywal sie i NIC o tym nie mowilo. Teraz kazdy rodzaj bledu krzyczy
+// dokladnie RAZ, wiec da sie go zobaczyc, nie zalewajac logu.
+const _shouted = new Set<string>();
+function shout(where: string, e: unknown): void {
+  if (_shouted.has(where)) return;
+  _shouted.add(where);
+  console.error(`[Session] ${where} NIE DZIALA:`, e instanceof Error ? e.message : e);
+}
+
+/** Czy tabele sesji w ogole istnieja. Bez tego zapis jest bezcelowy. */
+export function isSessionStoreReady(): boolean {
+  return !!t('activeSession') && !!t('sessionCoords');
+}
+
 // ── Zapis ────────────────────────────────────────────────────────────────────
 
 /** Rozpocznij nowa sesje. Czysci slady po poprzedniej. */
@@ -57,6 +75,14 @@ export async function beginSession(state: Omit<SessionState, 'id' | 'updatedAt'>
   try {
     await Promise.all([t('sessionCoords').clear(), t('activeSession').clear()]);
     await t('activeSession').put({ ...state, id: 'current', updatedAt: Date.now() });
+    // Weryfikacja odczytem — zapis moze "przejsc" bez wyjatku, a mimo to nie
+    // zostawic rekordu (np. gdy schemat nie ma tej tabeli).
+    const check = await t('activeSession').get('current');
+    if (!check) {
+      console.error('[Session] KRYTYCZNE: zapis sesji nie zostawil rekordu. ' +
+        'Trening NIE przezyje ubicia apki. Sprawdz, czy baza Dexie przeszla na wersje 8.');
+      return;
+    }
     dlog('[Session] rozpoczeta i zapisana');
   } catch (e) {
     console.warn('[Session] nie udalo sie zapisac startu:', e instanceof Error ? e.message : e);
@@ -71,14 +97,14 @@ export async function saveSessionState(
     const cur = await t('activeSession').get('current');
     if (!cur) return;   // sesja zakonczona w miedzyczasie — nie wskrzeszamy
     await t('activeSession').put({ ...cur, ...patch, id: 'current', updatedAt: Date.now() });
-  } catch { /* cisza — zapis stanu nie moze przerwac treningu */ }
+  } catch (e) { shout('zapis stanu', e); }
 }
 
 /** Dopisz JEDEN przyjety punkt trasy. */
 export async function appendCoord(lat: number, lng: number): Promise<void> {
   try {
     await t('sessionCoords').add({ lat, lng, t: Date.now() } as CoordRow);
-  } catch { /* cisza — lepiej stracic punkt niz sesje */ }
+  } catch (e) { shout('zapis punktu trasy', e); }
 }
 
 /** Zakoncz sesje i posprzataj. Wolane po zapisaniu ORAZ po odrzuceniu. */
