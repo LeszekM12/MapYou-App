@@ -412,6 +412,44 @@ function renderMinimapCanvas(container, coords, sport) {
     });
 }
 export { renderMinimapCanvas, encodePolyline, decodePolyline };
+async function fetchAtlasManifest(userId) {
+    if (!isOnline())
+        return null;
+    try {
+        const res = await fetch(`${BACKEND_URL}/sync/manifest?userId=${encodeURIComponent(userId)}`, {
+            signal: AbortSignal.timeout(10000),
+            cache: 'no-store',
+        });
+        if (res.ok) {
+            const d = await res.json();
+            if (d.status === 'ok' && d.data)
+                return d.data;
+        }
+        // 404 = backend bez tej trasy. Kazdy inny blad tez leci do starej sciezki:
+        // lepiej pobrac za duzo niz uznac Atlas za pusty i wypchnac wszystko od nowa.
+        if (res.status !== 404) {
+            console.warn(`[CloudSync] manifest HTTP ${res.status} — uzywam pelnych kolekcji`);
+        }
+    }
+    catch (err) {
+        console.warn('[CloudSync] manifest niedostepny — uzywam pelnych kolekcji:', err instanceof Error ? err.message : err);
+    }
+    // ── Droga zapasowa: stare, pelne endpointy ────────────────────────────────
+    const [enriched, unified, posts] = await Promise.all([
+        apiGet(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
+        apiGet(`/unified-workouts?userId=${encodeURIComponent(userId)}`),
+        apiGet(`/posts?userId=${encodeURIComponent(userId)}`),
+    ]);
+    // Null z ktoregokolwiek = nie wiemy, co jest w Atlasie. Zwracamy null, a
+    // pushNow przerwie wysylke — zamiast uznac, ze Atlas jest pusty.
+    if (enriched === null || unified === null || posts === null)
+        return null;
+    return {
+        enriched: enriched.map(a => ({ id: a.activityId, hasPhoto: !!a.photoUrl, hasCoords: !!a.coordsEnc })),
+        unified: unified.map(w => w.workoutId),
+        posts: posts.map(p => ({ id: p.postId, hasPhoto: !!p.photoUrl })),
+    };
+}
 export async function pushNow(userId, enriched, unified, posts) {
     if (!isOnline() || !userId)
         return;
@@ -424,12 +462,11 @@ export async function pushNow(userId, enriched, unified, posts) {
         return;
     }
     try {
-        // Pobierz co już jest w Atlas
-        const [atlasEnriched, atlasUnified, atlasPosts] = await Promise.all([
-            apiGet(`/enriched-activities?userId=${encodeURIComponent(userId)}`),
-            apiGet(`/unified-workouts?userId=${encodeURIComponent(userId)}`),
-            apiGet(`/posts?userId=${encodeURIComponent(userId)}`),
-        ]);
+        // Pobierz co już jest w Atlas — lekki manifest, ze zjazdem do starej drogi.
+        const manifest = await fetchAtlasManifest(userId);
+        const atlasEnriched = manifest?.enriched ?? null;
+        const atlasUnified = manifest?.unified ?? null;
+        const atlasPosts = manifest?.posts ?? null;
         // KRYTYCZNE (Faza 4): `apiGet` zwraca null przy KAZDEJ porazce — brak
         // sieci, 401, 500, timeout. Wczesniej null byl tu traktowany jak pusta
         // tablica (`?? []`), wiec jeden nieudany GET oznaczal „Atlas jest pusty"
@@ -448,12 +485,12 @@ export async function pushNow(userId, enriched, unified, posts) {
                 `posts=${atlasPosts === null ? 'BLAD' : 'ok'}). Sprobuje ponownie pozniej.`);
             return;
         }
-        const atlasEnrichedIds = new Set(atlasEnriched.map(a => a.activityId));
-        const atlasUnifiedIds = new Set(atlasUnified.map(w => w.workoutId));
-        const atlasPostIds = new Set(atlasPosts.map(p => p.postId));
-        // Mapa aktywności w Atlas z null photoUrl
-        const atlasNullPhotoIds = new Set(atlasEnriched.filter(a => !a.photoUrl).map(a => a.activityId));
-        const atlasNullPostIds = new Set(atlasPosts.filter(p => !p.photoUrl).map(p => p.postId));
+        const atlasEnrichedIds = new Set(atlasEnriched.map(a => a.id));
+        const atlasUnifiedIds = new Set(atlasUnified);
+        const atlasPostIds = new Set(atlasPosts.map(p => p.id));
+        // Rekordy w Atlas, ktorym brakuje zdjecia — do naprawy ponizej.
+        const atlasNullPhotoIds = new Set(atlasEnriched.filter(a => !a.hasPhoto).map(a => a.id));
+        const atlasNullPostIds = new Set(atlasPosts.filter(p => !p.hasPhoto).map(p => p.id));
         // Push brakujących enriched activities
         const missingEnriched = enriched.filter(a => !atlasEnrichedIds.has(a.id));
         for (const activity of missingEnriched) {
@@ -538,8 +575,8 @@ export async function pushNow(userId, enriched, unified, posts) {
             catch { }
         }
         // Napraw brakujące coordsEnc w Atlas dla starych aktywności
-        const atlasMissingCoordsEnc = (atlasEnriched ?? []).filter(a => !a.coordsEnc);
-        const atlasMissingIds = new Set(atlasMissingCoordsEnc.map(a => a.activityId));
+        const atlasMissingCoordsEnc = atlasEnriched.filter(a => !a.hasCoords);
+        const atlasMissingIds = new Set(atlasMissingCoordsEnc.map(a => a.id));
         const enrichedToEncode = enriched.filter(a => atlasMissingIds.has(a.id) && a.coords && a.coords.length > 0);
         for (const activity of enrichedToEncode) {
             try {
