@@ -46,10 +46,34 @@ export function setTokenProvider(fn) {
 /** Czy sesja MapYou jest gotowa — moduly synchronizacji sprawdzaja to,
  *  zeby nie mielic setek rekordow, ktore i tak zostana odciete. */
 export function isSessionReady() { return _sessionReady; }
+// Subskrybenci czekajacy na gotowa sesje (Faza 4).
+// Bramka `isSessionReady()` wystarcza modulom, ktore i tak sa wolane
+// wielokrotnie (sync, hydratacja). Rejestracja tokena FCM zdarza sie
+// DOKLADNIE RAZ przy starcie — jesli trafi przed sesje, odbija sie od 401
+// i nikt nie ponawia, wiec urzadzenie zostaje bez powiadomien do nastepnego
+// uruchomienia. Taki modul musi miec jak poczekac.
+const _readyWaiters = [];
+/** Wykonaj `fn`, gdy sesja bedzie gotowa (albo od razu, jesli juz jest). */
+export function onSessionReady(fn) {
+    if (_sessionReady) {
+        fn();
+        return;
+    }
+    _readyWaiters.push(fn);
+}
 /** Ustaw po udanej wymianie /auth/session (i wyzeruj przy wylogowaniu). */
 export function setSessionReady(ready) {
     _sessionReady = ready;
     dlog(`[authFetch] sesja MapYou ${ready ? 'gotowa' : 'niegotowa'}`);
+    if (ready && _readyWaiters.length) {
+        const waiting = _readyWaiters.splice(0);
+        waiting.forEach(fn => { try {
+            fn();
+        }
+        catch (e) {
+            console.warn('[authFetch] subskrybent sesji rzucil blad:', e);
+        } });
+    }
 }
 /** Opcjonalny hook: co zrobić, gdy backend odpowie 401 mimo tokena. */
 export function setOnUnauthorized(fn) {

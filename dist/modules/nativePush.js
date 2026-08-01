@@ -21,6 +21,7 @@
 // the event once our listener is attached, and we navigate.
 import { BACKEND_URL } from '../config.js';
 import { dlog } from '../utils/log.js';
+import { isSessionReady, onSessionReady } from './authFetch.js';
 import { getUserId, getDeviceId } from './PushNotifications.js';
 function capGlobal() {
     return globalThis.Capacitor;
@@ -54,6 +55,15 @@ function pushUserId() {
 async function registerToken(token) {
     if (!token)
         return;
+    // Faza 4: rejestracja MUSI poczekac na sesje. Plugin FCM oddaje token
+    // szybciej, niz konczy sie wymiana /auth/session, wiec bez tego POST
+    // odbijal sie od 401 (widoczne w logu Xcode jako „subscribe-fcm failed: 401")
+    // i urzadzenie zostawalo bez powiadomien az do nastepnego uruchomienia.
+    if (!isSessionReady()) {
+        dlog('[NativePush] czekam na sesje przed rejestracja tokena FCM');
+        onSessionReady(() => { void registerToken(token); });
+        return;
+    }
     const userId = pushUserId();
     const cap = capGlobal();
     try {

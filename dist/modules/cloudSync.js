@@ -430,12 +430,30 @@ export async function pushNow(userId, enriched, unified, posts) {
             apiGet(`/unified-workouts?userId=${encodeURIComponent(userId)}`),
             apiGet(`/posts?userId=${encodeURIComponent(userId)}`),
         ]);
-        const atlasEnrichedIds = new Set((atlasEnriched ?? []).map(a => a.activityId));
-        const atlasUnifiedIds = new Set((atlasUnified ?? []).map(w => w.workoutId));
-        const atlasPostIds = new Set((atlasPosts ?? []).map(p => p.postId));
+        // KRYTYCZNE (Faza 4): `apiGet` zwraca null przy KAZDEJ porazce — brak
+        // sieci, 401, 500, timeout. Wczesniej null byl tu traktowany jak pusta
+        // tablica (`?? []`), wiec jeden nieudany GET oznaczal „Atlas jest pusty"
+        // i apka wypychala CALA baze od nowa: ~170 rekordow, zdjecia na Cloudinary
+        // od zera, a na koniec log „✅ Pushed 111 workouts" mimo ze nic nie bylo
+        // do wyslania. To jest ta prawdziwa przyczyna objawu z Fazy 3 — bramka
+        // sesji tylko zaslonila ja przy starcie.
+        //
+        // Rozroznienie „pusto" od „nie wiem" jest tez warunkiem wstepnym trybu
+        // offline: bez niego kazde wejscie w tunel konczyloby sie masowym
+        // re-pushem po odzyskaniu zasiegu.
+        if (atlasEnriched === null || atlasUnified === null || atlasPosts === null) {
+            console.warn('[CloudSync] przerywam wysylke — nie udalo sie odczytac stanu Atlas ' +
+                `(enriched=${atlasEnriched === null ? 'BLAD' : 'ok'}, ` +
+                `unified=${atlasUnified === null ? 'BLAD' : 'ok'}, ` +
+                `posts=${atlasPosts === null ? 'BLAD' : 'ok'}). Sprobuje ponownie pozniej.`);
+            return;
+        }
+        const atlasEnrichedIds = new Set(atlasEnriched.map(a => a.activityId));
+        const atlasUnifiedIds = new Set(atlasUnified.map(w => w.workoutId));
+        const atlasPostIds = new Set(atlasPosts.map(p => p.postId));
         // Mapa aktywności w Atlas z null photoUrl
-        const atlasNullPhotoIds = new Set((atlasEnriched ?? []).filter(a => !a.photoUrl).map(a => a.activityId));
-        const atlasNullPostIds = new Set((atlasPosts ?? []).filter(p => !p.photoUrl).map(p => p.postId));
+        const atlasNullPhotoIds = new Set(atlasEnriched.filter(a => !a.photoUrl).map(a => a.activityId));
+        const atlasNullPostIds = new Set(atlasPosts.filter(p => !p.photoUrl).map(p => p.postId));
         // Push brakujących enriched activities
         const missingEnriched = enriched.filter(a => !atlasEnrichedIds.has(a.id));
         for (const activity of missingEnriched) {

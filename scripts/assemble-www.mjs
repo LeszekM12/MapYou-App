@@ -12,6 +12,12 @@ const copy = (p) => { if (existsSync(p)) cpSync(p, `${OUT}/${p}`, { recursive: t
 // Everything index.html references (relative paths keep working from www/ root)
 [
   'index.html',
+  // Faza 4 / D4: dokumenty prawne MUSZA jechac z apka. Wczesniej istnialy
+  // tylko na GitHub Pages, wiec grupa C (wygaszenie PWA) zabilaby linki
+  // „Polityka prywatnosci" i „Regulamin" — a bez nich sklepy nie wpuszcza
+  // aktualizacji. Lokalna kopia dziala tez bez zasiegu.
+  'privacy.html',
+  'terms.html',
   'dist',
   'public',
   'push-sw.js',
