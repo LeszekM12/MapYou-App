@@ -4128,4 +4128,68 @@ void CS.hydrate();
         }
     });
 })();
+// ─── Deep-link klubow (Faza 4 — poza planem) ─────────────────────────────────
+// Dwa adresy, ktore apka WYSYLALA, ale ktorych NIGDY nie umiala odczytac:
+//
+//   #club=KOD8ZNAKOW   zaproszenie do klubu (SearchView generuje ten link)
+//   #club_open=clubId  tapniecie powiadomienia push o klubie
+//
+// Pierwszy budowal sie w SearchView.ts, drugi byl opisany w komentarzach
+// (HomeView.ts, nativePush.ts) jako „obslugiwany przez main.ts" — ale zaden
+// handler nie istnial. Klikniecie zaproszenia otwieralo apke i nic wiecej,
+// wiec dolaczanie do klubu przez link nie dzialalo ani razu.
+(function setupClubDeepLink() {
+    const grab = (s, key) => {
+        const m = s.match(new RegExp(`[#&?]${key}=([^&]+)`));
+        return m ? decodeURIComponent(m[1]) : null;
+    };
+    const openClub = (clubId) => {
+        // SearchView jest ciezki (mapy, listy) — ladujemy go dopiero, gdy naprawde
+        // trzeba, zeby nie spowalniac startu apki dla wszystkich pozostalych.
+        void import('./modules/SearchView.js').then(m => m.searchView.open('clubs', clubId));
+    };
+    const resolveCode = async (code) => {
+        try {
+            const res = await fetch(`${BACKEND_URL}/clubs/invite/${encodeURIComponent(code)}`, { cache: 'no-store' });
+            const d = await res.json();
+            if (res.ok && d.status === 'ok' && d.clubId) {
+                openClub(d.clubId);
+                return;
+            }
+            alert('To zaproszenie wygaslo lub jest nieprawidlowe.\n\nPopros o nowy link — kody sa wazne 7 dni.');
+        }
+        catch {
+            alert('Nie udalo sie sprawdzic zaproszenia. Sprawdz polaczenie i sprobuj ponownie.');
+        }
+    };
+    const handle = (url) => {
+        const direct = grab(url, 'club_open');
+        if (direct) {
+            setTimeout(() => openClub(direct), 600);
+            return true;
+        }
+        const code = grab(url, 'club');
+        if (code) {
+            setTimeout(() => void resolveCode(code), 600);
+            return true;
+        }
+        return false;
+    };
+    // Zimny start: link kliknięty, gdy apka byla zamknieta.
+    // Opoznienie 600 ms — tyle samo co przy pozostalych deep-linkach; SearchView
+    // potrzebuje gotowego DOM-u, a przy starcie natywnym potrafi go jeszcze nie byc.
+    if (handle(location.hash) || handle(location.search)) {
+        try {
+            history.replaceState(null, '', location.pathname);
+        }
+        catch { /* ignore */ }
+    }
+    // Apka juz otwarta: tapniecie powiadomienia (tylko web/PWA — w natywnym
+    // WKWebView nie ma service workera, tam dziala sciezka hash powyzej).
+    navigator.serviceWorker?.addEventListener('message', e => {
+        const data = e.data;
+        if (data?.type === 'OPEN_CLUB')
+            handle(String(data.url ?? ''));
+    });
+})();
 //# sourceMappingURL=main.js.map
