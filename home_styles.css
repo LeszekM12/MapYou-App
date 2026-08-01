@@ -2357,7 +2357,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 14px 16px;
+  /* Pasek statusu (edge-to-edge) zaslanial „X" i tytul „New Reel". */
+  padding: calc(14px + env(safe-area-inset-top, 0px)) 16px 14px;
   background: rgba(0,0,0,0.6);
   flex-shrink: 0;
   z-index: 2;
@@ -2606,7 +2607,9 @@ video.home-reel-viewer__media {
   font-size: 11px; color: rgba(255,255,255,0.5);
 }
 .home-reel-viewer__close {
-  position: absolute; top: 12px; right: 12px;
+  /* Odtwarzacz jest pelnoekranowy, wiec przycisk wyjscia wpadal pod pasek
+     statusu i nie dalo sie zamknac ogladanego reelsa. */
+  position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: 12px;
   background: rgba(0,0,0,0.4);
   border: none; color: #fff;
   width: 30px; height: 30px; border-radius: 50%;

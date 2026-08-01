@@ -909,7 +909,7 @@ export class FriendsView {
             try {
                 // Jeśli znajomy ma już zapisany token — weryfikuj przez /live/status/:token
                 if (f.liveToken) {
-                    const res = await fetch(`${BACKEND_URL}/live/status/${f.liveToken}`);
+                    const res = await fetch(`${BACKEND_URL}/live/status/${f.liveToken}`, { cache: 'no-store' });
                     const data = await res.json();
                     if (!res.ok || data.session === 'finished' || data.session === 'not_found' || !data.session) {
                         await updateFriendLiveToken(f.subscriptionId, null);
@@ -926,7 +926,12 @@ export class FriendsView {
                 if (!ownerKey)
                     continue;
                 const ep = encodeURIComponent(ownerKey);
-                const res = await fetch(`${BACKEND_URL}/live/active/${ep}`);
+                // UWAGA: `cache: 'no-store'` jest tu OBOWIAZKOWE.
+                // Backend odpowiada 304 (widac w logu Fly), wiec WebView oddaje z cache
+                // POPRZEDNIA odpowiedz. Gdy raz padlo „active: false", apka trzymala sie
+                // tego i nie zauwazala rozpoczetego treningu — trzeba bylo miec ja otwarta
+                // w momencie startu, zeby cokolwiek zobaczyc.
+                const res = await fetch(`${BACKEND_URL}/live/active/${ep}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (data.active && data.token) {
                     await updateFriendLiveToken(f.subscriptionId, data.token);
@@ -958,7 +963,7 @@ export class FriendsView {
             // (never blindly to friends[0] — that cross-wired sessions).
             let ownerId = null;
             try {
-                const res = await fetch(`${BACKEND_URL}/live/status/${token}`);
+                const res = await fetch(`${BACKEND_URL}/live/status/${token}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (res.ok && data.session !== 'finished' && data.session !== 'not_found') {
                     ownerId = data.userId ?? null;
@@ -992,7 +997,7 @@ export class FriendsView {
         if (!friend) {
             let ownerId = null;
             try {
-                const res = await fetch(`${BACKEND_URL}/live/status/${token}`);
+                const res = await fetch(`${BACKEND_URL}/live/status/${token}`, { cache: 'no-store' });
                 const data = await res.json();
                 if (res.ok && data.session !== 'finished' && data.session !== 'not_found') {
                     ownerId = data.userId ?? null;
