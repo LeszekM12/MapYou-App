@@ -215,10 +215,19 @@ class WorkoutLiveActivity {
         if (!p || !id)
             return;
         try {
-            await p.endActivity({
-                activityId: id,
-                ...(final ? { data: laData({ ...final, state: 'Finished', paused: true }, this._pal) } : {}),
-            });
+            // `paused: true` ZAWSZE, takze gdy nie ma statystyk koncowych.
+            //
+            // iOS trzyma karte Live Activity jeszcze jakis czas po zakonczeniu —
+            // to normalne zachowanie systemu. Problem w tym, ze bez zamrozonej
+            // kotwicy natywny licznik TYKAL DALEJ i pokazywal nieistniejacy trening,
+            // dopoki uzytkownik sam nie zmiotl karty z ekranu blokady.
+            const finalData = final
+                ? laData({ ...final, state: 'Finished', paused: true }, this._pal)
+                : laData({
+                    time: '', dist: '', third: '', thirdLabel: '',
+                    state: 'Finished', timerRef: Date.now(), paused: true,
+                }, this._pal);
+            await p.endActivity({ activityId: id, data: finalData });
         }
         catch { /* non-critical */ }
     }

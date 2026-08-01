@@ -1471,7 +1471,7 @@ class App {
             // aktywne naraz: widac bylo Mape z nalozonym interfejsem Track.
             try {
                 const go = window.__switchTab;
-                go?.('tabMap');
+                go?.('tabTracker');
             }
             catch { /* zakladki jeszcze nie gotowe */ }
             this._enterTrackingView();
@@ -3743,7 +3743,10 @@ window.app = new App();
 // ─── BOTTOM NAV (exact copy of script.js initBottomNav IIFE) ─────────────────
 (function initBottomNav() {
     const SEARCH_BAR = document.getElementById('mapSearchBar');
-    let activeTab = 'tabMap';
+    // Domyslna zakladka po uruchomieniu apki. Wczesniej 'tabMap' — mapa
+    // otwierala sie jako pierwsza. Home jest wlasciwym ekranem startowym;
+    // trwajacy trening i tak przelacza widok w `_restoreSessionIfAny`.
+    let activeTab = 'tabHome';
     let routeActive = false;
     const MOBILE_SEARCH_BAR = document.getElementById('mapSearchBarMobile');
     // Show search bar immediately if starting on Map tab
