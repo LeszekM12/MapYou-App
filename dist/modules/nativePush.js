@@ -99,7 +99,33 @@ function routeFromUrl(url) {
         const u = new URL(url, location.origin);
         if (!u.search && !u.hash)
             return; // plain '/' → just foreground
+        // Ustawienie samego hasha NIE przeladowuje strony ani niczego nie budzi —
+        // apka juz dziala, a `FriendsView.init()` odczytal adres raz, przy starcie.
+        // Dlatego tapniecie powiadomienia o treningu na zywo tylko podmienialo hash
+        // i nic sie nie dzialo, dopoki uzytkownik sam nie wszedl w zakladke Friends.
+        //
+        // Live otwieramy wiec BEZPOSREDNIO, przez globalny hook wystawiony przez
+        // FriendsView. Gdy widok nie zdazyl sie jeszcze zainicjalizowac (zimny start
+        // z tapnietego powiadomienia), probujemy przez chwile ponownie.
+        const live = u.hash.startsWith('#live=') ? u.hash.replace('#live=', '') : '';
+        if (live) {
+            let tries = 0;
+            const open = () => {
+                const fn = window.__openLive;
+                if (typeof fn === 'function') {
+                    fn(live, 'Live Tracking');
+                    return;
+                }
+                if (++tries < 20)
+                    setTimeout(open, 250); // do 5 s na start widoku
+            };
+            open();
+            return;
+        }
         location.href = location.pathname + u.search + u.hash;
+        // Pozostale cele (aktywnosc, profil, kluby) maja wlasne nasluchy hasha,
+        // ale zmiana hasha ich nie budzi — dajemy im jawny sygnal.
+        window.dispatchEvent(new HashChangeEvent('hashchange'));
     }
     catch { /* malformed url — ignore */ }
 }
