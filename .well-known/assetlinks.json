@@ -5,8 +5,7 @@
       "namespace": "android_app",
       "package_name": "com.leszekm12.mapyou",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_RELEASE_SHA256",
-        "REPLACE_WITH_DEBUG_SHA256_OPTIONAL"
+        "EB:DA:B3:FA:49:A2:D0:C5:AE:69:23:D5:8F:2F:AA:57:BB:B4:E3:B3:1A:D8:FC:90:0C:F3:9C:B8:6A:FD:9B:A6"
       ]
     }
   }
