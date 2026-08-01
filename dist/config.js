@@ -15,9 +15,10 @@ export const BACKEND_URL = 'https://mapty-backend.fly.dev';
 // BEZ konczacego ukosnika. Miejsca uzycia dokladaja go same:
 //   `${PUBLIC_BASE_URL}/#invite=KOD`   `${PUBLIC_BASE_URL}/privacy.html`
 //
-// Po podpieciu subdomeny (D1 kroki 1-2) zmienia sie TYLKO ta jedna linia:
-//   export const PUBLIC_BASE_URL = 'https://mapyou.natours-mikrut.com';
-export const PUBLIC_BASE_URL = 'https://leszekm12.github.io/MapYou-App';
+// Domena wlasna (D1). Ten adres jest zapisany na stale w `assetlinks.json`
+// i `apple-app-site-association`, wiec jego zmiana wymaga rownoczesnej
+// aktualizacji obu tych plikow ORAZ nowego wydania apki.
+export const PUBLIC_BASE_URL = 'https://mapyou.leszekmikrut.com';
 // ─── FIREBASE (Phase 3) ───────────────────────────────────────────────────────
 export const FIREBASE_CONFIG = {
     apiKey: "AIzaSyBoLI-FyqEn2dcJwMGPgGIL4m0Fu0_RNO8",

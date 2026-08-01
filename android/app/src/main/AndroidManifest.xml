@@ -47,6 +47,27 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- App Links (Faza 4 / D1) ==========================================
+                 Bez tego klikniecie linku zapraszajacego otwieralo PRZEGLADARKE,
+                 nie apke — wlasnie dlatego zeskanowanie kodu QR aparatem systemowym
+                 ladowalo na stronie, gdzie uzytkownik nie ma sesji.
+
+                 `autoVerify="true"` sprawia, ze przy instalacji Android sam pobiera
+                 https://mapyou.leszekmikrut.com/.well-known/assetlinks.json
+                 i sprawdza, czy odcisk SHA-256 zgadza sie z podpisem tej apki.
+                 Zgadza sie -> linki otwiera apka, bez pytania uzytkownika.
+
+                 UWAGA: weryfikacja idzie TYLKO przy instalacji. Po zmianie
+                 assetlinks.json trzeba apke przeinstalowac, restart nie wystarczy.
+            -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https"
+                      android:host="mapyou.leszekmikrut.com" />
+            </intent-filter>
+
         </activity>
 
         <provider
