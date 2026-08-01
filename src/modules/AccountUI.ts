@@ -73,6 +73,9 @@ export async function initAccountSilent(): Promise<void> {
     // ZAWSZE synchronizuj po ustaleniu sesji — takze przy zwyklym 'login'.
     // Przy starcie apki hydratacja odpala sie ZANIM sesja jest gotowa, wiec
     // leci w trybie goscia i wraca pusta. To jest ten drugi, poprawny przebieg.
+    // Ciche przywrocenie przy starcie — BEZ wymuszania pelnej hydratacji.
+    // hydrate() sam zdecyduje: gdy IndexedDB ma dane i sa swieze, ograniczy sie
+    // do wypchniecia brakow zamiast pobierac wszystko od nowa.
     void syncAfterSignIn(session.mode).then(() => fillProfileFromProvider(user));
   } catch (e) {
     _signedIn = false;
@@ -610,7 +613,8 @@ export function showAuthModal(): Promise<boolean> {
         emitChange();
 
         // Zaleznie od trybu: sciagnij konto z Atlasa albo wypchnij lokalne dane.
-        await syncAfterSignIn(session.mode);
+        // Swiadome logowanie z okna — tu pelna hydratacja jest uzasadniona.
+        await syncAfterSignIn(session.mode, { forceFullHydrate: true });
         // Dopiero PO hydratacji — zeby nie nadpisac wlasnego zdjecia z serwera.
         await fillProfileFromProvider(provUser);
 
@@ -678,16 +682,27 @@ export function showAuthModal(): Promise<boolean> {
  *   claimed / created → konto POWSTAJE z danych gościa.
  *                      Trzeba WYPCHNĄĆ lokalne treningi w górę.
  */
-async function syncAfterSignIn(mode: 'login' | 'linked' | 'claimed' | 'created'): Promise<void> {
+async function syncAfterSignIn(
+  mode: 'login' | 'linked' | 'claimed' | 'created',
+  opts: { forceFullHydrate?: boolean } = {},
+): Promise<void> {
   try {
     if (mode === 'login' || mode === 'linked') {
-      // Zdejmij znacznik świeżej hydratacji — inaczej hydrate() uzna, że dane
-      // są aktualne (apka hydratowała na starcie pod etykietą gościa) i pominie
-      // ściąganie właśnie przywróconego konta.
-      localStorage.removeItem('mapyou_hydrated_at');
+      // Znacznik hydratacji zdejmujemy TYLKO przy swiadomym logowaniu.
+      //
+      // Przy zalogowaniu z okna apka hydratowala wczesniej pod etykieta goscia,
+      // wiec znacznik jest nieprawdziwy i dane konta trzeba sciagnac od zera.
+      //
+      // Przy CICHYM przywroceniu sesji (kazdy zimny start) jest odwrotnie:
+      // lokalne dane naleza juz do tego konta. Kasowanie znacznika obchodzilo
+      // 24-godzinny cache i przy KAZDYM uruchomieniu ciagnelo pelny komplet —
+      // w logu backendu okolo 740 kB (activities 426 kB + workouts 168 kB
+      // + reszta), zawsze te same rekordy. Bateria, transfer i zimny start
+      // maszyny Fly za kazdym razem.
+      if (opts.forceFullHydrate) localStorage.removeItem('mapyou_hydrated_at');
       const { hydrate } = await import('./cloudSync.js');
       await hydrate();
-      dlog('[Account] dane konta ściągnięte z Atlasa');
+      dlog('[Account] dane konta zsynchronizowane z Atlasem');
     } else {
       const { resetSyncFlag, syncToMongoIfNeeded } = await import('./syncToMongo.js');
       resetSyncFlag();
