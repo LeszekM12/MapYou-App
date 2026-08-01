@@ -358,6 +358,10 @@ class App {
         });
         this._initTracker();
         this._setTrackSport(__classPrivateFieldGet(this, _App_trackSport, "f"));
+        // Po zbudowaniu Trackera sprawdz, czy nie ma treningu przerwanego
+        // ubiciem procesu. Musi byc PO `_initTracker`, bo odtwarzanie
+        // potrzebuje gotowego obiektu i mapy.
+        void this._restoreSessionIfAny();
     }
     // ── SETTINGS ──────────────────────────────────────────────────────────────
     _initSettings() {
@@ -1424,6 +1428,47 @@ class App {
         this._renderStreak();
     }
     // ── TRACKER ───────────────────────────────────────────────────────────────
+    /** Wznow trening przerwany ubiciem procesu (Etap 1).
+     *
+     *  Android ubija WebView, gdy uzytkownik zmiecie apke z paska ostatnich albo
+     *  gdy systemowi zabraknie pamieci. Do tej pory znikal wtedy caly trening —
+     *  na ekranie blokady zostawalo zywe powiadomienie, ale po wejsciu do apki
+     *  Track byl pusty i nie bylo czego zapisac.
+     *
+     *  Teraz przy kazdym starcie sprawdzamy, czy w IndexedDB nie ma
+     *  niedokonczonej sesji. Jesli jest — odtwarzamy ja BEZ PYTANIA, tak jak
+     *  robi to Strava. Z punktu widzenia uzytkownika nic sie nie stalo. */
+    async _restoreSessionIfAny() {
+        try {
+            const { loadSession, loadSessionCoords, clearSession, isStale } = await import('./modules/sessionStore.js');
+            const state = await loadSession();
+            if (!state)
+                return;
+            // Sesja starsza niz doba to smiec po awarii, nie trening. Bez tego
+            // odtwarzalaby sie w nieskonczonosc przy kazdym uruchomieniu.
+            if (isStale(state)) {
+                await clearSession();
+                return;
+            }
+            const coords = await loadSessionCoords();
+            if (!__classPrivateFieldGet(this, _App_tracker, "f"))
+                return;
+            __classPrivateFieldSet(this, _App_trackSport, state.sport, "f");
+            __classPrivateFieldSet(this, _App_lastAnnouncedKm, Math.floor(state.distanceM / 1000), "f");
+            __classPrivateFieldSet(this, _App_wasAutoPaused, state.autoPaused, "f");
+            __classPrivateFieldSet(this, _App_lastLapCount, state.laps.length, "f");
+            __classPrivateFieldGet(this, _App_tracker, "f").setAutoPause(this._isAutoPauseOn());
+            __classPrivateFieldGet(this, _App_tracker, "f").restore(state, coords);
+            if (this._isLiveShareEnabled())
+                void liveTracker.start();
+            void this._requestWakeLock();
+            this._enterTrackingView();
+            dlog(`[Track] wznowiono trening: ${coords.length} punktow, ${(state.distanceM / 1000).toFixed(2)} km`);
+        }
+        catch (e) {
+            console.warn('[Track] nie udalo sie wznowic sesji:', e instanceof Error ? e.message : e);
+        }
+    }
     _initTracker() {
         const map = __classPrivateFieldGet(this, _App_map, "f");
         // Init tracker

@@ -210,6 +210,34 @@ db.version(7).stores({
   reels:              'id, userId, expiresAt',
 });
 
+// version(8) — ETAP 1: trening przezywa ubicie procesu.
+//
+// Do tej pory caly stan aktywnego treningu (trasa, dystans, czas, okrazenia)
+// zyl WYLACZNIE w polach obiektu `Tracker`. Gdy Android ubil WebView — bo
+// uzytkownik zmiotl apke z paska albo system potrzebowal pamieci — obiekt
+// znikal razem z trasa. Natywna wtyczka GPS dzialala dalej (stad zywe
+// powiadomienie na ekranie blokady), ale nie miala dokad wysylac pozycji.
+// Powrot do apki dawal pusty ekran Track i utrate calego biegu.
+//
+//   activeSession — JEDEN rekord (id='current') ze stanem sesji.
+//   sessionCoords — punkty trasy dopisywane PRZYROSTOWO.
+//
+// Punkty sa osobna tabela celowo. Przepisywanie calej tablicy przy kazdym
+// fixie oznaczaloby przy godzinnym biegu tysiace zapisow rosnacej tablicy —
+// przy 3 godzinach to setki megabajtow zapisu i zajechany dysk telefonu.
+// Dopisanie jednego rekordu jest stalym kosztem niezaleznie od dlugosci trasy.
+db.version(8).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
+  activeSession:      'id',
+  sessionCoords:      '++seq',
+});
+
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
 
 function _generateDescription(type: string, isoDate: string): string {

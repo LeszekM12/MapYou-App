@@ -4,6 +4,9 @@ import { bgTracker } from './bgTracker.js';
 import { workoutNotification } from './workoutNotification.js';
 import { workoutLiveActivity } from './liveActivity.js';
 import { liveTracker } from './LiveTracker.js';
+// Etap 1 — trwalosc sesji. Kazdy przyjety punkt i kazda zmiana stanu ida
+// natychmiast do IndexedDB, zeby trening przezyl ubicie procesu WebView.
+import { beginSession, saveSessionState, appendCoord, clearSession } from './sessionStore.js';
 // Native-iOS detection — used to pick the GPS-speed auto-pause path there
 // (devicemotion is suspended by iOS whenever the screen locks).
 function isIosNative() {
@@ -396,6 +399,17 @@ export class Tracker {
         this._apAnchor = null;
         this._laps = [];
         this._lastLapSec = 0;
+        void beginSession({
+            sport: this.sport,
+            startTime: this.startTime,
+            pausedTime: 0,
+            pauseStart: 0,
+            distanceM: 0,
+            paused: false,
+            autoPaused: false,
+            laps: [],
+            lastLapSec: 0,
+        });
         const color = getColor(this.sport);
         this.polyline = L.polyline([], {
             color, weight: 5, opacity: 0.95,
@@ -412,6 +426,61 @@ export class Tracker {
             }
         }, 1000);
     }
+    // ── Odtworzenie po ubiciu procesu (Etap 1) ──────────────────────────────────
+    /** Wznow trening z migawki zapisanej w IndexedDB.
+     *
+     *  Wolane przy starcie apki, gdy `sessionStore` znajdzie niezakonczona sesje.
+     *  Odtwarza WSZYSTKO: kotwice czasu, dystans, okrazenia, trase i marker —
+     *  a potem uruchamia GPS tak samo jak zwykly `start()`. Z punktu widzenia
+     *  uzytkownika nic sie nie stalo: licznik idzie dalej od wlasciwej wartosci,
+     *  mapa ma cala przebyta trase.
+     *
+     *  Czas liczy sie od `startTime`, wiec minuty spedzone przy ubitej apce
+     *  wliczaja sie normalnie — dokladnie tak, jak gdyby apka dzialala. */
+    restore(state, coords) {
+        if (this._active)
+            return;
+        this.sport = state.sport;
+        this._active = true;
+        this._paused = state.paused;
+        this.startTime = state.startTime;
+        this.pausedTime = state.pausedTime;
+        this.pauseStart = state.pauseStart;
+        this.distanceM = state.distanceM;
+        this._autoPaused = state.autoPaused;
+        this._laps = [...state.laps];
+        this._lastLapSec = state.lastLapSec;
+        this.coords = [...coords];
+        this._belowSince = null;
+        this._apAnchor = null;
+        const color = getColor(this.sport);
+        this.polyline = L.polyline(coords.map(c => L.latLng(c[0], c[1])), {
+            color, weight: 5, opacity: 0.95,
+        }).addTo(this.map);
+        const last = coords[coords.length - 1];
+        if (last) {
+            this.dotMarker = L.circleMarker([last[0], last[1]], {
+                radius: 9, color: '#fff', fillColor: color, fillOpacity: 1, weight: 2.5,
+            }).addTo(this.map);
+            this.map.setView([last[0], last[1]], this.map.getZoom() || 16);
+        }
+        // GPS wznawiamy tylko gdy trening NIE jest na pauzie — inaczej punkty
+        // z pauzy doliczylyby sie do dystansu.
+        if (!this._paused) {
+            this._startGPS();
+            if (this._autoPauseOn && this._useMotionAP)
+                this._startMotion();
+        }
+        void workoutLiveActivity.start(this.sport, getSportLabel(this.sport));
+        this.timerInterval = setInterval(() => {
+            if (!this._paused) {
+                const stats = this._buildStats();
+                this.onUpdate(stats);
+                this._updateNotification(stats);
+            }
+        }, 1000);
+        this.onUpdate(this._buildStats());
+    }
     // ── Pause ───────────────────────────────────────────────────────────────────
     pause() {
         if (!this._active || this._paused)
@@ -426,6 +495,7 @@ export class Tracker {
         this._apAnchor = null;
         // Ticks freeze while paused — push the "Paused" state to the island now.
         void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
+        void saveSessionState({ paused: true, pauseStart: this.pauseStart, autoPaused: false });
     }
     // ── Resume ──────────────────────────────────────────────────────────────────
     resume() {
@@ -438,6 +508,7 @@ export class Tracker {
             this._startMotion();
         this.onUpdate(this._buildStats());
         void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
+        void saveSessionState({ paused: false, pausedTime: this.pausedTime, pauseStart: 0 });
     }
     // ── Stop ────────────────────────────────────────────────────────────────────
     stop() {
@@ -474,6 +545,8 @@ export class Tracker {
             description: `${getIcon(this.sport)} ${getSportLabel(this.sport)} on ${months[d.getMonth()]} ${d.getDate()}`,
             laps: [...this._laps],
         };
+        // Sesja zamknieta — kasujemy migawke, zeby nie odtworzyla sie przy starcie.
+        void clearSession();
     }
     // ── Reset ───────────────────────────────────────────────────────────────────
     reset() {
@@ -619,6 +692,15 @@ export class Tracker {
         if (accepted) {
             this.coords.push(newCoord);
             this.polyline?.addLatLng(L.latLng(lat, lng));
+            // Punkt na dysk NATYCHMIAST. To jest sedno Etapu 1 — po ubiciu procesu
+            // trasa odtwarza sie z tych rekordow, a nie z pamieci obiektu.
+            void appendCoord(lat, lng);
+            void saveSessionState({
+                distanceM: this.distanceM,
+                laps: this._laps,
+                lastLapSec: this._lastLapSec,
+                autoPaused: this._autoPaused,
+            });
         }
         if (this.dotMarker) {
             this.dotMarker.setLatLng([lat, lng]);
