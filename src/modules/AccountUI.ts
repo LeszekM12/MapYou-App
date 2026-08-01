@@ -20,6 +20,8 @@ import {
 } from './authService.js';
 import type { AccountUser } from './authService.js';
 import { setSessionReady } from './authFetch.js';
+import { BACKEND_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 
 
 
@@ -67,7 +69,7 @@ export async function initAccountSilent(): Promise<void> {
     const session = await exchangeSession(undefined, { silentOnly: true });
     _signedIn = true;
     setSessionReady(true);   // dopiero teraz wolno dokladac token do zadan
-    console.log(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
+    dlog(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
     // ZAWSZE synchronizuj po ustaleniu sesji — takze przy zwyklym 'login'.
     // Przy starcie apki hydratacja odpala sie ZANIM sesja jest gotowa, wiec
     // leci w trybie goscia i wraca pusta. To jest ten drugi, poprawny przebieg.
@@ -110,6 +112,13 @@ export function renderAccountCard(): string {
           </button>
         </div>
         ${renderProviderRow()}
+        <button id="accDelete"
+          style="margin-top:16px;width:100%;padding:10px;border-radius:10px;
+                 border:1px solid rgba(239,68,68,0.45);background:none;
+                 color:#ef4444;font-size:1.15rem;font-weight:600;
+                 font-family:inherit;cursor:pointer">
+          Usuń konto
+        </button>
       </div>`;
   }
 
@@ -257,6 +266,10 @@ export function bindAccountCard(root: ParentNode, onChanged?: () => void): void 
     });
   });
 
+  root.querySelector('#accDelete')?.addEventListener('click', () => {
+    void showDeleteAccountModal();
+  });
+
   root.querySelector('#accSignOut')?.addEventListener('click', () => {
     void (async () => {
       if (!confirm(
@@ -289,6 +302,143 @@ export function bindAccountCard(root: ParentNode, onChanged?: () => void): void 
       // treningi, ktorych juz nie ma w bazie.
       setTimeout(() => window.location.reload(), 200);
     })();
+  });
+}
+
+// ── Usuwanie konta (Faza 4 / D0) ──────────────────────────────────────────────
+//
+// WYMOG APP STORE (Guideline 5.1.1(v)): skoro apka pozwala zalozyc konto,
+// musi pozwolic je usunac z wlasnego wnetrza. Odeslanie na maila albo sam
+// „wyloguj" nie wystarczy — Apple odrzuci build.
+//
+// Operacja jest nieodwracalna, wiec wymagamy przepisania slowa zamiast
+// zwyklego „OK". Przy `confirm()` wystarczy jedno odruchowe tapniecie —
+// przy koncie z 235 rekordami to za malo.
+
+const DELETE_WORD = 'USUŃ';
+
+export function showDeleteAccountModal(): Promise<boolean> {
+  return new Promise(resolve => {
+    document.getElementById('delAccModal')?.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'delAccModal';
+    modal.className = 'name-modal';
+    modal.style.zIndex = '10001';   // ponad modalem logowania (10000)
+    document.body.appendChild(modal);
+
+    let done = false;
+    const finish = (ok: boolean): void => {
+      if (done) return;
+      done = true;
+      modal.style.opacity    = '0';
+      modal.style.transition = 'opacity 0.25s';
+      setTimeout(() => { modal.remove(); resolve(ok); }, 250);
+    };
+
+    modal.innerHTML = `
+      <div class="name-modal__card" style="position:relative">
+        <div class="name-modal__icon">⚠️</div>
+        <h2 class="name-modal__title">Usunąć konto na zawsze?</h2>
+        <p class="name-modal__sub" style="text-align:left">
+          Bezpowrotnie znikną: treningi i trasy, zdjęcia i posty, rekordy
+          i trofea, znajomi oraz członkostwo w klubach. Tego nie da się cofnąć
+          — nie ma kosza ani kopii zapasowej.
+        </p>
+        <p class="name-modal__sub" style="text-align:left;margin-top:-4px">
+          Jeśli chcesz tylko zejść z tego telefonu, użyj
+          <strong>Wyloguj</strong> — dane zostaną w chmurze.
+        </p>
+        <p class="name-modal__sub" style="text-align:left;margin-top:-4px">
+          Aby potwierdzić, wpisz <strong>${DELETE_WORD}</strong>:
+        </p>
+        <input id="delAccInput" type="text" autocomplete="off" autocapitalize="characters"
+          spellcheck="false" placeholder="${DELETE_WORD}"
+          style="width:100%;padding:12px;border-radius:10px;
+                 border:1px solid rgba(128,128,128,0.45);background:rgba(128,128,128,0.12);
+                 color:var(--f-text,#fff);font-size:1.3rem;font-family:inherit;
+                 text-align:center;letter-spacing:2px;box-sizing:border-box">
+        <button class="name-modal__btn" id="delAccGo" disabled
+          style="margin-top:14px;background:#ef4444;color:#fff;opacity:0.45">
+          Usuń konto na zawsze
+        </button>
+        <button class="name-modal__recover-link" id="delAccCancel" style="margin-top:12px">
+          Anuluj
+        </button>
+        <p id="delAccErr" style="display:none;color:#ef4444;font-size:13px;margin:12px 0 0;line-height:1.4"></p>
+      </div>`;
+
+    const input  = modal.querySelector<HTMLInputElement>('#delAccInput')!;
+    const goBtn  = modal.querySelector<HTMLButtonElement>('#delAccGo')!;
+    const errEl  = modal.querySelector<HTMLElement>('#delAccErr')!;
+
+    const normalize = (s: string): string => s.trim().toUpperCase();
+    input.addEventListener('input', () => {
+      const ok = normalize(input.value) === DELETE_WORD;
+      goBtn.disabled      = !ok;
+      goBtn.style.opacity = ok ? '1' : '0.45';
+    });
+
+    modal.querySelector('#delAccCancel')?.addEventListener('click', () => finish(false));
+    // Tlo NIE zamyka tego modalu celowo — przypadkowe tapniecie obok nie
+    // powinno przerwac swiadomej decyzji w polowie.
+
+    goBtn.addEventListener('click', () => {
+      void (async () => {
+        goBtn.disabled     = true;
+        goBtn.textContent  = 'Usuwanie…';
+        errEl.style.display = 'none';
+        input.disabled     = true;
+
+        try {
+          // Token dokladany automatycznie przez authFetch (sesja jest gotowa,
+          // bo przycisk widac tylko przy zalogowanym koncie).
+          const res  = await fetch(`${BACKEND_URL}/auth/me`, {
+            method: 'DELETE',
+            signal: AbortSignal.timeout(30_000),
+          });
+          const data = await res.json().catch(() => ({})) as { status?: string; message?: string };
+
+          if (!res.ok || data.status !== 'ok') {
+            throw new Error(data.message ?? `Błąd ${res.status}`);
+          }
+
+          // Konto po stronie serwera juz nie istnieje — sprzatamy telefon.
+          _signedIn = false; _email = null; _providers = [];
+          setSessionReady(false);
+          try { await signOutEverywhere(); } catch { /* konto Firebase moglo juz zniknac */ }
+          try {
+            const [{ clearAccountDataLocally }, { clearFriendsLocally }] = await Promise.all([
+              import('./db.js'),
+              import('./FriendsDB.js'),
+            ]);
+            await clearAccountDataLocally();
+            await clearFriendsLocally();
+          } catch (e) {
+            console.warn('[Account] czyszczenie danych po usunieciu konta nieudane:',
+              e instanceof Error ? e.message : e);
+          }
+
+          emitChange();
+          finish(true);
+          // Widoki trzymaja dane w pamieci — bez przeladowania pokazywalyby
+          // treningi, ktorych juz nie ma.
+          setTimeout(() => window.location.reload(), 300);
+
+        } catch (e) {
+          const raw = e instanceof Error ? e.message : String(e);
+          errEl.textContent   = /network|timeout|Load failed|aborted/i.test(raw)
+            ? 'Brak połączenia z siecią. Konto NIE zostało usunięte — spróbuj ponownie.'
+            : `Nie udało się usunąć konta: ${raw}`;
+          errEl.style.display = 'block';
+          goBtn.textContent   = 'Usuń konto na zawsze';
+          goBtn.disabled      = false;
+          input.disabled      = false;
+        }
+      })();
+    });
+
+    setTimeout(() => input.focus(), 100);
   });
 }
 
@@ -456,7 +606,7 @@ export function showAuthModal(): Promise<boolean> {
           _email = provUser?.email ?? null;
           _providers = provUser?.providers ?? [];
         } catch { /* noop */ }
-        console.log(`[Account] zalogowano (${session.mode}) userId=${session.userId}`);
+        dlog(`[Account] zalogowano (${session.mode}) userId=${session.userId}`);
         emitChange();
 
         // Zaleznie od trybu: sciagnij konto z Atlasa albo wypchnij lokalne dane.
@@ -537,12 +687,12 @@ async function syncAfterSignIn(mode: 'login' | 'linked' | 'claimed' | 'created')
       localStorage.removeItem('mapyou_hydrated_at');
       const { hydrate } = await import('./cloudSync.js');
       await hydrate();
-      console.log('[Account] dane konta ściągnięte z Atlasa');
+      dlog('[Account] dane konta ściągnięte z Atlasa');
     } else {
       const { resetSyncFlag, syncToMongoIfNeeded } = await import('./syncToMongo.js');
       resetSyncFlag();
       await syncToMongoIfNeeded();
-      console.log('[Account] lokalne treningi wysłane do chmury');
+      dlog('[Account] lokalne treningi wysłane do chmury');
     }
   } catch (e) {
     console.warn('[Account] synchronizacja po zalogowaniu nieudana:', e instanceof Error ? e.message : e);
@@ -587,7 +737,7 @@ async function fillProfileFromProvider(user: AccountUser | null): Promise<void> 
 
   if (Object.keys(patch).length) {
     saveProfileToLocal(patch);   // zapisuje lokalnie i wysyla na serwer
-    console.log('[Account] profil uzupelniony z konta:', Object.keys(patch).join(', '));
+    dlog('[Account] profil uzupelniony z konta:', Object.keys(patch).join(', '));
     emitChange();
   }
 }

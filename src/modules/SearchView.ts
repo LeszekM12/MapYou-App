@@ -7,7 +7,7 @@
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { BACKEND_URL } from '../config.js';
+import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
 import { renderEventsSection, openCreateEventModal } from './clubEvents.js';
 import { renderMembersSection } from './clubMembers.js';
@@ -1035,7 +1035,7 @@ export class SearchView {
           const res  = await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/invite`, { method:'POST' });
           const data = await res.json() as { status: string; code: string };
           if (data.status !== 'ok') throw new Error('Failed');
-          const link = `${window.location.href.split('#')[0]}#club=${data.code}`;
+          const link = `${PUBLIC_BASE_URL}/#club=${data.code}`;
           if (navigator.share) {
             await navigator.share({ title: `Join ${club.name} on MapYou`, url: link });
           } else {

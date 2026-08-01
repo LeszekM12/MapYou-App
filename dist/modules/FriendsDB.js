@@ -12,6 +12,9 @@
 // Znajomi są dodawani przez:
 //   1. Wklejenie linku zaproszenia
 //   2. Skanowanie QR kodu
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { PUBLIC_BASE_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 // ── Dexie setup ───────────────────────────────────────────────────────────────
 const friendsDb = new Dexie('mapyou_friends');
 friendsDb.version(1).stores({
@@ -36,7 +39,7 @@ export async function addFriend(friend) {
         .equals(friend.subscriptionId)
         .first();
     if (existing) {
-        console.log(`[FriendsDB] Friend already exists: ${friend.name}`);
+        dlog(`[FriendsDB] Friend already exists: ${friend.name}`);
         return existing.id;
     }
     return await friendsDb.friends.add(friend);
@@ -73,8 +76,7 @@ export async function generateInviteLink(name, pushSub, backendUrl, userId) {
     const data = await res.json();
     if (data.status !== 'ok')
         throw new Error('Failed to create invite');
-    const base = window.location.href.split('#')[0];
-    return `${base}#invite=${data.code}`;
+    return `${PUBLIC_BASE_URL}/#invite=${data.code}`;
 }
 /**
  * Pobiera dane zaproszenia z backendu na podstawie krótkiego kodu.
@@ -131,7 +133,7 @@ export function checkInviteInUrl() {
 export async function clearFriendsLocally() {
     try {
         await friendsDb.friends.clear();
-        console.log('[FriendsDB] wyczyszczono liste znajomych');
+        dlog('[FriendsDB] wyczyszczono liste znajomych');
     }
     catch (err) {
         console.warn('[FriendsDB] blad czyszczenia:', err);

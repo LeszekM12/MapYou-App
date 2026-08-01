@@ -6,7 +6,8 @@
 //   - wysyła pozycję co INTERVAL_MS sekund
 //   - obsługuje pause/resume/finish
 //   - integruje z push notifications do znajomych
-import { BACKEND_URL } from '../config.js';
+import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 import { getAllFriends, updateFriendLiveToken } from './FriendsDB.js';
 import { getUserId } from './PushNotifications.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
@@ -29,8 +30,7 @@ export function setUserName(name) {
     localStorage.setItem(LS_USERNAME, name.trim());
 }
 export function getLiveUrl(token) {
-    const base = window.location.href.split('#')[0].split('?')[0];
-    return `${base}#live=${token}`;
+    return `${PUBLIC_BASE_URL}/#live=${token}`;
 }
 // ── LiveTracker class ─────────────────────────────────────────────────────────
 export class LiveTracker {
@@ -154,7 +154,7 @@ export class LiveTracker {
         for (const f of friends) {
             await updateFriendLiveToken(f.subscriptionId, this._token);
         }
-        console.log(`[LiveTracker] Started: ${this._token}`);
+        dlog(`[LiveTracker] Started: ${this._token}`);
         return this._token;
     }
     // ── Pause ──────────────────────────────────────────────────────────────────
@@ -211,7 +211,7 @@ export class LiveTracker {
             }
         }
         localStorage.removeItem(LS_TOKEN_KEY);
-        console.log(`[LiveTracker] Finished: ${this._token}`);
+        dlog(`[LiveTracker] Finished: ${this._token}`);
         this._token = null;
     }
     /** Feed a fresh position from the Tracker's native GPS pipeline.

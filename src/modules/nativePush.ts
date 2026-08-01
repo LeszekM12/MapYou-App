@@ -21,6 +21,7 @@
 // the event once our listener is attached, and we navigate.
 
 import { BACKEND_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 import { getUserId, getDeviceId } from './PushNotifications.js';
 
 // ── Plugin access ─────────────────────────────────────────────────────────────
@@ -82,7 +83,7 @@ async function registerToken(token: string): Promise<void> {
       }),
     });
     if (res.ok) {
-      console.log(`[NativePush] FCM token registered for ${userId}.`);
+      dlog(`[NativePush] FCM token registered for ${userId}.`);
     } else {
       console.warn('[NativePush] subscribe-fcm failed:', res.status);
     }
@@ -115,7 +116,7 @@ export async function initNativePush(): Promise<void> {
   try {
     const perm = await p.requestPermissions();
     if (perm.receive !== 'granted') {
-      console.log('[NativePush] permission not granted:', perm.receive);
+      dlog('[NativePush] permission not granted:', perm.receive);
       return;
     }
   } catch (e) {

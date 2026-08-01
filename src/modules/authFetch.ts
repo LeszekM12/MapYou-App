@@ -16,6 +16,7 @@
 // górze main.ts, zanim jakikolwiek moduł zdąży wykonać żądanie.
 
 import { BACKEND_URL } from '../config.js';
+import { dlog, dwarn } from '../utils/log.js';
 
 type TokenProvider = () => Promise<string | null>;
 
@@ -58,7 +59,7 @@ export function isSessionReady(): boolean { return _sessionReady; }
 /** Ustaw po udanej wymianie /auth/session (i wyzeruj przy wylogowaniu). */
 export function setSessionReady(ready: boolean): void {
   _sessionReady = ready;
-  console.log(`[authFetch] sesja MapYou ${ready ? 'gotowa' : 'niegotowa'}`);
+  dlog(`[authFetch] sesja MapYou ${ready ? 'gotowa' : 'niegotowa'}`);
 }
 
 /** Opcjonalny hook: co zrobić, gdy backend odpowie 401 mimo tokena. */
@@ -96,7 +97,7 @@ export function installAuthFetch(): void {
     // ── Tryb gościa ──────────────────────────────────────────────────────────
     if (!token) {
       if (isGuestAllowed(url)) return original(input, init);
-      console.warn(
+      dwarn(
         `[authFetch] ODCIETE (${_sessionReady ? 'sesja gotowa, ale BRAK TOKENA' : 'brak sesji'}): ` +
         url.slice(BACKEND_URL.length),
       );

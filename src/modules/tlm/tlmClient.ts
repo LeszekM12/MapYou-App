@@ -14,6 +14,8 @@
 // Wymaga libsodium zaladowanego globalnie (script tag - jak Dexie w MapYou).
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { dlog } from '../../utils/log.js';
+
 declare const sodium: any;
 
 const TLM_SERVER_URL = 'https://tlm.natours-mikrut.com';
@@ -76,7 +78,7 @@ export async function ensureTlmIdentity(): Promise<TlmIdentity> {
   localStorage.setItem(LS_SK, sodium.to_base64(kp.privateKey, B64()));
   localStorage.setItem(LS_PK, sodium.to_base64(kp.publicKey, B64()));
   localStorage.setItem(LS_ID, id);
-  console.log('[TLM-GW] utworzono tozsamosc TLM:', id);
+  dlog('[TLM-GW] utworzono tozsamosc TLM:', id);
   return { tlmId: id, publicKey: kp.publicKey, privateKey: kp.privateKey };
 }
 
@@ -151,7 +153,7 @@ export class TlmGatewaySocket {
       }
       if (frame.type === 'ready') {
         this.ready = true;
-        console.log('[TLM-GW] zalogowano jako', this.identity.tlmId);
+        dlog('[TLM-GW] zalogowano jako', this.identity.tlmId);
         for (const f of this.queue) this.rawSend(f);
         this.queue = [];
       }

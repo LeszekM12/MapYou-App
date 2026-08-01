@@ -4,6 +4,22 @@
 // https://account.mapbox.com → Tokens → Allowed URLs → leszekm12.github.io
 export const BACKEND_URL = 'https://mapty-backend.fly.dev';
 
+// ─── PUBLICZNY ADRES APLIKACJI (Faza 4 / D1) ─────────────────────────────────
+// Linki zapraszajace (znajomi, kluby, trening na zywo) oraz dokumenty prawne
+// MUSZA wskazywac na adres osiagalny z zewnatrz. Wczesniej budowaly sie
+// z `window.location.href`, co w natywnej apce daje pochodzenie WebView:
+//   iOS     → capacitor://localhost
+//   Android → https://localhost
+// Takie linki sa martwe wszedzie poza telefonem nadawcy — wysylales
+// zaproszenie, ktorego nikt nie mogl otworzyc.
+//
+// BEZ konczacego ukosnika. Miejsca uzycia dokladaja go same:
+//   `${PUBLIC_BASE_URL}/#invite=KOD`   `${PUBLIC_BASE_URL}/privacy.html`
+//
+// Po podpieciu subdomeny (D1 kroki 1-2) zmienia sie TYLKO ta jedna linia:
+//   export const PUBLIC_BASE_URL = 'https://mapyou.natours-mikrut.com';
+export const PUBLIC_BASE_URL = 'https://leszekm12.github.io/MapYou-App';
+
 // ─── FIREBASE (Phase 3) ───────────────────────────────────────────────────────
 
 export const FIREBASE_CONFIG = {

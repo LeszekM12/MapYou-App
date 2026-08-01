@@ -20,6 +20,7 @@
 // This covers cold starts too: the tap launches the app the plugin replays
 // the event once our listener is attached, and we navigate.
 import { BACKEND_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 import { getUserId, getDeviceId } from './PushNotifications.js';
 function capGlobal() {
     return globalThis.Capacitor;
@@ -67,7 +68,7 @@ async function registerToken(token) {
             }),
         });
         if (res.ok) {
-            console.log(`[NativePush] FCM token registered for ${userId}.`);
+            dlog(`[NativePush] FCM token registered for ${userId}.`);
         }
         else {
             console.warn('[NativePush] subscribe-fcm failed:', res.status);
@@ -100,7 +101,7 @@ export async function initNativePush() {
     try {
         const perm = await p.requestPermissions();
         if (perm.receive !== 'granted') {
-            console.log('[NativePush] permission not granted:', perm.receive);
+            dlog('[NativePush] permission not granted:', perm.receive);
             return;
         }
     }

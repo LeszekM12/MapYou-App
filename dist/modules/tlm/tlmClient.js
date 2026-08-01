@@ -12,6 +12,8 @@
 //  - wariant base64: URLSAFE_NO_PADDING (jak react-native-libsodium)
 //
 // Wymaga libsodium zaladowanego globalnie (script tag - jak Dexie w MapYou).
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { dlog } from '../../utils/log.js';
 const TLM_SERVER_URL = 'https://tlm.natours-mikrut.com';
 const TLM_WS_URL = TLM_SERVER_URL.replace(/^http/, 'ws') + '/ws';
 // Klucze w localStorage. Uczciwie: web nie ma Keystore jak Android;
@@ -60,7 +62,7 @@ export async function ensureTlmIdentity() {
     localStorage.setItem(LS_SK, sodium.to_base64(kp.privateKey, B64()));
     localStorage.setItem(LS_PK, sodium.to_base64(kp.publicKey, B64()));
     localStorage.setItem(LS_ID, id);
-    console.log('[TLM-GW] utworzono tozsamosc TLM:', id);
+    dlog('[TLM-GW] utworzono tozsamosc TLM:', id);
     return { tlmId: id, publicKey: kp.publicKey, privateKey: kp.privateKey };
 }
 // ── Szyfrowanie wiadomosci (format zgodny z apka TLM) ────────────────────────
@@ -157,7 +159,7 @@ export class TlmGatewaySocket {
             }
             if (frame.type === 'ready') {
                 this.ready = true;
-                console.log('[TLM-GW] zalogowano jako', this.identity.tlmId);
+                dlog('[TLM-GW] zalogowano jako', this.identity.tlmId);
                 for (const f of this.queue)
                     this.rawSend(f);
                 this.queue = [];

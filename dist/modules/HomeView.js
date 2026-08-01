@@ -3,7 +3,7 @@
 import { loadEnrichedActivities, deleteEnrichedActivity, deleteActivity, updateEnrichedActivityFields } from './db.js';
 import { isRouteSaved, saveRoute, unsaveRoute } from './SavedRoutes.js';
 import { openPublicProfile } from './PublicProfile.js';
-import { BACKEND_URL } from '../config.js';
+import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
 import { renderMinimapCanvas, decodePolyline, encodePolyline, pushNow, uploadReel } from './cloudSync.js';
 import { getIcon, getColor, getSportLabel, formatDuration, formatPace, formatDistance } from './Tracker.js';
 import { getWeekSteps, getDaySteps, getCachedDaySteps, getHealthProviderKind, getImportableWorkouts, markHealthImported, openHealthConnectSettings } from './health.js';
@@ -311,7 +311,7 @@ function openSharePanel(card, act) {
     });
     // Copy link
     panel.querySelector(`#hcsCopy-${act.id}`)?.addEventListener('click', async () => {
-        const url = window.location.href.split('#')[0];
+        const url = PUBLIC_BASE_URL;
         const shareText = `${act.name || act.description} — ${act.distanceKm.toFixed(2)} km in ${formatDuration(act.durationSec)} 🏃 #MapYou`;
         try {
             await navigator.clipboard.writeText(shareText + '\n' + url);
@@ -328,7 +328,7 @@ function openSharePanel(card, act) {
                 await navigator.share({
                     title: act.name || act.description,
                     text: `${act.name || act.description} — ${act.distanceKm.toFixed(2)} km · ${formatDuration(act.durationSec)} via MapYou`,
-                    url: window.location.href,
+                    url: PUBLIC_BASE_URL,
                 });
             }
             catch { }

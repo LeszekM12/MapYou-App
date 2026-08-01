@@ -19,6 +19,7 @@ import { initializeApp, getApps } from 'firebase/app';
 import { getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, inMemoryPersistence, browserPopupRedirectResolver, GoogleAuthProvider, OAuthProvider, signInWithPopup, onAuthStateChanged, signOut as webSignOut, } from 'firebase/auth';
 import { BACKEND_URL, FIREBASE_CONFIG } from '../config.js';
 import { setTokenProvider } from './authFetch.js';
+import { dlog } from '../utils/log.js';
 const LS_USER_ID = 'mapyou_userId_profile';
 const LS_RECOVERY_KEY = 'mapyou_recovery_code';
 function cap() {
@@ -87,10 +88,10 @@ export async function getSignedInUser() {
         try {
             const { user } = await plugin().getCurrentUser();
             if (!user) {
-                console.log('[Auth] natywnie: brak zalogowanego użytkownika');
+                dlog('[Auth] natywnie: brak zalogowanego użytkownika');
                 return null;
             }
-            console.log('[Auth] natywnie: zalogowany', user.uid);
+            dlog('[Auth] natywnie: zalogowany', user.uid);
             return {
                 uid: user.uid,
                 email: user.email ?? null,

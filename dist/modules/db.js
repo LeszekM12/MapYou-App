@@ -1,5 +1,6 @@
 // ─── DATABASE MODULE (IndexedDB via Dexie.js) ────────────────────────────────
 // Dexie jest ładowane z CDN w index.html jako globalny Dexie
+import { dlog } from '../utils/log.js';
 export const db = new Dexie('mapty');
 // version(1) — workouty (istniejące dane)
 db.version(1).stores({
@@ -338,7 +339,7 @@ export async function clearAccountDataLocally() {
         // Dexie jest globalem z CDN — minimalny typ lokalny zamiast namespace.
         const tables = db.tables;
         await Promise.all(tables.map(t => t.clear()));
-        console.log('[DB] wyczyszczono tabele:', tables.map(t => t.name).join(', '));
+        dlog('[DB] wyczyszczono tabele:', tables.map(t => t.name).join(', '));
     }
     catch (err) {
         console.warn('[DB] blad czyszczenia bazy:', err);
@@ -358,7 +359,7 @@ export async function clearAccountDataLocally() {
                 toRemove.push(key);
         }
         toRemove.forEach(k => localStorage.removeItem(k));
-        console.log(`[DB] wyczyszczono ${toRemove.length} kluczy konta`);
+        dlog(`[DB] wyczyszczono ${toRemove.length} kluczy konta`);
     }
     catch (err) {
         console.warn('[DB] blad czyszczenia localStorage:', err);

@@ -24,6 +24,7 @@ import { BACKEND_URL } from '../config.js';
 import { saveWorkoutToDB, deleteWorkoutFromDB, loadWorkoutsFromDB, saveActivity, loadActivities, deleteActivity, saveEnrichedActivity, loadEnrichedActivities, deleteEnrichedActivity, saveUnifiedWorkout, loadUnifiedWorkouts, deleteUnifiedWorkout, savePost, loadPosts, deletePost, saveReel, loadReels, deleteReel, saveProfileToDB, } from './db.js';
 import { getUserId } from './UserProfile.js';
 import { isSessionReady } from './authFetch.js';
+import { dlog } from '../utils/log.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function isOnline() {
     return navigator.onLine;
@@ -43,7 +44,7 @@ async function apiPost(path, body) {
         if (!res.ok)
             console.error('[CS] POST failed', path, res.status, await res.text().catch(() => ''));
         else
-            console.log('[CS] POST ok', path, res.status);
+            dlog('[CS] POST ok', path, res.status);
         return res.ok;
     }
     catch (err) {
@@ -92,7 +93,7 @@ async function apiGet(path) {
             console.warn(`[CS-GET] ${path} -> status=${data.status}`);
             return null;
         }
-        console.log(`[CS-GET] ${path} -> OK, ${data.data?.length ?? 0} rekordow`);
+        dlog(`[CS-GET] ${path} -> OK, ${data.data?.length ?? 0} rekordow`);
         return data.data;
     }
     catch (e) {
@@ -419,7 +420,7 @@ export async function pushNow(userId, enriched, unified, posts) {
     // ostrzezen — co realnie spowalnialo start i falszowalo licznik „Pushed".
     // Wysylka i tak nastapi pozniej, gdy warstwa konta ustali sesje.
     if (!isSessionReady()) {
-        console.log('[CloudSync] ⏳ pomijam wysylke — sesja jeszcze nie gotowa');
+        dlog('[CloudSync] ⏳ pomijam wysylke — sesja jeszcze nie gotowa');
         return;
     }
     try {
@@ -447,7 +448,7 @@ export async function pushNow(userId, enriched, unified, posts) {
                     ? encodePolyline(toSave.coords)
                     : null;
                 await apiPost('/enriched-activities', { ...toSave, userId, activityId: toSave.id, coordsEnc, coords: [] });
-                console.log(`[CloudSync] 📤 Pushed missing activity: ${activity.id}`);
+                dlog(`[CloudSync] 📤 Pushed missing activity: ${activity.id}`);
             }
             catch { }
         }
@@ -471,7 +472,7 @@ export async function pushNow(userId, enriched, unified, posts) {
                 await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
                     userId, photoUrl: finalUrl, photoPublicId: publicId,
                 });
-                console.log(`[CloudSync] 🖼️ Fixed photo for activity: ${activity.id} → ${finalUrl.substring(0, 50)}`);
+                dlog(`[CloudSync] 🖼️ Fixed photo for activity: ${activity.id} → ${finalUrl.substring(0, 50)}`);
             }
             catch { }
         }
@@ -492,7 +493,7 @@ export async function pushNow(userId, enriched, unified, posts) {
                 await apiPost(`/posts/${encodeURIComponent(post.id)}/photo`, {
                     userId, photoUrl: finalUrl, photoPublicId: publicId,
                 });
-                console.log(`[CloudSync] 🖼️ Fixed photo for post: ${post.id} → ${finalUrl.substring(0, 50)}`);
+                dlog(`[CloudSync] 🖼️ Fixed photo for post: ${post.id} → ${finalUrl.substring(0, 50)}`);
             }
             catch { }
         }
@@ -501,7 +502,7 @@ export async function pushNow(userId, enriched, unified, posts) {
         for (const workout of missingUnified) {
             try {
                 await apiPost('/unified-workouts', { ...workout, userId, workoutId: workout.id });
-                console.log(`[CloudSync] 📤 Pushed missing workout: ${workout.id}`);
+                dlog(`[CloudSync] 📤 Pushed missing workout: ${workout.id}`);
             }
             catch { }
         }
@@ -514,7 +515,7 @@ export async function pushNow(userId, enriched, unified, posts) {
                     ? { ...post, photoUrl: uploaded.url, photoPublicId: uploaded.publicId }
                     : post;
                 await apiPost('/posts', { ...toSave, userId, postId: toSave.id });
-                console.log(`[CloudSync] 📤 Pushed missing post: ${post.id}`);
+                dlog(`[CloudSync] 📤 Pushed missing post: ${post.id}`);
             }
             catch { }
         }
@@ -528,7 +529,7 @@ export async function pushNow(userId, enriched, unified, posts) {
                 await apiPost(`/enriched-activities/${encodeURIComponent(activity.id)}/photo`, {
                     userId, coordsEnc,
                 });
-                console.log(`[CloudSync] 📍 Fixed coordsEnc for: ${activity.name}`);
+                dlog(`[CloudSync] 📍 Fixed coordsEnc for: ${activity.name}`);
             }
             catch { }
         }
@@ -539,7 +540,7 @@ export async function pushNow(userId, enriched, unified, posts) {
             await apiPost('/users', { userId, weeklyWins, bestStreak }).catch(() => { });
         }
         if (missingEnriched.length + missingUnified.length + missingPosts.length > 0) {
-            console.log(`[CloudSync] ✅ Pushed ${missingEnriched.length} activities, ${missingUnified.length} workouts, ${missingPosts.length} posts`);
+            dlog(`[CloudSync] ✅ Pushed ${missingEnriched.length} activities, ${missingUnified.length} workouts, ${missingPosts.length} posts`);
         }
     }
     catch (err) {
@@ -552,7 +553,7 @@ export async function hydrate() {
     // To samo co w pushNow: bez sesji pobieranie wroci puste i tylko zamaze
     // znacznik „hydrated_at", przez co prawdziwa hydratacja zostalaby pominieta.
     if (!isSessionReady()) {
-        console.log('[CloudSync] ⏳ pomijam hydratacje — sesja jeszcze nie gotowa');
+        dlog('[CloudSync] ⏳ pomijam hydratacje — sesja jeszcze nie gotowa');
         return;
     }
     const userId = getUserId();
@@ -567,12 +568,12 @@ export async function hydrate() {
     ]);
     const hasLocalData = workouts.length + activities.length + enriched.length + unified.length + posts.length > 0;
     if (hasLocalData && Date.now() - lastHydrated < HYDRATE_MAX_AGE) {
-        console.log('[CloudSync] ✅ IndexedDB has data, skipping hydration');
+        dlog('[CloudSync] ✅ IndexedDB has data, skipping hydration');
         // Ale zawsze sprawdź czy lokalne dane są w Atlas — push brakujących
         void pushNow(userId, enriched, unified, posts);
         return;
     }
-    console.log('[CloudSync] 🔄 Hydrating from Atlas...');
+    dlog('[CloudSync] 🔄 Hydrating from Atlas...');
     try {
         // Pobierz wszystkie kolekcje z Atlas równolegle
         const [serverWorkouts, serverActivities, serverEnriched, serverUnified, serverPosts, serverProfile,] = await Promise.all([
@@ -682,7 +683,7 @@ export async function hydrate() {
                 document.querySelectorAll('[data-username]')
                     .forEach(el => { el.textContent = sv.name; });
             }
-            console.log('[CloudSync] ✅ Profil przywrocony z serwera');
+            dlog('[CloudSync] ✅ Profil przywrocony z serwera');
             // Trofea (Weekly Goal Cups, Streak Records) są czytane przez ProfileView
             // z localStorage, a _pushMissingToAtlas wysyła je do /users — brakowało
             // drogi POWROTNEJ. Bez tego po przywróceniu konta na nowym urządzeniu
@@ -699,7 +700,7 @@ export async function hydrate() {
             }
         }
         localStorage.setItem(LS_HYDRATED_KEY, String(Date.now()));
-        console.log(`[CloudSync] ✅ Hydrated ${count} records from Atlas`);
+        dlog(`[CloudSync] ✅ Hydrated ${count} records from Atlas`);
     }
     catch (err) {
         console.warn('[CloudSync] Hydration failed:', err);

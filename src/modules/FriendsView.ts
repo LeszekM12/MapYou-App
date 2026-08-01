@@ -14,7 +14,8 @@ import {
 } from './FriendsDB.js';
 import { LiveMap, type LiveData } from './LiveMap.js';
 import { getIcon as _ffIcon, getSportLabel as _ffLabel } from './Tracker.js';
-import { BACKEND_URL } from '../config.js';
+import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 import { getUserName } from './LiveTracker.js';
 import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
@@ -120,7 +121,7 @@ export class FriendsView {
             if (d.userId) {
               friendUserId = d.userId;
               await updateFriendUserId(f.subscriptionId, d.userId);
-              console.log(`[Friends] Fixed friendUserId for ${f.name}: ${d.userId}`);
+              dlog(`[Friends] Fixed friendUserId for ${f.name}: ${d.userId}`);
             }
           }
         } catch {}
@@ -444,8 +445,7 @@ export class FriendsView {
     } catch {}
 
     // 3. Backend niedostępny (offline) — awaryjny base64 (długi, ale działa bez sieci)
-    const base = window.location.href.split('#')[0];
-    this._cachedInviteLink = `${base}#invite=${btoa(JSON.stringify({
+    this._cachedInviteLink = `${PUBLIC_BASE_URL}/#invite=${btoa(JSON.stringify({
       name,
       pushSub: sub ? sub.toJSON() : null,
     }))}`;

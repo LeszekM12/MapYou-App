@@ -6,7 +6,8 @@
 
 
 
-import { BACKEND_URL } from './config.js';
+import { BACKEND_URL, PUBLIC_BASE_URL } from './config.js';
+import { isDebug, setDebug } from './utils/log.js';
 // ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──
 import { installAuthFetch } from './modules/authFetch.js';
 installAuthFetch();
@@ -490,12 +491,13 @@ class App {
     // wlasna subdomene (mapyou.natours-mikrut.com) zmienia sie tylko ta linia,
     // a nie kazde wystapienie z osobna. Sklepy i ekran zgody Google wymagaja,
     // zeby oba dokumenty byly dostepne z poziomu aplikacji.
-    const LEGAL_BASE = 'https://leszekm12.github.io/MapYou-App';
+    // Faza 4 / D1: adres zyje teraz w config.ts (PUBLIC_BASE_URL) razem
+    // z linkami zapraszajacymi — jedna zmiana po przejsciu na subdomene.
     document.getElementById('settingPrivacy')?.addEventListener('click', () => {
-      window.open(`${LEGAL_BASE}/privacy.html`, '_blank');
+      window.open(`${PUBLIC_BASE_URL}/privacy.html`, '_blank');
     });
     document.getElementById('settingTerms')?.addEventListener('click', () => {
-      window.open(`${LEGAL_BASE}/terms.html`, '_blank');
+      window.open(`${PUBLIC_BASE_URL}/terms.html`, '_blank');
     });
 
     // Easter egg: tap the "Settings" title 7× to reveal the hidden
@@ -3747,6 +3749,12 @@ document.getElementById('settingSync')?.addEventListener('click', async () => {
   const sub = document.querySelector('#settingSync .settings-item__sub') as HTMLElement | null;
 
   const logs: string[] = [];
+  // Faza 4 / A5: diagnostyka cloudSync idzie przez dlog(), ktore przy
+  // wylaczonej fladze NIC nie wypisuje — bez tego panel ponizej pokazywalby
+  // „No logs captured" zamiast przebiegu synchronizacji. Wlaczamy flage na
+  // czas operacji i przywracamy poprzedni stan w finally.
+  const wasDebug = isDebug();
+  setDebug(true);
   const origLog  = console.log.bind(console);
   const origWarn = console.warn.bind(console);
   const origErr  = console.error.bind(console);
@@ -3765,6 +3773,7 @@ document.getElementById('settingSync')?.addEventListener('click', async () => {
   console.log   = origLog;
   console.warn  = origWarn;
   console.error = origErr;
+  if (!wasDebug) setDebug(false);
 
   const panel = document.getElementById('settingsPanel');
   if (panel) {

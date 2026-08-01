@@ -5,6 +5,7 @@
 
 import type { Coords, WorkoutType } from '../types/index.js';
 import type { ActivityRecord } from './Tracker.js';
+import { dlog } from '../utils/log.js';
 
 // ── Typy ──────────────────────────────────────────────────────────────────────
 
@@ -506,7 +507,7 @@ export async function clearAccountDataLocally(): Promise<void> {
     // Dexie jest globalem z CDN — minimalny typ lokalny zamiast namespace.
     const tables = db.tables as unknown as Array<{ name: string; clear(): Promise<void> }>;
     await Promise.all(tables.map(t => t.clear()));
-    console.log('[DB] wyczyszczono tabele:', tables.map(t => t.name).join(', '));
+    dlog('[DB] wyczyszczono tabele:', tables.map(t => t.name).join(', '));
   } catch (err) {
     console.warn('[DB] blad czyszczenia bazy:', err);
   }
@@ -524,7 +525,7 @@ export async function clearAccountDataLocally(): Promise<void> {
       if (isAccountKey && !KEEP_ON_LOGOUT.has(key)) toRemove.push(key);
     }
     toRemove.forEach(k => localStorage.removeItem(k));
-    console.log(`[DB] wyczyszczono ${toRemove.length} kluczy konta`);
+    dlog(`[DB] wyczyszczono ${toRemove.length} kluczy konta`);
   } catch (err) {
     console.warn('[DB] blad czyszczenia localStorage:', err);
   }

@@ -5,7 +5,7 @@
 // Friends: search, invite, list (backend-ready placeholders)
 // Clubs: create locally, search by name/location (backend-ready)
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { BACKEND_URL } from '../config.js';
+import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
 import { renderEventsSection, openCreateEventModal } from './clubEvents.js';
 import { renderMembersSection } from './clubMembers.js';
@@ -1070,7 +1070,7 @@ export class SearchView {
                     const data = await res.json();
                     if (data.status !== 'ok')
                         throw new Error('Failed');
-                    const link = `${window.location.href.split('#')[0]}#club=${data.code}`;
+                    const link = `${PUBLIC_BASE_URL}/#club=${data.code}`;
                     if (navigator.share) {
                         await navigator.share({ title: `Join ${club.name} on MapYou`, url: link });
                     }

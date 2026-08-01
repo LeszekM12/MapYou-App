@@ -14,6 +14,7 @@
 //   Klucz subskrypcji w DB = userId:deviceId (unikalny per urządzenie)
 
 import { BACKEND_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 import { getIPLocation, hasGPSPermission, getGPSLocation } from './LocationService.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
@@ -53,7 +54,7 @@ export function getUserId(): string {
   if (!id) {
     id = generateUUID();
     localStorage.setItem(LS_USER_ID, id);
-    console.log(`[Push] New userId created: ${id}`);
+    dlog(`[Push] New userId created: ${id}`);
   }
   return id;
 }
@@ -67,7 +68,7 @@ export function getDeviceId(): string {
   if (!id) {
     id = generateUUID();
     localStorage.setItem(LS_DEVICE_ID, id);
-    console.log(`[Push] New deviceId created: ${id}`);
+    dlog(`[Push] New deviceId created: ${id}`);
   }
   return id;
 }
@@ -166,7 +167,7 @@ export async function initPushNotifications(): Promise<void> {
   const deviceId = getDeviceId();
 
   await sendSubscriptionToBackend(subscription, userId, deviceId);
-  console.log(`[Push] Subscribed: userId=${userId} deviceId=${deviceId}`);
+  dlog(`[Push] Subscribed: userId=${userId} deviceId=${deviceId}`);
 }
 
 // ── Wyrejestrowanie ───────────────────────────────────────────────────────────
@@ -193,7 +194,7 @@ export async function unsubscribeFromPush(): Promise<void> {
   } catch { /* ignoruj błąd sieciowy */ }
 
   await sub.unsubscribe();
-  console.log('[Push] Unsubscribed');
+  dlog('[Push] Unsubscribed');
 }
 
 // ── Re-subskrypcja po restarcie backendu ──────────────────────────────────────
@@ -212,7 +213,7 @@ export async function resubscribeIfNeeded(): Promise<void> {
 
     // Odśwież rejestrację w backendzie (po restarcie Render traci dane w pamięci)
     await sendSubscriptionToBackend(sub, getUserId(), getDeviceId());
-    console.log('[Push] Re-subscribed after backend restart');
+    dlog('[Push] Re-subscribed after backend restart');
   } catch { /* ignoruj */ }
 }
 

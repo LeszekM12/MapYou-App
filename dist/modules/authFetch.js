@@ -15,6 +15,7 @@
 // Kolejność startu (KRYTYCZNE): installAuthFetch() musi być wywołane na samej
 // górze main.ts, zanim jakikolwiek moduł zdąży wykonać żądanie.
 import { BACKEND_URL } from '../config.js';
+import { dlog, dwarn } from '../utils/log.js';
 let _getToken = async () => null;
 let _installed = false;
 let _onUnauthorized = null;
@@ -48,7 +49,7 @@ export function isSessionReady() { return _sessionReady; }
 /** Ustaw po udanej wymianie /auth/session (i wyzeruj przy wylogowaniu). */
 export function setSessionReady(ready) {
     _sessionReady = ready;
-    console.log(`[authFetch] sesja MapYou ${ready ? 'gotowa' : 'niegotowa'}`);
+    dlog(`[authFetch] sesja MapYou ${ready ? 'gotowa' : 'niegotowa'}`);
 }
 /** Opcjonalny hook: co zrobić, gdy backend odpowie 401 mimo tokena. */
 export function setOnUnauthorized(fn) {
@@ -78,7 +79,7 @@ export function installAuthFetch() {
         if (!token) {
             if (isGuestAllowed(url))
                 return original(input, init);
-            console.warn(`[authFetch] ODCIETE (${_sessionReady ? 'sesja gotowa, ale BRAK TOKENA' : 'brak sesji'}): ` +
+            dwarn(`[authFetch] ODCIETE (${_sessionReady ? 'sesja gotowa, ale BRAK TOKENA' : 'brak sesji'}): ` +
                 url.slice(BACKEND_URL.length));
             return guestBlocked();
         }

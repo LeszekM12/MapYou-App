@@ -14,6 +14,9 @@
 //   2. Skanowanie QR kodu
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+import { PUBLIC_BASE_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
+
 declare const Dexie: any;
 
 // ── Typy ─────────────────────────────────────────────────────────────────────
@@ -75,7 +78,7 @@ export async function addFriend(friend: Omit<Friend, 'id'>): Promise<number> {
     .equals(friend.subscriptionId)
     .first();
   if (existing) {
-    console.log(`[FriendsDB] Friend already exists: ${friend.name}`);
+    dlog(`[FriendsDB] Friend already exists: ${friend.name}`);
     return existing.id;
   }
   return await friendsDb.friends.add(friend);
@@ -124,8 +127,7 @@ export async function generateInviteLink(
   });
   const data = await res.json() as { status: string; code: string };
   if (data.status !== 'ok') throw new Error('Failed to create invite');
-  const base = window.location.href.split('#')[0];
-  return `${base}#invite=${data.code}`;
+  return `${PUBLIC_BASE_URL}/#invite=${data.code}`;
 }
 
 /**
@@ -183,7 +185,7 @@ export function checkInviteInUrl(): string | null {
 export async function clearFriendsLocally(): Promise<void> {
   try {
     await friendsDb.friends.clear();
-    console.log('[FriendsDB] wyczyszczono liste znajomych');
+    dlog('[FriendsDB] wyczyszczono liste znajomych');
   } catch (err) {
     console.warn('[FriendsDB] blad czyszczenia:', err);
   }

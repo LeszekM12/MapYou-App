@@ -7,7 +7,8 @@
 //   - obsługuje pause/resume/finish
 //   - integruje z push notifications do znajomych
 
-import { BACKEND_URL } from '../config.js';
+import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
+import { dlog } from '../utils/log.js';
 import { getAllFriends, updateFriendLiveToken } from './FriendsDB.js';
 import { getUserId } from './PushNotifications.js';
 
@@ -36,8 +37,7 @@ export function setUserName(name: string): void {
 }
 
 export function getLiveUrl(token: string): string {
-  const base = window.location.href.split('#')[0].split('?')[0];
-  return `${base}#live=${token}`;
+  return `${PUBLIC_BASE_URL}/#live=${token}`;
 }
 
 // ── LiveTracker class ─────────────────────────────────────────────────────────
@@ -127,7 +127,7 @@ export class LiveTracker {
       await updateFriendLiveToken(f.subscriptionId, this._token);
     }
 
-    console.log(`[LiveTracker] Started: ${this._token}`);
+    dlog(`[LiveTracker] Started: ${this._token}`);
     return this._token;
   }
 
@@ -185,7 +185,7 @@ export class LiveTracker {
     }
 
     localStorage.removeItem(LS_TOKEN_KEY);
-    console.log(`[LiveTracker] Finished: ${this._token}`);
+    dlog(`[LiveTracker] Finished: ${this._token}`);
     this._token = null;
   }
 
