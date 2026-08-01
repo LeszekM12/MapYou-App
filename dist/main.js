@@ -3736,6 +3736,11 @@ window.app = new App();
         bar.classList.remove('msb--visible', 'msb--hidden-route');
     }
     const isDesktop = () => window.innerWidth >= 900;
+    // Hook dla modulow spoza main.ts (FriendsView otwiera zakladke Friends po
+    // tapnieciu powiadomienia o treningu na zywo). `switchTab` jest funkcja
+    // lokalna, wiec bez tego nie da sie jej wolac z zewnatrz.
+    window.__switchTab =
+        (id) => switchTab(id);
     function switchTab(tabId) {
         // ── Desktop ──────────────────────────────────────────────────
         if (isDesktop()) {

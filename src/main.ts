@@ -3466,6 +3466,12 @@ window.app = new App();
 
   const isDesktop = () => window.innerWidth >= 900;
 
+  // Hook dla modulow spoza main.ts (FriendsView otwiera zakladke Friends po
+  // tapnieciu powiadomienia o treningu na zywo). `switchTab` jest funkcja
+  // lokalna, wiec bez tego nie da sie jej wolac z zewnatrz.
+  (window as unknown as Record<string, unknown>).__switchTab =
+    (id: string): void => switchTab(id);
+
   function switchTab(tabId: string) {
     // ── Desktop ──────────────────────────────────────────────────
     if (isDesktop()) {

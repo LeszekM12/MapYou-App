@@ -909,6 +909,17 @@ export class FriendsView {
     const title = document.getElementById('friendsLiveName');
     if (!panel) return;
 
+    // Panel live siedzi WEWNATRZ zakladki Friends. Odslonienie go bez zmiany
+    // zakladki nic nie daje, gdy uzytkownik jest na Home albo Map — mapa
+    // otwiera sie niewidocznie i „pojawia" dopiero, gdy sam przejdzie do
+    // Friends. Dokladnie tak zachowywalo sie tapniecie powiadomienia
+    // o rozpoczetym treningu znajomego.
+    try {
+      const go = (window as unknown as Record<string, unknown>).__switchTab as
+        | ((id: string) => void) | undefined;
+      go?.('tabFriends');
+    } catch { /* zakladki jeszcze nie gotowe — panel i tak sie odsloni */ }
+
     panel.classList.remove('hidden');
     if (title) title.textContent = `${name}'s Route`;
 
