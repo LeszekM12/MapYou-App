@@ -12,6 +12,7 @@ import { renderAccountCard, bindAccountCard } from './AccountUI.js';
 import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId } from './UserProfile.js';
 import { loadPosts } from './db.js';
+import { onSessionReady } from './authFetch.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 const LS_WEEKLY_WINS = 'mapyou_weekly_wins'; // number — count of weeks goal was hit
 const LS_GOAL_WEEK = 'mapyou_last_goal_week'; // ISO week string — last week goal was checked
@@ -322,27 +323,31 @@ export class ProfileView {
             // `undefined`, robil `?? []` i pokazywal 0 obserwujacych oraz pusta liste,
             // mimo ze na koncie byli. /auth/me zwraca pelny dokument, wiec dziala tez
             // klikniecie w licznik (lista „kto mnie obserwuje").
-            fetch(`${BACKEND_URL}/auth/me`, { cache: 'no-store' })
-                .then(r => r.json())
-                .then((d) => {
-                if (d.status !== 'ok')
-                    return;
-                const followersEl = el.querySelector('.pv-stats-row__item:nth-child(1) .pv-stats-row__val');
-                const followingEl = el.querySelector('.pv-stats-row__item:nth-child(2) .pv-stats-row__val');
-                const followers = d.data.followers ?? [];
-                const following = d.data.following ?? [];
-                if (followersEl)
-                    followersEl.textContent = String(followers.length);
-                if (followingEl)
-                    followingEl.textContent = String(following.length);
-                const myUserId = getUserId();
-                el.querySelector('#pvFollowersBtn')?.addEventListener('click', () => {
-                    _showFollowList(el, 'Followers', followers, myUserId);
-                });
-                el.querySelector('#pvFollowingBtn')?.addEventListener('click', () => {
-                    _showFollowList(el, 'Following', following, myUserId);
-                });
-            }).catch(() => { });
+            // Tak samo jak przy znajomych: bez gotowej sesji `/auth/me` zwraca 401
+            // i liczniki zostawaly na zerze.
+            onSessionReady(() => {
+                fetch(`${BACKEND_URL}/auth/me`, { cache: 'no-store' })
+                    .then(r => r.json())
+                    .then((d) => {
+                    if (d.status !== 'ok')
+                        return;
+                    const followersEl = el.querySelector('.pv-stats-row__item:nth-child(1) .pv-stats-row__val');
+                    const followingEl = el.querySelector('.pv-stats-row__item:nth-child(2) .pv-stats-row__val');
+                    const followers = d.data.followers ?? [];
+                    const following = d.data.following ?? [];
+                    if (followersEl)
+                        followersEl.textContent = String(followers.length);
+                    if (followingEl)
+                        followingEl.textContent = String(following.length);
+                    const myUserId = getUserId();
+                    el.querySelector('#pvFollowersBtn')?.addEventListener('click', () => {
+                        _showFollowList(el, 'Followers', followers, myUserId);
+                    });
+                    el.querySelector('#pvFollowingBtn')?.addEventListener('click', () => {
+                        _showFollowList(el, 'Following', following, myUserId);
+                    });
+                }).catch(() => { });
+            });
         }
         return;
     }

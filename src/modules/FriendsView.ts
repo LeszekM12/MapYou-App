@@ -13,6 +13,7 @@ import {
   type Friend,
 } from './FriendsDB.js';
 import { hydrateFriendsFromServer } from './FriendsDB.js';
+import { onSessionReady } from './authFetch.js';
 import { LiveMap, type LiveData } from './LiveMap.js';
 import { getIcon as _ffIcon, getSportLabel as _ffLabel } from './Tracker.js';
 import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
@@ -73,9 +74,15 @@ export class FriendsView {
 
     // Odtworz znajomych z serwera (po reinstalacji Dexie jest pusty),
     // potem uzupelnij brakujace friendUserId i przerysuj liste.
-    void hydrateFriendsFromServer(BACKEND_URL)
-      .then(n => { if (n) void this.render(); })
-      .then(() => this._fixMissingFriendUserIds());
+    // MUSI czekac na sesje. `init()` odpala sie z main.ts przy starcie apki,
+    // zanim `/auth/session` ustali tozsamosc — a bez tokena `/auth/me` zwraca
+    // 401 (widac w logu Fly) i odtwarzanie konczylo sie po cichu zerem.
+    // To ten sam wyscig, ktory wczesniej zabijal rejestracje tokena FCM.
+    onSessionReady(() => {
+      void hydrateFriendsFromServer(BACKEND_URL)
+        .then(n => { if (n) void this.render(); })
+        .then(() => this._fixMissingFriendUserIds());
+    });
 
     // Renderuj listę
     void this.render();

@@ -14,6 +14,7 @@ import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId, type ProfileData } from './UserProfile.js';
 import type { ProfileRecord } from './db.js';
 import { loadPosts, type PostRecord } from './db.js';
+import { onSessionReady } from './authFetch.js';
 
 declare const Chart: any;
 
@@ -323,6 +324,9 @@ export class ProfileView {
       // `undefined`, robil `?? []` i pokazywal 0 obserwujacych oraz pusta liste,
       // mimo ze na koncie byli. /auth/me zwraca pelny dokument, wiec dziala tez
       // klikniecie w licznik (lista „kto mnie obserwuje").
+      // Tak samo jak przy znajomych: bez gotowej sesji `/auth/me` zwraca 401
+      // i liczniki zostawaly na zerze.
+      onSessionReady(() => {
       fetch(`${BACKEND_URL}/auth/me`, { cache: 'no-store' })
         .then(r => r.json())
         .then((d: { status: string; data: { followers?: string[]; following?: string[] } }) => {
@@ -341,6 +345,7 @@ export class ProfileView {
             _showFollowList(el, 'Following', following, myUserId);
           });
         }).catch(() => {});
+      });
     }
     return;
   }
