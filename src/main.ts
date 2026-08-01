@@ -8,6 +8,9 @@
 
 import { BACKEND_URL, PUBLIC_BASE_URL } from './config.js';
 import { dlog, isDebug, setDebug } from './utils/log.js';
+import { initAppCheck } from './modules/appCheck.js';
+// App Check musi ruszyc PRZED pierwszym zadaniem do backendu.
+void initAppCheck();
 // ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──
 import { installAuthFetch } from './modules/authFetch.js';
 installAuthFetch();

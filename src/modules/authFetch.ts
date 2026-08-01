@@ -17,6 +17,7 @@
 
 import { BACKEND_URL } from '../config.js';
 import { dlog, dwarn } from '../utils/log.js';
+import { getAppCheckToken } from './appCheck.js';
 
 type TokenProvider = () => Promise<string | null>;
 
@@ -114,7 +115,15 @@ export function installAuthFetch(): void {
 
     // ── Tryb gościa ──────────────────────────────────────────────────────────
     if (!token) {
-      if (isGuestAllowed(url)) return original(input, init);
+      if (isGuestAllowed(url)) {
+        // Nawet zadania goscia (logowanie, planowanie trasy) niosa App Check —
+        // to wlasnie one sa celem masowego naduzycia z przepisanym kluczem.
+        const ac = await getAppCheckToken();
+        if (!ac) return original(input, init);
+        const gh = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+        gh.set('X-Firebase-AppCheck', ac);
+        return original(input, { ...init, headers: gh });
+      }
       dwarn(
         `[authFetch] ODCIETE (${_sessionReady ? 'sesja gotowa, ale BRAK TOKENA' : 'brak sesji'}): ` +
         url.slice(BACKEND_URL.length),
@@ -126,6 +135,13 @@ export function installAuthFetch(): void {
       init?.headers ?? (input instanceof Request ? input.headers : undefined),
     );
     if (!headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+
+    // App Check — dowod, ze zadanie idzie z prawdziwej apki, nie ze skryptu.
+    // Naglowek dokladamy WYLACZNIE tutaj, czyli tylko dla `BACKEND_URL`
+    // (sprawdzone wyzej). Gdyby poszedl szerzej, token wyciekalby do
+    // Cloudinary, Mapboxa i CARTO — a on identyfikuje Twoja instalacje.
+    const appCheck = await getAppCheckToken();
+    if (appCheck) headers.set('X-Firebase-AppCheck', appCheck);
 
     const res = await original(input, { ...init, headers });
 
