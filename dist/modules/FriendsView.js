@@ -7,6 +7,7 @@
 //   - live mapa wbudowana w zakładkę
 //   - polling statusu znajomych co 30s
 import { getAllFriends, addFriend, deleteFriend, updateFriendLiveToken, updateFriendUserId, generateInviteLink, fetchInviteByCode, parseInviteLink, checkInviteInUrl, } from './FriendsDB.js';
+import { hydrateFriendsFromServer } from './FriendsDB.js';
 import { LiveMap } from './LiveMap.js';
 import { getIcon as _ffIcon, getSportLabel as _ffLabel } from './Tracker.js';
 import { BACKEND_URL, PUBLIC_BASE_URL } from '../config.js';
@@ -108,8 +109,12 @@ export class FriendsView {
         document.getElementById('btnAddFriend')?.addEventListener('click', () => this._showAddFriendModal());
         document.getElementById('btnScanQR')?.addEventListener('click', () => this._scanQR());
         document.getElementById('btnCloseLiveView')?.addEventListener('click', () => this._closeLiveView());
-        // Napraw znajomych bez friendUserId
-        void this._fixMissingFriendUserIds();
+        // Odtworz znajomych z serwera (po reinstalacji Dexie jest pusty),
+        // potem uzupelnij brakujace friendUserId i przerysuj liste.
+        void hydrateFriendsFromServer(BACKEND_URL)
+            .then(n => { if (n)
+            void this.render(); })
+            .then(() => this._fixMissingFriendUserIds());
         // Renderuj listę
         void this.render();
         // Od razu zweryfikuj statusy — nie czekaj 30s

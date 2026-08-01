@@ -317,7 +317,13 @@ export class ProfileView {
     // Pobierz followers/following z Atlas w tle
     const userId = profile.userId;
     if (userId) {
-      fetch(`${BACKEND_URL}/users/${encodeURIComponent(userId)}`, { cache: 'no-store' })
+      // WLASNY profil bierzemy z /auth/me, nie z /users/:id.
+      // Publiczny endpoint po Fazie 2 oddaje tylko `followersCount` i
+      // `followingCount` — bez tablic. Kod czytal `d.data.followers`, dostawal
+      // `undefined`, robil `?? []` i pokazywal 0 obserwujacych oraz pusta liste,
+      // mimo ze na koncie byli. /auth/me zwraca pelny dokument, wiec dziala tez
+      // klikniecie w licznik (lista „kto mnie obserwuje").
+      fetch(`${BACKEND_URL}/auth/me`, { cache: 'no-store' })
         .then(r => r.json())
         .then((d: { status: string; data: { followers?: string[]; following?: string[] } }) => {
           if (d.status !== 'ok') return;

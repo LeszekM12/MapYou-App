@@ -179,6 +179,60 @@ export function checkInviteInUrl(): string | null {
   }
 }
 
+
+/** Odtworz liste znajomych z serwera (Faza 4 — poza planem).
+ *
+ *  Znajomi zyli WYLACZNIE w Dexie na telefonie. Serwer ma ich od dawna
+ *  (`User.friends[]`, dopisywane przez POST /users/:id/friends/:friendId),
+ *  ale zaden kod ich stamtad nie odczytywal — wiec kazda reinstalacja albo
+ *  nowy telefon zaczynal z pusta lista i trzeba bylo zapraszac od nowa.
+ *
+ *  Dociagamy tylko BRAKUJACYCH — istniejacych wpisow nie ruszamy, zeby nie
+ *  nadpisac zapamietanego `pushSub` ani `liveToken`.
+ *
+ *  `subscriptionId` ustawiamy na `local:<userId>`, bo endpointu push znajomego
+ *  klient nie zna i znac nie powinien. Nie szkodzi: odpytywanie sesji live
+ *  uzywa `friendUserId`, a powiadomienia rozsyla serwer po swojej stronie.
+ */
+export async function hydrateFriendsFromServer(backendUrl: string): Promise<number> {
+  try {
+    const meRes = await fetch(`${backendUrl}/auth/me`, { cache: 'no-store' });
+    if (!meRes.ok) return 0;
+    const me = await meRes.json() as { status?: string; data?: { friends?: string[] } };
+    const ids = me.data?.friends ?? [];
+    if (!ids.length) return 0;
+
+    const known = new Set((await getAllFriends()).map(f => f.friendUserId).filter(Boolean));
+    const missing = ids.filter(id => !known.has(id));
+    if (!missing.length) return 0;
+
+    let added = 0;
+    for (const uid of missing) {
+      try {
+        const r = await fetch(`${backendUrl}/users/${encodeURIComponent(uid)}`, { cache: 'no-store' });
+        if (!r.ok) continue;
+        const d = await r.json() as { status?: string; data?: { name?: string } };
+        if (d.status !== 'ok') continue;
+        await addFriend({
+          name:           d.data?.name ?? 'MapYou User',
+          friendUserId:   uid,
+          subscriptionId: `local:${uid}`,
+          pushSub:        { endpoint: `local:${uid}`, expirationTime: null, keys: { p256dh: '', auth: '' } },
+          liveToken:      null,
+          lastSeen:       null,
+          addedAt:        Date.now(),
+        });
+        added++;
+      } catch { /* pojedynczy znajomy — nie przerywamy reszty */ }
+    }
+    if (added) dlog(`[FriendsDB] odtworzono ${added} znajomych z serwera`);
+    return added;
+  } catch (err) {
+    console.warn('[FriendsDB] nie udalo sie odtworzyc znajomych:', err instanceof Error ? err.message : err);
+    return 0;
+  }
+}
+
 /** Usun wszystkich znajomych z urzadzenia (wylogowanie).
  *  `mapyou_friends` to OSOBNA baza Dexie, wiec czyszczenie glownej bazy
  *  jej nie obejmuje — bez tego znajomi poprzedniego uzytkownika zostawali. */

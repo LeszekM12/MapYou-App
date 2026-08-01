@@ -726,11 +726,55 @@ async function fillProfileFromProvider(user: AccountUser | null): Promise<void> 
   const { saveProfileToLocal } = await import('./UserProfile.js');
   const patch: { name?: string; avatarB64?: string } = {};
 
-  const localName = (localStorage.getItem('mapyou_userName') ?? '').trim();
-  const isPlaceholder = !localName || localName === 'MapYou User' || localName === 'Athlete';
+  // ── Zrodlem prawdy jest SERWER, nie localStorage ──────────────────────────
+  // Wczesniej ta funkcja pytala o `mapyou_userName` i `mapyou_avatar`
+  // w localStorage. Po CZYSTEJ INSTALACJI localStorage jest pusty, wiec guard
+  // uznawal, ze konto nie ma ani imienia, ani zdjecia — i nadpisywal jedno
+  // i drugie danymi z Google, mimo ze na koncie byly wlasne.
+  //
+  // Drugi, grozniejszy skutek: `saveProfileToLocal` wysyla na serwer CALY
+  // lokalny profil (`loadProfileFromLocal()`), a nie sama latke. Swiezy
+  // localStorage ma puste bio, miasto i wage — wiec zapis imienia kasowal
+  // w Atlasie „o mnie" i reszte pol.
+  //
+  // Dlatego: najpierw pytamy serwer, potem uzupelniamy localStorage jego
+  // wartosciami, a dopiero na koncu dokladamy to, czego naprawde brakuje.
+  let srv: Record<string, unknown> | null = null;
+  try {
+    const res = await fetch(`${BACKEND_URL}/auth/me`, { cache: 'no-store', signal: AbortSignal.timeout(10_000) });
+    if (res.ok) {
+      const d = await res.json() as { status?: string; data?: Record<string, unknown> };
+      if (d.status === 'ok' && d.data) srv = d.data;
+    }
+  } catch { /* brak sieci — nie ryzykujemy nadpisania, wychodzimy nizej */ }
+
+  // Bez potwierdzenia z serwera NIC nie zapisujemy. Lepiej zostawic profil
+  // nieuzupelniony niz skasowac istniejacy.
+  if (!srv) {
+    dlog('[Account] pomijam uzupelnienie profilu — brak odpowiedzi serwera');
+    return;
+  }
+
+  // Odtworz w localStorage to, co ma serwer — zeby pelny zapis nizej niczego
+  // nie wyzerowal.
+  const mirror: Record<string, string> = {
+    mapyou_userName: 'name', mapyou_bio: 'bio', mapyou_city: 'city',
+    mapyou_region: 'region', mapyou_birthDate: 'birthDate',
+    mapyou_gender: 'gender', mapyou_weightKg: 'weightKg',
+  };
+  for (const [lsKey, field] of Object.entries(mirror)) {
+    const v = srv[field];
+    if (v !== undefined && v !== null && v !== '') localStorage.setItem(lsKey, String(v));
+  }
+  if (typeof srv.avatarB64 === 'string' && srv.avatarB64) {
+    localStorage.setItem('mapyou_avatar', srv.avatarB64);
+  }
+
+  const srvName = String(srv.name ?? '').trim();
+  const isPlaceholder = !srvName || srvName === 'MapYou User' || srvName === 'Athlete';
   if (isPlaceholder && user.displayName) patch.name = user.displayName;
 
-  const hasAvatar = !!localStorage.getItem('mapyou_avatar');
+  const hasAvatar = typeof srv.avatarB64 === 'string' && srv.avatarB64.length > 0;
   if (!hasAvatar && user.photoUrl) {
     try {
       // Zdjecie zapisujemy jako base64, a nie URL — dzieki temu dziala offline
