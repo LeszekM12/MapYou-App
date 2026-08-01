@@ -562,6 +562,7 @@ export class FriendsView {
   private _showAddFriendModal(
     prefillName?: string,
     prefillSub?: Friend['pushSub'],
+    prefillFriendUserId?: string | null,
   ): void {
     document.getElementById('addFriendModal')?.remove();
 
@@ -602,9 +603,21 @@ export class FriendsView {
     modal.querySelector('#afAdd')?.addEventListener('click', async () => {
       let name = prefillName;
       let sub  = prefillSub;
-      let invFriendId: string | null = null;
+      let invFriendId: string | null = prefillFriendUserId ?? null;
 
-      if (!prefillSub) {
+      // Warunek sprawdza IMIE, nie `pushSub`.
+      //
+      // Wczesniej stalo tu `if (!prefillSub)`. Zaproszenie utworzone przez apke
+      // NATYWNA nie ma subskrypcji web push (`navigator.serviceWorker` tam nie
+      // istnieje), wiec backend zapisuje `pushSub: null` i tyle oddaje. Modal
+      // dostawal poprawne imie, ale puste `prefillSub` — i wchodzil w galaz
+      // „odczytaj kod z pola tekstowego". Pole bylo puste, wiec leciало
+      // `GET /live/invite/` bez kodu, backend zwracal 404, a uzytkownik widzial
+      // „Invalid or expired invite link" MIMO ze zaproszenie bylo poprawne.
+      //
+      // Objaw byl niewidoczny, dopoki linki nie otwieraly apki — dlatego wyszedl
+      // dopiero po uruchomieniu App Links.
+      if (!prefillName) {
         const input = modal.querySelector<HTMLInputElement>('#afLinkInput');
         const raw   = input?.value.trim() ?? '';
 
@@ -805,7 +818,7 @@ export class FriendsView {
     code = code.replace(/^#?invite=/, '');
     if (!code) { this._showToast('No invite found'); return; }
     const inv = await fetchInviteByCode(code, BACKEND_URL);
-    if (inv) { this._showAddFriendModal(inv.name, inv.pushSub); return; }
+    if (inv) { this._showAddFriendModal(inv.name, inv.pushSub, inv.friendUserId ?? null); return; }
     const parsed = parseInviteLink(`#invite=${code}`);
     if (parsed) { this._showAddFriendModal(parsed.name, parsed.pushSub); return; }
     this._showToast('Invite not found or expired');

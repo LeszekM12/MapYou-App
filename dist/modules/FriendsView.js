@@ -558,7 +558,7 @@ export class FriendsView {
         }
     }
     // ── Add friend modal ───────────────────────────────────────────────────────
-    _showAddFriendModal(prefillName, prefillSub) {
+    _showAddFriendModal(prefillName, prefillSub, prefillFriendUserId) {
         document.getElementById('addFriendModal')?.remove();
         const modal = document.createElement('div');
         modal.id = 'addFriendModal';
@@ -594,8 +594,20 @@ export class FriendsView {
         modal.querySelector('#afAdd')?.addEventListener('click', async () => {
             let name = prefillName;
             let sub = prefillSub;
-            let invFriendId = null;
-            if (!prefillSub) {
+            let invFriendId = prefillFriendUserId ?? null;
+            // Warunek sprawdza IMIE, nie `pushSub`.
+            //
+            // Wczesniej stalo tu `if (!prefillSub)`. Zaproszenie utworzone przez apke
+            // NATYWNA nie ma subskrypcji web push (`navigator.serviceWorker` tam nie
+            // istnieje), wiec backend zapisuje `pushSub: null` i tyle oddaje. Modal
+            // dostawal poprawne imie, ale puste `prefillSub` — i wchodzil w galaz
+            // „odczytaj kod z pola tekstowego". Pole bylo puste, wiec leciало
+            // `GET /live/invite/` bez kodu, backend zwracal 404, a uzytkownik widzial
+            // „Invalid or expired invite link" MIMO ze zaproszenie bylo poprawne.
+            //
+            // Objaw byl niewidoczny, dopoki linki nie otwieraly apki — dlatego wyszedl
+            // dopiero po uruchomieniu App Links.
+            if (!prefillName) {
                 const input = modal.querySelector('#afLinkInput');
                 const raw = input?.value.trim() ?? '';
                 // Wyodrębnij kod z URL lub użyj bezpośrednio
@@ -794,7 +806,7 @@ export class FriendsView {
         }
         const inv = await fetchInviteByCode(code, BACKEND_URL);
         if (inv) {
-            this._showAddFriendModal(inv.name, inv.pushSub);
+            this._showAddFriendModal(inv.name, inv.pushSub, inv.friendUserId ?? null);
             return;
         }
         const parsed = parseInviteLink(`#invite=${code}`);
