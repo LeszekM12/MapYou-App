@@ -7,3 +7,9 @@ android/app/build/
 android/local.properties
 android/capacitor-cordova-android-plugins/build/
 android/app/google-services.json
+# Faza 4 / D2 — podpis release (hasla NIGDY do repo)
+android/keystore.properties
+*.jks
+*.keystore
+node_modules/
+www/

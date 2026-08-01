@@ -1,5 +1,17 @@
 apply plugin: 'com.android.application'
 
+// ─── PODPIS RELEASE (Faza 4 / D2) ────────────────────────────────────────────
+// Haslo do keystore NIE MOZE trafic do repozytorium. Czytamy je z pliku
+// `android/keystore.properties`, ktory jest w .gitignore. Gdy pliku nie ma
+// (np. na swiezym klonie albo w CI bez sekretow), build debug dziala normalnie,
+// a release po prostu nie zostanie podpisany — zamiast wysypac sie bledem.
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+def hasKeystore = keystorePropertiesFile.exists()
+if (hasKeystore) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace = "com.leszekm12.mapyou"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,10 +28,23 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        if (hasKeystore) {
+            release {
+                storeFile     file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias      keystoreProperties['keyAlias']
+                keyPassword   keystoreProperties['keyPassword']
+            }
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (hasKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }
