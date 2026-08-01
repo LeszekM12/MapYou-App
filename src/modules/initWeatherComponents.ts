@@ -6,6 +6,7 @@ import { getWeather, clearWeatherCache } from './WeatherService.js';
 import { WeatherModal }       from './WeatherModal.js';
 import type { WeatherData }   from './WeatherTypes.js';
 import type { Coords }        from '../types/index.js';
+import { dlog } from '../utils/log.js';
 import {
   getIPLocation,
   hasGPSPermission,
@@ -75,7 +76,7 @@ export async function switchToGPSWeather(): Promise<void> {
     const gpsCoords = await getGPSLocation();
     clearWeatherCache(); // force fresh fetch — coords changed from IP to GPS
     await loadWeather(gpsCoords);
-    console.info('[Weather] Switched to GPS location');
+    dlog('[Weather] Switched to GPS location');
   } catch {
     console.warn('[Weather] GPS switch failed — keeping IP weather');
   }

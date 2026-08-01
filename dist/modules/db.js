@@ -114,7 +114,7 @@ export async function migrateLocalStorageToIndexedDB() {
     const normalized = parsed.map(w => normalizeWorkout(w));
     try {
         await db.workouts.bulkAdd(normalized);
-        console.info(`[DB] ✅ Zmigrowano ${normalized.length} workoutów.`);
+        dlog(`[DB] ✅ Zmigrowano ${normalized.length} workoutów.`);
     }
     catch (err) {
         console.error('[DB] ❌ Błąd migracji:', err);
@@ -148,7 +148,7 @@ export async function clearAllWorkoutsFromDB() {
 export async function saveActivity(activity) {
     try {
         await db.activities.put(activity);
-        console.info(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
+        dlog(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
         return activity.id;
     }
     catch (err) {
@@ -181,7 +181,7 @@ export async function deleteActivity(id) {
 export async function saveEnrichedActivity(activity) {
     try {
         await db.enrichedActivities.put(activity);
-        console.info(`[DB] ✅ EnrichedActivity saved: ${activity.id}`);
+        dlog(`[DB] ✅ EnrichedActivity saved: ${activity.id}`);
         return activity.id;
     }
     catch (err) {

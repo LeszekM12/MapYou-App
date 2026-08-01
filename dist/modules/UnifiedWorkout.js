@@ -5,6 +5,7 @@
 // Merges WorkoutRecord + EnrichedActivity + ActivityRecord into one model.
 // Migration runs once on first load.
 import { db } from './db.js';
+import { dlog } from '../utils/log.js';
 // ── DB re-exports (single Dexie instance lives in db.ts) ────────────────────
 // We re-export from db.ts to keep ONE instance of Dexie('mapty').
 export { saveUnifiedWorkout, loadUnifiedWorkouts, deleteUnifiedWorkout, } from './db.js';
@@ -160,7 +161,7 @@ export async function migrateToUnified() {
     const filtered = results.filter(r => !deletedIds.has(r.id));
     if (filtered.length > 0) {
         await db.unifiedWorkouts.bulkPut(filtered);
-        console.info(`[UnifiedDB] ✅ Synced ${filtered.length} workouts to unified table`);
+        dlog(`[UnifiedDB] ✅ Synced ${filtered.length} workouts to unified table`);
     }
     // Also clean up any that snuck back in
     if (deletedIds.size > 0) {

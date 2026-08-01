@@ -3,6 +3,7 @@
 // Switches to GPS automatically when permission is later granted.
 import { getWeather, clearWeatherCache } from './WeatherService.js';
 import { WeatherModal } from './WeatherModal.js';
+import { dlog } from '../utils/log.js';
 import { getIPLocation, hasGPSPermission, getGPSLocation, subscribeToPermissionChanges, } from './LocationService.js';
 // ── Singletons ────────────────────────────────────────────────────────────────
 let _modal = null;
@@ -66,7 +67,7 @@ export async function switchToGPSWeather() {
         const gpsCoords = await getGPSLocation();
         clearWeatherCache(); // force fresh fetch — coords changed from IP to GPS
         await loadWeather(gpsCoords);
-        console.info('[Weather] Switched to GPS location');
+        dlog('[Weather] Switched to GPS location');
     }
     catch {
         console.warn('[Weather] GPS switch failed — keeping IP weather');

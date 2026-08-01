@@ -7,7 +7,7 @@
 
 
 import { BACKEND_URL, PUBLIC_BASE_URL } from './config.js';
-import { isDebug, setDebug } from './utils/log.js';
+import { dlog, isDebug, setDebug } from './utils/log.js';
 // ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──
 import { installAuthFetch } from './modules/authFetch.js';
 installAuthFetch();
@@ -330,7 +330,7 @@ class App {
         try {
           const coords = JSON.parse(saved) as Coords;
           this._loadMap(coords, this.#mapZoomLevel);
-          console.info('[Map] Loaded with last saved GPS coords (no prompt)');
+          dlog('[Map] Loaded with last saved GPS coords (no prompt)');
           subscribeToPermissionChanges((c) => this._recenterMapToGPS(c));
           return;
         } catch { /* fall through to IP */ }
@@ -342,7 +342,7 @@ class App {
     const ipLoc = await getIPLocation();
     if (ipLoc) {
       coords = ipLoc.coords;
-      console.info(`[Map] IP location: ${ipLoc.city}, ${ipLoc.country}`);
+      dlog(`[Map] IP location: ${ipLoc.city}, ${ipLoc.country}`);
     } else {
       console.warn('[Map] IP location failed — using default coords');
     }

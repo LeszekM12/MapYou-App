@@ -10,6 +10,7 @@
 import type { Coords } from '../types/index.js';
 import type { UnifiedWorkout } from './db.js';
 import { db } from './db.js';
+import { dlog } from '../utils/log.js';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -175,7 +176,7 @@ export async function migrateToUnified(): Promise<void> {
 
   if (filtered.length > 0) {
     await db.unifiedWorkouts.bulkPut(filtered);
-    console.info(`[UnifiedDB] ✅ Synced ${filtered.length} workouts to unified table`);
+    dlog(`[UnifiedDB] ✅ Synced ${filtered.length} workouts to unified table`);
   }
 
   // Also clean up any that snuck back in

@@ -278,7 +278,7 @@ export async function migrateLocalStorageToIndexedDB(): Promise<number> {
   const normalized = parsed.map(w => normalizeWorkout(w as Record<string, unknown>));
   try {
     await db.workouts.bulkAdd(normalized);
-    console.info(`[DB] ✅ Zmigrowano ${normalized.length} workoutów.`);
+    dlog(`[DB] ✅ Zmigrowano ${normalized.length} workoutów.`);
   } catch (err) {
     console.error('[DB] ❌ Błąd migracji:', err);
     return 0;
@@ -318,7 +318,7 @@ export async function clearAllWorkoutsFromDB(): Promise<void> {
 export async function saveActivity(activity: ActivityRecord): Promise<string> {
   try {
     await db.activities.put(activity);
-    console.info(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
+    dlog(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
     return activity.id;
   } catch (err) {
     console.error('[DB] Błąd zapisu aktywności:', err);
@@ -353,7 +353,7 @@ export async function deleteActivity(id: string): Promise<void> {
 export async function saveEnrichedActivity(activity: EnrichedActivity): Promise<string> {
   try {
     await db.enrichedActivities.put(activity);
-    console.info(`[DB] ✅ EnrichedActivity saved: ${activity.id}`);
+    dlog(`[DB] ✅ EnrichedActivity saved: ${activity.id}`);
     return activity.id;
   } catch (err) {
     console.error('[DB] Błąd zapisu enrichedActivity:', err);
