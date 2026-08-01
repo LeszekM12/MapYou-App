@@ -100,48 +100,61 @@ export class LiveTracker {
         localStorage.setItem(LS_TOKEN_KEY, this._token);
         const userName = getUserName();
         const liveUrl = getLiveUrl(this._token);
-        // Zbierz push subskrypcje znajomych — pobierz świeże z backendu po userId
         const friends = await getAllFriends();
-        const friendUserIds = friends
-            .map(f => f.friendUserId)
-            .filter((id) => !!id);
-        // Pobierz aktualne subskrypcje z backendu dla każdego znajomego
-        const freshSubs = [];
-        await Promise.all(friendUserIds.map(async (uid) => {
-            try {
-                const res = await fetch(`${BACKEND_URL}/push/subscriptions-for/${encodeURIComponent(uid)}`);
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.status === 'ok')
-                        freshSubs.push(...data.data);
-                }
-            }
-            catch { /* offline */ }
-        }));
-        // Fallback — użyj lokalnych subskrypcji jeśli backend nie odpowiedział
-        const friendSubs = freshSubs.length > 0
-            ? freshSubs
-            : friends.filter(f => f.pushSub?.endpoint).map(f => f.pushSub);
-        // Owner identity — so viewers match THIS session to the right friend
         const myUserId = getUserId();
-        let ownerEndpoint = null;
+        // Lokalne subskrypcje znajomych jako materiał pomocniczy. Backend i tak
+        // dolozy swieze po swojej stronie — patrz komentarz nizej.
+        const friendSubs = friends.filter(f => f.pushSub?.endpoint).map(f => f.pushSub);
+        // ── Rejestracja sesji MUSI byc pierwsza ──────────────────────────────────
+        // Wczesniej przed tym zapytaniem stalo `await navigator.serviceWorker.ready`.
+        // Na iOS `navigator.serviceWorker` nie istnieje, wiec linia rzucala od razu
+        // i leciala do catch — sesja powstawala. Na Androidzie obiekt ISTNIEJE, a
+        // `.ready` to obietnica, ktora NIGDY sie nie rozwiazuje, jesli zaden worker
+        // nie zostal aktywowany. `await` wisial w nieskonczonosc, `/live/start`
+        // nigdy nie leciał, a natywny tracker mimo to slal `/live/update` — backend
+        // odpowiadal 404, bo sesja nie istniala. Stad live dzialal tylko z iPhone'a
+        // na Samsunga, nigdy odwrotnie.
+        //
+        // Teraz sesja powstaje ZANIM cokolwiek moze sie zawiesic. `ownerEndpoint`
+        // jest tylko usprawnieniem dopasowania sesji do znajomego, wiec dochodzi
+        // osobnym zadaniem, gdy juz go znamy.
         try {
-            const reg = await navigator.serviceWorker.ready;
-            const sub = await reg.pushManager.getSubscription();
-            ownerEndpoint = sub?.endpoint ?? null;
-        }
-        catch { /* no push */ }
-        // Zarejestruj sesję na backendzie + wyślij push do znajomych
-        try {
-            await fetch(`${BACKEND_URL}/live/start`, {
+            const res = await fetch(`${BACKEND_URL}/live/start`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running', myUserId, ownerEndpoint }),
+                signal: AbortSignal.timeout(15000),
+                body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs, sport: this._sport ?? 'running', myUserId }),
             });
+            if (!res.ok)
+                console.warn('[LiveTracker] /live/start HTTP', res.status);
         }
         catch (err) {
             console.warn('[LiveTracker] start failed:', err);
         }
+        // Wlasny endpoint push — dopiero teraz, z twardym limitem czasu.
+        // `serviceWorker.ready` potrafi nie rozwiazac sie nigdy, wiec NIGDY nie
+        // wolno na nia czekac bez wyscigu z timerem.
+        void (async () => {
+            try {
+                if (!('serviceWorker' in navigator))
+                    return;
+                const reg = await Promise.race([
+                    navigator.serviceWorker.ready,
+                    new Promise(r => setTimeout(() => r(null), 3000)),
+                ]);
+                if (!reg)
+                    return;
+                const sub = await reg.pushManager.getSubscription();
+                if (!sub?.endpoint)
+                    return;
+                await fetch(`${BACKEND_URL}/live/start`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token: this._token, userName, liveUrl, friendSubs: [], sport: this._sport ?? 'running', myUserId, ownerEndpoint: sub.endpoint }),
+                });
+            }
+            catch { /* brak push — sesja i tak dziala po userId */ }
+        })();
         // Zacznij śledzenie GPS
         this._startGPS();
         // Wysyłaj pozycję co INTERVAL_MS (web/PWA; na iOS przy blokadzie ticki śpią,
