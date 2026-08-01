@@ -66,7 +66,32 @@ export class LiveMap {
         this._map = L.map(this._container, {
             zoomControl: true,
             attributionControl: false,
-        }).setView([52, 19], 13);
+        });
+        // BEZ `setView` na start. Wczesniej stalo tu `setView([52, 19], 13)` —
+        // geometryczny srodek Polski. Mapa renderowala sie tam, sciagala komplet
+        // kafelkow dla przypadkowego pola pod Lodzia, a dopiero po odpowiedzi
+        // serwera przeskakiwala do znajomego i ladowala kafelki DRUGI RAZ.
+        // Stad kilka sekund czekania.
+        //
+        // Leaflet wymaga jakiegos widoku, zanim cokolwiek narysuje, wiec dajemy
+        // ostatnia znana pozycje uzytkownika (ma ja w localStorage z wlasnej mapy).
+        // Znajomy jest zwykle w poblizu, wiec kafelki czesto sa juz w cache.
+        let start = [52, 19];
+        let zoom = 13;
+        try {
+            // `mapty_last_coords` zapisuje glowna mapa apki. Format to krotka
+            // [lat, lng] (typ `Coords`), nie obiekt — patrz src/types/index.ts.
+            const raw = localStorage.getItem('mapty_last_coords');
+            if (raw) {
+                const c = JSON.parse(raw);
+                if (Array.isArray(c) && typeof c[0] === 'number' && typeof c[1] === 'number') {
+                    start = [c[0], c[1]];
+                    zoom = 15;
+                }
+            }
+        }
+        catch { /* brak zapisanej pozycji — zostaje widok ogolny */ }
+        this._map.setView(start, zoom);
         L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap',
         }).addTo(this._map);
@@ -80,8 +105,13 @@ export class LiveMap {
     watch(token) {
         this._token = token;
         this._stopPolling();
-        this._initMap(); // lazy init — mapa jest teraz widoczna
-        void this._poll(); // natychmiastowe pobranie
+        // Kolejnosc ma znaczenie. Wczesniej najpierw powstawala mapa (co uruchamia
+        // pobieranie kafelkow), a dopiero potem szlo zapytanie o pozycje znajomego.
+        // Teraz oba ida ROWNOLEGLE — zapytanie startuje pierwsze, a Leaflet buduje
+        // sie w tym samym czasie. Oszczedza to tyle, ile trwa odpowiedz serwera.
+        const first = this._poll();
+        this._initMap();
+        void first;
         this._pollTimer = setInterval(() => void this._poll(), POLL_INTERVAL_MS);
     }
     /** Zatrzymaj polling */
@@ -143,7 +173,10 @@ export class LiveMap {
                     weight: 3,
                 }).addTo(this._map);
                 // Zawsze centruj na pierwszej pozycji znajomego
-                this._map.setView(pos, 16, { animate: true });
+                // BEZ animacji przy pierwszym ustaleniu pozycji. Animowany przelot
+                // trwa ~0,25 s i po drodze zamawia kafelki dla kazdej klatki — czyli
+                // dla trasy, ktorej nikt nie oglada. Skok jest natychmiastowy.
+                this._map.setView(pos, 16, { animate: false });
             }
             else {
                 this._marker.setLatLng(pos);
