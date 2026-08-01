@@ -480,6 +480,9 @@ export class Tracker {
             }
         }, 1000);
         this.onUpdate(this._buildStats());
+        // Po wznowieniu z migawki wyspa musi znac stan pauzy — inaczej startuje
+        // w trybie „biegnie" mimo wstrzymanego treningu.
+        void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
     }
     // ── Pause ───────────────────────────────────────────────────────────────────
     pause() {
@@ -812,7 +815,17 @@ export class Tracker {
             // pausedTime grows on every resume, pushing the anchor forward so pauses
             // are excluded. While paused the timer is hidden (opacity), so the
             // momentarily-stale anchor is never visible.
-            timerRef: this.startTime + this.pausedTime,
+            // Kotwica ZAMROZONA na czas pauzy.
+            //
+            // `pausedTime` rosnie dopiero przy wznowieniu, wiec podczas pauzy
+            // kotwica zostawala nieaktualna i natywny licznik tykal dalej. Mialo go
+            // zaslaniac przelaczenie przezroczystosci, ale gdy to zawiedzie (a na
+            // Dynamic Island zawodzilo), uzytkownik widzi biegnacy czas mimo pauzy.
+            // Doliczajac trwajaca pauze do kotwicy sprawiamy, ze licznik stoi
+            // NAPRAWDE — niezaleznie od tego, czy warstwa graficzna go ukryla.
+            timerRef: this.startTime + this.pausedTime
+                + (this._paused && this.pauseStart ? Date.now() - this.pauseStart : 0)
+                + (this._autoPaused && this._autoPauseStart ? Date.now() - this._autoPauseStart : 0),
             paused,
         };
     }

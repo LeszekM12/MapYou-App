@@ -1437,6 +1437,19 @@ class App {
 
       if (this._isLiveShareEnabled()) void liveTracker.start();
       void this._requestWakeLock();
+
+      // NAJPIERW przelacz zakladke, potem wejdz w widok trackingu.
+      //
+      // `_enterTrackingView()` tylko DODAJE klase `tab-panel--active` do
+      // `tabMap` — nie zdejmuje jej z pozostalych. Przy zwyklym starcie
+      // treningu uzytkownik jest juz na Mapie, wiec to nie przeszkadza.
+      // Przy wznawianiu apka otwiera zakladke domyslna i obie karty zostawaly
+      // aktywne naraz: widac bylo Mape z nalozonym interfejsem Track.
+      try {
+        const go = (window as unknown as Record<string, unknown>).__switchTab as
+          | ((id: string) => void) | undefined;
+        go?.('tabMap');
+      } catch { /* zakladki jeszcze nie gotowe */ }
       this._enterTrackingView();
 
       dlog(`[Track] wznowiono trening: ${coords.length} punktow, ${(state.distanceM / 1000).toFixed(2)} km`);
