@@ -96,6 +96,41 @@ export class FriendsView {
             setTimeout(() => this._openLiveView(token, 'Live Tracking'), 500);
             history.replaceState(null, '', window.location.pathname);
         }
+        // ── Linki otwarte PRZEZ SYSTEM (App Links / Universal Links) ─────────────
+        // Kod wyzej czyta `window.location.hash` — to dziala tylko przy zimnym
+        // starcie z adresu wpisanego w WebView. Gdy link otwiera system (klikniecie
+        // w Messengerze, zeskanowanie QR aparatem), Capacitor NIE nawiguje WebView,
+        // tylko oddaje adres zdarzeniem `appUrlOpen`. Hash zostaje pusty i dlatego
+        // apka sie otwierala, ale znajomy nigdy sie nie dodawal.
+        //
+        // Wtyczka jest opcjonalna: gdy jej nie ma (web/PWA), po prostu pomijamy —
+        // tam dziala sciezka hash powyzej.
+        void (async () => {
+            try {
+                const cap = window.Capacitor;
+                const appPlugin = cap?.Plugins?.App;
+                if (!appPlugin?.addListener)
+                    return;
+                appPlugin.addListener('appUrlOpen', (data) => {
+                    const url = data?.url ?? '';
+                    if (!url)
+                        return;
+                    const hash = url.includes('#') ? url.slice(url.indexOf('#')) : '';
+                    if (hash.startsWith('#invite=')) {
+                        void this._processInviteCode(hash.replace('#invite=', ''));
+                    }
+                    else if (hash.startsWith('#live=')) {
+                        this._openLiveView(hash.replace('#live=', ''), 'Live Tracking');
+                    }
+                    else if (hash.startsWith('#club=') || hash.startsWith('#club_open=')) {
+                        // Kluby obsluguje samodzielny blok w main.ts — przekazujemy mu adres
+                        // przez hash, zeby nie duplikowac logiki.
+                        location.hash = hash;
+                    }
+                });
+            }
+            catch { /* brak wtyczki — sciezka hash wystarcza */ }
+        })();
         // Global hook so a tapped live notification (in-app bell) can open the live map
         window.__openLive = (token, name) => this._openLiveView(token, name);
         // Inicjalizuj mapę w kontenerze
@@ -225,10 +260,34 @@ export class FriendsView {
             list.querySelectorAll('[data-delete]').forEach(btn => {
                 btn.addEventListener('click', async () => {
                     const id = Number(btn.dataset.delete);
-                    if (confirm('Remove this friend?')) {
-                        await deleteFriend(id);
-                        void this.render();
+                    if (!confirm('Remove this friend?'))
+                        return;
+                    // Usuniecie MUSI pojsc takze na serwer. Wczesniej kasowalo tylko
+                    // lokalna baze Dexie, a wpis zostawal w `User.friends[]` — czyli
+                    // znajomy dalej widzial feed „dla znajomych" i trening na zywo,
+                    // mimo ze zniknal z listy. Po dodaniu odtwarzania znajomych z serwera
+                    // wracal tez na sama liste przy kolejnym wejsciu w zakladke.
+                    const friends = await getAllFriends();
+                    const friend = friends.find(f => f.id === id);
+                    const myUserId = getUserId();
+                    if (friend?.friendUserId && myUserId) {
+                        try {
+                            const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(myUserId)}/friends/${encodeURIComponent(friend.friendUserId)}`, { method: 'DELETE' });
+                            if (!res.ok) {
+                                // Bez potwierdzenia z serwera NIE kasujemy lokalnie — inaczej
+                                // znajomy znika z ekranu, ale nadal ma dostep do Twoich danych,
+                                // a przy nastepnym starcie i tak wroci.
+                                alert('Nie udalo sie usunac znajomego na serwerze. Sprobuj ponownie.');
+                                return;
+                            }
+                        }
+                        catch {
+                            alert('Brak polaczenia. Znajomy nie zostal usuniety.');
+                            return;
+                        }
                     }
+                    await deleteFriend(id);
+                    void this.render();
                 });
             });
         }
