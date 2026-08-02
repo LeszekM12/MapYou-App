@@ -232,6 +232,29 @@ db.version(7).stores({
 // Nie ginie po ubiciu apki ani po restarcie telefonu. Kazdy rekord niesie
 // wlasny `idemKey`, dzieki ktoremu ponowienie NIE tworzy duplikatu
 // (patrz middleware/idempotency.ts po stronie backendu).
+// version(10) — cache kafelkow mapy.
+//
+// Kafelki to gotowe obrazki PNG sciagane z CARTO/OSM. Bez cache mapa offline
+// pokazuje tylko to, co przypadkiem zostalo w cache przegladarki — czyli
+// dokladnie ten fragment i to jedno powiekszenie, ktore akurat ogladales.
+//
+// Klucz to `styl/z/x/y`. `lastUsed` sluzy do kasowania najstarszych, gdy
+// cache przekroczy limit — inaczej urosloby to do setek megabajtow
+// (sam zoom 17 dla promienia 10 km to ~250 MB).
+db.version(10).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
+  activeSession:      'id',
+  sessionCoords:      '++seq',
+  outbox:             '++id, createdAt',
+  tiles:              'key, lastUsed',
+});
+
 db.version(9).stores({
   workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
   activities:         'id, sport, date, distanceKm, durationSec',
