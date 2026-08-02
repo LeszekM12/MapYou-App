@@ -57,6 +57,11 @@ function newKey() {
 /** Odloz zapis na pozniej. Zwraca klucz idempotencji nadany temu zadaniu. */
 export async function enqueue(url, method, headers, body) {
     const idemKey = newKey();
+    // Token NIE trafia do kolejki. Zapis moze poczekac godziny, a token wygasa
+    // po ~60 minutach — zapisany bylby bezuzyteczny. Swiezy dolozy `authFetch`
+    // przy ponownej probie.
+    delete headers['Authorization'];
+    delete headers['authorization'];
     await tbl().add({
         idemKey, url, method, headers, body,
         createdAt: Date.now(), attempts: 0, lastError: null,
@@ -121,9 +126,13 @@ export async function flush() {
             if (item.attempts >= MAX_ATTEMPTS)
                 continue;
             try {
+                // `X-Outbox-Replay` mowi `authFetch`, ze to JUZ jest ponowienie
+                // z kolejki. Bez tego przechwytywacz zlapalby blad sieci i dolozyl
+                // to samo zadanie DRUGI RAZ — kolejka nigdy by sie nie oproznila,
+                // tylko rosla przy kazdej nieudanej probie.
                 const res = await fetch(item.url, {
                     method: item.method,
-                    headers: { ...item.headers, 'Idempotency-Key': item.idemKey },
+                    headers: { ...item.headers, 'Idempotency-Key': item.idemKey, 'X-Outbox-Replay': '1' },
                     body: item.body,
                 });
                 if (res.ok || res.status === 409) {
@@ -131,6 +140,7 @@ export async function flush() {
                     // proba jednak doszla, tylko odpowiedz do nas nie wrocila.
                     await tbl().delete(item.id);
                     dlog(`[Outbox] wyslano ${item.method} ${item.url}`);
+                    notifyChange(); // licznik ma spadac na biezaco, nie dopiero na koncu
                     continue;
                 }
                 if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
@@ -139,6 +149,7 @@ export async function flush() {
                     // to znaczy, ze zapis przepadl i uzytkownik powinien wiedziec.
                     console.error(`[Outbox] zapis odrzucony na stale (${res.status}): ${item.method} ${item.url}`);
                     await tbl().delete(item.id);
+                    notifyChange();
                     continue;
                 }
                 // 5xx / 408 / 429 — problem po stronie serwera, ma prawo minac.
@@ -226,4 +237,29 @@ export function mountOfflineBar() {
     window.addEventListener('online', () => { void pendingCount().then(render); });
     window.addEventListener('offline', () => { void pendingCount().then(render); });
 }
+// ── Diagnostyka ──────────────────────────────────────────────────────────────
+/** Podglad kolejki z konsoli:  mapyouOutbox()
+ *
+ *  Pokazuje, co dokladnie czeka, ile razy probowano i na czym padlo.
+ *  `mapyouOutbox(true)` czysci kolejke — uzywac tylko swiadomie,
+ *  bo kasuje dane uzytkownika, ktore nigdy nie doszly na serwer. */
+window.mapyouOutbox =
+    async (purge = false) => {
+        if (purge) {
+            const n = await pendingCount();
+            await tbl().clear();
+            notifyChange();
+            return `Wyczyszczono kolejke (${n} pozycji BEZPOWROTNIE utraconych).`;
+        }
+        const items = await listPending();
+        if (!items.length)
+            return 'Kolejka pusta.';
+        return items.map(i => ({
+            id: i.id,
+            zadanie: `${i.method} ${i.url.replace(/^https?:\/\/[^/]+/, '')}`,
+            prob: i.attempts,
+            blad: i.lastError ?? '—',
+            czeka: `${Math.round((Date.now() - i.createdAt) / 1000)} s`,
+        }));
+    };
 //# sourceMappingURL=outbox.js.map

@@ -140,6 +140,13 @@ export function installAuthFetch() {
             res = await original(input, { ...init, headers });
         }
         catch (netErr) {
+            // Jesli to zadanie POCHODZI z kolejki, nie wolno go zakolejkowac ponownie —
+            // inaczej kazda nieudana proba mnozylaby wpisy i kolejka rosla w
+            // nieskonczonosc zamiast sie oprozniac.
+            const isReplay = headers.get('X-Outbox-Replay') === '1'
+                || init?.headers?.['X-Outbox-Replay'] === '1';
+            if (isReplay)
+                throw netErr;
             const { isQueueable, enqueue } = await import('./outbox.js');
             if (!isQueueable(url, method))
                 throw netErr;
