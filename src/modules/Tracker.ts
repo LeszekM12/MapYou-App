@@ -720,13 +720,7 @@ export class Tracker {
         ? `${stats.speedKmH.toFixed(1)} km/h`
         : `${formatPace(stats.paceMinKm)} /km`,
       thirdLabel: isSpeedSport ? 'SPEED' : 'PACE',
-      // Symbol pauzy w samym tekscie stanu.
-      //
-      // Payload nie ma osobnego pola na ikone, a uklad widgetu siedzi w Swift —
-      // nie da sie go zmienic z TypeScriptu. Ale pole `state` widget renderuje,
-      // wiec znak U+23F8 (pauza) trafi na wyspe razem z napisem. To najblizej
-      // zachowania Stravy, jakie da sie osiagnac bez ruszania kodu natywnego.
-      state: this._autoPaused ? '\u23F8 Auto-paused' : (this._paused ? '\u23F8 Paused' : ''),
+      state: this._autoPaused ? 'Auto-paused' : (this._paused ? 'Paused' : ''),
       // Anchor for the native ticking timer: (now − timerRef) = active elapsed.
       // pausedTime grows on every resume, pushing the anchor forward so pauses
       // are excluded. While paused the timer is hidden (opacity), so the

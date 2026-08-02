@@ -3746,7 +3746,9 @@ window.app = new App();
 // ─── BOTTOM NAV (exact copy of script.js initBottomNav IIFE) ─────────────────
 (function initBottomNav() {
     const SEARCH_BAR = document.getElementById('mapSearchBar');
-    let activeTab = 'tabMap';
+    // Ekran startowy to Home — znacznik `tab-panel--active` stoi na nim juz
+    // w HTML, wiec nie ma migniecia Mapa -> Home.
+    let activeTab = 'tabHome';
     let routeActive = false;
     const MOBILE_SEARCH_BAR = document.getElementById('mapSearchBarMobile');
     // Show search bar immediately if starting on Map tab
@@ -3881,13 +3883,21 @@ window.app = new App();
     }
     // mirrorWorkoutList replaced by StatsView
     document.querySelectorAll('.bottom-nav__item').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
-    // Ekran startowy = Home.
-    //
-    // Nie wystarczy postawic `tab-panel--active` w HTML — `homeView.init()`
-    // odpala sie WYLACZNIE wewnatrz `switchTab`. Bez tego panel jest widoczny,
-    // ale pusty (szary ekran). Dlatego znacznik w HTML zostaje na `tabMap`,
-    // a my przelaczamy na Home wlasciwa sciezka, ktora odpala inicjalizacje.
-    switchTab('tabHome');
+    // Home jest juz aktywny w HTML, ale `homeView.init()` odpala sie normalnie
+    // wewnatrz `switchTab` — a tej sciezki przy starcie nie przechodzimy.
+    // Wolanie `switchTab('tabHome')` tez nie zadziala, bo zobaczy te sama
+    // zakladke i potraktuje to jak ponowne klikniecie (zwija panel).
+    // Dlatego inicjalizujemy WPROST — bez przeskoku przez Mape i bez
+    // paska wyszukiwania, ktory zostawal po niej na wierzchu.
+    // `queueMicrotask` bo `homeViewInited` deklarowane jest nizej w module —
+    // odkladamy o jeden takt, zeby siegnac po nie po zaladowaniu calego pliku.
+    hideMobileSearchTab();
+    queueMicrotask(() => {
+        if (!homeViewInited) {
+            homeViewInited = true;
+            homeView.init();
+        }
+    });
     function patchApp() {
         if (!window.app?._startRouteMode) {
             setTimeout(patchApp, 150);

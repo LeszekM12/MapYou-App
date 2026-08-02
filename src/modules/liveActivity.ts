@@ -54,6 +54,9 @@ function systemPalette(): Palette {
 }
 // Island palette (fixed — the island pill is always dark)
 const ISLAND_ACCENT = '#4ade80';
+// Bursztyn dla stanu pauzy na wyspie — czytelny na czarnym tle i wyraznie
+// odrozniony od zieleni „trening trwa". Strava uzywa w tym miejscu zoltego.
+const ISLAND_PAUSE = '#FFB020';
 const ISLAND_TEXT   = '#ffffff';
 const ISLAND_MUTED  = '#9ca3af';
 
@@ -164,7 +167,27 @@ function islandLayout(sport: string, sportLabel: string) {
   const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ISLAND_ACCENT }] };
   return {
     compactLeading:  icon,
-    compactTrailing: timeStack(13, 'cmp', 50),
+    // Compact trailing: czas ORAZ ikona pauzy, nalozone na siebie.
+    //
+    // Widoczna jest zawsze dokladnie jedna — decyduja te same pola `runOp`
+    // i `pauseOp`, ktore juz stereja reszta. Podczas pauzy czas znika,
+    // a na jego miejscu pojawia sie natywny symbol `pause.fill`, tak jak
+    // robi to Strava (u niej to zolte kolko z pauza po prawej stronie wyspy).
+    //
+    // `systemName` to SF Symbols — ikona jest natywna, wiec wyglada jak
+    // czesc systemu, a nie jak znak wklejony w tekst.
+    compactTrailing: {
+      type: 'container',
+      properties: [{ direction: 'stack' }],
+      children: [
+        timeStack(13, 'cmp', 50),
+        { type: 'image', properties: [
+          { systemName: 'pause.fill' },
+          { color: ISLAND_PAUSE },
+          { opacity: '{{pauseOp}}' },
+        ] },
+      ],
+    },
     minimal:         icon,
     expanded: {
       leading:  { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_ACCENT }] },
