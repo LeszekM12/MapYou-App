@@ -160,7 +160,7 @@ export function installAuthFetch() {
             await enqueue(url, method, plain, body);
             // Odpowiedz zastepcza. 202 = „przyjeto do realizacji" — wolajacy widzi
             // sukces, a zapis wyjdzie, gdy siec wroci.
-            return new Response(JSON.stringify({ status: 'queued', message: 'Zapisano lokalnie — wyślemy po powrocie sieci.' }), { status: 202, headers: { 'Content-Type': 'application/json' } });
+            return new Response(JSON.stringify({ status: 'queued', message: 'Saved locally — will sync when back online.' }), { status: 202, headers: { 'Content-Type': 'application/json' } });
         }
         // Token wygasł/nieprawidłowy → jedna próba z odświeżonym tokenem
         if (res.status === 401) {

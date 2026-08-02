@@ -180,7 +180,7 @@ export function installAuthFetch(): void {
       // Odpowiedz zastepcza. 202 = „przyjeto do realizacji" — wolajacy widzi
       // sukces, a zapis wyjdzie, gdy siec wroci.
       return new Response(
-        JSON.stringify({ status: 'queued', message: 'Zapisano lokalnie — wyślemy po powrocie sieci.' }),
+        JSON.stringify({ status: 'queued', message: 'Saved locally — will sync when back online.' }),
         { status: 202, headers: { 'Content-Type': 'application/json' } },
       );
     }

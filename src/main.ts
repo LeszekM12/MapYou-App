@@ -10,6 +10,14 @@ import { BACKEND_URL, PUBLIC_BASE_URL } from './config.js';
 import { dlog, isDebug, setDebug } from './utils/log.js';
 import { initAppCheck } from './modules/appCheck.js';
 import { startOutbox, mountOfflineBar } from './modules/outbox.js';
+import { installTileCache, requestPersistentStorage } from './modules/tileCache.js';
+// Cache kafelkow MUSI wejsc zanim powstanie pierwsza warstwa mapy —
+// podmienia fabryke `L.tileLayer`, wiec warstwy stworzone wczesniej
+// zostalyby bez cache.
+installTileCache();
+// Popros o trwaly magazyn — chroni kolejke offline i niezapisany trening
+// przed skasowaniem, gdy telefonowi zabraknie miejsca.
+void requestPersistentStorage();
 // Kolejka zapisow offline — wysyla zalegle zadania, gdy siec wroci,
 // i pokazuje pasek statusu.
 void Promise.resolve().then(() => { startOutbox(); mountOfflineBar(); });

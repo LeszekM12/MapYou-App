@@ -231,8 +231,27 @@ export function mountOfflineBar(): void {
   const text = document.getElementById('offlineBarText');
   if (!bar || !text) return;
 
+  // Minimalny czas pokazania stanu „Wysylanie…".
+  //
+  // Wysylka trwa zwykle kilkaset milisekund, wiec pasek pojawialby sie
+  // i znikal w tym samym mgnieniu — uzytkownik nie wiedzialby, czy jego
+  // trening w ogole poszedl. Trzymamy go przez chwile, zeby komunikat
+  // dalo sie przeczytac.
+  const MIN_SYNC_MS = 1400;
+  let syncShownAt = 0;
+
   const render = (pending: number): void => {
     const offline = !navigator.onLine;
+
+    // Jesli wlasnie pokazalismy „Wysylanie…", nie chowaj od razu.
+    if (!offline && pending === 0 && syncShownAt) {
+      const left = MIN_SYNC_MS - (Date.now() - syncShownAt);
+      if (left > 0) { setTimeout(() => render(0), left); return; }
+      syncShownAt = 0;
+      text.textContent = 'Synced \u2713';
+      setTimeout(() => render(0), 900);
+      return;
+    }
 
     if (!offline && pending === 0) {
       bar.classList.remove('offline-bar--visible', 'offline-bar--syncing');
@@ -250,11 +269,12 @@ export function mountOfflineBar(): void {
     if (offline) {
       bar.classList.remove('offline-bar--syncing');
       text.textContent = pending > 0
-        ? `Tryb offline — ${pending} ${pending === 1 ? 'zmiana czeka' : 'zmian czeka'} na wysłanie`
-        : 'Tryb offline — zmiany wyślą się automatycznie';
+        ? `Offline — ${pending} ${pending === 1 ? 'change' : 'changes'} pending`
+        : 'Offline — changes will sync automatically';
     } else {
       bar.classList.add('offline-bar--syncing');
-      text.textContent = `Wysyłanie… (${pending})`;
+      text.textContent = `Syncing… (${pending})`;
+      if (!syncShownAt) syncShownAt = Date.now();
     }
   };
 
