@@ -725,17 +725,14 @@ export class Tracker {
       // pausedTime grows on every resume, pushing the anchor forward so pauses
       // are excluded. While paused the timer is hidden (opacity), so the
       // momentarily-stale anchor is never visible.
-      // Kotwica ZAMROZONA na czas pauzy.
+      // NIE dodawaj tu trwajacej pauzy. Probowalem — i to zepsulo dzialajace
+      // zatrzymywanie licznika na Dynamic Island.
       //
-      // `pausedTime` rosnie dopiero przy wznowieniu, wiec podczas pauzy
-      // kotwica zostawala nieaktualna i natywny licznik tykal dalej. Mialo go
-      // zaslaniac przelaczenie przezroczystosci, ale gdy to zawiedzie (a na
-      // Dynamic Island zawodzilo), uzytkownik widzi biegnacy czas mimo pauzy.
-      // Doliczajac trwajaca pauze do kotwicy sprawiamy, ze licznik stoi
-      // NAPRAWDE — niezaleznie od tego, czy warstwa graficzna go ukryla.
-      timerRef: this.startTime + this.pausedTime
-        + (this._paused && this.pauseStart ? Date.now() - this.pauseStart : 0)
-        + (this._autoPaused && this._autoPauseStart ? Date.now() - this._autoPauseStart : 0),
+      // Powod: natywny `Text(.timer)` pokazuje roznice „teraz minus kotwica",
+      // wiec przesuwanie kotwicy nie zatrzymuje go, tylko falszuje wartosc.
+      // Licznik zatrzymuje WYLACZNIE ukrycie tego elementu — czyli `runOp`
+      // i `pauseOp` w `laData`. Ten mechanizm dziala i nie nalezy go dublowac.
+      timerRef: this.startTime + this.pausedTime,
       paused,
     };
   }

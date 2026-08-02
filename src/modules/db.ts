@@ -226,6 +226,25 @@ db.version(7).stores({
 // fixie oznaczaloby przy godzinnym biegu tysiace zapisow rosnacej tablicy —
 // przy 3 godzinach to setki megabajtow zapisu i zajechany dysk telefonu.
 // Dopisanie jednego rekordu jest stalym kosztem niezaleznie od dlugosci trasy.
+// version(9) — ETAP 2: kolejka zapisow offline ("outbox").
+//
+// Zapis, ktory nie doszedl do serwera, ladunku w tej tabeli i czeka na siec.
+// Nie ginie po ubiciu apki ani po restarcie telefonu. Kazdy rekord niesie
+// wlasny `idemKey`, dzieki ktoremu ponowienie NIE tworzy duplikatu
+// (patrz middleware/idempotency.ts po stronie backendu).
+db.version(9).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
+  activeSession:      'id',
+  sessionCoords:      '++seq',
+  outbox:             '++id, createdAt',
+});
+
 db.version(8).stores({
   workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
   activities:         'id, sport, date, distanceKm, durationSec',

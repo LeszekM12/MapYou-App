@@ -143,7 +143,40 @@ export function installAuthFetch(): void {
     const appCheck = await getAppCheckToken();
     if (appCheck) headers.set('X-Firebase-AppCheck', appCheck);
 
-    const res = await original(input, { ...init, headers });
+    // ── Zapisy: kolejka offline (Etap 2) ────────────────────────────────────
+    //
+    // Wszystkie zadania do backendu przechodza przez ten jeden punkt, wiec
+    // kolejke wpinamy TUTAJ — zamiast przerabiac 92 wywolania w 19 plikach.
+    //
+    // Lapiemy WYLACZNIE bledy sieci (wyjatek z `fetch`). Odpowiedz 4xx/5xx
+    // to nie brak polaczenia — serwer odpowiedzial i wolajacy ma prawo
+    // zobaczyc jego odpowiedz.
+    const method = (init?.method ?? (input instanceof Request ? input.method : 'GET')).toUpperCase();
+
+    let res: Response;
+    try {
+      res = await original(input, { ...init, headers });
+    } catch (netErr) {
+      const { isQueueable, enqueue } = await import('./outbox.js');
+      if (!isQueueable(url, method)) throw netErr;
+
+      const plain: Record<string, string> = {};
+      headers.forEach((v, k) => { plain[k] = v; });
+      const body = typeof init?.body === 'string' ? init.body : null;
+
+      // Cialo nietekstowe (FormData, Blob) sie nie serializuje — nie da sie
+      // go odlozyc bez utraty zawartosci, wiec przepuszczamy blad dalej.
+      if (init?.body && body === null) throw netErr;
+
+      await enqueue(url, method, plain, body);
+
+      // Odpowiedz zastepcza. 202 = „przyjeto do realizacji" — wolajacy widzi
+      // sukces, a zapis wyjdzie, gdy siec wroci.
+      return new Response(
+        JSON.stringify({ status: 'queued', message: 'Zapisano lokalnie — wyślemy po powrocie sieci.' }),
+        { status: 202, headers: { 'Content-Type': 'application/json' } },
+      );
+    }
 
     // Token wygasł/nieprawidłowy → jedna próba z odświeżonym tokenem
     if (res.status === 401) {

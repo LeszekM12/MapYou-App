@@ -18,6 +18,10 @@ var _a, _App_map, _App_ghostRoute, _App_createActive, _App_createWaypoints, _App
 import { BACKEND_URL, PUBLIC_BASE_URL } from './config.js';
 import { dlog, isDebug, setDebug } from './utils/log.js';
 import { initAppCheck } from './modules/appCheck.js';
+import { startOutbox, mountOfflineBar } from './modules/outbox.js';
+// Kolejka zapisow offline — wysyla zalegle zadania, gdy siec wroci,
+// i pokazuje pasek statusu.
+void Promise.resolve().then(() => { startOutbox(); mountOfflineBar(); });
 // App Check musi ruszyc PRZED pierwszym zadaniem do backendu.
 void initAppCheck();
 // ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──
@@ -1472,12 +1476,9 @@ class App {
             // Kolejnosc: NAJPIERW widok trackingu, POTEM zakladka.
             // `_enterTrackingView()` sam wymusza `tabMap`, wiec przelaczenie musi
             // isc po nim — inaczej zostaje nadpisane i uzytkownik ladowal na Mapie.
+            // `_enterTrackingView()` sam ustawia zakladke poprawnie (i zdejmuje
+            // aktywnosc z poprzedniej), wiec nie dublujemy tego tutaj.
             this._enterTrackingView();
-            try {
-                const go = window.__switchTab;
-                go?.('tabTracker');
-            }
-            catch { /* zakladki jeszcze nie gotowe */ }
             dlog(`[Track] wznowiono trening: ${coords.length} punktow, ${(state.distanceM / 1000).toFixed(2)} km`);
         }
         catch (e) {
@@ -2928,6 +2929,13 @@ class App {
         const histBtn = document.getElementById('trkHistoryToggle');
         if (histBtn)
             histBtn.style.display = 'none';
+        // Mapa MUSI byc aktywnym panelem — element `#map` w nim siedzi i bez tego
+        // nie ma czego renderowac. Ale trzeba tez ZDJAC aktywnosc z poprzedniej
+        // zakladki. Wczesniej tego nie robiono: klasa tylko sie dokladala, wiec
+        // przy starcie treningu z Home albo po wznowieniu sesji dwa panele byly
+        // aktywne naraz i nakladaly sie na siebie.
+        window.__switchTab &&
+            window.__switchTab('tabMap');
         document.getElementById('tabMap')?.classList.add('tab-panel--active');
         document.getElementById('trackerOverlay')?.classList.remove('hidden');
         document.getElementById('routeMiniPill')?.classList.add('pill--above-tracker');
