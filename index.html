@@ -197,7 +197,7 @@
 <!-- TRACKER OVERLAY — fullscreen nad mapą podczas nagrywania -->
 
 
-<div id="tabMap" class="tab-panel">
+<div id="tabMap" class="tab-panel tab-panel--active">
     <div class="tab-scroll">
         <div class="tab-header" id="weatherTopBar" role="button" tabindex="0" aria-label="Open weather details">
             <div class="tab-header__location">
@@ -512,13 +512,13 @@
 
 </div>
 
-<div id="tabHome" class="tab-panel tab-panel--active">
+<div id="tabHome" class="tab-panel">
   <div class="home-scroll"></div>
   <div id="friendsFeed"></div>
 </div>
 
 <nav class="bottom-nav" id="bottomNav">
-    <button class="bottom-nav__item bottom-nav__item--active" data-tab="tabHome">
+    <button class="bottom-nav__item" data-tab="tabHome">
       <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none"
            stroke="currentColor" stroke-width="2"
            stroke-linecap="round" stroke-linejoin="round">
@@ -527,7 +527,7 @@
       </svg>
       <span class="bottom-nav__label">Home</span>
     </button>
-    <button class="bottom-nav__item" data-tab="tabMap">
+    <button class="bottom-nav__item bottom-nav__item--active" data-tab="tabMap">
         <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
              stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="11" r="3"/>

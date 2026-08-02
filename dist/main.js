@@ -1469,12 +1469,15 @@ class App {
             // treningu uzytkownik jest juz na Mapie, wiec to nie przeszkadza.
             // Przy wznawianiu apka otwiera zakladke domyslna i obie karty zostawaly
             // aktywne naraz: widac bylo Mape z nalozonym interfejsem Track.
+            // Kolejnosc: NAJPIERW widok trackingu, POTEM zakladka.
+            // `_enterTrackingView()` sam wymusza `tabMap`, wiec przelaczenie musi
+            // isc po nim — inaczej zostaje nadpisane i uzytkownik ladowal na Mapie.
+            this._enterTrackingView();
             try {
                 const go = window.__switchTab;
                 go?.('tabTracker');
             }
             catch { /* zakladki jeszcze nie gotowe */ }
-            this._enterTrackingView();
             dlog(`[Track] wznowiono trening: ${coords.length} punktow, ${(state.distanceM / 1000).toFixed(2)} km`);
         }
         catch (e) {
@@ -3743,10 +3746,7 @@ window.app = new App();
 // ─── BOTTOM NAV (exact copy of script.js initBottomNav IIFE) ─────────────────
 (function initBottomNav() {
     const SEARCH_BAR = document.getElementById('mapSearchBar');
-    // Domyslna zakladka po uruchomieniu apki. Wczesniej 'tabMap' — mapa
-    // otwierala sie jako pierwsza. Home jest wlasciwym ekranem startowym;
-    // trwajacy trening i tak przelacza widok w `_restoreSessionIfAny`.
-    let activeTab = 'tabHome';
+    let activeTab = 'tabMap';
     let routeActive = false;
     const MOBILE_SEARCH_BAR = document.getElementById('mapSearchBarMobile');
     // Show search bar immediately if starting on Map tab
@@ -3881,6 +3881,13 @@ window.app = new App();
     }
     // mirrorWorkoutList replaced by StatsView
     document.querySelectorAll('.bottom-nav__item').forEach(btn => btn.addEventListener('click', () => switchTab(btn.dataset.tab)));
+    // Ekran startowy = Home.
+    //
+    // Nie wystarczy postawic `tab-panel--active` w HTML — `homeView.init()`
+    // odpala sie WYLACZNIE wewnatrz `switchTab`. Bez tego panel jest widoczny,
+    // ale pusty (szary ekran). Dlatego znacznik w HTML zostaje na `tabMap`,
+    // a my przelaczamy na Home wlasciwa sciezka, ktora odpala inicjalizacje.
+    switchTab('tabHome');
     function patchApp() {
         if (!window.app?._startRouteMode) {
             setTimeout(patchApp, 150);
