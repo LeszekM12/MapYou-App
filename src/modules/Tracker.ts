@@ -244,6 +244,9 @@ export class Tracker {
   // Auto-pause: freeze time/distance when (nearly) stationary, keep GPS running
   private _autoPauseOn:  boolean = false;   // feature enabled (setting)
   private _autoPaused:   boolean = false;   // currently auto-paused
+  private _visHooked = false;
+  private _lastStateSave = 0;               // throttling zapisu stanu sesji
+  private _pendingDraw: Coords[] = [];      // punkty do dorysowania po powrocie
   private _autoPauseStart = 0;              // ms when current auto-pause began
   private _belowSince: number | null = null;// ms since speed dropped below threshold (GPS path)
   private _apAnchor: [number, number] | null = null; // anchor for stationary detection (null-speed iOS path)
@@ -327,6 +330,18 @@ export class Tracker {
     }, 1000);
   }
 
+  /** Dorysuj punkty zebrane, gdy ekran byl wygaszony.
+   *
+   *  Jedno wywolanie zamiast setek — Leaflet przelicza sciezke raz. */
+  private _flushPendingDraw(): void {
+    if (!this._pendingDraw.length || !this.polyline) { this._pendingDraw = []; return; }
+    const pts = this._pendingDraw;
+    this._pendingDraw = [];
+    this.polyline.setLatLngs(this.coords.map(c => L.latLng(c[0], c[1])));
+    const last = pts[pts.length - 1];
+    if (last) this.dotMarker?.setLatLng(L.latLng(last[0], last[1]));
+  }
+
   // ── Odtworzenie po ubiciu procesu (Etap 1) ──────────────────────────────────
 
   /** Wznow trening z migawki zapisanej w IndexedDB.
@@ -352,7 +367,17 @@ export class Tracker {
     this.startTime  = state.startTime;
     this.pausedTime = state.pausedTime;
     this.pauseStart = state.pauseStart;
-    this.distanceM  = state.distanceM;
+    // Dystans PRZELICZAMY z punktow, zamiast ufac zapisanemu stanowi.
+    //
+    // Stan sesji zapisujemy co 10 sekund (oszczednosc baterii), wiec przy
+    // ubiciu procesu miedzy zapisami zapamietany dystans moze byc do 10 s
+    // starszy niz trasa. Punkty leca do bazy natychmiast i sa kompletne —
+    // wiec suma odleglosci miedzy nimi jest ZAWSZE dokladniejsza.
+    //
+    // Uzywamy tej samej metody i tych samych progow co przy zbieraniu
+    // (MIN_STEP_M i sufit 50 m), zeby wynik byl co do metra taki sam,
+    // jakby apka nie zostala ubita.
+    this.distanceM  = recomputeDistance(coords, state.distanceM);
     this._autoPaused = state.autoPaused;
     this._laps      = [...state.laps];
     this._lastLapSec = state.lastLapSec;
@@ -503,7 +528,17 @@ export class Tracker {
 
   // ── Private ─────────────────────────────────────────────────────────────────
 
+  /** Podepnij dorysowanie po powrocie do apki. Raz na instancje. */
+  private _installVisibilityRedraw(): void {
+    if (this._visHooked) return;
+    this._visHooked = true;
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) this._flushPendingDraw();
+    });
+  }
+
   private _startGPS(): void {
+    this._installVisibilityRedraw();
     // Native: record via a background foreground-service so the route keeps
     // logging with the screen locked. Web/PWA: foreground watch (Krok A).
     if (bgTracker.isAvailable()) {
@@ -587,12 +622,11 @@ export class Tracker {
     // last accepted point). GPS now delivers ~1 fix/s (distanceFilter: 0 keeps
     // the Live Activity ticking in the background), so without this gate the
     // stationary jitter would inflate distance and bloat the route.
-    const MIN_STEP_M = 3;
     let accepted = true;
     if (this.coords.length > 0) {
       const prev = this.coords[this.coords.length - 1];
       const dist = L.latLng(prev[0], prev[1]).distanceTo(L.latLng(lat, lng));
-      accepted = dist >= MIN_STEP_M && dist < 50; // jitter floor + GPS-jump ceiling
+      accepted = dist >= MIN_STEP_M && dist < MAX_STEP_M;
       if (accepted) this.distanceM += dist;
     }
 
@@ -607,16 +641,39 @@ export class Tracker {
 
     if (accepted) {
       this.coords.push(newCoord);
-      this.polyline?.addLatLng(L.latLng(lat, lng));
+
+      // Nie rysuj, gdy nikt nie patrzy.
+      //
+      // `addLatLng` przelicza sciezke SVG przy kazdym punkcie. Przy wygaszonym
+      // ekranie albo apce w tle to praca calkowicie zmarnowana — a trwa cala
+      // godzine biegu. Punkty odkladamy i dorysowujemy jednym ruchem,
+      // gdy uzytkownik wroci.
+      if (document.hidden) {
+        this._pendingDraw.push(newCoord);
+      } else {
+        this.polyline?.addLatLng(L.latLng(lat, lng));
+      }
       // Punkt na dysk NATYCHMIAST. To jest sedno Etapu 1 — po ubiciu procesu
       // trasa odtwarza sie z tych rekordow, a nie z pamieci obiektu.
       void appendCoord(lat, lng);
-      void saveSessionState({
-        distanceM:  this.distanceM,
-        laps:       this._laps,
-        lastLapSec: this._lastLapSec,
-        autoPaused: this._autoPaused,
-      });
+
+      // Stan sesji zapisujemy RZADZIEJ niz punkty.
+      //
+      // Punkt musi ladowac natychmiast — to on ginie przy ubiciu procesu.
+      // Ale `saveSessionState` przepisuje CALY rekord sesji, a robione przy
+      // kazdym fixie dawalo ~3600 transakcji IndexedDB na godzine treningu.
+      // Dystans i okrazenia da sie odtworzyc z punktow, wiec 10 sekund
+      // opoznienia niczego nie kosztuje, a oszczedza baterie.
+      const now = Date.now();
+      if (now - this._lastStateSave > 10_000) {
+        this._lastStateSave = now;
+        void saveSessionState({
+          distanceM:  this.distanceM,
+          laps:       this._laps,
+          lastLapSec: this._lastLapSec,
+          autoPaused: this._autoPaused,
+        });
+      }
     }
 
     if (this.dotMarker) {
@@ -764,4 +821,31 @@ export function formatPace(paceMinKm: number): string {
   return `${m}:${String(s).padStart(2,'0')}`;
 }
 
+/** Progi akceptacji punktu GPS — WSPOLNE dla nagrywania i przeliczania.
+ *
+ *  Trzymane w jednym miejscu celowo: gdyby kazda sciezka miala wlasna kopie,
+ *  zmiana jednej po cichu rozjechalaby dystans liczony na zywo z tym
+ *  odtwarzanym po wznowieniu sesji. */
+export const MIN_STEP_M = 3;    // ponizej to drgania GPS, nie ruch
+export const MAX_STEP_M = 50;   // powyzej to przeskok sygnalu, nie bieg
+
 export function formatDistance(km: number): string { return km.toFixed(2); }
+
+/** Policz dystans trasy z listy punktow.
+ *
+ *  Progi identyczne jak przy zbieraniu na zywo: odrzucamy drgania GPS ponizej
+ *  MIN_STEP_M i skoki powyzej 50 m. Dzieki temu przeliczenie po wznowieniu
+ *  daje te sama liczbe, co ciagle nagrywanie.
+ *
+ *  `fallback` wraca, gdy punktow jest za malo, zeby cokolwiek policzyc. */
+export function recomputeDistance(coords: Coords[], fallback = 0): number {
+  if (coords.length < 2) return fallback;
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    const a = coords[i - 1];
+    const b = coords[i];
+    const d = L.latLng(a[0], a[1]).distanceTo(L.latLng(b[0], b[1]));
+    if (d >= MIN_STEP_M && d < MAX_STEP_M) total += d;
+  }
+  return total;
+}
