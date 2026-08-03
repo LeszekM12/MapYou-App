@@ -2837,6 +2837,10 @@ class App {
   _enterTrackingView(): void {
     const nav = document.querySelector<HTMLElement>('.bottom-nav');
     if (nav) nav.style.display = 'none';
+    // Element nazywa sie `mapSearchBar`, nie `mapSearchBarMobile` — przez ta
+    // literowke pasek wyszukiwania z zakladki Map zostawal WIDOCZNY nad mapa
+    // przez caly trening (razem z kaflami Store / WC / Pharmacy / Park).
+    document.getElementById('mapSearchBar')?.classList.add('msb--hidden-tab');
     document.getElementById('mapSearchBarMobile')?.classList.add('msb--hidden-tab');
     // Ukryj bottom bar (sport selector + start btn)
     const bottom = document.getElementById('trkBottom');
@@ -2848,9 +2852,18 @@ class App {
     // zakladki. Wczesniej tego nie robiono: klasa tylko sie dokladala, wiec
     // przy starcie treningu z Home albo po wznowieniu sesji dwa panele byly
     // aktywne naraz i nakladaly sie na siebie.
+    // Zakladka TRACK, nie Map.
+    //
+    // Mapa (`#map`) lezy POZA panelami zakladek, wiec renderuje sie niezaleznie
+    // od tego, ktora jest aktywna — przelaczenie na Track nic nie psuje.
+    // Wczesniej wymuszalismy `tabMap`, przez co po zakonczeniu treningu
+    // uzytkownik ladowal na Mapie zamiast na Track.
+    //
+    // Dodatkowo: w HTML sa DWA elementy o `id="tabMap"` (panel pogody w linii
+    // ~200 i wlasciwa mapa w ~467). `getElementById` zwraca pierwszy, wiec
+    // aktywowalismy panel pogody. Omijamy problem, nie dotykajac struktury.
     (window as unknown as Record<string, unknown>).__switchTab &&
-      ((window as unknown as Record<string, () => void>).__switchTab as unknown as (id: string) => void)('tabMap');
-    document.getElementById('tabMap')?.classList.add('tab-panel--active');
+      ((window as unknown as Record<string, () => void>).__switchTab as unknown as (id: string) => void)('tabTracker');
     document.getElementById('trackerOverlay')?.classList.remove('hidden');
     document.getElementById('routeMiniPill')?.classList.add('pill--above-tracker');
     this._setTrackingState('active');
@@ -2865,7 +2878,8 @@ class App {
     document.getElementById('trkExpLaps')?.setAttribute('hidden', '');
     this.#lastLapCount = 0;
     document.getElementById('routeMiniPill')?.classList.remove('pill--above-tracker');
-    document.getElementById('tabMap')?.classList.remove('tab-panel--active');
+    // Po zakonczeniu treningu zostajemy na Track — tam sa wyniki i historia.
+    document.getElementById('mapSearchBar')?.classList.remove('msb--hidden-tab');
     const nav = document.querySelector<HTMLElement>('.bottom-nav');
     if (nav) nav.style.display = '';
     // Przywróć bottom bar
@@ -3812,11 +3826,12 @@ document.addEventListener('error', (ev) => {
     if (host && !host.querySelector('.media-pending')) {
       const note = document.createElement('div');
       note.className = 'media-pending';
-      note.textContent = '⏳ Photo will upload when back online';
+      note.textContent = 'Photo uploads when back online';
       note.style.cssText =
-        'display:flex;align-items:center;justify-content:center;min-height:120px;' +
-        'padding:18px;border-radius:12px;background:#F0F2F5;color:#5B6672;' +
-        'font-size:13.5px;font-weight:500;text-align:center;';
+        'display:flex;align-items:center;justify-content:center;gap:7px;' +
+        'padding:10px 14px;border-radius:10px;' +
+        'background:rgba(120,130,140,.09);color:#6B7580;' +
+        'font-size:12.5px;font-weight:500;letter-spacing:.1px;';
       host.appendChild(note);
     }
     return;

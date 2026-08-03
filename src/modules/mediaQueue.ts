@@ -125,8 +125,16 @@ export async function flushMedia(): Promise<void> {
   // wiec powtorka dochodzi obcieta — serwer zglasza „Unexpected end of form".
   // Prosciej nie zaczynac, dopoki nie ma czym sie uwierzytelnic.
   try {
-    const { isSessionReady } = await import('./authFetch.js');
-    if (!isSessionReady()) { dlog('[Media] sesja niegotowa — czekam'); return; }
+    const { isSessionReady, onSessionReady } = await import('./authFetch.js');
+    if (!isSessionReady()) {
+      // NIE porzucamy proby — ustawiamy sie w kolejce na moment, w ktorym
+      // sesja bedzie gotowa. Wczesniej wychodzilismy i czekali na nastepny
+      // cykl (90 s), przez co zdjecie potrafilo wisiec kilkanascie sekund
+      // po powrocie sieci, mimo ze wszystko bylo juz gotowe.
+      dlog('[Media] sesja niegotowa — wysle, gdy bedzie');
+      onSessionReady(() => { void flushMedia(); });
+      return;
+    }
   } catch { /* brak funkcji — probujemy mimo to */ }
 
   flushing = true;
@@ -246,11 +254,20 @@ let started = false;
 export function startMediaQueue(): void {
   if (started) return;
   started = true;
-  window.addEventListener('online', () => { void flushMedia(); });
+  window.addEventListener('online', () => {
+    // Trzy proby w pierwszych sekundach po powrocie sieci.
+    //
+    // Zdarzenie `online` w WebView potrafi przyjsc, zanim polaczenie
+    // faktycznie przenosi ruch — pierwsza proba pada, a kolejna szla dopiero
+    // po 90 sekundach. Stad wrazenie, ze zdjecie „wysyla sie w nieskonczonosc".
+    void flushMedia();
+    setTimeout(() => { void flushMedia(); }, 1_500);
+    setTimeout(() => { void flushMedia(); }, 5_000);
+  });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void flushMedia();
   });
-  setInterval(() => { void flushMedia(); }, 90_000);
+  setInterval(() => { void flushMedia(); }, 20_000);
   void flushMedia();
   dlog('[Media] nasluch uruchomiony');
 }

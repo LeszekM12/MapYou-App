@@ -2759,39 +2759,56 @@ video.home-reel-viewer__media {
 
 
 /* ── Pasek trybu offline (Etap 2) ─────────────────────────────────────────
-   Nad cala apka, pod paskiem systemowym. `env(safe-area-inset-top)` bo
-   Android 15 rysuje od krawedzi, a iPhone ma wciecie. */
+   Pigulka, nie belka.
+   Pierwsza wersja byla pelnoekranowym paskiem przyklejonym do gory —
+   przy wcieciu iPhone'a zajmowala ~15% ekranu i zaslaniala naglowek apki.
+   Teraz to waska pastylka, ktora wsuwa sie POD paskiem systemowym,
+   nie przykrywa tresci i znika sama. */
 .offline-bar {
   position: fixed;
-  top: 0; left: 0; right: 0;
+  top: calc(6px + env(safe-area-inset-top, 0px));
+  left: 50%;
   z-index: 9999;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: calc(6px + env(safe-area-inset-top, 0px)) 14px 6px;
-  background: #3A3F47;
+  gap: 7px;
+  max-width: calc(100vw - 32px);
+  padding: 7px 15px;
+  border-radius: 999px;
+  background: rgba(28, 32, 38, .92);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, .18);
   color: #fff;
-  font-size: 13px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: .1px;
-  transform: translateY(-100%);
-  transition: transform .28s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Wsuwanie od gory, ze skalowaniem — czytelne, ale nienachalne. */
+  transform: translate(-50%, calc(-100% - 20px)) scale(.94);
+  opacity: 0;
+  transition: transform .32s cubic-bezier(.22, 1, .36, 1), opacity .22s ease;
+  pointer-events: none;
 }
-.offline-bar--visible { transform: translateY(0); }
-.offline-bar--syncing { background: #1F6F43; }
+.offline-bar--visible {
+  transform: translate(-50%, 0) scale(1);
+  opacity: 1;
+}
+.offline-bar--syncing { background: rgba(22, 101, 52, .94); }
 
 .offline-bar__dot {
-  width: 7px; height: 7px;
+  width: 6px; height: 6px;
   border-radius: 50%;
   background: #FFB020;
   flex: 0 0 auto;
 }
 .offline-bar--syncing .offline-bar__dot {
   background: #6BE39B;
-  animation: offlineBarPulse 1s ease-in-out infinite;
+  animation: offlineBarPulse 1.1s ease-in-out infinite;
 }
 @keyframes offlineBarPulse {
   0%, 100% { opacity: 1; }
-  50%      { opacity: .35; }
+  50%      { opacity: .3; }
 }
