@@ -1094,7 +1094,8 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   // zadaniem juz po narysowaniu karty. Offline to zadanie pada i pod sercem
   // zostawalo zero — polubienia „znikaly", mimo ze istnialy.
   // Cache z localStorage sprawia, ze widac je od razu i bez sieci.
-  const _cachedLikes = localStorage.getItem(`hc_likes_${itemId}`);
+  const _cachedLikes = localStorage.getItem(`hc_likes_${itemId}`)
+    ?? localStorage.getItem(`hc_likes_p_${itemId}`);
   const likeCount    = (rec._likeCount as number)
     ?? (_cachedLikes !== null ? parseInt(_cachedLikes, 10) : 0);
   const _cachedLiked = localStorage.getItem(`hc_liked_${itemId}`) === '1';
@@ -1166,7 +1167,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
       ${notesHtml}
 
       <div class="home-card__footer ad-footer" style="border-top:1px solid var(--app-border)">
-        <button class="home-card__action home-card__action--like" data-action="like" aria-label="Like">
+        <button class="home-card__action home-card__action--like${_cachedLiked ? ' home-card__action--liked' : ''}" data-action="like" aria-label="Like">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
             <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
           </svg>
@@ -3600,13 +3601,34 @@ export class HomeView {
           .then((resp: { status: string; data: Record<string, { count: number; liked: boolean }> }) => {
             if (resp.status !== 'ok') return;
             for (const [id, info] of Object.entries(resp.data)) {
-              if (!info.liked) continue;
-              const btn = feedList.querySelector<HTMLElement>(`[data-like-count="${id}"]`)?.closest('.home-card__action') as HTMLElement | null;
-              if (btn) btn.classList.add('home-card__action--liked');
-              const btnP = feedList.querySelector<HTMLElement>(`[data-like-count="p_${id}"]`)?.closest('.home-card__action') as HTMLElement | null;
-              if (btnP) btnP.classList.add('home-card__action--liked');
+              // Zapamietaj — offline to jedyne zrodlo tych liczb.
+              localStorage.setItem(`hc_likes_${id}`, String(info.count));
+              localStorage.setItem(`hc_liked_${id}`, info.liked ? '1' : '0');
+              paintLike(id, info.count, info.liked);
             }
-          }).catch(() => {});
+          }).catch(() => {
+            // Brak sieci — odtworz ostatnio znany stan zamiast zostawiac zera.
+            for (const id of itemIds) {
+              const c = localStorage.getItem(`hc_likes_${id}`);
+              if (c === null) continue;
+              paintLike(id, parseInt(c, 10), localStorage.getItem(`hc_liked_${id}`) === '1');
+            }
+          });
+
+        /** Ustaw serce ORAZ licznik — dla aktywnosci i dla postow.
+         *
+         *  Wczesniej ta sciezka ustawiala WYLACZNIE serce, i to tylko dla
+         *  polubionych (`if (!info.liked) continue`). Licznik pod sercem
+         *  nie byl ruszany w ogole, wiec przy wejsciu na Home widac bylo
+         *  zera do momentu recznego odswiezenia. */
+        function paintLike(id: string, count: number, liked: boolean): void {
+          for (const sel of [id, `p_${id}`]) {
+            const el = feedList.querySelector<HTMLElement>(`[data-like-count="${sel}"]`);
+            if (!el) continue;
+            el.textContent = String(count);
+            el.closest('.home-card__action')?.classList.toggle('home-card__action--liked', liked);
+          }
+        }
       }
 
       // Infinite scroll
