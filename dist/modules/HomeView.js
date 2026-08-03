@@ -62,8 +62,13 @@ function intensityColor(n) {
 // ── Comment panel ─────────────────────────────────────────────────────────────
 // Keep every like button for an item (feed card, post card, activity detail) in sync
 function broadcastLike(id, liked, count) {
+    // Bezpiecznik. `String(undefined)` daje napis „undefined" i tak wlasnie
+    // trafial on pod serce, gdy zapis poszedl do kolejki offline zamiast na
+    // serwer. Wolajacy juz tego nie przysyla, ale niech funkcja sama sie broni —
+    // to jedno miejsce, przez ktore przechodza WSZYSTKIE aktualizacje licznika.
+    const safe = Number.isFinite(count) ? Math.max(0, count) : 0;
     document.querySelectorAll(`[data-like-count="${id}"], [data-like-count="p_${id}"]`).forEach(el => {
-        el.textContent = String(count);
+        el.textContent = String(safe);
         el.closest('.home-card__action')?.classList.toggle('home-card__action--liked', liked);
     });
 }
@@ -129,9 +134,14 @@ function openCommentPanel(card, actId) {
         .then((d) => {
         renderAtlasComments(d.data ?? []);
         // Update count badge
+        const n = d.data?.length ?? 0;
         const countEl = card.querySelector(`[data-comment-count="${actId}"], [data-comment-count="${realId}"]`);
         if (countEl)
-            countEl.textContent = String(d.data?.length ?? 0);
+            countEl.textContent = String(n);
+        // Zapamietaj — offline to jedyne zrodlo tej liczby przy renderze karty.
+        for (const id of [actId, realId])
+            if (id)
+                localStorage.setItem(`hc_comments_${id}`, String(n));
     }).catch(() => { list.innerHTML = '<p class="hcc__empty">No comments yet</p>'; });
     const sendComment = async () => {
         const text = input.value.trim();
@@ -1069,10 +1079,25 @@ export async function openActivityDetail(act, isOwn, actId) {
     // Cache z localStorage sprawia, ze widac je od razu i bez sieci.
     const _cachedLikes = localStorage.getItem(`hc_likes_${itemId}`)
         ?? localStorage.getItem(`hc_likes_p_${itemId}`);
-    const likeCount = rec._likeCount
-        ?? (_cachedLikes !== null ? parseInt(_cachedLikes, 10) : 0);
+    const _recLikes = rec._likeCount;
+    // UWAGA na `??`: `_likeCount` rowne ZERU jest wartoscia zdefiniowana,
+    // wiec `_recLikes ?? cache` NIGDY nie siegalo po cache — a rekordy
+    // z feedu maja tam zero, dopoki nie doszlo osobne zapytanie o polubienia.
+    // Stad „lajkow nie ma od razu". Cache wygrywa, gdy rekord nie wie nic
+    // albo wie, ze jest zero, a my pamietamy wiecej.
+    const _cachedNum = _cachedLikes !== null ? parseInt(_cachedLikes, 10) : null;
+    const likeCount = (_recLikes && _recLikes > 0)
+        ? _recLikes
+        : (_cachedNum ?? 0);
     const _cachedLiked = localStorage.getItem(`hc_liked_${itemId}`) === '1';
-    const commentCount = rec._commentCount ?? 0;
+    // Komentarze — ta sama historia co polubienia: rekord z feedu ma tu zero,
+    // dopoki nie doszlo osobne zapytanie. Offline to zapytanie pada i licznik
+    // zostaje pusty, mimo ze komentarze istnieja.
+    const _recComments = rec._commentCount;
+    const _cachedComm = localStorage.getItem(`hc_comments_${itemId}`);
+    const commentCount = (_recComments && _recComments > 0)
+        ? _recComments
+        : (_cachedComm !== null ? parseInt(_cachedComm, 10) : 0);
     const viewCount = (act._viewCount ?? act.views)
         ?? rec._viewCount ?? rec.views ?? 0;
     const heroInner = (ownCoords || friendCoords)
@@ -1353,8 +1378,29 @@ export async function openActivityDetail(act, isOwn, actId) {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, itemId, itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
-                    broadcastLike(itemId, d.liked, d.count);
-                }).catch(() => { });
+                    // Zapis poszedl do kolejki offline — serwer nie zwrocil liczby.
+                    // Aktualizujemy lokalnie, inaczej pod sercem lada `undefined`.
+                    if (d.status === 'queued' || typeof d.count !== 'number') {
+                        const liked = btn.classList.toggle('home-card__action--liked');
+                        const key = `hc_likes_${itemId}`;
+                        const next = Math.max(0, parseInt(localStorage.getItem(key) ?? '0', 10) + (liked ? 1 : -1));
+                        localStorage.setItem(key, String(next));
+                        localStorage.setItem(`hc_liked_${itemId}`, liked ? '1' : '0');
+                        broadcastLike(itemId, liked, next);
+                        return;
+                    }
+                    localStorage.setItem(`hc_likes_${itemId}`, String(d.count));
+                    localStorage.setItem(`hc_liked_${itemId}`, d.liked ? '1' : '0');
+                    broadcastLike(itemId, d.liked ?? false, d.count);
+                }).catch(() => {
+                    // Brak sieci i brak kolejki — i tak pokaz zmiane lokalnie.
+                    const liked = btn.classList.toggle('home-card__action--liked');
+                    const key = `hc_likes_${itemId}`;
+                    const next = Math.max(0, parseInt(localStorage.getItem(key) ?? '0', 10) + (liked ? 1 : -1));
+                    localStorage.setItem(key, String(next));
+                    localStorage.setItem(`hc_liked_${itemId}`, liked ? '1' : '0');
+                    broadcastLike(itemId, liked, next);
+                });
             }
             if (action === 'comment') {
                 openCommentsView(sheetEl, itemId);
@@ -1395,6 +1441,7 @@ export async function openActivityDetail(act, isOwn, actId) {
             }
         }
         // Comment count — keep detail in sync with the feed (works for own + friends')
+        // Wynik zapamietujemy, zeby offline bylo z czego odtworzyc licznik.
         void fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(itemId)}`)
             .then(r => r.json())
             .then((d) => {
