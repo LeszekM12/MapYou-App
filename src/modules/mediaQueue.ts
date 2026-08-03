@@ -39,9 +39,25 @@ const tbl = (): any => (db as any).mediaQueue;
  *  z prawdziwym adresem i bezpieczny w JSON. */
 export const PENDING_PREFIX = 'mapyou-pending://';
 
+/** Ile razy probowac jeden plik. Wiecej niz przy zwyklych zapisach, bo
+ *  zdjecia bywaja duze i padaja na slabym zasiegu, a ich utrata boli
+ *  bardziej niz utrata polubienia. */
+const MAX_ATTEMPTS = 12;
+
 export interface MediaJob {
   id?:        number;
-  blob:       Blob;
+  /** Zawartosc pliku jako ArrayBuffer, NIE Blob.
+   *
+   *  Blob zapisany wprost w IndexedDB zawodzi na iOS (WKWebView) — wraca
+   *  pusty albo odlaczony. Objaw jest podstepny: `FormData` sklada sie bez
+   *  bledu, wysylka rusza, a serwer dostaje multipart bez zawartosci
+   *  i odpowiada `500 Unexpected end of form` w kilkanascie milisekund.
+   *
+   *  ArrayBuffer klonuje sie niezawodnie na kazdej platformie. Blob
+   *  odtwarzamy dopiero przy wysylce. */
+  data:       ArrayBuffer;
+  mimeType:   string;
+  size:       number;
   filename:   string;
   userId:     string;
   folder:     'activities' | 'posts' | 'avatars';
@@ -59,32 +75,60 @@ export async function enqueueMedia(
   blob: Blob, filename: string, userId: string,
   folder: 'activities' | 'posts' | 'avatars', publicId?: string | null,
 ): Promise<string> {
+  // Rozpakowujemy Blob do ArrayBuffera JUZ TERAZ — dopoki jest zywy.
+  const data = await blob.arrayBuffer();
+  if (!data.byteLength) throw new Error('pusty plik — nie kolejkuje');
+
   const id = await tbl().add({
-    blob, filename, userId, folder, publicId: publicId ?? null,
+    data, mimeType: blob.type || 'application/octet-stream', size: data.byteLength,
+    filename, userId, folder, publicId: publicId ?? null,
     placeholder: '', createdAt: Date.now(), attempts: 0, lastError: null,
   } as MediaJob);
   const placeholder = `${PENDING_PREFIX}${id}`;
   await tbl().update(id, { placeholder });
-  dlog(`[Media] odlozono plik (${Math.round(blob.size / 1024)} kB) -> ${placeholder}`);
+  dlog(`[Media] odlozono plik (${Math.round(data.byteLength / 1024)} kB) -> ${placeholder}`);
   return placeholder;
 }
 
+/** Ile plikow CZEKA NA WYSLANIE.
+ *
+ *  Celowo NIE liczymy zadan, ktore wyczerpaly limit prob. Wczesniej liczylem
+ *  wszystkie — i wystarczylo jedno trwale niepowodzenie, zeby pasek utknal
+ *  na „Syncing… (1)" na zawsze, bo licznik nigdy nie schodzil do zera.
+ *  Takie zadania nadal siedza w bazie (nie kasujemy danych uzytkownika),
+ *  ale nie udaja, ze cos sie dzieje. */
 export async function pendingMediaCount(): Promise<number> {
-  try { return await tbl().count(); } catch { return 0; }
+  try {
+    const all = await tbl().toArray() as MediaJob[];
+    return all.filter(j => j.attempts < MAX_ATTEMPTS).length;
+  } catch { return 0; }
+}
+
+/** Zadania, ktore trwale padly — do pokazania uzytkownikowi. */
+export async function failedMediaCount(): Promise<number> {
+  try {
+    const all = await tbl().toArray() as MediaJob[];
+    return all.filter(j => j.attempts >= MAX_ATTEMPTS).length;
+  } catch { return 0; }
 }
 
 // ── Wysyłka ──────────────────────────────────────────────────────────────────
-
-/** Ile razy probowac jeden plik. Wiecej niz przy zwyklych zapisach, bo
- *  zdjecia bywaja duze i padaja na slabym zasiegu, a ich utrata boli
- *  bardziej niz utrata polubienia. */
-const MAX_ATTEMPTS = 12;
 
 let flushing = false;
 
 /** Wyslij zalegle media i popraw rekordy, ktore na nie wskazuja. */
 export async function flushMedia(): Promise<void> {
   if (flushing || !navigator.onLine) return;
+
+  // Bez gotowej sesji `/upload/media` odpowie 401, a `authFetch` ponowi
+  // zadanie z TYM SAMYM `FormData`. Cialo multipart bylo juz raz wyslane,
+  // wiec powtorka dochodzi obcieta — serwer zglasza „Unexpected end of form".
+  // Prosciej nie zaczynac, dopoki nie ma czym sie uwierzytelnic.
+  try {
+    const { isSessionReady } = await import('./authFetch.js');
+    if (!isSessionReady()) { dlog('[Media] sesja niegotowa — czekam'); return; }
+  } catch { /* brak funkcji — probujemy mimo to */ }
+
   flushing = true;
 
   try {
@@ -95,8 +139,17 @@ export async function flushMedia(): Promise<void> {
     for (const job of jobs) {
       if (job.attempts >= MAX_ATTEMPTS) continue;
       try {
+        // Odtwarzamy Blob z bajtow i SPRAWDZAMY, czy cos w nim jest.
+        // Pusty plik nie ma po co lecieć — serwer i tak odpowie bledem,
+        // a zadanie krecilo by sie w kolko az do wyczerpania prob.
+        if (!job.data || !job.data.byteLength) {
+          console.error(`[Media] zadanie ${job.id} ma pusta zawartosc — usuwam`);
+          await tbl().delete(job.id);
+          continue;
+        }
+        const blob = new Blob([job.data], { type: job.mimeType });
         const form = new FormData();
-        form.append('file',   job.blob, job.filename);
+        form.append('file',   blob, job.filename);
         form.append('userId', job.userId);
         form.append('folder', job.folder);
         if (job.publicId) form.append('publicId', job.publicId);
@@ -107,8 +160,15 @@ export async function flushMedia(): Promise<void> {
         const data = await res.json() as { status?: string; url?: string };
         if (data.status !== 'ok' || !data.url) throw new Error('odpowiedz bez adresu');
 
-        await replacePlaceholder(job.placeholder, data.url);
+        // Kasujemy zadanie ZANIM poprawimy rekordy.
+        //
+        // Wczesniej bylo odwrotnie i gdy `replacePlaceholder` rzucilo bledem,
+        // zadanie zostawalo w kolejce mimo UDANEJ wysylki. Efekt: plik szedl
+        // na serwer w kolko, a licznik nigdy nie spadal.
+        // Plik jest juz w chmurze — to jest moment, w ktorym zadanie
+        // przestaje byc potrzebne.
         await tbl().delete(job.id);
+        await replacePlaceholder(job.placeholder, data.url);
         dlog(`[Media] wyslano ${job.placeholder} -> ${data.url}`);
       } catch (e) {
         await tbl().update(job.id, {
@@ -208,7 +268,7 @@ export function startMediaQueue(): void {
     return jobs.map(j => ({
       id: j.id,
       plik: j.filename,
-      kB: Math.round(j.blob.size / 1024),
+      kB: Math.round((j.size ?? 0) / 1024),
       folder: j.folder,
       prob: j.attempts,
       blad: j.lastError ?? '—',

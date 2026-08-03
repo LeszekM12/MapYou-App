@@ -4084,6 +4084,31 @@ document.addEventListener('error', (ev) => {
     const src = el.src ?? '';
     if (!src || src.startsWith('data:'))
         return; // placeholdery zostawiamy
+    // Zdjecie CZEKA NA WYSLANIE (tryb offline).
+    //
+    // `mapyou-pending://<id>` to adres zastepczy nadawany, gdy plik nie mogl
+    // pojsc na serwer. Przegladarka nie potrafi go zaladowac, wiec ladowal tu
+    // razem z prawdziwymi bledami i element byl chowany — uzytkownik widzial
+    // szare pudlo bez zadnego wyjasnienia.
+    //
+    // Zamiast chowac, pokazujemy czytelny komunikat. Po wyslaniu pliku adres
+    // zostanie podmieniony w bazie i przy nastepnym renderze zdjecie sie pojawi.
+    if (src.includes('mapyou-pending://')) {
+        el.style.display = 'none';
+        const host = el.closest('.post-media, .pv-photo-viewer__grid-item, .reel-thumb')
+            ?? el.parentElement;
+        if (host && !host.querySelector('.media-pending')) {
+            const note = document.createElement('div');
+            note.className = 'media-pending';
+            note.textContent = '⏳ Photo will upload when back online';
+            note.style.cssText =
+                'display:flex;align-items:center;justify-content:center;min-height:120px;' +
+                    'padding:18px;border-radius:12px;background:#F0F2F5;color:#5B6672;' +
+                    'font-size:13.5px;font-weight:500;text-align:center;';
+            host.appendChild(note);
+        }
+        return;
+    }
     el.style.display = 'none';
     // Ukryj też pusty kafelek siatki, żeby nie zostawiać dziury w layoucie
     const tile = el.closest('.pv-photo-viewer__grid-item, .pv-photo-viewer__list-item, .reel-thumb, .post-media');
