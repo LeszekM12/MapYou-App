@@ -221,6 +221,28 @@ async function replacePlaceholder(placeholder: string, realUrl: string): Promise
     } catch { /* pojedyncza tabela nie moze przerwac calosci */ }
   }
 
+  // Podmien TAKZE to, co jest juz narysowane na ekranie.
+  //
+  // Poprawienie bazy nie odswieza widoku — uzytkownik musial wyjsc z ekranu
+  // i wrocic, zeby zobaczyc zdjecie. Teraz wymieniamy adres bezposrednio
+  // w DOM i kasujemy notke „Photo uploads when back online", wiec zdjecie
+  // wskakuje samo, w momencie w ktorym jest gotowe.
+  try {
+    document.querySelectorAll<HTMLImageElement | HTMLVideoElement>('img, video')
+      .forEach(el => {
+        if (!el.getAttribute('src')?.includes(placeholder)) return;
+        el.src = realUrl;
+        el.style.display = '';
+        const host = el.closest<HTMLElement>('.post-media, .pv-photo-viewer__grid-item, .reel-thumb')
+          ?? el.parentElement;
+        host?.querySelector('.media-pending')?.remove();
+      });
+    // Notki bez zywego <img> obok (element zostal usuniety przy renderze).
+    document.querySelectorAll('.media-pending').forEach(n => {
+      if (!n.parentElement?.querySelector('img[src], video[src]')) n.remove();
+    });
+  } catch { /* DOM moze byc w trakcie przerysowania */ }
+
   if (!touched.length) { dlog('[Media] brak rekordow do poprawienia'); return; }
   dlog(`[Media] poprawiono ${touched.length} rekordow`);
 

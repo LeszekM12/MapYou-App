@@ -26,6 +26,10 @@ import { db } from './db.js';
 import { dlog } from '../utils/log.js';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const tbl = () => db.outbox;
+/** Maksymalna liczba prob dla jednego zapisu. Po jej przekroczeniu rekord
+ *  ZOSTAJE w bazie (to dane uzytkownika), ale przestajemy go probowac
+ *  i nie liczymy go jako „czekajacy". */
+const MAX_ATTEMPTS = 8;
 // ── Co wolno kolejkowac ──────────────────────────────────────────────────────
 /** Sciezki, ktorych NIE odkladamy. Dopasowanie po fragmencie adresu. */
 const NEVER_QUEUE = [
@@ -38,6 +42,13 @@ const NEVER_QUEUE = [
     '/directions', // planowanie trasy — wynik potrzebny natychmiast
     '/loop',
     '/sync/manifest',
+    // Polubienia NIE ida do kolejki.
+    //
+    // Wolajacy odczytuje z odpowiedzi nowa liczbe polubien. Odpowiedz zastepcza
+    // („queued") tej liczby nie ma, wiec pod sercem pojawialo sie `undefined`.
+    // Polubienie offline jest malo warte, a widoczny smiec w interfejsie duzo
+    // kosztuje — wiec pozwalamy mu po prostu nie przejsc.
+    '/feed/like',
 ];
 export function isQueueable(url, method) {
     if (!['POST', 'PUT', 'PATCH', 'DELETE'].includes(method.toUpperCase()))
@@ -71,9 +82,16 @@ export async function enqueue(url, method, headers, body) {
     return idemKey;
 }
 /** Ile zapisow czeka na wyslanie. */
+/** Ile zapisow CZEKA NA WYSLANIE.
+ *
+ *  Nie liczymy tych, ktore wyczerpaly limit prob — sa pomijane w petli
+ *  wysylkowej, wiec wliczanie ich oznaczaloby licznik, ktory nigdy nie
+ *  schodzi do zera. Dokladnie to widac bylo jako „Syncing… (2)" wiszace
+ *  w nieskonczonosc, mimo ze wszystko juz doszlo. */
 export async function pendingCount() {
     try {
-        return await tbl().count();
+        const all = await tbl().toArray();
+        return all.filter(i => i.attempts < MAX_ATTEMPTS).length;
     }
     catch {
         return 0;
@@ -108,7 +126,6 @@ let flushing = false;
  *  Po jej przekroczeniu rekord ZOSTAJE w kolejce, ale przestajemy go probowac
  *  w tym cyklu. Nie kasujemy go — to dane uzytkownika i lepiej, zeby czekaly,
  *  niz zeby zniknely po cichu. */
-const MAX_ATTEMPTS = 8;
 /** Wyslij wszystko, co czeka. Bezpieczne do wolania wielokrotnie —
  *  rownolegle wywolania sa pomijane. */
 export async function flush() {
@@ -216,6 +233,7 @@ export function mountOfflineBar() {
     // dalo sie przeczytac.
     const MIN_SYNC_MS = 1400;
     let syncShownAt = 0;
+    let hideTimer = 0;
     // Pasek liczy TAKZE zalegle zdjecia. Uzytkownik nie odroznia „zapis czeka"
     // od „zdjecie czeka" — dla niego to jedna rzecz: cos jeszcze nie poszlo.
     const render = async (queued) => {
@@ -249,6 +267,21 @@ export function mountOfflineBar() {
         // gdy element dopiero co przestal byc `hidden`.
         void bar.offsetHeight;
         bar.classList.add('offline-bar--visible');
+        // Sam sie chowa po chwili.
+        //
+        // Pasek wisial przez CALY czas bez sieci — a to bywaja godziny. Informacja
+        // jest wazna raz, w momencie zmiany stanu; potem tylko zabiera miejsce.
+        // Pokazujemy go na ~4,5 s i chowamy. Wroci przy kazdej kolejnej zmianie
+        // (nowy zapis w kolejce, powrot sieci, koniec wysylki).
+        if (hideTimer)
+            clearTimeout(hideTimer);
+        hideTimer = window.setTimeout(() => {
+            bar.classList.remove('offline-bar--visible');
+            setTimeout(() => {
+                if (!bar.classList.contains('offline-bar--visible'))
+                    bar.hidden = true;
+            }, 350);
+        }, 4500);
         if (offline) {
             bar.classList.remove('offline-bar--syncing');
             text.textContent = pending > 0
