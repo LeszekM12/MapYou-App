@@ -126,6 +126,21 @@ export async function flush() {
         return;
     if (!navigator.onLine)
         return;
+    // Bez gotowej sesji KAZDE zadanie wraca z 401.
+    //
+    // Kolejka rusza przy zdarzeniu `online`, ktore w WebView potrafi przyjsc
+    // zanim Firebase odswiezy token. Wysylalismy wiec bez autoryzacji, serwer
+    // odrzucal, a galaz „blad klienta" kasowala zadanie NA ZAWSZE — polubienie
+    // przepadalo po cichu i po odswiezeniu stan sie cofal.
+    try {
+        const { isSessionReady, onSessionReady } = await import('./authFetch.js');
+        if (!isSessionReady()) {
+            dlog('[Outbox] sesja niegotowa — wysle, gdy bedzie');
+            onSessionReady(() => { void flush(); });
+            return;
+        }
+    }
+    catch { /* brak funkcji — probujemy mimo to */ }
     flushing = true;
     try {
         const items = await listPending();
@@ -158,6 +173,20 @@ export async function flush() {
                     dlog(`[Outbox] wyslano ${item.method} ${item.url}`);
                     notifyChange(); // licznik ma spadac na biezaco, nie dopiero na koncu
                     continue;
+                }
+                // 401 i 403 NIE sa trwale — znaczą „nie teraz", nie „nigdy".
+                //
+                // Token wygasa co godzine, a zadanie moze czekac w kolejce dluzej.
+                // Kasowanie go w takiej sytuacji to cicha utrata danych uzytkownika,
+                // a dokladnie tego ta kolejka ma zapobiegac.
+                if (res.status === 401 || res.status === 403) {
+                    await tbl().update(item.id, { attempts: item.attempts + 1, lastError: `HTTP ${res.status}` });
+                    try {
+                        const { onSessionReady } = await import('./authFetch.js');
+                        onSessionReady(() => { void flush(); });
+                    }
+                    catch { /* noop */ }
+                    break; // reszta i tak dostanie to samo
                 }
                 if (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) {
                     // Blad klienta (400, 403, 404...) nie naprawi sie sam. Ponawianie
