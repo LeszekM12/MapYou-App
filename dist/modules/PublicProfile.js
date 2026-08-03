@@ -3,6 +3,7 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
 import { getIcon as _getIcon, getColor as _getColor, getSportLabel as _getSportLabel } from './Tracker.js';
+import * as SS from './socialStore.js';
 function _relDate(ts) {
     return new Date(typeof ts === 'number' ? ts : ts).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -686,7 +687,7 @@ function _attachLikeComment(card, itemId, itemType) {
         setTimeout(() => btn.classList.remove('home-card__action--pulse'), 400);
         const res = await fetch(`${BACKEND_URL}/feed/like`, {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, itemId, itemType }),
+            body: JSON.stringify({ userId, itemId: SS.resolve(itemId), itemType }),
         }).catch(() => null);
         if (res?.ok) {
             const d = await res.json();

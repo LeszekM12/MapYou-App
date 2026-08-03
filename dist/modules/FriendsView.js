@@ -17,6 +17,7 @@ import { getUserName } from './LiveTracker.js';
 import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { isSignedIn, signInPromptHtml, bindSignInPrompts, onAccountChange } from './AccountUI.js';
+import * as SS from './socialStore.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const STATUS_POLL_MS = 10000; // sprawdzaj status znajomych co 10s
 // ── FriendsView class ─────────────────────────────────────────────────────────
@@ -406,7 +407,7 @@ export class FriendsView {
             const res = await fetch(`${BACKEND_URL}/feed/like`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId, itemId, itemType }),
+                body: JSON.stringify({ userId, itemId: SS.resolve(itemId), itemType }),
             });
             if (res.ok) {
                 const d = await res.json();

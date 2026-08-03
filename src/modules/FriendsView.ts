@@ -22,6 +22,7 @@ import { getUserName } from './LiveTracker.js';
 import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { isSignedIn, signInPromptHtml, bindSignInPrompts, onAccountChange } from './AccountUI.js';
+import * as SS from './socialStore.js';
 
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 
@@ -393,7 +394,7 @@ export class FriendsView {
       const res = await fetch(`${BACKEND_URL}/feed/like`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ userId, itemId, itemType }),
+        body:    JSON.stringify({ userId, itemId: SS.resolve(itemId), itemType }),
       });
       if (res.ok) {
         const d = await res.json() as { liked: boolean; count: number };

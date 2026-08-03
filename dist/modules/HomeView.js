@@ -506,7 +506,13 @@ export function buildPostCard(post, onRefresh) {
         void fetch(`${BACKEND_URL}/feed/like`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId, itemId: post.id, itemType: 'post' }),
+            // KANONICZNY identyfikator, nie surowy.
+            //
+            // Zapytanie zbiorcze o polubienia pyta o postac kanoniczna
+            // (`activityId` przed `id`). Wysylajac surowe `id` zapisywalismy
+            // lajka pod INNYM kluczem, niz potem pytalismy — serwer
+            // odpowiadal, ze nie jest polubione, i lajk znikal po odswiezeniu.
+            body: JSON.stringify({ userId, itemId: SS.resolve(post.id), itemType: 'post' }),
         }).then(r => r.json()).then((d) => {
             if (typeof d.count === 'number') {
                 SS.confirmFromServer(post.id, d.count, !!d.liked);
@@ -1351,7 +1357,7 @@ export async function openActivityDetail(act, isOwn, actId) {
                 const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
                 void fetch(`${BACKEND_URL}/feed/like`, {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, itemId, itemType: 'activity' }),
+                    body: JSON.stringify({ userId, itemId: SS.resolve(itemId), itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
                     if (typeof d.count === 'number') {
                         SS.confirmFromServer(itemId, d.count, !!d.liked);
@@ -1517,7 +1523,13 @@ export function buildCard(act) {
                 void fetch(`${BACKEND_URL}/feed/like`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ userId, itemId: act.id, itemType: 'activity' }),
+                    // KANONICZNY identyfikator, nie surowy.
+                    //
+                    // Zapytanie zbiorcze o polubienia pyta o postac kanoniczna
+                    // (`activityId` przed `id`). Wysylajac surowe `id` zapisywalismy
+                    // lajka pod INNYM kluczem, niz potem pytalismy — serwer
+                    // odpowiadal, ze nie jest polubione, i lajk znikal po odswiezeniu.
+                    body: JSON.stringify({ userId, itemId: SS.resolve(act.id), itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
                     if (typeof d.count === 'number') {
                         SS.confirmFromServer(act.id, d.count, !!d.liked);
@@ -4546,7 +4558,7 @@ export class HomeView {
                     e.stopPropagation();
                     const res = await fetch(`${BACKEND_URL}/feed/like`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: myUserId, itemId: act.id, itemType: 'activity' }),
+                        body: JSON.stringify({ userId: myUserId, itemId: SS.resolve(act.id), itemType: 'activity' }),
                     });
                     if (res.ok) {
                         const d = await res.json();
@@ -4589,7 +4601,7 @@ export class HomeView {
                     e.stopPropagation();
                     const res = await fetch(`${BACKEND_URL}/feed/like`, {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ userId: myUserId, itemId: post.id, itemType: 'post' }),
+                        body: JSON.stringify({ userId: myUserId, itemId: SS.resolve(post.id), itemType: 'post' }),
                     });
                     if (res.ok) {
                         const d = await res.json();
