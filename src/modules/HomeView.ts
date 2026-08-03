@@ -534,7 +534,7 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
       body: JSON.stringify({ userId, itemId: post.id, itemType: 'post' }),
     }).then(r => r.json()).then((d: { liked?: boolean; count?: number }) => {
       if (typeof d.count === 'number') {
-        SS.set(post.id, { liked: !!d.liked, likes: d.count, fromServer: true });
+        SS.confirmFromServer(post.id, d.count, !!d.liked);
       }
     }).catch(() => { SS.toggleLike(post.id); });
   });
@@ -1366,7 +1366,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
           body: JSON.stringify({ userId, itemId, itemType: 'activity' }),
         }).then(r => r.json()).then((d: { liked?: boolean; count?: number }) => {
           if (typeof d.count === 'number') {
-            SS.set(itemId, { liked: !!d.liked, likes: d.count, fromServer: true });
+            SS.confirmFromServer(itemId, d.count, !!d.liked);
           }
         }).catch(() => { SS.toggleLike(itemId); });
       }
@@ -1391,7 +1391,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
           const info = resp.data[itemId];
           if (!info) return;
           // Zapamietaj — offline to jedyne zrodlo tych liczb.
-          SS.set(itemId, { likes: info.count, liked: info.liked, fromServer: true });
+          SS.mergeFromServer(itemId, info.count, info.liked);
         }).catch(() => { /* brak sieci — magazyn ma ostatni znany stan */ });
     }
     // Comment count — keep detail in sync with the feed (works for own + friends')
@@ -1539,7 +1539,7 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
           body: JSON.stringify({ userId, itemId: act.id, itemType: 'activity' }),
         }).then(r => r.json()).then((d: { liked?: boolean; count?: number }) => {
           if (typeof d.count === 'number') {
-            SS.set(act.id, { liked: !!d.liked, likes: d.count, fromServer: true });
+            SS.confirmFromServer(act.id, d.count, !!d.liked);
           }
         }).catch(() => { SS.toggleLike(act.id); });
       }
@@ -3476,6 +3476,20 @@ export class HomeView {
     ].sort((a, b) => b.date - a.date);
 
     const paintFeed = (feed: FeedItem[]): void => {
+      // Powiaz warianty identyfikatora PRZED narysowaniem kart.
+      //
+      // Karta czyta stan przez `SS.get(itemId)`. Jesli aliasy jeszcze nie
+      // istnieja, `itemId` nie zostanie sprowadzony do postaci kanonicznej
+      // i magazyn odda pustke — dlatego przy pierwszym wejsciu w Home lajkow
+      // nie bylo, a pojawialy sie dopiero po przelaczeniu zakladki (czyli
+      // przy DRUGIM renderze, gdy aliasy juz byly).
+      for (const f of feed) {
+        SS.linkIds([
+          f.data.activityId as string | undefined,
+          f.data.postId as string | undefined,
+          f.data.id as string | undefined,
+        ]);
+      }
       feedList.innerHTML = '';
       this._feedObserver?.disconnect();
       document.getElementById('feedSentinel')?.remove();
@@ -3583,27 +3597,19 @@ export class HomeView {
 
       // Batch load liked state
       if (userId && feed.length > 0) {
-        // Powiaz warianty identyfikatora KAZDEGO wpisu.
-        //
-        // Jeden wpis feedu miewa `activityId`, `postId` i `id` — rozne czesci
-        // kodu uzywaly roznych, wiec odpowiedz serwera trafiala w selektor,
-        // ktorego nie ma. Magazyn sprowadza je do jednej postaci i od tej pory
-        // nie ma znaczenia, ktorego uzyje widok.
-        const itemIds: string[] = [];
-        for (const f of feed) {
-          const canon = SS.linkIds([
+        const itemIds = feed
+          .map(f => SS.linkIds([
             f.data.activityId as string | undefined,
             f.data.postId as string | undefined,
             f.data.id as string | undefined,
-          ]);
-          if (canon) itemIds.push(canon);
-        }
+          ]))
+          .filter(Boolean);
         void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemIds.join(','))}`, { cache: 'no-store' })
           .then(r => r.json())
           .then((resp: { status: string; data: Record<string, { count: number; liked: boolean }> }) => {
             if (resp.status !== 'ok') return;
             for (const [id, info] of Object.entries(resp.data)) {
-              SS.set(id, { likes: info.count, liked: info.liked, fromServer: true });
+              SS.mergeFromServer(id, info.count, info.liked);
             }
           }).catch(() => { /* brak sieci — magazyn ma ostatni znany stan */ });
       }

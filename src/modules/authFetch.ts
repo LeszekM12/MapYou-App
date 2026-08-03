@@ -219,8 +219,8 @@ export function installAuthFetch(): void {
           const req = JSON.parse(sent) as { itemId?: string };
           const d   = await res.clone().json() as { liked?: boolean; count?: number };
           if (req.itemId && typeof d.count === 'number') {
-            const { set } = await import('./socialStore.js');
-            set(req.itemId, { liked: !!d.liked, likes: d.count, fromServer: true });
+            const { confirmFromServer } = await import('./socialStore.js');
+            confirmFromServer(req.itemId, d.count, !!d.liked);
           }
         } catch { /* nie blokujemy odpowiedzi */ }
       })();

@@ -38,9 +38,12 @@ export interface SocialEntry {
   likes:    number;
   liked:    boolean;
   comments: number;
-  /** Czy stan pochodzi z serwera, czy z optymistycznej zmiany offline.
-   *  Dane z serwera maja pierwszenstwo przy scalaniu. */
+  /** Czy stan pochodzi z serwera. */
   fromServer: boolean;
+  /** Zmiana zrobiona lokalnie, ktora NIE dotarla jeszcze na serwer.
+   *  Chroni przed nadpisaniem przez odswiezenie zbiorcze, ktore o niej
+   *  nie wie. Kasowana, gdy serwer potwierdzi ten sam stan. */
+  pending?: boolean;
 }
 
 type Store = Record<string, SocialEntry>;
@@ -112,21 +115,18 @@ export function set(id: string, patch: Partial<SocialEntry>): void {
   const key = resolve(id);
   const cur = store[key] ?? { ...EMPTY };
 
-  // Dane z serwera nie moga nadpisac swiezszej zmiany zrobionej offline,
-  // ktora czeka jeszcze w kolejce. Rozpoznajemy ja po `fromServer: false`.
-  if (patch.fromServer && !cur.fromServer && cur.likes !== 0) {
-    // Zachowaj lokalna decyzje o polubieniu, przyjmij liczbe z serwera
-    // skorygowana o nasza nieprzeslana zmiane.
-    const delta = cur.liked ? 1 : 0;
-    store[key] = {
-      likes:    Math.max(0, (patch.likes ?? cur.likes) + delta),
-      liked:    cur.liked,
-      comments: patch.comments ?? cur.comments,
-      fromServer: false,
-    };
-  } else {
-    store[key] = { ...cur, ...patch };
-  }
+  // Scalanie jest CELOWO proste: patch wygrywa.
+  //
+  // Pierwsza wersja probowala byc madrzejsza — przy danych z serwera
+  // doliczala „nieprzeslana zmiane lokalna" (`+delta`) i zachowywala stare
+  // `liked`. Skutek byl taki, ze KAZDE klikniecie offline dodawalo lajka
+  // dwa razy (raz `toggleLike`, raz doliczony delta), licznik rosl bez konca,
+  // a serce nigdy nie gaslo, bo `liked` przepisywalo sie ze starego stanu.
+  //
+  // Ochrone przed nadpisaniem niewyslanej zmiany realizuje teraz `pending`
+  // sprawdzane w `mergeFromServer` — i tylko tam, gdzie ma sens: przy
+  // odswiezeniu ZBIORCZYM, ktore o naszej zmianie nie wie.
+  store[key] = { ...cur, ...patch };
   save();
   paint();
 }
@@ -139,8 +139,24 @@ export function toggleLike(id: string): { liked: boolean; count: number } {
   const cur = get(id);
   const liked = !cur.liked;
   const count = Math.max(0, cur.likes + (liked ? 1 : -1));
-  set(id, { liked, likes: count, fromServer: false });
+  set(id, { liked, likes: count, fromServer: false, pending: true });
   return { liked, count };
+}
+
+/** Przyjmij stan z odswiezenia ZBIORCZEGO.
+ *
+ *  Rozni sie od `set` jednym: nie nadpisuje wpisu, ktory czeka jeszcze
+ *  w kolejce offline. Zbiorcze zapytanie zwraca stan sprzed naszej zmiany,
+ *  wiec przyjecie go cofneloby polubienie na oczach uzytkownika. */
+export function mergeFromServer(id: string, likes: number, liked: boolean): void {
+  const cur = get(id);
+  if (cur.pending) return;
+  set(id, { likes, liked, fromServer: true, pending: false });
+}
+
+/** Serwer potwierdzil nasza zmiane — wpis nie jest juz „w drodze". */
+export function confirmFromServer(id: string, likes: number, liked: boolean): void {
+  set(id, { likes, liked, fromServer: true, pending: false });
 }
 
 // ── Malowanie ────────────────────────────────────────────────────────────────
