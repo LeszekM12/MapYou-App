@@ -59,13 +59,6 @@ const NEVER_QUEUE = [
   '/directions',        // planowanie trasy — wynik potrzebny natychmiast
   '/loop',
   '/sync/manifest',
-  // Polubienia NIE ida do kolejki.
-  //
-  // Wolajacy odczytuje z odpowiedzi nowa liczbe polubien. Odpowiedz zastepcza
-  // („queued") tej liczby nie ma, wiec pod sercem pojawialo sie `undefined`.
-  // Polubienie offline jest malo warte, a widoczny smiec w interfejsie duzo
-  // kosztuje — wiec pozwalamy mu po prostu nie przejsc.
-  '/feed/like',
 ];
 
 export function isQueueable(url: string, method: string): boolean {
@@ -270,8 +263,16 @@ export function mountOfflineBar(): void {
     renderCount(pending);
   };
 
+  // Ostatnio pokazany stan. Bez tego pasek wracal przy KAZDYM odpytaniu
+  // licznika (co 5 s) — chowal sie po 4,5 s i natychmiast wjezdzal z powrotem,
+  // w nieskonczonej petli. Pokazujemy go wylacznie, gdy cos sie ZMIENILO.
+  let lastKey = '';
+
   const renderCount = (pending: number): void => {
     const offline = !navigator.onLine;
+    const key = `${offline ? 'off' : 'on'}:${pending}`;
+    const changed = key !== lastKey;
+    lastKey = key;
 
     // Jesli wlasnie pokazalismy „Wysylanie…", nie chowaj od razu.
     if (!offline && pending === 0 && syncShownAt) {
@@ -289,6 +290,9 @@ export function mountOfflineBar(): void {
       setTimeout(() => { if (!bar.classList.contains('offline-bar--visible')) bar.hidden = true; }, 300);
       return;
     }
+
+    // Stan sie nie zmienil — nie budzimy paska ponownie.
+    if (!changed) return;
 
     bar.hidden = false;
     // Wymuszenie przeliczenia stylu — bez tego przejscie nie odpali,

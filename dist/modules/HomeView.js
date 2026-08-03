@@ -492,7 +492,23 @@ export function buildPostCard(post, onRefresh) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, itemId: post.id, itemType: 'post' }),
         }).then(r => r.json()).then((d) => {
-            broadcastLike(post.id, d.liked, d.count);
+            // Zapis trafil do kolejki offline — serwer nie odpowiedzial liczba.
+            // Robimy optymistyczna aktualizacje lokalna, tak samo jak przy bledzie
+            // sieci. Bez tego pod sercem pojawialo sie `undefined`.
+            if (d.status === 'queued' || typeof d.count !== 'number') {
+                const liked = btn.classList.toggle('home-card__action--liked');
+                const lsKey = `hc_likes_p_${post.id}`;
+                const next = Math.max(0, parseInt(localStorage.getItem(lsKey) ?? '0', 10) + (liked ? 1 : -1));
+                localStorage.setItem(lsKey, String(next));
+                localStorage.setItem(`hc_liked_p_${post.id}`, liked ? '1' : '0');
+                const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
+                if (el)
+                    el.textContent = String(next);
+                return;
+            }
+            localStorage.setItem(`hc_likes_p_${post.id}`, String(d.count));
+            localStorage.setItem(`hc_liked_p_${post.id}`, d.liked ? '1' : '0');
+            broadcastLike(post.id, d.liked ?? false, d.count);
         }).catch(() => {
             const liked = btn.classList.toggle('home-card__action--liked');
             const lsKey = `hc_likes_p_${post.id}`;
@@ -1045,7 +1061,16 @@ export async function openActivityDetail(act, isOwn, actId) {
         ? `<div class="ad-section"><h3 class="ad-section-title">Notatki</h3><p class="ad-notes">🔒 ${full.notes}</p></div>`
         : '';
     const itemId = actId || rec.activityId || full.id;
-    const likeCount = rec._likeCount ?? 0;
+    // Licznik polubien: rekord → ostatnio znana wartosc → zero.
+    //
+    // `_likeCount` bywa puste, bo prawdziwe liczby dociagane sa OSOBNYM
+    // zadaniem juz po narysowaniu karty. Offline to zadanie pada i pod sercem
+    // zostawalo zero — polubienia „znikaly", mimo ze istnialy.
+    // Cache z localStorage sprawia, ze widac je od razu i bez sieci.
+    const _cachedLikes = localStorage.getItem(`hc_likes_${itemId}`);
+    const likeCount = rec._likeCount
+        ?? (_cachedLikes !== null ? parseInt(_cachedLikes, 10) : 0);
+    const _cachedLiked = localStorage.getItem(`hc_liked_${itemId}`) === '1';
     const commentCount = rec._commentCount ?? 0;
     const viewCount = (act._viewCount ?? act.views)
         ?? rec._viewCount ?? rec.views ?? 0;
@@ -1350,12 +1375,23 @@ export async function openActivityDetail(act, isOwn, actId) {
                 const info = resp.data[itemId];
                 if (!info)
                     return;
+                // Zapamietaj — offline to jedyne zrodlo tych liczb.
+                localStorage.setItem(`hc_likes_${itemId}`, String(info.count));
+                localStorage.setItem(`hc_liked_${itemId}`, info.liked ? '1' : '0');
+                applyLike(info.count, info.liked);
+            }).catch(() => {
+                // Brak sieci — pokaz ostatnio znany stan zamiast zera.
+                const c = localStorage.getItem(`hc_likes_${itemId}`);
+                if (c !== null)
+                    applyLike(parseInt(c, 10), localStorage.getItem(`hc_liked_${itemId}`) === '1');
+            });
+            function applyLike(count, liked) {
                 const likeBtn = ov.querySelector('.ad-footer .home-card__action--like');
-                likeBtn?.classList.toggle('home-card__action--liked', info.liked);
+                likeBtn?.classList.toggle('home-card__action--liked', liked);
                 const el = ov.querySelector(`[data-like-count="${itemId}"]`);
                 if (el)
-                    el.textContent = String(info.count);
-            }).catch(() => { });
+                    el.textContent = String(count);
+            }
         }
         // Comment count — keep detail in sync with the feed (works for own + friends')
         void fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(itemId)}`)
