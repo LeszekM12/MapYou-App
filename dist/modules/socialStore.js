@@ -134,8 +134,20 @@ export function toggleLike(id) {
  *  wiec przyjecie go cofneloby polubienie na oczach uzytkownika. */
 export function mergeFromServer(id, likes, liked) {
     const cur = get(id);
-    if (cur.pending)
+    // Wpis czeka jeszcze w kolejce offline.
+    //
+    // Odswiezenie zbiorcze zwraca stan SPRZED naszej zmiany, wiec przyjecie go
+    // cofneloby polubienie. Ale nie mozemy tez trzymac `pending` w nieskonczonosc,
+    // bo wtedy prawdziwe zmiany z serwera nigdy by nie doszly.
+    //
+    // Rozstrzygamy tak: gdy serwer POTWIERDZA nasz stan, uznajemy zmiane za
+    // dostarczona i zdejmujemy flage. Gdy sie nie zgadza — zostawiamy nasza
+    // wersje i flage, bo znaczy to, ze zapis wciaz jest w drodze.
+    if (cur.pending) {
+        if (liked === cur.liked)
+            set(id, { likes, liked, fromServer: true, pending: false });
         return;
+    }
     set(id, { likes, liked, fromServer: true, pending: false });
 }
 /** Serwer potwierdzil nasza zmiane — wpis nie jest juz „w drodze". */
