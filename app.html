@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"/>
+    <meta http-equiv="X-UA-Compatible" content="ie=edge"/>
+    <meta name="theme-color" content="#141417" media="(prefers-color-scheme: dark)"/>
+    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)"/>
+    <meta name="description" content="Mapty — track your workouts on the map"/>
+    <meta name="color-scheme" content="dark light"/>
+    <meta name="apple-mobile-web-app-title" content="Mapty"/>
+    <link rel="apple-touch-icon" href="public/icon-192.png"/>
+    <link rel="shortcut icon" type="image/png" href="public/icon-192.png"/>
+    <link rel="manifest" href="public/manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+    <link rel="stylesheet" href="style.css"/>
+  <link rel="stylesheet" href="home_styles.css">
+    <link rel="stylesheet" href="weather.css"/>
+    <link rel="stylesheet" href="light_theme.css"/>
+    <link rel="stylesheet" href="friends.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
+          integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
+          crossorigin=""/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <script>Chart.defaults.color = "rgba(255,255,255,0.5)"; Chart.defaults.borderColor = "rgba(255,255,255,0.06)";</script>
+    <link rel="stylesheet" href="stats_styles.css"/>
+    <link rel="stylesheet" href="profile_styles.css"/>
+    <link rel="stylesheet" href="search_styles.css"/>
+    <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
+            integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
+            crossorigin=""></script>
+    <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/libsodium-wrappers/0.7.15/sodium.min.js"></script>
+    <script src="https://unpkg.com/dexie@3/dist/dexie.min.js"></script>
+    <script type="module" src="./dist/main.js"></script>
+    <title>MapYou - Workouts App</title>
+</head>
+<body>
+
+
+<!-- FLOATING SEARCH BAR (Map tab only) -->
+<div id="mapSearchBar" class="map-search-bar msb--hidden-tab">
+    <div class="map-search-bar__inner">
+        <div class="map-search-bar__row">
+            <input class="poi-search__input" id="poiInput" type="text"
+                   placeholder="Search nearby…" autocomplete="off" list="poiSuggestions"/>
+            <datalist id="poiSuggestions"></datalist>
+            <button class="poi-search__btn" id="poiSearchBtn">🔍</button>
+            <button class="btn-settings-gear" id="btnSettings" title="Settings">⚙️</button>
+        </div>
+        <div class="poi-filters" id="poiFilters">
+            <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
+            <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
+            <button class="poi-filter-btn" data-query="pharmacy">💊 Pharmacy</button>
+            <button class="poi-filter-btn" data-query="park">🌳 Park</button>
+            <button class="poi-filter-btn" data-query="paczkomat">📦 Parcel locker</button>
+            <button class="poi-filter-btn" data-query="restaurant">🍴 Restaurant</button>
+            <button class="poi-filter-btn" data-query="ATM">🏧 ATM</button>
+            <button class="poi-filter-btn" data-query="hotel">🏨 Hotel</button>
+            <button class="poi-filter-btn" data-query="church">⛪ Church</button>
+            <button class="poi-filter-btn" data-query="cafe">☕ Cafe</button>
+            <button class="poi-filter-btn" data-query="hospital">🏥 Hospital</button>
+        </div>
+        <ul class="poi-results hidden" id="poiResults"></ul>
+    </div>
+</div>
+
+<!-- Route mini-pill: shows distance+time when route drawn and panel collapsed -->
+<div id="routeMiniPill" class="route-mini-pill hidden">
+    <span class="route-mini-pill__item">📏 <span id="routeMiniDist">—</span> km</span>
+    <span class="route-mini-pill__sep">·</span>
+    <span class="route-mini-pill__item">⏱ <span id="routeMiniTime">—</span> min</span>
+</div>
+
+<!-- SETTINGS PANEL -->
+<div class="settings-panel hidden" id="settingsPanel">
+    <div class="settings-panel__header">
+        <button class="btn-settings-back" id="btnSettingsBack">←</button>
+        <span class="settings-panel__title">Settings</span>
+    </div>
+    <div class="settings-item" id="settingShare">
+        <span class="settings-item__icon">📤</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Share my location</div>
+            <div class="settings-item__sub">Send a Google Maps link</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingNight">
+        <span class="settings-item__icon">🌙</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Night mode</div>
+            <div class="settings-item__sub">Dark UI + dark map tiles</div>
+        </div>
+        <div class="night-toggle" id="nightToggle">
+            <div class="night-toggle__knob"></div>
+        </div>
+    </div>
+    <div class="settings-item" id="settingVoice">
+        <span class="settings-item__icon">🔊</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Voice stats</div>
+            <div class="settings-item__sub">Announce distance &amp; pace every km</div>
+        </div>
+        <div class="voice-toggle" id="voiceToggle">
+            <div class="voice-toggle__knob"></div>
+        </div>
+    </div>
+    <div class="settings-item" id="settingCluster">
+        <span class="settings-item__icon">📍</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Cluster markers</div>
+            <div class="settings-item__sub">Group nearby workouts on map</div>
+        </div>
+        <div class="cluster-toggle" id="clusterToggle">
+            <div class="cluster-toggle__knob"></div>
+        </div>
+    </div>
+    <div class="settings-item" id="settingBgTracking" style="display:none">
+        <span class="settings-item__icon">🛰️</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Background tracking</div>
+            <div class="settings-item__sub">Keep recording with the screen off</div>
+        </div>
+    </div>
+    <div class="settings-item" id="settingClear">
+        <span class="settings-item__icon">🗑️</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Clear all workouts</div>
+            <div class="settings-item__sub">Remove saved history</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingRecovery">
+        <span class="settings-item__icon">🔑</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Recovery code</div>
+            <div class="settings-item__sub">Save your code to recover data</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingStravaImport">
+        <span class="settings-item__icon">🧳</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Import from Strava</div>
+            <div class="settings-item__sub">Move your whole Strava history into MapYou</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingRestore">
+        <span class="settings-item__icon">🔁</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Restore account</div>
+            <div class="settings-item__sub">Enter a code to switch this device to your account</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingPrivacy">
+        <span class="settings-item__icon">🛡️</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Privacy Policy</div>
+            <div class="settings-item__sub">How MapYou handles your data</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingTerms">
+        <span class="settings-item__icon">📄</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Terms of Service</div>
+            <div class="settings-item__sub">Rules for using the app</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingSync" style="display:none">
+        <span class="settings-item__icon">☁️</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Sync to cloud</div>
+            <div class="settings-item__sub">Send your data to MongoDB Atlas</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+    <div class="settings-item" id="settingInstall" style="display:none">
+        <span class="settings-item__icon">📱</span>
+        <div class="settings-item__text">
+            <div class="settings-item__label">Install app</div>
+            <div class="settings-item__sub">Add to home screen</div>
+        </div>
+        <span class="settings-item__arrow">›</span>
+    </div>
+</div>
+
+<!-- TAB 1: WORKOUTS -->
+
+<!-- TRACKER OVERLAY — fullscreen nad mapą podczas nagrywania -->
+
+
+<div id="tabMap" class="tab-panel">
+    <div class="tab-scroll">
+        <div class="tab-header" id="weatherTopBar" role="button" tabindex="0" aria-label="Open weather details">
+            <div class="tab-header__location">
+                <span class="tab-header__pin">📍</span>
+                <span class="tab-header__city" id="bnwLocation">—</span>
+            </div>
+            <img src="public/logo.png" alt="MapYou logo" class="logo"/>
+            <div class="tab-header__weather">
+                <span class="tab-header__wicon" id="bnwIcon">—</span>
+                <span class="tab-header__temp"  id="bnwTemp">—</span>
+                <span class="tab-header__desc"  id="bnwDesc"></span>
+            </div>
+        </div>
+        <!-- Desktop search (hidden on mobile via CSS) -->
+        <div class="sidebar-search-bar">
+            <div class="poi-search__bar">
+                <input class="poi-search__input" id="poiInputDesktop" type="text" placeholder="Search nearby…"
+                       autocomplete="off"/>
+                <button class="poi-search__btn" id="poiSearchBtnDesktop">🔍</button>
+                <button class="btn-settings-gear" id="btnSettingsDesktop" title="Settings">⚙️</button>
+            </div>
+            <div class="poi-filters" id="poiFiltersDesktop">
+                <button class="poi-filter-btn" data-query="grocery store">🛒 Store</button>
+                <button class="poi-filter-btn" data-query="toilet">🚻 WC</button>
+                <button class="poi-filter-btn" data-query="pharmacy">💊 Pharmacy</button>
+                <button class="poi-filter-btn" data-query="park">🌳 Park</button>
+                <button class="poi-filter-btn" data-query="Paczkomat InPost">📦 Paczkomat</button>
+                <button class="poi-filter-btn" data-query="restaurant">🍴 Restaurant</button>
+                <button class="poi-filter-btn" data-query="ATM">🏧 ATM</button>
+                <button class="poi-filter-btn" data-query="hotel">🏨 Hotel</button>
+                <button class="poi-filter-btn" data-query="church">⛪ Church</button>
+                <button class="poi-filter-btn" data-query="cafe">☕ Cafe</button>
+                <button class="poi-filter-btn" data-query="hospital">🏥 Hospital</button>
+            </div>
+            <ul class="poi-results hidden" id="poiResultsDesktop"></ul>
+        </div>
+
+        <div class="tracking-controls">
+            <button class="btn-track" id="btnTrack">📍 Start tracking</button>
+        </div>
+        <div class="route-controls">
+            <button class="btn-route" id="btnRoute">🗺️ Plan Route A → B</button>
+            <div class="route-info hidden" id="routeInfo">
+                <div class="route-mode-selector">
+                    <button class="route-mode-btn route-mode-btn--active" data-mode="running" title="Running">🏃‍♂️
+                    </button>
+                    <button class="route-mode-btn" data-mode="cycling" title="Cycling">🚴‍♀️</button>
+                    <button class="route-mode-btn" data-mode="walking" title="Walking">🚶</button>
+                </div>
+                <div class="route-info__steps">
+                    <div class="route-info__step">
+                        <span class="route-info__badge route-info__badge--a">A</span>
+                        <span id="stepAText">Click the start point on the map</span>
+                    </div>
+                    <div class="route-info__step">
+                        <span class="route-info__badge route-info__badge--b">B</span>
+                        <span id="stepBText">Click the end point on the map</span>
+                    </div>
+                </div>
+                <div class="route-loading hidden" id="routeLoading">
+                    <div class="route-loading__spinner">
+                        <div class="route-loading__dot"></div>
+                        <div class="route-loading__dot"></div>
+                        <div class="route-loading__dot"></div>
+                    </div>
+                    <span class="route-loading__text">Calculating route...</span>
+                </div>
+                <div class="route-result hidden" id="routeResult">
+                    <div class="route-result__item">
+                        <span class="route-result__icon">📏</span>
+                        <span class="route-result__value" id="routeDist">—</span>
+                        <span class="route-result__unit">km</span>
+                    </div>
+                    <div class="route-result__item">
+                        <span class="route-result__icon">⏱</span>
+                        <span class="route-result__value" id="routeTime">—</span>
+                        <span class="route-result__unit">min</span>
+                    </div>
+                </div>
+                <button class="btn-route-cancel" id="btnCancelRoute">✕ Cancel route</button>
+            </div>
+        </div>
+        <!-- Form kept for JS functionality, rendered as modal on mobile -->
+        <ul class="workouts workouts--hidden-in-tab">
+            <form class="form hidden">
+                <div class="form__row">
+                    <label class="form__label">Type</label>
+                    <select class="form__input form__input--type">
+                        <option value="running">Running</option>
+                        <option value="cycling">Cycling</option>
+                        <option value="walking">Walking</option>
+                    </select>
+                </div>
+                <div class="form__row">
+                    <label class="form__label">Distance</label>
+                    <input class="form__input form__input--distance" placeholder="km" step="0.1"/>
+                </div>
+                <div class="form__row">
+                    <label class="form__label">Duration</label>
+                    <input class="form__input form__input--duration" placeholder="min" step="0.1"/>
+                </div>
+                <div class="form__row">
+                    <label class="form__label">Cadence</label>
+                    <input class="form__input form__input--cadence" placeholder="step/min"/>
+                </div>
+                <div class="form__row form__row--hidden">
+                    <label class="form__label">Elev Gain</label>
+                    <input class="form__input form__input--elevation" placeholder="meters"/>
+                </div>
+                <button class="form__btn">✓ Add Workout</button>
+            </form>
+        </ul>
+    </div>
+</div>
+
+<!-- MAP: always full screen, z-index 1 -->
+<div id="map">
+    <!-- Skeleton loader — inside map -->
+    <div id="mapSkeleton" class="map-skeleton">
+        <div class="map-skeleton__bg"></div>
+        <div class="map-skeleton__loader">
+            <svg class="map-skeleton__spinner" viewBox="0 0 50 50">
+                <circle class="map-skeleton__track" cx="25" cy="25" r="20" fill="none" stroke-width="4"/>
+                <circle class="map-skeleton__arc" cx="25" cy="25" r="20" fill="none" stroke-width="4"
+                        stroke-dasharray="80 45" stroke-linecap="round"/>
+            </svg>
+            <span class="map-skeleton__label">Loading map…</span>
+        </div>
+        <div class="map-skeleton__msg hidden" id="skeletonMsg">
+            <p class="map-skeleton__text">Map is loading longer than usual…</p>
+            <button class="map-skeleton__btn" id="btnRetry">↺ Retry</button>
+        </div>
+    </div>
+    <!-- Offline badge — stays in map corner -->
+    <div id="offlineBadge" class="offline-badge hidden">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+             stroke-linejoin="round">
+            <line x1="1" y1="1" x2="23" y2="23"/>
+            <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+            <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+            <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+            <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+            <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+            <circle cx="12" cy="20" r="1"/>
+        </svg>
+        Offline
+    </div>
+</div>
+<!-- TAB 2: STATS -->
+<div id="tabStats" class="tab-panel">
+    <div class="tab-scroll">
+    </div>
+</div>
+
+<!-- TAB 3: MAP (transparent) -->
+
+
+
+<!-- TAB: TRACKER -->
+<div id="tabTracker" class="tab-panel tab-panel--tracker">
+
+  <!-- Following-route pill (ghost overlay loaded) -->
+  <div class="trk-ghost-pill hidden" id="trkGhostPill">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="5" r="2.5"/><path d="M8.5 19H15a3 3 0 0 0 3-3V7.5M6 16.5V8a3 3 0 0 1 3-3h6.5"/></svg>
+    <span class="trk-ghost-pill__txt" id="trkGhostPillTxt">Following route</span>
+    <button class="trk-ghost-pill__x" id="trkGhostPillClear" aria-label="Stop following">✕</button>
+  </div>
+
+  <!-- Permission overlay — widoczny gdy brak uprawnień GPS -->
+  <div class="trk-permission hidden" id="trkPermission">
+    <div class="trk-permission__sheet">
+      <div class="trk-permission__icon">📍</div>
+      <h2 class="trk-permission__title">Allow location access</h2>
+      <p class="trk-permission__desc">Mapty needs your precise location to track distance, pace and route.</p>
+      <button class="trk-permission__allow" id="trkPermAllow">Allow location</button>
+      <button class="trk-permission__skip"  id="trkPermSkip">Not now</button>
+    </div>
+  </div>
+
+  <!-- Timer-only screen — shown for non-trackable sports (gym, tennis...) -->
+  <div class="trk-timer-screen hidden" id="trkTimerScreen">
+    <div class="trk-timer-screen__clock" id="trkTimerClock">20:13</div>
+    <div class="trk-timer-screen__label">Time of day</div>
+  </div>
+
+  <!-- Bottom bar — drag up to reveal panel -->
+  <div class="trk-bottom" id="trkBottom">
+    <div class="trk-bottom__handle" id="trkBottomHandle"><span></span></div>
+
+    <div class="trk-bottom__row">
+      <button class="trk-sport-btn" id="trkSportBtn" data-sport="running">
+        <span class="trk-sport-btn__emoji" id="trkSportBtnEmoji">🏃</span>
+        <span class="trk-sport-btn__label" id="trkSportBtnLabel">Running</span>
+        <svg class="trk-sport-btn__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+      <button class="trk-start-btn" id="trkBtnStart">
+        <svg viewBox="0 0 24 24" fill="currentColor" width="36" height="36">
+          <polygon points="6,3 20,12 6,21"/>
+        </svg>
+      </button>
+      <button class="trk-routes-btn" id="trkRoutesBtn" title="Routes">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22">
+          <circle cx="6" cy="19" r="3"/><circle cx="18" cy="5" r="3"/>
+          <path d="M9 19h6a3 3 0 0 0 3-3V8M6 16V8a3 3 0 0 1 3-3h6"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Slide-up panel -->
+    <div class="trk-bottom__panel" id="trkPanel">
+      <div class="trk-panel-row">
+        <span class="trk-panel-row__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><path d="M5 12a7 7 0 0 1 7-7M5 16a11 11 0 0 1 11-11"/><circle cx="5" cy="19" r="1.5" fill="currentColor"/></svg>
+        </span>
+        <div class="trk-panel-row__text">
+          <span class="trk-panel-row__label">Share my location with friends</span>
+          <span class="trk-panel-row__sub" id="trkShareLocSub">Friends can watch you live</span>
+        </div>
+        <button class="trk-toggle" id="trkShareLocToggle" role="switch" aria-checked="true"><span class="trk-toggle__knob"></span></button>
+      </div>
+      <button class="trk-panel-row trk-panel-row--btn" id="trkSettingsBtn">
+        <span class="trk-panel-row__icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="22" height="22"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </span>
+        <div class="trk-panel-row__text">
+          <span class="trk-panel-row__label">Settings</span>
+        </div>
+        <svg class="trk-panel-row__chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- Route builder toolbar (Create mode) -->
+  <div class="trk-create-bar hidden" id="trkCreateBar">
+    <div class="trk-create-bar__top">
+      <button class="trk-create-sport" id="trkCreateSport"><span id="trkCreateSportIcon">🏃</span> <span id="trkCreateSportLabel">Running</span></button>
+      <span class="trk-create-dist"><strong id="trkCreateDist">0.00</strong> km</span>
+    </div>
+    <p class="trk-create-hint" id="trkCreateHint">Tap the map to add points</p>
+    <button class="trk-create-loop" id="trkCreateLoop">🔄 Auto-generate a loop</button>
+    <div class="trk-create-bar__actions">
+      <button class="trk-create-act" id="trkCreateUndo">↩︎ Undo</button>
+      <button class="trk-create-act" id="trkCreateClear">Clear</button>
+      <button class="trk-create-act" id="trkCreateCancel">Cancel</button>
+      <button class="trk-create-act trk-create-act--save" id="trkCreateSave">Save route</button>
+    </div>
+  </div>
+
+  <!-- Map style picker button — right side -->
+  <button class="trk-map-style-btn" id="trkMapStyleBtn" title="Change map style">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+      <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+    </svg>
+  </button>
+
+</div>
+
+<!-- Map style picker panel (shared between Map and Track tabs) -->
+<div class="map-style-panel hidden" id="mapStylePanel">
+  <div class="map-style-panel__inner">
+    <div class="map-style-panel__title">Map Style</div>
+    <div class="map-style-panel__grid" id="mapStyleGrid"></div>
+  </div>
+</div>
+
+<div id="tabMap" class="tab-panel tab-panel--map">
+  <!-- Map style button for Map tab -->
+  <button class="trk-map-style-btn trk-map-style-btn--map" id="mapTabStyleBtn" title="Change map style">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+      <polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/>
+      <line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/>
+    </svg>
+  </button>
+</div>
+
+<!-- BOTTOM NAV -->
+
+<!-- TAB: FRIENDS -->
+<div id="tabFriends" class="tab-panel">
+  <div class="tab-scroll">
+
+    <!-- Header -->
+    <div class="friends-header">
+      <span class="friends-header__title">Friends</span>
+      <div class="friends-header__actions">
+        <button class="friends-header__btn friends-header__btn--share" id="btnShareMyLink">
+          🔗 My Link
+        </button>
+        <button class="friends-header__btn" id="btnAddFriend">+ Add</button>
+      </div>
+    </div>
+
+    <!-- Friends list -->
+    <div class="friends-list" id="friendsList"></div>
+
+  </div><!-- /tab-scroll -->
+
+  <!-- Live view panel — absolute over the tab -->
+  <div id="friendsLivePanel" class="fls-panel hidden">
+    <div class="fls-header">
+      <span class="fls-header__name" id="friendsLiveName">Live Route</span>
+      <button class="fls-close" id="btnCloseLiveView">✕</button>
+    </div>
+    <div class="fls-status-bar">
+      <div id="friendsLiveStatus">
+        <span class="fls-status">Connecting...</span>
+      </div>
+    </div>
+    <div id="friendsLiveMapContainer"></div>
+  </div>
+
+</div>
+
+<!-- Pasek trybu offline (Etap 2). Globalny, nad wszystkimi zakladkami. -->
+<div id="offlineBar" class="offline-bar" hidden>
+  <span class="offline-bar__dot"></span>
+  <span id="offlineBarText">Offline — changes will sync automatically</span>
+</div>
+
+<div id="tabHome" class="tab-panel tab-panel--active">
+  <div class="home-scroll"></div>
+  <div id="friendsFeed"></div>
+</div>
+
+<nav class="bottom-nav" id="bottomNav">
+    <button class="bottom-nav__item bottom-nav__item--active" data-tab="tabHome">
+      <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2"
+           stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+        <polyline points="9 22 9 12 15 12 15 22" />
+      </svg>
+      <span class="bottom-nav__label">Home</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabMap">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="11" r="3"/>
+            <path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 0 1-2.827 0l-4.244-4.243a8 8 0 1 1 11.314 0z"/>
+        </svg>
+        <span class="bottom-nav__label">Map</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabTracker">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <polygon points="10,8 16,12 10,16" fill="currentColor" stroke="none"/>
+        </svg>
+        <span class="bottom-nav__label">Track</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabStats">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="20" x2="18" y2="10"/>
+            <line x1="12" y1="20" x2="12" y2="4"/>
+            <line x1="6" y1="20" x2="6" y2="14"/>
+        </svg>
+        <span class="bottom-nav__label">Stats</span>
+    </button>
+    <button class="bottom-nav__item" data-tab="tabFriends">
+        <svg class="bottom-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+          <circle cx="9" cy="7" r="4"/>
+          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+        </svg>
+        <span class="bottom-nav__label">Friends</span>
+    </button>
+</nav>
+
+<div class="ios-install-banner hidden" id="iosInstallBanner">
+    <div class="ios-install-banner__icon"><img src="public/icon-192.png" alt=""
+                                               onerror="this.style.display='none';this.nextElementSibling.style.display='block'"/><span
+            style="display:none;font-size:2.4rem">🗺️</span></div>
+    <div class="ios-install-banner__text">
+        <div class="ios-install-banner__title">Install Mapty on your phone</div>
+        <div class="ios-install-banner__sub">Tap
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+                 stroke-linecap="round" stroke-linejoin="round"
+                 style="display:inline-block;vertical-align:middle;margin:0 1px;color:#ccc">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                <polyline points="16 6 12 2 8 6"/>
+                <line x1="12" y1="2" x2="12" y2="15"/>
+            </svg>
+            Share and &ldquo;Add to Home Screen&rdquo; +
+        </div>
+    </div>
+    <button class="ios-install-banner__close" id="iosInstallClose">✕</button>
+</div>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('public/sw.js')
+                .then(reg => {
+                    if (reg.waiting) {
+                        reg.waiting.postMessage({type: 'SKIP_WAITING'});
+                    }
+                    reg.addEventListener('updatefound', () => {
+                        const newWorker = reg.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                newWorker.postMessage({type: 'SKIP_WAITING'});
+                            }
+                        });
+                    });
+                });
+        });
+        navigator.serviceWorker.addEventListener('controllerchange', () => {
+            window.location.reload();
+        });
+    }
+</script>
+
+<div id="trackerOverlay" class="tracker-overlay hidden" data-state="idle">
+  <div class="tracker-overlay__paused hidden" id="trkPausedBar">Auto-pause</div>
+  <div class="tracker-overlay__stats" id="trkStatsCard" role="button" tabindex="0">
+    <span class="tracker-overlay__expand" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </span>
+    <div class="tracker-overlay__stat">
+      <span class="tracker-overlay__val" id="trkDist">0.00</span>
+      <span class="tracker-overlay__lbl">km</span>
+    </div>
+    <div class="tracker-overlay__stat tracker-overlay__stat--center">
+      <span class="tracker-overlay__val" id="trkTime">00:00</span>
+      <span class="tracker-overlay__lbl" id="trkStatus">Recording...</span>
+    </div>
+    <div class="tracker-overlay__stat">
+      <span class="tracker-overlay__val" id="trkPace">--:--</span>
+      <span class="tracker-overlay__lbl" id="trkPaceLbl">min/km</span>
+    </div>
+  </div>
+  <div class="tracker-overlay__controls">
+    <button class="tracker-overlay__discard hidden" id="trkBtnDiscard">Discard</button>
+    <button class="tracker-overlay__pause" id="trkBtnPause">⏸ Pause</button>
+    <button class="tracker-overlay__stop hidden" id="trkBtnStop">⏹ Finish</button>
+  </div>
+</div>
+
+<!-- Fullscreen expanded stats (covers map) -->
+<div id="trkExpanded" class="trk-expanded hidden">
+  <div class="trk-expanded__header" id="trkExpHeader">
+    <span class="trk-expanded__status" id="trkExpStatus">Recording</span>
+    <span class="trk-expanded__time" id="trkExpTime">00:00:00</span>
+    <button class="trk-expanded__collapse" id="trkExpCollapse" aria-label="Collapse">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="22" height="22"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="14" y1="10" x2="21" y2="3"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+    </button>
+  </div>
+  <div class="trk-expanded__body">
+    <div class="trk-expanded__metric">
+      <span class="trk-expanded__val" id="trkExpPace">-:--</span>
+      <span class="trk-expanded__lbl" id="trkExpPaceLbl">Avg pace (/km)</span>
+    </div>
+    <div class="trk-expanded__metric">
+      <span class="trk-expanded__val trk-expanded__val--big" id="trkExpDist">0.00</span>
+      <span class="trk-expanded__lbl">Distance (km)</span>
+    </div>
+    <div class="trk-expanded__laps" id="trkExpLaps" hidden>
+      <span class="trk-expanded__laps-title">Laps (km)</span>
+      <div class="trk-expanded__laps-list" id="trkExpLapsList"></div>
+    </div>
+  </div>
+  <div class="trk-expanded__controls">
+    <button class="trk-expanded__btn trk-expanded__btn--resume" id="trkExpPause">⏸ Pause</button>
+    <button class="trk-expanded__btn trk-expanded__btn--finish" id="trkExpStop">⏹ Finish</button>
+  </div>
+</div>
+
+</body>
+</html>
