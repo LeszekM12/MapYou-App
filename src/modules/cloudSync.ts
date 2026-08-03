@@ -22,6 +22,7 @@
 //   await CS.hydrate();                      // przy starcie — pobierz z Atlas jeśli IndexedDB puste
 
 import { BACKEND_URL } from '../config.js';
+import { dwarn } from '../utils/log.js';
 import {
   saveWorkoutToDB,
   deleteWorkoutFromDB,
@@ -177,8 +178,32 @@ export async function uploadMediaFile(
       } catch { resolve(null); }
     });
 
-    xhr.addEventListener('error',   () => resolve(null));
-    xhr.addEventListener('timeout', () => resolve(null));
+    // Blad sieci albo przekroczony czas — plik NIE moze zniknac.
+    //
+    // Wczesniej oba przypadki konczyly sie `resolve(null)`, czyli zdjecie
+    // przepadalo bez sladu i bez ostrzezenia. Teraz laduje w kolejce
+    // (`mediaQueue`) razem z zawartoscia, a wolajacy dostaje adres zastepczy
+    // `mapyou-pending://<id>`. Rekord zapisuje sie z nim normalnie i dziala
+    // offline; po powrocie sieci zastepnik zostaje podmieniony na prawdziwy
+    // adres w bazie lokalnej i w chmurze.
+    const queueIt = (why: string): void => {
+      void (async () => {
+        try {
+          const { enqueueMedia } = await import('./mediaQueue.js');
+          const placeholder = await enqueueMedia(
+            file, (file as File).name ?? 'upload', userId, folder, fixedPublicId ?? null,
+          );
+          dwarn(`[Upload] ${why} — plik odlozony do kolejki`);
+          resolve({ url: placeholder, publicId: fixedPublicId ?? '', mediaType: 'image' });
+        } catch (e) {
+          console.error('[Upload] nie udalo sie odlozyc pliku:', e instanceof Error ? e.message : e);
+          resolve(null);
+        }
+      })();
+    };
+
+    xhr.addEventListener('error',   () => queueIt('blad sieci'));
+    xhr.addEventListener('timeout', () => queueIt('przekroczony czas'));
     xhr.send(form);
   });
 }

@@ -82,6 +82,29 @@ db.version(7).stores({
 // Klucz to `styl/z/x/y`. `lastUsed` sluzy do kasowania najstarszych, gdy
 // cache przekroczy limit — inaczej urosloby to do setek megabajtow
 // (sam zoom 17 dla promienia 10 km to ~250 MB).
+// version(11) — kolejka zdjec i filmow offline.
+//
+// Zdjecia NIE moga isc przez `outbox`, bo tamten trzyma cialo zadania jako
+// tekst, a pliku sie tak nie zapisze. Do tego wysylka mediow idzie przez
+// `XMLHttpRequest` (potrzebny pasek postepu), wiec przechwytywacz `fetch`
+// w authFetch w ogole jej nie widzi.
+//
+// Dlatego osobna tabela: trzyma sam plik jako Blob plus dane potrzebne
+// do ponowienia wysylki.
+db.version(11).stores({
+    workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+    activities: 'id, sport, date, distanceKm, durationSec',
+    enrichedActivities: 'id, sport, date, name',
+    profile: 'userId',
+    postsFeed: 'id, date',
+    unifiedWorkouts: 'id, type, source, date, distanceKm',
+    reels: 'id, userId, expiresAt',
+    activeSession: 'id',
+    sessionCoords: '++seq',
+    outbox: '++id, createdAt',
+    tiles: 'key, lastUsed',
+    mediaQueue: '++id, createdAt',
+});
 db.version(10).stores({
     workouts: 'id, type, date, distance, duration, cadence, pace, elevGain, speed',
     activities: 'id, sport, date, distanceKm, durationSec',

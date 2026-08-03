@@ -216,18 +216,25 @@ export function mountOfflineBar() {
     // dalo sie przeczytac.
     const MIN_SYNC_MS = 1400;
     let syncShownAt = 0;
-    const render = (pending) => {
+    // Pasek liczy TAKZE zalegle zdjecia. Uzytkownik nie odroznia „zapis czeka"
+    // od „zdjecie czeka" — dla niego to jedna rzecz: cos jeszcze nie poszlo.
+    const render = async (queued) => {
+        const { pendingMediaCount } = await import('./mediaQueue.js');
+        const pending = queued + await pendingMediaCount();
+        renderCount(pending);
+    };
+    const renderCount = (pending) => {
         const offline = !navigator.onLine;
         // Jesli wlasnie pokazalismy „Wysylanie…", nie chowaj od razu.
         if (!offline && pending === 0 && syncShownAt) {
             const left = MIN_SYNC_MS - (Date.now() - syncShownAt);
             if (left > 0) {
-                setTimeout(() => render(0), left);
+                setTimeout(() => renderCount(0), left);
                 return;
             }
             syncShownAt = 0;
             text.textContent = 'Synced \u2713';
-            setTimeout(() => render(0), 900);
+            setTimeout(() => renderCount(0), 900);
             return;
         }
         if (!offline && pending === 0) {
@@ -255,9 +262,12 @@ export function mountOfflineBar() {
                 syncShownAt = Date.now();
         }
     };
-    onOutboxChange(render);
-    window.addEventListener('online', () => { void pendingCount().then(render); });
-    window.addEventListener('offline', () => { void pendingCount().then(render); });
+    onOutboxChange(n => { void render(n); });
+    window.addEventListener('online', () => { void pendingCount().then(n => render(n)); });
+    window.addEventListener('offline', () => { void pendingCount().then(n => render(n)); });
+    // Zdjecia wysylaja sie wlasnym cyklem — odswiezamy licznik co 5 s,
+    // zeby pasek nie zostal na starej liczbie po wyslaniu pliku.
+    setInterval(() => { void pendingCount().then(n => render(n)); }, 5000);
 }
 // ── Diagnostyka ──────────────────────────────────────────────────────────────
 /** Podglad kolejki z konsoli:  mapyouOutbox()
