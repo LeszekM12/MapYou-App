@@ -152,7 +152,7 @@ export async function flush(): Promise<void> {
   try {
     const items = await listPending();
     if (!items.length) return;
-    dlog(`[Outbox] wysylam ${items.length} zaleglych zapisow`);
+    console.warn(`[Outbox] wysylam ${items.length} zaleglych zapisow`);
 
     for (const item of items) {
       if (item.attempts >= MAX_ATTEMPTS) continue;
@@ -167,6 +167,13 @@ export async function flush(): Promise<void> {
           body:    item.body,
         });
 
+        // Raport z KAZDEJ proby — bez wzgledu na tryb diagnostyczny.
+        //
+        // Bez tego nieudana wysylka byla niewidoczna: uzytkownik widzial
+        // lajka lokalnie, serwer o nim nie wiedzial, a po odswiezeniu stan
+        // sie cofal bez zadnego sladu w logach.
+        console.warn(`[Outbox] ${item.method} ${item.url.replace(/^https?:\/\/[^/]+/, '')} -> ${res.status}`);
+
         if (res.ok || res.status === 409) {
           // 409 traktujemy jak sukces — zasob juz istnieje, czyli poprzednia
           // proba jednak doszla, tylko odpowiedz do nas nie wrocila.
@@ -180,7 +187,10 @@ export async function flush(): Promise<void> {
           // Blad klienta (400, 403, 404...) nie naprawi sie sam. Ponawianie
           // go w nieskonczonosc tylko obciaza serwer. Usuwamy, ale GLOSNO —
           // to znaczy, ze zapis przepadl i uzytkownik powinien wiedziec.
-          console.error(`[Outbox] zapis odrzucony na stale (${res.status}): ${item.method} ${item.url}`);
+          const detail = await res.text().catch(() => '');
+          console.error(`[Outbox] ODRZUCONY NA STALE ${res.status}: ${item.method} ${item.url}`,
+            `\n  cialo zadania: ${item.body?.slice(0, 200) ?? '(brak)'}`,
+            `\n  odpowiedz: ${detail.slice(0, 200)}`);
           await tbl().delete(item.id);
           notifyChange();
           continue;
@@ -192,7 +202,8 @@ export async function flush(): Promise<void> {
           lastError: `HTTP ${res.status}`,
         });
       } catch (e) {
-        // Blad sieci — zostawiamy w kolejce i probujemy pozniej.
+        console.warn(`[Outbox] blad sieci przy ${item.method} ${item.url}:`,
+          e instanceof Error ? e.message : e);
         await tbl().update(item.id, {
           attempts: item.attempts + 1,
           lastError: e instanceof Error ? e.message : String(e),
