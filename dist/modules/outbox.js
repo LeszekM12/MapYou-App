@@ -180,7 +180,7 @@ export async function flush() {
                 // Kasowanie go w takiej sytuacji to cicha utrata danych uzytkownika,
                 // a dokladnie tego ta kolejka ma zapobiegac.
                 if (res.status === 401 || res.status === 403) {
-                    await tbl().update(item.id, { attempts: item.attempts + 1, lastError: `HTTP ${res.status}` });
+                    await tbl().update(item.id, { lastError: `HTTP ${res.status} (czekam na sesje)` });
                     try {
                         const { onSessionReady } = await import('./authFetch.js');
                         onSessionReady(() => { void flush(); });
@@ -199,16 +199,20 @@ export async function flush() {
                     continue;
                 }
                 // 5xx / 408 / 429 — problem po stronie serwera, ma prawo minac.
-                await tbl().update(item.id, {
-                    attempts: item.attempts + 1,
-                    lastError: `HTTP ${res.status}`,
-                });
+                // Tak samo jak przy bledzie sieci: nie zuzywamy limitu prob.
+                await tbl().update(item.id, { lastError: `HTTP ${res.status}` });
             }
             catch (e) {
-                console.warn(`[Outbox] blad sieci przy ${item.method} ${item.url}:`, e instanceof Error ? e.message : e);
+                console.warn(`[Outbox] blad sieci: ${item.method} ${item.url.replace(/^https?:\/\/[^/]+/, '')}` +
+                    ` | proba ${item.attempts + 1}/${MAX_ATTEMPTS} | ${e instanceof Error ? e.message : String(e)}`);
+                // Blad sieci NIE zuzywa limitu prob.
+                //
+                // Limit ma chronic przed zadaniem, ktore serwer trwale odrzuca —
+                // nie przed slabym zasiegiem. Fly usypia maszyny, wiec pierwsze
+                // zadanie po przerwie potrafi paść z bledem sieci; osiem takich
+                // i zapis uzytkownika umieral, mimo ze nic z nim nie bylo nie tak.
                 await tbl().update(item.id, {
-                    attempts: item.attempts + 1,
-                    lastError: e instanceof Error ? e.message : String(e),
+                    lastError: `siec: ${e instanceof Error ? e.message : String(e)}`,
                 });
                 // Skoro siec padla, nie ma sensu meczyc reszty w tym cyklu.
                 break;
@@ -234,7 +238,14 @@ export function startOutbox() {
         if (document.visibilityState === 'visible')
             void flush();
     });
-    setInterval(() => { void flush(); }, 60000);
+    setInterval(() => { void flush(); }, 20000);
+    // Fly usypia maszyny — pierwsze zadanie po przerwie czesto pada.
+    // Trzy proby w pierwszych sekundach po powrocie sieci zalatwiaja to bez
+    // czekania na kolejny cykl.
+    window.addEventListener('online', () => {
+        setTimeout(() => { void flush(); }, 2000);
+        setTimeout(() => { void flush(); }, 6000);
+    });
     void flush();
     dlog('[Outbox] nasluch uruchomiony');
 }
