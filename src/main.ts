@@ -11,6 +11,7 @@ import { dlog, isDebug, setDebug } from './utils/log.js';
 import { initAppCheck } from './modules/appCheck.js';
 import { startOutbox, mountOfflineBar } from './modules/outbox.js';
 import { startMediaQueue } from './modules/mediaQueue.js';
+import { startSocialStore } from './modules/socialStore.js';
 import { installTileCache, requestPersistentStorage } from './modules/tileCache.js';
 // Cache kafelkow MUSI wejsc zanim powstanie pierwsza warstwa mapy —
 // podmienia fabryke `L.tileLayer`, wiec warstwy stworzone wczesniej
@@ -21,7 +22,7 @@ installTileCache();
 void requestPersistentStorage();
 // Kolejka zapisow offline — wysyla zalegle zadania, gdy siec wroci,
 // i pokazuje pasek statusu.
-void Promise.resolve().then(() => { startOutbox(); mountOfflineBar(); startMediaQueue(); });
+void Promise.resolve().then(() => { startOutbox(); mountOfflineBar(); startMediaQueue(); startSocialStore(); });
 // App Check musi ruszyc PRZED pierwszym zadaniem do backendu.
 void initAppCheck();
 // ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──

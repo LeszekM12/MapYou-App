@@ -19,6 +19,7 @@ import { statsView } from './StatsView.js';
 import { loadPosts } from './db.js';
 import { CS } from './cloudSync.js';
 import { wmoInfo } from './WeatherService.js';
+import * as SS from './socialStore.js';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 // Tap-to-zoom for activity photos (Stats detail + activity detail). Delegated, bound once.
 if (typeof document !== 'undefined' && !window.__photoZoomBound) {
@@ -138,10 +139,10 @@ function openCommentPanel(card, actId) {
         const countEl = card.querySelector(`[data-comment-count="${actId}"], [data-comment-count="${realId}"]`);
         if (countEl)
             countEl.textContent = String(n);
-        // Zapamietaj — offline to jedyne zrodlo tej liczby przy renderze karty.
-        for (const id of [actId, realId])
-            if (id)
-                localStorage.setItem(`hc_comments_${id}`, String(n));
+        // Do magazynu — offline to jedyne zrodlo tej liczby przy renderze karty.
+        SS.linkIds([actId, realId]);
+        if (actId || realId)
+            SS.set((actId || realId), { comments: n, fromServer: true });
     }).catch(() => { list.innerHTML = '<p class="hcc__empty">No comments yet</p>'; });
     const sendComment = async () => {
         const text = input.value.trim();
@@ -497,37 +498,20 @@ export function buildPostCard(post, onRefresh) {
         const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
         btn.classList.add('home-card__action--pulse');
         setTimeout(() => btn.classList.remove('home-card__action--pulse'), 400);
+        // Magazyn zajmuje sie stanem i przerysowaniem — tu tylko wysylamy.
+        //
+        // Wczesniej kazdy handler mial WLASNA logike optymistyczna, wlasne klucze
+        // w localStorage i wlasne pisanie po DOM. Cztery kopie tego samego,
+        // rozjezdzajace sie przy kazdej zmianie. Teraz jedno miejsce wie wszystko.
         void fetch(`${BACKEND_URL}/feed/like`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId, itemId: post.id, itemType: 'post' }),
         }).then(r => r.json()).then((d) => {
-            // Zapis trafil do kolejki offline — serwer nie odpowiedzial liczba.
-            // Robimy optymistyczna aktualizacje lokalna, tak samo jak przy bledzie
-            // sieci. Bez tego pod sercem pojawialo sie `undefined`.
-            if (d.status === 'queued' || typeof d.count !== 'number') {
-                const liked = btn.classList.toggle('home-card__action--liked');
-                const lsKey = `hc_likes_p_${post.id}`;
-                const next = Math.max(0, parseInt(localStorage.getItem(lsKey) ?? '0', 10) + (liked ? 1 : -1));
-                localStorage.setItem(lsKey, String(next));
-                localStorage.setItem(`hc_liked_p_${post.id}`, liked ? '1' : '0');
-                const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
-                if (el)
-                    el.textContent = String(next);
-                return;
+            if (typeof d.count === 'number') {
+                SS.set(post.id, { liked: !!d.liked, likes: d.count, fromServer: true });
             }
-            localStorage.setItem(`hc_likes_p_${post.id}`, String(d.count));
-            localStorage.setItem(`hc_liked_p_${post.id}`, d.liked ? '1' : '0');
-            broadcastLike(post.id, d.liked ?? false, d.count);
-        }).catch(() => {
-            const liked = btn.classList.toggle('home-card__action--liked');
-            const lsKey = `hc_likes_p_${post.id}`;
-            const next = Math.max(0, parseInt(localStorage.getItem(lsKey) ?? '0', 10) + (liked ? 1 : -1));
-            localStorage.setItem(lsKey, String(next));
-            const el = card.querySelector(`[data-like-count="p_${post.id}"]`);
-            if (el)
-                el.textContent = String(next);
-        });
+        }).catch(() => { SS.toggleLike(post.id); });
     });
     // Wire comment
     card.querySelector('[data-action="comment"]')?.addEventListener('click', e => {
@@ -1077,27 +1061,18 @@ export async function openActivityDetail(act, isOwn, actId) {
     // zadaniem juz po narysowaniu karty. Offline to zadanie pada i pod sercem
     // zostawalo zero — polubienia „znikaly", mimo ze istnialy.
     // Cache z localStorage sprawia, ze widac je od razu i bez sieci.
-    const _cachedLikes = localStorage.getItem(`hc_likes_${itemId}`)
-        ?? localStorage.getItem(`hc_likes_p_${itemId}`);
+    // Stan spoleczny bierzemy z MAGAZYNU, nie z rekordu ani z rozsypanych
+    // kluczy localStorage. Magazyn zna ostatnia znana wartosc niezaleznie od
+    // tego, czy jest siec — i dorysuje sie sam, gdy przyjda dane z serwera.
+    const _social = SS.get(itemId);
     const _recLikes = rec._likeCount;
-    // UWAGA na `??`: `_likeCount` rowne ZERU jest wartoscia zdefiniowana,
-    // wiec `_recLikes ?? cache` NIGDY nie siegalo po cache — a rekordy
-    // z feedu maja tam zero, dopoki nie doszlo osobne zapytanie o polubienia.
-    // Stad „lajkow nie ma od razu". Cache wygrywa, gdy rekord nie wie nic
-    // albo wie, ze jest zero, a my pamietamy wiecej.
-    const _cachedNum = _cachedLikes !== null ? parseInt(_cachedLikes, 10) : null;
-    const likeCount = (_recLikes && _recLikes > 0)
-        ? _recLikes
-        : (_cachedNum ?? 0);
-    const _cachedLiked = localStorage.getItem(`hc_liked_${itemId}`) === '1';
+    const likeCount = _social.likes > 0 ? _social.likes : (_recLikes ?? 0);
+    const _cachedLiked = _social.liked;
     // Komentarze — ta sama historia co polubienia: rekord z feedu ma tu zero,
     // dopoki nie doszlo osobne zapytanie. Offline to zapytanie pada i licznik
     // zostaje pusty, mimo ze komentarze istnieja.
     const _recComments = rec._commentCount;
-    const _cachedComm = localStorage.getItem(`hc_comments_${itemId}`);
-    const commentCount = (_recComments && _recComments > 0)
-        ? _recComments
-        : (_cachedComm !== null ? parseInt(_cachedComm, 10) : 0);
+    const commentCount = _social.comments > 0 ? _social.comments : (_recComments ?? 0);
     const viewCount = (act._viewCount ?? act.views)
         ?? rec._viewCount ?? rec.views ?? 0;
     const heroInner = (ownCoords || friendCoords)
@@ -1378,29 +1353,10 @@ export async function openActivityDetail(act, isOwn, actId) {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, itemId, itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
-                    // Zapis poszedl do kolejki offline — serwer nie zwrocil liczby.
-                    // Aktualizujemy lokalnie, inaczej pod sercem lada `undefined`.
-                    if (d.status === 'queued' || typeof d.count !== 'number') {
-                        const liked = btn.classList.toggle('home-card__action--liked');
-                        const key = `hc_likes_${itemId}`;
-                        const next = Math.max(0, parseInt(localStorage.getItem(key) ?? '0', 10) + (liked ? 1 : -1));
-                        localStorage.setItem(key, String(next));
-                        localStorage.setItem(`hc_liked_${itemId}`, liked ? '1' : '0');
-                        broadcastLike(itemId, liked, next);
-                        return;
+                    if (typeof d.count === 'number') {
+                        SS.set(itemId, { liked: !!d.liked, likes: d.count, fromServer: true });
                     }
-                    localStorage.setItem(`hc_likes_${itemId}`, String(d.count));
-                    localStorage.setItem(`hc_liked_${itemId}`, d.liked ? '1' : '0');
-                    broadcastLike(itemId, d.liked ?? false, d.count);
-                }).catch(() => {
-                    // Brak sieci i brak kolejki — i tak pokaz zmiane lokalnie.
-                    const liked = btn.classList.toggle('home-card__action--liked');
-                    const key = `hc_likes_${itemId}`;
-                    const next = Math.max(0, parseInt(localStorage.getItem(key) ?? '0', 10) + (liked ? 1 : -1));
-                    localStorage.setItem(key, String(next));
-                    localStorage.setItem(`hc_liked_${itemId}`, liked ? '1' : '0');
-                    broadcastLike(itemId, liked, next);
-                });
+                }).catch(() => { SS.toggleLike(itemId); });
             }
             if (action === 'comment') {
                 openCommentsView(sheetEl, itemId);
@@ -1423,22 +1379,8 @@ export async function openActivityDetail(act, isOwn, actId) {
                 if (!info)
                     return;
                 // Zapamietaj — offline to jedyne zrodlo tych liczb.
-                localStorage.setItem(`hc_likes_${itemId}`, String(info.count));
-                localStorage.setItem(`hc_liked_${itemId}`, info.liked ? '1' : '0');
-                applyLike(info.count, info.liked);
-            }).catch(() => {
-                // Brak sieci — pokaz ostatnio znany stan zamiast zera.
-                const c = localStorage.getItem(`hc_likes_${itemId}`);
-                if (c !== null)
-                    applyLike(parseInt(c, 10), localStorage.getItem(`hc_liked_${itemId}`) === '1');
-            });
-            function applyLike(count, liked) {
-                const likeBtn = ov.querySelector('.ad-footer .home-card__action--like');
-                likeBtn?.classList.toggle('home-card__action--liked', liked);
-                const el = ov.querySelector(`[data-like-count="${itemId}"]`);
-                if (el)
-                    el.textContent = String(count);
-            }
+                SS.set(itemId, { likes: info.count, liked: info.liked, fromServer: true });
+            }).catch(() => { });
         }
         // Comment count — keep detail in sync with the feed (works for own + friends')
         // Wynik zapamietujemy, zeby offline bylo z czego odtworzyc licznik.
@@ -1569,22 +1511,18 @@ export function buildCard(act) {
                 btn.classList.add('home-card__action--pulse');
                 setTimeout(() => btn.classList.remove('home-card__action--pulse'), 400);
                 const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+                // PIATA sciezka polubienia w tym pliku — karta aktywnosci w feedzie.
+                // Wlasnie ona umykala przy poprzednich naprawach. Teraz, jak reszta,
+                // oddaje stan magazynowi i nie pisze po DOM samodzielnie.
                 void fetch(`${BACKEND_URL}/feed/like`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ userId, itemId: act.id, itemType: 'activity' }),
                 }).then(r => r.json()).then((d) => {
-                    broadcastLike(act.id, d.liked, d.count);
-                }).catch(() => {
-                    // offline fallback
-                    const liked = btn.classList.toggle('home-card__action--liked');
-                    const lsKey = `hc_likes_${act.id}`;
-                    const next = Math.max(0, parseInt(localStorage.getItem(lsKey) ?? '0', 10) + (liked ? 1 : -1));
-                    localStorage.setItem(lsKey, String(next));
-                    const el = card.querySelector(`[data-like-count="${act.id}"]`);
-                    if (el)
-                        el.textContent = String(next);
-                });
+                    if (typeof d.count === 'number') {
+                        SS.set(act.id, { liked: !!d.liked, likes: d.count, fromServer: true });
+                    }
+                }).catch(() => { SS.toggleLike(act.id); });
             }
             if (action === 'comment') {
                 const existing = card.querySelector('.home-card__comment-panel');
@@ -3909,42 +3847,31 @@ export class HomeView {
                 friendsFeedEl.innerHTML = '';
             // Batch load liked state
             if (userId && feed.length > 0) {
-                const itemIds = feed.map(f => (f.data.activityId ?? f.data.postId ?? f.data.id)).filter(Boolean);
+                // Powiaz warianty identyfikatora KAZDEGO wpisu.
+                //
+                // Jeden wpis feedu miewa `activityId`, `postId` i `id` — rozne czesci
+                // kodu uzywaly roznych, wiec odpowiedz serwera trafiala w selektor,
+                // ktorego nie ma. Magazyn sprowadza je do jednej postaci i od tej pory
+                // nie ma znaczenia, ktorego uzyje widok.
+                const itemIds = [];
+                for (const f of feed) {
+                    const canon = SS.linkIds([
+                        f.data.activityId,
+                        f.data.postId,
+                        f.data.id,
+                    ]);
+                    if (canon)
+                        itemIds.push(canon);
+                }
                 void fetch(`${BACKEND_URL}/feed/likes/batch?userId=${encodeURIComponent(userId)}&items=${encodeURIComponent(itemIds.join(','))}`, { cache: 'no-store' })
                     .then(r => r.json())
                     .then((resp) => {
                     if (resp.status !== 'ok')
                         return;
                     for (const [id, info] of Object.entries(resp.data)) {
-                        // Zapamietaj — offline to jedyne zrodlo tych liczb.
-                        localStorage.setItem(`hc_likes_${id}`, String(info.count));
-                        localStorage.setItem(`hc_liked_${id}`, info.liked ? '1' : '0');
-                        paintLike(id, info.count, info.liked);
+                        SS.set(id, { likes: info.count, liked: info.liked, fromServer: true });
                     }
-                }).catch(() => {
-                    // Brak sieci — odtworz ostatnio znany stan zamiast zostawiac zera.
-                    for (const id of itemIds) {
-                        const c = localStorage.getItem(`hc_likes_${id}`);
-                        if (c === null)
-                            continue;
-                        paintLike(id, parseInt(c, 10), localStorage.getItem(`hc_liked_${id}`) === '1');
-                    }
-                });
-                /** Ustaw serce ORAZ licznik — dla aktywnosci i dla postow.
-                 *
-                 *  Wczesniej ta sciezka ustawiala WYLACZNIE serce, i to tylko dla
-                 *  polubionych (`if (!info.liked) continue`). Licznik pod sercem
-                 *  nie byl ruszany w ogole, wiec przy wejsciu na Home widac bylo
-                 *  zera do momentu recznego odswiezenia. */
-                function paintLike(id, count, liked) {
-                    for (const sel of [id, `p_${id}`]) {
-                        const el = feedList.querySelector(`[data-like-count="${sel}"]`);
-                        if (!el)
-                            continue;
-                        el.textContent = String(count);
-                        el.closest('.home-card__action')?.classList.toggle('home-card__action--liked', liked);
-                    }
-                }
+                }).catch(() => { });
             }
             // Infinite scroll
             this._setupInfiniteScroll(feedList, activities, posts, userId);

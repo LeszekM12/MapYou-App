@@ -177,12 +177,53 @@ export function installAuthFetch(): void {
 
       await enqueue(url, method, plain, body);
 
+      // ── Polubienia: odpowiedz MUSI wygladac jak prawdziwa ──────────────
+      //
+      // Wolajacy odczytuje z niej `{ liked, count }` i wpisuje wprost do DOM.
+      // Odpowiedz „queued" tych pol nie ma, wiec pod sercem ladowal napis
+      // `undefined` albo zero.
+      //
+      // Latanie tego w widokach okazalo sie bledem — kazde polubienie ma
+      // wlasna sciezke (karta posta, karta aktywnosci, szczegoly, reels)
+      // i przy kazdej poprawce znajdowala sie kolejna, nieuwzgledniona.
+      // Dlatego liczymy nowy stan TUTAJ, w jedynym miejscu, przez ktore
+      // przechodza wszystkie bez wyjatku, i oddajemy dokladnie ten ksztalt,
+      // ktorego kod juz oczekuje.
+      if (url.includes('/feed/like') && body) {
+        try {
+          const req = JSON.parse(body) as { itemId?: string };
+          if (req.itemId) {
+            const { toggleLike } = await import('./socialStore.js');
+            const { liked, count } = toggleLike(req.itemId);
+            return new Response(JSON.stringify({ status: 'ok', liked, count }),
+              { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+        } catch { /* nieparsowalne cialo — lecimy dalej */ }
+      }
+
       // Odpowiedz zastepcza. 202 = „przyjeto do realizacji" — wolajacy widzi
       // sukces, a zapis wyjdzie, gdy siec wroci.
       return new Response(
         JSON.stringify({ status: 'queued', message: 'Saved locally — will sync when back online.' }),
         { status: 202, headers: { 'Content-Type': 'application/json' } },
       );
+    }
+
+    // Polubienie poszlo na serwer — zapisz odpowiedz w magazynie, zeby
+    // wszystkie widoki (takze te niewidoczne w tej chwili) mialy aktualny stan.
+    if (res.ok && url.includes('/feed/like')) {
+      void (async () => {
+        try {
+          const sent = typeof init?.body === 'string' ? init.body : null;
+          if (!sent) return;
+          const req = JSON.parse(sent) as { itemId?: string };
+          const d   = await res.clone().json() as { liked?: boolean; count?: number };
+          if (req.itemId && typeof d.count === 'number') {
+            const { set } = await import('./socialStore.js');
+            set(req.itemId, { liked: !!d.liked, likes: d.count, fromServer: true });
+          }
+        } catch { /* nie blokujemy odpowiedzi */ }
+      })();
     }
 
     // Token wygasł/nieprawidłowy → jedna próba z odświeżonym tokenem
