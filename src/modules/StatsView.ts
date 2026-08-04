@@ -297,11 +297,18 @@ export class StatsView {
     set('svGoalPct', `${pct}%`);
     const fill = document.getElementById('svGoalFill');
     if (fill) fill.style.width = `${pct}%`;
-    // Record weekly goal win (only for current week, deduped inside)
+    // Cel tygodniowy — powiadamiamy WYLACZNIE przy pierwszym zdobyciu.
+    //
+    // `pct >= 100` pozostaje prawdziwe do konca tygodnia, wiec sam warunek
+    // nie wystarcza: statystyki przeliczaja sie przy kazdym wejsciu na ekran
+    // i uzytkownik dostawal to samo powiadomienie w kolko.
+    // O tym, czy cos sie NAPRAWDE wydarzylo, decyduje `recordWeeklyGoalWin`.
     if (pct >= 100 && this._weekOffset === 0) {
-      recordWeeklyGoalWin();
-      const wins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
-      notifyWeeklyGoal(wins);
+      const isNewWin = recordWeeklyGoalWin();
+      if (isNewWin) {
+        const wins = parseInt(localStorage.getItem('mapyou_weekly_wins') ?? '0', 10);
+        notifyWeeklyGoal(wins);
+      }
     }
 
     // Week label

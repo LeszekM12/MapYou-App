@@ -2969,3 +2969,13 @@ video.home-reel-viewer__media {
   .cv-emoji-bar { border-top-color: #252B33; }
   .cv-tool      { color: #98A3AE; }
 }
+
+/* ── Komentarz autora na karcie feedu ──────────────────────────────────────
+   Jeden wiersz pod trescia, jak podpis w Instagramie. Cudze komentarze
+   zostaja na pelnym ekranie. */
+.home-card__author-comment {
+  padding: 0 14px 10px;
+  font-size: 14px; line-height: 1.45; color: var(--app-text, #0F1720);
+}
+.hcac-name { font-weight: 700; margin-right: 6px; }
+.hcac-text { word-break: break-word; }

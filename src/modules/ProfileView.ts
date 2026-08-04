@@ -37,13 +37,28 @@ function _syncStatsToAtlas(): void {
   }).catch(() => {});
 }
 
-export function recordWeeklyGoalWin(): void {
-  const now      = new Date();
-  const weekKey  = `${now.getFullYear()}-W${_isoWeek(now)}`;
-  if (localStorage.getItem(LS_GOAL_WEEK) === weekKey) return; // already counted this week
+/** Zapisz zdobycie celu tygodniowego.
+ *
+ *  Zwraca `true` TYLKO przy pierwszym zdobyciu w danym tygodniu.
+ *
+ *  Ta wartosc jest istotna: wolajacy musi wiedziec, czy cos sie faktycznie
+ *  wydarzylo. Wczesniej funkcja nic nie zwracala, a powiadomienie wysylano
+ *  obok niej — bezwarunkowo. Statystyki przeliczaja sie przy kazdym wejsciu
+ *  na ekran, wiec uzytkownik dostawal to samo powiadomienie w kolko.
+ *
+ *  WZORZEC DLA PRZYSZLYCH WYZWAN
+ *  Kazde osiagniecie powinno dzialac tak samo: funkcja zapisujaca decyduje,
+ *  czy to NOWE zdobycie, i tylko wtedy pozwala powiadomic. Sprawdzanie
+ *  warunku („czy pct >= 100") NIE wystarcza — warunek pozostaje prawdziwy
+ *  do konca tygodnia. */
+export function recordWeeklyGoalWin(): boolean {
+  const now     = new Date();
+  const weekKey = `${now.getFullYear()}-W${_isoWeek(now)}`;
+  if (localStorage.getItem(LS_GOAL_WEEK) === weekKey) return false;
   localStorage.setItem(LS_GOAL_WEEK, weekKey);
   const prev = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);
   localStorage.setItem(LS_WEEKLY_WINS, String(prev + 1));
+  return true;
 }
 
 function _isoWeek(d: Date): number {

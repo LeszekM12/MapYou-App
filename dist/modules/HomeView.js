@@ -1089,6 +1089,23 @@ export async function openActivityDetail(act, isOwn, actId) {
     const visIco = visibility === 'everyone' ? '🌐' : visibility === 'friends' ? '👥' : '🔒';
     const visBadge = `${visIco} ${visText}${muted ? ' · Hidden from feed' : ''}`;
     const authorName = rec.authorName || (isOwn ? (profile.name || 'You') : getSportLabel(full.sport));
+    // Komentarz autora — jedyny pokazywany na karcie, jak podpis w Instagramie.
+    //
+    // Cudze komentarze zostaja na pelnym ekranie. Backend oddaje go w polu
+    // `_authorComment`, wiec karta nie robi zadnego dodatkowego zapytania.
+    //
+    // Tresc uciekamy recznie: komentarz pisze uzytkownik, wiec wstawienie go
+    // wprost do `innerHTML` byloby otwarta furtka na wstrzykniecie kodu.
+    const esc = (t) => t
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    const _ac = rec._authorComment;
+    const authorCommentHtml = _ac?.text
+        ? `<div class="home-card__author-comment">
+         <span class="hcac-name">${esc(authorName)}</span>
+         <span class="hcac-text">${esc(_ac.text)}</span>
+       </div>`
+        : '';
     const avatarSrc = rec.avatarB64 ?? rec.authorAvatarUrl ?? (isOwn ? profile.avatarB64 : null);
     const avatarHtml = avatarSrc ? `<img src="${avatarSrc}" alt="avatar"/>` : `<span>${icon}</span>`;
     const title = (full.name || '').replace(/^(undefined|null)\s*/i, '').trim() || getSportLabel(full.sport);
@@ -1289,6 +1306,7 @@ export async function openActivityDetail(act, isOwn, actId) {
       <div id="adWeatherSlot"></div>
       <div id="adElevSlot"></div>
       ${notesHtml}
+      ${authorCommentHtml}
 
       <div class="home-card__footer ad-footer" style="border-top:1px solid var(--app-border)">
         <button class="home-card__action home-card__action--like${_cachedLiked ? ' home-card__action--liked' : ''}" data-action="like" aria-label="Like">
