@@ -31,6 +31,8 @@ function plugin() {
 let _ready = false;
 let _token = null;
 let _expiresAt = 0;
+let _failures = 0;
+let _retryAfter = 0;
 /** Uruchom App Check. Bezpieczne do wolania zawsze — bez wtyczki nic nie robi. */
 export async function initAppCheck() {
     const p = plugin();
@@ -77,20 +79,36 @@ export async function getAppCheckToken() {
         return null;
     if (_token && Date.now() < _expiresAt)
         return _token;
+    // Karencja po serii niepowodzen — patrz komentarz nizej.
+    if (Date.now() < _retryAfter)
+        return null;
     const p = plugin();
     if (!p)
         return null;
     try {
         const res = await p.getToken();
         _token = res.token ?? null;
+        _failures = 0;
+        _retryAfter = 0;
         _expiresAt = res.expireTimeMillis
             ? res.expireTimeMillis - 60000
             : Date.now() + 30 * 60000; // brak daty → zachowawczo pol godziny
         return _token;
     }
     catch (e) {
-        // Nie hałasujemy przy kazdym zadaniu — token po prostu nie poleci.
-        dlog('[AppCheck] pobranie tokena nieudane:', e instanceof Error ? e.message : e);
+        // ODCZEKAJ po niepowodzeniu — nie probuj przy kazdym zadaniu.
+        //
+        // Apple limituje App Attest. Kazda nieudana proba zaostrzala limit,
+        // a my ponawialismy przy KAZDYM zadaniu do backendu — czyli kilkanascie
+        // razy na sekunde. Efekt: „Too many attempts", a w slad za tym
+        // rozsypujaca sie siec i kolejka, ktora nie moze sie oproznic.
+        //
+        // Przerwa rosnie wykladniczo do 30 minut. App Check jest opcjonalny —
+        // jego brak nie moze psuc dzialania apki.
+        _failures += 1;
+        _retryAfter = Date.now() + Math.min(30 * 60000, 5000 * 2 ** Math.min(_failures, 9));
+        console.warn(`[AppCheck] token niedostepny (${_failures}. raz) — kolejna proba za ` +
+            `${Math.round((_retryAfter - Date.now()) / 1000)} s:`, e instanceof Error ? e.message : e);
         _token = null;
         return null;
     }

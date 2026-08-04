@@ -123,7 +123,17 @@ export function installAuthFetch() {
         // Naglowek dokladamy WYLACZNIE tutaj, czyli tylko dla `BACKEND_URL`
         // (sprawdzone wyzej). Gdyby poszedl szerzej, token wyciekalby do
         // Cloudinary, Mapboxa i CARTO — a on identyfikuje Twoja instalacje.
-        const appCheck = await getAppCheckToken();
+        // App Check NIE MOZE opozniac zadania.
+        //
+        // `getToken()` schodzi do natywnego App Attest, a ten przy limicie prób
+        // potrafi wisiec sekundami. Kazde zadanie do backendu czekalo wiec na
+        // cos, co jest CALKOWICIE opcjonalne — i cala apka zwalniala.
+        // Dwie sekundy albo lecimy bez naglowka; backend jest w trybie audytu
+        // i tak go nie wymaga.
+        const appCheck = await Promise.race([
+            getAppCheckToken(),
+            new Promise(r => setTimeout(() => r(null), 2000)),
+        ]);
         if (appCheck)
             headers.set('X-Firebase-AppCheck', appCheck);
         // ── Zapisy: kolejka offline (Etap 2) ────────────────────────────────────
