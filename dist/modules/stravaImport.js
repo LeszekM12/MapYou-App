@@ -610,6 +610,29 @@ export function showStravaImportModal() {
                     (summary.duplicates ? ` · pominięte duplikaty: ${summary.duplicates}` : '') +
                     (summary.failed ? ` · ⚠️ nieudane: ${summary.failed} (${summary.failedNames.join(', ')}${summary.failed > 10 ? '…' : ''})` : '') +
                     `<br>Odśwież aplikację, aby zobaczyć treningi.`;
+            // Przelicz osiagniecia z CALEJ historii.
+            //
+            // Import wnosi lata treningow naraz — bez tego uzytkownik musialby
+            // czekac na kolejny zapisany trening, zeby zobaczyc odznaki za rzeczy,
+            // ktore osiagnal dawno temu. Backend liczy je z historii i przyznaje
+            // wstecz, z data zdobycia, nie data importu.
+            void (async () => {
+                try {
+                    const { BACKEND_URL } = await import('../config.js');
+                    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+                    if (!userId)
+                        return;
+                    const r = await fetch(`${BACKEND_URL}/achievements/recompute`, {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ userId }),
+                    });
+                    const d = await r.json();
+                    if (d.earned) {
+                        status.innerHTML += `<br>🏅 Odblokowano <b>${d.earned}</b> nowych osiągnięć!`;
+                    }
+                }
+                catch { /* osiagniecia doliczy sie przy nastepnym zapisie */ }
+            })();
             closeBtn.textContent = 'Odśwież aplikację';
             closeBtn.onclick = () => location.reload();
         }

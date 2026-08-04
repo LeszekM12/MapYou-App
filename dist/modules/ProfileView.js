@@ -793,6 +793,57 @@ export class ProfileView {
       <p class="pv-efforts__note">Calculated from GPS-tracked running activities only.</p>`;
     }
     // ── Trophies ────────────────────────────────────────────────────────────────
+    /** Odznaki przyznane przez backend na podstawie CALEJ historii treningow.
+     *
+     *  Licza sie tam, a nie tutaj, bo to dane trwale: przezywaja zmiane telefonu
+     *  i da sie je pokazac na profilu publicznym. Import ze Stravy przyznaje je
+     *  wstecz — uzytkownik od razu widzi, co osiagnal przez lata. */
+    async _renderServerAchievements(host) {
+        if (!host)
+            return;
+        const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+        if (!userId)
+            return;
+        let items = [];
+        try {
+            const r = await fetch(`${BACKEND_URL}/achievements?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+            const d = await r.json();
+            items = d.data ?? [];
+            localStorage.setItem('mapyou_achievements', JSON.stringify(items));
+        }
+        catch {
+            // Bez sieci pokazujemy ostatnio znany stan — gablota nie moze byc pusta
+            // tylko dlatego, ze uzytkownik jest offline.
+            try {
+                items = JSON.parse(localStorage.getItem('mapyou_achievements') ?? '[]');
+            }
+            catch {
+                items = [];
+            }
+        }
+        if (!items.length)
+            return;
+        const GROUPS = [
+            ['distance', '🎯 Distance Milestones'],
+            ['total', '📈 Lifetime Totals'],
+            ['streak', '🔥 Consistency'],
+            ['record', '⛰️ Records'],
+            ['seasonal', '🗓️ Seasonal Challenges'],
+        ];
+        host.innerHTML = GROUPS.map(([g, title]) => {
+            const inGroup = items.filter(a => a.group === g);
+            if (!inGroup.length)
+                return '';
+            return `
+        <div class="pv-section-title" style="margin-top:24px">${title}</div>
+        <div class="pv-trophy-grid">${inGroup.map(a => `
+          <div class="pv-ach" title="${a.desc}">
+            <span class="pv-ach__icon" style="background:${a.color}22;color:${a.color}">${a.icon}</span>
+            <span class="pv-ach__label">${a.label}</span>
+            <span class="pv-ach__date">${new Date(a.earnedAt).toLocaleDateString()}</span>
+          </div>`).join('')}</div>`;
+        }).join('');
+    }
     _renderTrophies(el) {
         const actTrophies = _activityTrophies(this._workouts);
         const wkTrophies = _weeklyTrophies();
@@ -822,7 +873,12 @@ export class ProfileView {
       <div class="pv-trophy-grid">${wkTrophies.map(_buildTrophySVG).join('')}</div>
 
       <div class="pv-section-title" style="margin-top:24px">🔥 Streak Records${bestStreak >= 7 ? ` <span style="color:#f97316;font-size:1.1rem">(Best: ${bestStreak} days)</span>` : ''}</div>
-      <div class="pv-trophy-grid pv-trophy-grid--scroll">${streakTrophies.map(_buildTrophySVG).join('')}</div>`;
+      <div class="pv-trophy-grid pv-trophy-grid--scroll">${streakTrophies.map(_buildTrophySVG).join('')}</div>
+
+      <div id="pvServerTrophies"></div>`;
+        // Osiagniecia liczone na serwerze — dociagamy po narysowaniu reszty,
+        // zeby gablota pokazala sie natychmiast, nawet bez sieci.
+        void this._renderServerAchievements(el.querySelector('#pvServerTrophies'));
     }
     // ── Posts ───────────────────────────────────────────────────────────────────
     _renderPosts(el) {
