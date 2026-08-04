@@ -671,6 +671,11 @@ function openActivityOptionsMenu(ov, itemId, visibility, muted, closeDetail) {
         <span class="adm-toggle${muted ? ' adm-toggle--on' : ''}"><span class="adm-knob"></span></span>
       </button>
       <div class="adm-divider"></div>
+      <button class="adm-row" id="admEdit">
+        <span class="adm-ic">✏️</span>
+        <span class="adm-txt"><span class="adm-t">Edit activity</span><span class="adm-s">Title, description, private note, photos</span></span>
+      </button>
+      <div class="adm-divider"></div>
       <button class="adm-row adm-row--danger" id="admDelete">
         <span class="adm-ic">🗑️</span>
         <span class="adm-txt"><span class="adm-t">Delete activity</span><span class="adm-s">This cannot be undone</span></span>
@@ -680,6 +685,33 @@ function openActivityOptionsMenu(ov, itemId, visibility, muted, closeDetail) {
     const closeMenu = () => menu.remove();
     menu.addEventListener('click', e => { if (e.target === menu)
         closeMenu(); });
+    // Edycja — otwiera osobny modal i zamyka to menu.
+    menu.querySelector('#admEdit')?.addEventListener('click', () => {
+        closeMenu();
+        void (async () => {
+            const { openEditActivity } = await import('./EditActivityModal.js');
+            const { db } = await import('./db.js');
+            // Aktualne pola bierzemy z bazy — menu ich nie zna.
+            /* eslint-disable @typescript-eslint/no-explicit-any */
+            const rec = await db.enrichedActivities.get(itemId);
+            openEditActivity({
+                activityId: itemId,
+                name: rec?.name ?? '',
+                description: rec?.description ?? '',
+                notes: rec?.notes ?? '',
+                photoUrl: rec?.photoUrl ?? null,
+                photos: rec?.photos ?? [],
+            }, userId, async (upd) => {
+                // Zapisz lokalnie, zeby zmiana byla widoczna od razu — takze offline.
+                try {
+                    if (rec)
+                        await db.enrichedActivities.put({ ...rec, ...upd });
+                }
+                catch { /* noop */ }
+                closeDetail();
+            });
+        })();
+    });
     let curVis = visibility, curMuted = muted;
     const refreshBadge = () => {
         const badge = ov.querySelector('#adVisBadge');

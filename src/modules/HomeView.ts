@@ -713,6 +713,11 @@ function openActivityOptionsMenu(
         <span class="adm-toggle${muted ? ' adm-toggle--on' : ''}"><span class="adm-knob"></span></span>
       </button>
       <div class="adm-divider"></div>
+      <button class="adm-row" id="admEdit">
+        <span class="adm-ic">✏️</span>
+        <span class="adm-txt"><span class="adm-t">Edit activity</span><span class="adm-s">Title, description, private note, photos</span></span>
+      </button>
+      <div class="adm-divider"></div>
       <button class="adm-row adm-row--danger" id="admDelete">
         <span class="adm-ic">🗑️</span>
         <span class="adm-txt"><span class="adm-t">Delete activity</span><span class="adm-s">This cannot be undone</span></span>
@@ -721,6 +726,32 @@ function openActivityOptionsMenu(
   document.body.appendChild(menu);
   const closeMenu = (): void => menu.remove();
   menu.addEventListener('click', e => { if (e.target === menu) closeMenu(); });
+
+  // Edycja — otwiera osobny modal i zamyka to menu.
+  menu.querySelector('#admEdit')?.addEventListener('click', () => {
+    closeMenu();
+    void (async () => {
+      const { openEditActivity } = await import('./EditActivityModal.js');
+      const { db } = await import('./db.js');
+      // Aktualne pola bierzemy z bazy — menu ich nie zna.
+      /* eslint-disable @typescript-eslint/no-explicit-any */
+      const rec = await (db as any).enrichedActivities.get(itemId) as Record<string, unknown> | undefined;
+      openEditActivity({
+        activityId: itemId,
+        name:        (rec?.name as string) ?? '',
+        description: (rec?.description as string) ?? '',
+        notes:       (rec?.notes as string) ?? '',
+        photoUrl:    (rec?.photoUrl as string | null) ?? null,
+        photos:      (rec?.photos as string[]) ?? [],
+      }, userId, async upd => {
+        // Zapisz lokalnie, zeby zmiana byla widoczna od razu — takze offline.
+        try {
+          if (rec) await (db as any).enrichedActivities.put({ ...rec, ...upd });
+        } catch { /* noop */ }
+        closeDetail();
+      });
+    })();
+  });
 
   let curVis = visibility, curMuted = muted;
   const refreshBadge = (): void => {
