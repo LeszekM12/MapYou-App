@@ -203,8 +203,20 @@ function openCommentsView(card: HTMLElement, actId: string): void {
         <span class="cv-title">Comments</span>
       </div>
       <div class="cv-list" id="cvList"><p class="cv-empty">Loading…</p></div>
+      <div class="cv-attach" id="cvAttach" hidden>
+        <img id="cvAttachImg" alt="">
+        <button class="cv-attach-x" id="cvAttachX" aria-label="Remove photo">×</button>
+      </div>
       <div class="cv-form">
-        <input class="cv-input" id="cvInput" placeholder="Add a comment…" maxlength="200"/>
+        <button class="cv-tool" id="cvPhoto" aria-label="Add photo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20">
+            <rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.6"/>
+            <path d="M21 15l-5-5L5 21"/>
+          </svg>
+        </button>
+        <button class="cv-tool" id="cvEmoji" aria-label="Add emoji">🙂</button>
+        <input type="file" id="cvFile" accept="image/*" hidden>
+        <input class="cv-input" id="cvInput" placeholder="Add a comment…" maxlength="2200"/>
         <button class="cv-send" id="cvSend" aria-label="Send">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="18" height="18">
             <line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>
@@ -233,15 +245,58 @@ function openCommentsView(card: HTMLElement, actId: string): void {
   const input = ov.querySelector<HTMLInputElement>('#cvInput')!;
   const list  = ov.querySelector<HTMLElement>('#cvList')!;
 
-  const render = (comments: Array<{ authorName: string; text: string }>): void => {
+  type CV = {
+    commentId?: string; userId?: string; authorName: string; text: string;
+    photoUrl?: string | null; editedAt?: string | null; _pending?: boolean;
+  };
+
+  let items: CV[] = [];
+
+  const render = (comments: CV[]): void => {
+    items = comments;
     list.innerHTML = comments.length
-      ? comments.map(c => `<div class="cv-item">
-          <span class="cv-author">${c.authorName}</span>
-          <span class="cv-text">${c.text}</span>
-        </div>`).join('')
+      ? comments.map(c => {
+          const mine    = c.userId === userId;
+          const pending = c.photoUrl?.startsWith('mapyou-pending://');
+          return `<div class="cv-item${c._pending ? ' cv-item--pending' : ''}" data-cid="${c.commentId ?? ''}">
+            <div class="cv-line">
+              <span class="cv-author">${c.authorName}</span>
+              <span class="cv-text">${c.text}</span>
+              ${c.editedAt ? '<span class="cv-edited">edited</span>' : ''}
+            </div>
+            ${c.photoUrl
+              ? (pending
+                  ? '<div class="cv-photo cv-photo--pending">Uploading…</div>'
+                  : `<img class="cv-photo" src="${c.photoUrl}" alt="">`)
+              : ''}
+            ${mine ? `<button class="cv-edit" data-edit="${c.commentId ?? ''}">Edit</button>` : ''}
+          </div>`;
+        }).join('')
       : '<p class="cv-empty">No comments yet — be the first.</p>';
     list.scrollTop = list.scrollHeight;
   };
+
+  // ── Edycja wlasnego komentarza ────────────────────────────────────────────
+  list.addEventListener('click', e => {
+    const btn = (e.target as HTMLElement).closest<HTMLElement>('[data-edit]');
+    if (!btn) return;
+    const cid = btn.dataset.edit;
+    const cur = items.find(c => c.commentId === cid);
+    if (!cid || !cur) return;
+    const next = prompt('Edit comment', cur.text);
+    if (next === null) return;
+    const text = next.trim();
+    if (!text) return;
+
+    // Pokazujemy zmiane OD RAZU — serwer tylko potwierdza.
+    cur.text = text; cur.editedAt = new Date().toISOString();
+    render(items);
+
+    void fetch(`${BACKEND_URL}/feed/comment/${encodeURIComponent(cid)}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, text }),
+    }).catch(() => { /* kolejka offline dosle */ });
+  });
 
   const updateCount = (n: number): void => {
     const el = card.querySelector<HTMLElement>(`[data-comment-count="${actId}"], [data-comment-count="${realId}"]`);
@@ -250,29 +305,89 @@ function openCommentsView(card: HTMLElement, actId: string): void {
 
   void fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(realId)}`)
     .then(r => r.json())
-    .then((d: { data: Array<{ authorName: string; text: string }> }) => {
+    .then((d: { data: CV[] }) => {
       render(d.data ?? []); updateCount(d.data?.length ?? 0);
     })
     .catch(() => { list.innerHTML = '<p class="cv-empty">No comments yet</p>'; });
 
+  // ── Zdjecie w komentarzu ──────────────────────────────────────────────────
+  let attached: string | null = null;
+  const fileEl   = ov.querySelector<HTMLInputElement>('#cvFile')!;
+  const attachEl = ov.querySelector<HTMLElement>('#cvAttach')!;
+  const attachImg = ov.querySelector<HTMLImageElement>('#cvAttachImg')!;
+
+  ov.querySelector('#cvPhoto')?.addEventListener('click', () => fileEl.click());
+  ov.querySelector('#cvAttachX')?.addEventListener('click', () => {
+    attached = null; attachEl.hidden = true; attachImg.src = '';
+  });
+
+  fileEl.addEventListener('change', () => {
+    const f = fileEl.files?.[0];
+    fileEl.value = '';
+    if (!f) return;
+    // Podglad z pliku — natychmiastowy, niezalezny od wysylki.
+    attachImg.src = URL.createObjectURL(f);
+    attachEl.hidden = false;
+    void (async () => {
+      const { uploadMediaFile } = await import('./cloudSync.js');
+      // Bez sieci `uploadMediaFile` odklada plik do kolejki i oddaje adres
+      // zastepczy — komentarz mozna wyslac tak czy tak.
+      const up = await uploadMediaFile(f, userId, 'posts');
+      attached = up?.url ?? null;
+      if (!attached) { attachEl.hidden = true; alert('Could not attach photo.'); }
+    })();
+  });
+
+  // ── Emoji ─────────────────────────────────────────────────────────────────
+  // Prosty zestaw zamiast pelnego wyboru — te kilkanascie pokrywa wiekszosc
+  // uzyc pod postem sportowym, a nie wymaga biblioteki ani osobnego ekranu.
+  ov.querySelector('#cvEmoji')?.addEventListener('click', () => {
+    ov.querySelector('.cv-emoji-bar')?.remove();
+    const bar = document.createElement('div');
+    bar.className = 'cv-emoji-bar';
+    bar.innerHTML = ['💪','🔥','👏','🎉','❤️','😍','😂','🙌','🚀','⚡','🏃','🚴','🥇','😮','🤝','👀']
+      .map(e => `<button class="cv-emoji" data-e="${e}">${e}</button>`).join('');
+    ov.querySelector('.cv-form')?.before(bar);
+    bar.addEventListener('click', ev => {
+      const b = (ev.target as HTMLElement).closest<HTMLElement>('[data-e]');
+      if (!b) return;
+      input.value += b.dataset.e ?? '';
+      input.focus();
+    });
+  });
+
   const send = async (): Promise<void> => {
     const text = input.value.trim();
-    if (!text) return;
-    input.value = '';
-    input.disabled = true;
+    if (!text && !attached) return;
+
+    // Komentarz pojawia sie OD RAZU, przed odpowiedzia serwera.
+    //
+    // Identyfikator nadajemy tutaj i wysylamy go dalej — dzieki temu
+    // ponowienie z kolejki offline trafia w ten sam rekord zamiast tworzyc
+    // duplikat, a lista nie musi byc pobierana ponownie.
+    const commentId = `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const optimistic: CV = {
+      commentId, userId, authorName: userName, text,
+      photoUrl: attached, _pending: true,
+    };
+    render([...items, optimistic]);
+    updateCount(items.length);
+
+    const photoUrl = attached;
+    input.value = ''; attached = null; attachEl.hidden = true;
+    ov.querySelector('.cv-emoji-bar')?.remove();
+
     try {
       const res = await fetch(`${BACKEND_URL}/feed/comment`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ userId, authorName: userName, itemId: realId, itemType, text }),
+        body:    JSON.stringify({ commentId, userId, authorName: userName, itemId: realId, itemType, text, photoUrl }),
       });
       if (res.ok) {
-        const r2 = await fetch(`${BACKEND_URL}/feed/comments/${encodeURIComponent(realId)}`);
-        const d2 = await r2.json() as { data: Array<{ authorName: string; text: string }> };
-        render(d2.data ?? []); updateCount(d2.data?.length ?? 0);
+        const found = items.find(c => c.commentId === commentId);
+        if (found) { found._pending = false; render(items); }
       }
-    } catch {}
-    input.disabled = false;
+    } catch { /* kolejka offline dosle — komentarz zostaje na ekranie */ }
     input.focus();
   };
 
@@ -553,7 +668,7 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
       existing.classList.remove('home-card__comment-panel--open');
       setTimeout(() => existing.remove(), 280);
     } else {
-      openCommentPanel(card, `p_${post.id}`);
+      openCommentsView(card, `p_${post.id}`);
     }
   });
 
@@ -1588,13 +1703,12 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
       }
 
       if (action === 'comment') {
-        const existing = card.querySelector('.home-card__comment-panel');
-        if (existing) {
-          existing.classList.remove('home-card__comment-panel--open');
-          setTimeout(() => existing.remove(), 280);
-        } else {
-          openCommentPanel(card, act.id);
-        }
+        // Pelny widok komentarzy, jak w Instagramie.
+        //
+        // Wczesniej wysuwal sie waski pasek do pisania wewnatrz karty —
+        // nie dalo sie tam czytac watku, a pisanie odbywalo sie na oslep.
+        // Ten sam widok, ktorego uzywaja szczegoly aktywnosci.
+        openCommentsView(card, act.id);
       }
 
       if (action === 'share') {
