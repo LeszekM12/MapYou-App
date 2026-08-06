@@ -34,6 +34,10 @@ const tbl = (): any => (db as any).outbox;
  *  i nie liczymy go jako „czekajacy". */
 const MAX_ATTEMPTS = 8;
 
+/** Odstep miedzy probami PO przekroczeniu `MAX_ATTEMPTS`.
+ *  Zapis nie jest juz porzucany — tylko ponawiany rzadko. */
+const SLOW_RETRY_MS = 6 * 60 * 60_000;
+
 export interface OutboxItem {
   id?:        number;
   idemKey:    string;
@@ -171,11 +175,38 @@ export async function flush(): Promise<void> {
   try {
     const items = await listPending();
     if (!items.length) return;
-    console.warn(`[Outbox] wysylam ${items.length} zaleglych zapisow`);
+    // Liczymy tylko te, ktore FAKTYCZNIE pojda — inaczej log mowil
+    // „wysylam 16", podczas gdy dziewiec z nich bylo pominietych przez limit
+    // prob albo karencje, i nie bylo wiadomo, czemu nic sie nie dzieje.
+    // Licznik bledow sieci Z RZEDU — patrz galaz `catch` nizej.
+    let awaria = 0;
+    const now = Date.now();
+    const gotowe = items.filter(i =>
+      i.attempts < MAX_ATTEMPTS && (!i.nextTryAt || now >= i.nextTryAt));
+    const wstrzymane = items.length - gotowe.length;
+    if (!gotowe.length) {
+      console.warn(`[Outbox] ${items.length} zapisow czeka, ale zaden nie jest gotowy` +
+        ` (limit prob lub karencja). Odblokuj: mapyouOutbox('retry')`);
+      return;
+    }
+    console.warn(`[Outbox] wysylam ${gotowe.length} zaleglych zapisow` +
+      (wstrzymane ? ` (${wstrzymane} wstrzymanych — mapyouOutbox('retry'))` : ''));
 
     for (const item of items) {
-      if (item.attempts >= MAX_ATTEMPTS) continue;
-      // Karencja po bledzie serwera — patrz nizej.
+      // Jedyny powod pominiecia: karencja jeszcze trwa.
+      //
+      // Wczesniej bylo tu takze `if (item.attempts >= MAX_ATTEMPTS) continue;`,
+      // czyli zapis po osmiu nieudanych probach PARKOWAL SIE NA ZAWSZE.
+      // Zostawal w bazie (dobrze — to dane uzytkownika), ale nikt go juz nigdy
+      // nie ponawial. Gdy przyczyna znikala — bo poprawilismy serwer albo
+      // dolozylismy metode do CORS — zapis i tak nie ruszal. Trzeba bylo
+      // recznie wolac `mapyouOutbox('retry')` z konsoli, czego zwykly
+      // uzytkownik nigdy nie zrobi.
+      //
+      // Teraz limit nie zatrzymuje ponowien, tylko je ZWALNIA (patrz `backoff`
+      // nizej): po przekroczeniu progu odstep siega szesciu godzin. Zapis
+      // wraca sam, gdy tylko serwer zacznie odpowiadac — bez zadnej akcji
+      // ze strony uzytkownika.
       if (item.nextTryAt && Date.now() < item.nextTryAt) continue;
       try {
         // `X-Outbox-Replay` mowi `authFetch`, ze to JUZ jest ponowienie
@@ -194,6 +225,8 @@ export async function flush(): Promise<void> {
         // lajka lokalnie, serwer o nim nie wiedzial, a po odswiezeniu stan
         // sie cofal bez zadnego sladu w logach.
         console.warn(`[Outbox] ${item.method} ${item.url.replace(/^https?:\/\/[^/]+/, '')} -> ${res.status}`);
+
+        awaria = 0;   // cokolwiek odpowiedzialo = siec dziala
 
         if (res.ok || res.status === 409) {
           // 409 traktujemy jak sukces — zasob juz istnieje, czyli poprzednia
@@ -245,22 +278,29 @@ export async function flush(): Promise<void> {
         // osiem prob rozklada sie na kilka godzin, a nie na trzy minuty.
         // To zostawia zapas na zimny start maszyny Fly, ktory bywa 5xx.
         const attempts = item.attempts + 1;
-        const backoff  = Math.min(60 * 60_000, 20_000 * 2 ** (attempts - 1));
+        // Do progu: 20 s, 40 s, 80 s... (do godziny) — szybkie nadrabianie
+        // po zimnym starcie Fly. Po progu: staly odstep szesciu godzin, zeby
+        // trwale chory zapis nie meczyl serwera, ale TEZ nie umieral.
+        const backoff = attempts >= MAX_ATTEMPTS
+          ? SLOW_RETRY_MS
+          : Math.min(60 * 60_000, 20_000 * 2 ** (attempts - 1));
         await tbl().update(item.id, {
           attempts,
           nextTryAt: Date.now() + backoff,
           lastError: `HTTP ${res.status} (proba ${attempts}/${MAX_ATTEMPTS})`,
         });
-        if (attempts >= MAX_ATTEMPTS) {
-          console.error(
-            `[Outbox] PODDAJE SIE po ${MAX_ATTEMPTS} probach: ${item.method} ${item.url}` +
-            `\n  Rekord ZOSTAJE w kolejce (to dane uzytkownika) — podejrzyj: mapyouOutbox()`,
+        if (attempts === MAX_ATTEMPTS) {
+          console.warn(
+            `[Outbox] ${MAX_ATTEMPTS} nieudanych prob: ${item.method} ${item.url}` +
+            `\n  Przechodze na wolne ponawianie (co 6 h) — zapis NIE jest porzucony` +
+            `\n  i wroci sam, gdy serwer zacznie odpowiadac. Recznie: mapyouOutbox('retry')`,
           );
         }
       } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
         console.warn(
           `[Outbox] blad sieci: ${item.method} ${item.url.replace(/^https?:\/\/[^/]+/, '')}` +
-          ` | proba ${item.attempts + 1}/${MAX_ATTEMPTS} | ${e instanceof Error ? e.message : String(e)}`,
+          ` | proba ${item.attempts + 1}/${MAX_ATTEMPTS} | ${msg}`,
         );
         // Blad sieci NIE zuzywa limitu prob.
         //
@@ -268,11 +308,31 @@ export async function flush(): Promise<void> {
         // nie przed slabym zasiegiem. Fly usypia maszyny, wiec pierwsze
         // zadanie po przerwie potrafi paść z bledem sieci; osiem takich
         // i zapis uzytkownika umieral, mimo ze nic z nim nie bylo nie tak.
-        await tbl().update(item.id, {
-          lastError: `siec: ${e instanceof Error ? e.message : String(e)}`,
-        });
-        // Skoro siec padla, nie ma sensu meczyc reszty w tym cyklu.
-        break;
+        await tbl().update(item.id, { lastError: `siec: ${msg}` });
+
+        // ── DLACZEGO NIE PRZERYWAMY OD RAZU ────────────────────────────────
+        //
+        // Wczesniej bylo tu bezwarunkowe `break` z uzasadnieniem „skoro siec
+        // padla, nie ma sensu meczyc reszty". Zalozenie jest bledne: `fetch`
+        // rzuca wyjatkiem takze wtedy, gdy siec dziala doskonale, a odrzucone
+        // zostalo JEDNO konkretne zadanie — np. przez CORS.
+        //
+        // Skutek byl powazny: pozycja, ktora zawsze pada, blokowala CALA
+        // kolejke za soba. Petla przerywala na niej za kazdym razem, wiec
+        // zapisy stojace dalej nie byly proboWane ANI RAZU — takze te nowe,
+        // dodane pozniej. Kolejka rosla, pasek pokazywal „7 syncing" bez konca,
+        // a zmiany zrobione bez zasiegu nie wysylaly sie po powrocie online.
+        // Zadna z nich nie byla zepsuta — po prostu nigdy nie dostaly szansy.
+        //
+        // Teraz przerywamy dopiero, gdy padnie KILKA pozycji z rzedu albo gdy
+        // system jawnie mowi, ze jest offline. Pojedyncza chora pozycja
+        // zostaje z boku, a reszta idzie dalej.
+        awaria++;
+        if (!navigator.onLine || awaria >= 3) {
+          console.warn('[Outbox] siec niedostepna — przerywam cykl, wroce automatycznie');
+          break;
+        }
+        continue;
       }
     }
   } finally {
@@ -283,6 +343,26 @@ export async function flush(): Promise<void> {
 
 // ── Automatyczna wysylka ─────────────────────────────────────────────────────
 
+/** Skasuj karencje WSZYSTKIM zapisom — kazdy dostaje jedna natychmiastowa probe.
+ *
+ *  Wolane przy starcie apki i przy powrocie sieci. Po co, skoro karencja i tak
+ *  kiedys minie? Bo najczestszy powod dlugiej karencji to awaria, ktora zostala
+ *  w miedzyczasie USUNIETA — poprawiony serwer, dolozona metoda w CORS, wygasly
+ *  problem u operatora. Czekanie wtedy szesciu godzin nie ma sensu.
+ *
+ *  Licznika prob NIE zerujemy. Gdyby zapis byl faktycznie chory, po nieudanej
+ *  probie wroci do wolnego trybu — a nie zacznie znowu dobijac sie co 20 sekund.
+ *  Jedna proba na uruchomienie apki to obciazenie, ktore mozna zignorowac. */
+async function reviveAll(): Promise<void> {
+  try {
+    const all = await tbl().toArray() as OutboxItem[];
+    const wstrzymane = all.filter(i => i.nextTryAt);
+    if (!wstrzymane.length) return;
+    for (const i of wstrzymane) await tbl().update(i.id, { nextTryAt: undefined });
+    dlog(`[Outbox] odblokowano ${wstrzymane.length} zapisow po karencji`);
+  } catch { /* brak bazy — flush i tak sprobuje */ }
+}
+
 let started = false;
 
 /** Uruchom nasluch. Wysylka rusza przy powrocie sieci, przy powrocie
@@ -292,7 +372,9 @@ export function startOutbox(): void {
   if (started) return;
   started = true;
 
-  window.addEventListener('online', () => { void flush(); });
+  // Powrot sieci = najlepszy moment, zeby dac szanse WSZYSTKIM zapisom,
+  // takze tym w wolnym trybie. Dlatego najpierw `reviveAll`, potem `flush`.
+  window.addEventListener('online', () => { void reviveAll().then(() => flush()); });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') void flush();
   });
@@ -304,7 +386,10 @@ export function startOutbox(): void {
     setTimeout(() => { void flush(); }, 2_000);
     setTimeout(() => { void flush(); }, 6_000);
   });
-  void flush();
+  // Start apki tez zeruje karencje — jesli przyczyna awarii zniknela miedzy
+  // sesjami, uzytkownik nie czeka na uplyniecie odstepu. To wlasnie sprawia,
+  // ze zaleglosci rozchodza sie SAME, bez `mapyouOutbox('retry')` z konsoli.
+  void reviveAll().then(() => flush());
   dlog('[Outbox] nasluch uruchomiony');
 }
 
@@ -420,12 +505,29 @@ export function mountOfflineBar(): void {
 
 /** Podglad kolejki z konsoli:  mapyouOutbox()
  *
- *  Pokazuje, co dokladnie czeka, ile razy probowano i na czym padlo.
- *  `mapyouOutbox(true)` czysci kolejke — uzywac tylko swiadomie,
- *  bo kasuje dane uzytkownika, ktore nigdy nie doszly na serwer. */
+ *  mapyouOutbox()         — co czeka, ile prob, na czym padlo
+ *  mapyouOutbox('retry')  — zeruje licznik prob i karencje, wysyla od nowa
+ *  mapyouOutbox(true)     — czysci kolejke BEZPOWROTNIE
+ *
+ *  Tryb 'retry' jest potrzebny, bo rekord po wyczerpaniu limitu prob zostaje
+ *  w bazie, ale nie jest juz nigdy ponawiany. To celowe — dane uzytkownika
+ *  nie znikaja po cichu — ale gdy przyczyna zostanie usunieta (np. brakujaca
+ *  metoda w CORS albo naprawiony serwer), trzeba go moc odblokowac.
+ *  Bez tego jedynym wyjsciem bylo kasowanie, czyli utrata zapisow. */
 (window as unknown as Record<string, unknown>).mapyouOutbox =
-  async (purge = false): Promise<unknown> => {
-    if (purge) {
+  async (purge: boolean | string = false): Promise<unknown> => {
+    if (purge === 'retry') {
+      const all = await listPending();
+      const stuck = all.filter(i =>
+        i.attempts > 0 || (i.nextTryAt && Date.now() < i.nextTryAt));
+      for (const i of stuck) {
+        await tbl().update(i.id, { attempts: 0, nextTryAt: undefined, lastError: null });
+      }
+      notifyChange();
+      void flush();
+      return `Odblokowano ${stuck.length} z ${all.length} zapisow — wysylam od nowa.`;
+    }
+    if (purge === true) {
       const n = await pendingCount();
       await tbl().clear();
       notifyChange();

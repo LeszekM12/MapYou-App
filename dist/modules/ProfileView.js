@@ -807,10 +807,55 @@ export class ProfileView {
             return;
         let items = [];
         try {
-            const r = await fetch(`${BACKEND_URL}/achievements?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
-            const d = await r.json();
-            items = d.data ?? [];
-            localStorage.setItem('mapyou_achievements', JSON.stringify(items));
+            // ── NAJPIERW PRZELICZ, POTEM POBIERZ ───────────────────────────────────
+            //
+            // Odznaka trafia do bazy dopiero, gdy przejdzie przez `/recompute`.
+            // Wczesniej wolal to WYLACZNIE import ze Stravy — nic wiecej w calej
+            // aplikacji. Skutek: kazda NOWA regula dopisana do `RULES` na serwerze
+            // nie dotyczyla nikogo, kto akurat nie robil importu. Gablota pokazywala
+            // stary zestaw i wygladalo to na zgubione osiagniecia, choc dane byly
+            // w porzadku — po prostu nikt ich nie policzyl.
+            //
+            // `/recompute` jest idempotentne (przyznana odznaka zachowuje pierwotna
+            // date zdobycia), wiec wolanie go przy otwieraniu gabloty niczego nie
+            // duplikuje ani nie „odswieza" starych odznak. Odpowiedz zawiera juz
+            // pelna liste, wiec nie potrzeba drugiego zapytania.
+            //
+            // Gdyby przeliczanie zawiodlo (zimny start Fly, brak sesji), spadamy
+            // do zwyklego GET — lepiej pokazac stary zestaw niz nic.
+            let d = null;
+            try {
+                const rc = await fetch(`${BACKEND_URL}/achievements/recompute`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ userId }),
+                });
+                if (rc.ok)
+                    d = await rc.json();
+            }
+            catch { /* spadamy do GET ponizej */ }
+            if (!d) {
+                const r = await fetch(`${BACKEND_URL}/achievements?userId=${encodeURIComponent(userId)}`, { cache: 'no-store' });
+                d = await r.json();
+            }
+            // `catalog` zawiera WSZYSTKIE odznaki (zdobyte + cele). Gdy serwer jest
+            // starszy i go nie zwraca, spadamy do `data` — samych zdobytych.
+            items = d.catalog ?? d.data ?? [];
+            // Pusta odpowiedz NIE kasuje pamieci podrecznej. Gdy serwer odmowil
+            // (401 przy niegotowej sesji, 5xx przy zimnym starcie), `data` jest
+            // puste — zapisanie tego zamazywaloby ostatni znany stan i gablota
+            // zostawala pusta takze po odzyskaniu polaczenia.
+            if (items.length) {
+                localStorage.setItem('mapyou_achievements', JSON.stringify(items));
+            }
+            else {
+                try {
+                    items = JSON.parse(localStorage.getItem('mapyou_achievements') ?? '[]');
+                }
+                catch {
+                    items = [];
+                }
+            }
         }
         catch {
             // Bez sieci pokazujemy ostatnio znany stan — gablota nie moze byc pusta
@@ -831,18 +876,43 @@ export class ProfileView {
             ['record', '⛰️ Records'],
             ['seasonal', '🗓️ Seasonal Challenges'],
         ];
-        host.innerHTML = GROUPS.map(([g, title]) => {
+        // Licznik postepu — od razu widac, ile jeszcze zostalo.
+        const zdobyte = items.filter(a => a.earned !== false).length;
+        const naglowek = items.length > zdobyte
+            ? `<div class="pv-section-title" style="margin-top:24px">🏅 Achievements
+           <span style="opacity:.5;font-weight:400">${zdobyte} / ${items.length}</span>
+         </div>`
+            : '';
+        host.innerHTML = naglowek + GROUPS.map(([g, title]) => {
             const inGroup = items.filter(a => a.group === g);
             if (!inGroup.length)
                 return '';
             return `
         <div class="pv-section-title" style="margin-top:24px">${title}</div>
-        <div class="pv-trophy-grid">${inGroup.map(a => `
-          <div class="pv-ach" title="${esc(a.desc)}">
-            <span class="pv-ach__icon" style="background:${a.color}22;color:${a.color}">${a.icon}</span>
+        <div class="pv-trophy-grid">${inGroup.map(a => {
+                // `earned === false` wystepuje tylko w katalogu z nowego backendu.
+                // Starsza odpowiedz nie ma tego pola i zawiera wylacznie zdobyte,
+                // wiec brak pola traktujemy jak „zdobyte" — widok dziala z obiema.
+                const locked = a.earned === false;
+                // Stan zablokowany robimy stylem wbudowanym, nie klasa CSS —
+                // dzieki temu nie trzeba ruszac arkuszy i dokladac osobnego pliku
+                // do wdrozenia. Wyszarzenie + przygaszenie czyta sie jednoznacznie
+                // jako „jeszcze nie", a podpowiedz mowi, co zrobic.
+                const styl = locked
+                    ? 'filter:grayscale(1);opacity:.42'
+                    : '';
+                const tlo = locked ? 'rgba(255,255,255,0.06)' : `${a.color}22`;
+                const kolor = locked ? 'rgba(255,255,255,0.45)' : a.color;
+                const stopka = locked
+                    ? '<span class="pv-ach__date" style="opacity:.75">🔒 Goal</span>'
+                    : `<span class="pv-ach__date">${new Date(a.earnedAt).toLocaleDateString()}</span>`;
+                return `
+          <div class="pv-ach" style="${styl}" title="${esc(a.desc)}">
+            <span class="pv-ach__icon" style="background:${tlo};color:${kolor}">${a.icon}</span>
             <span class="pv-ach__label">${esc(a.label)}</span>
-            <span class="pv-ach__date">${new Date(a.earnedAt).toLocaleDateString()}</span>
-          </div>`).join('')}</div>`;
+            ${stopka}
+          </div>`;
+            }).join('')}</div>`;
         }).join('');
     }
     _renderTrophies(el) {
