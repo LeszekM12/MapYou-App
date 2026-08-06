@@ -310,7 +310,7 @@ body.light-mode .sv-week-summary__acts { color: #999 !important; }
 body.light-mode .sv-subtab { color: #999 !important; }
 body.light-mode .sv-subtab--active { background: #00c46a !important; color: #fff !important; }
 body.light-mode .sv-section__title { color: #999 !important; }
-body.light-mode .sv-week-goal { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+body.light-mode .sv-week-goal { background: rgba(0,0,0,0.035) !important; box-shadow: none !important; }
 body.light-mode .sv-week-goal__header { color: #1a1a1a !important; }
 body.light-mode .sv-week-goal__bar { background: #e5e5ea !important; }
 body.light-mode .sv-week-label { color: #1a1a1a !important; }
@@ -343,7 +343,10 @@ body.light-mode .sv-detail-stats { background: #fff !important; }
 body.light-mode .sv-detail-stat { border-color: rgba(0,0,0,0.07) !important; }
 body.light-mode .sv-detail-stat__val { color: #1a1a1a !important; }
 body.light-mode .sv-detail-stat__lbl { color: #999 !important; }
-body.light-mode .sv-chart-wrap { background: #fff !important; }
+/* Wykres NIE jest osobna karta. Bialy prostokat wewnatrz szarej sekcji
+   dawal trzy poziomy zagniezdzenia dla jednego wykresu i wygladal
+   niechlujnie. Sekcja ma juz wlasne tlo. */
+body.light-mode .sv-chart-wrap { background: transparent !important; }
 
 /* ── Map search ─────────────────────────────────────────────────────────────── */
 body.light-mode .map-search-bar,

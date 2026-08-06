@@ -915,6 +915,58 @@ export class ProfileView {
         <div class="pv-section-title" style="margin-top:24px">${title}</div>
         <div class="pv-trophy-grid">${kafle}</div>`;
         }).join('');
+        // ── STREFA WYZWAN ───────────────────────────────────────────────────────
+        //
+        // Osobno od odznak, bo rzadza sie inna zasada: tu pokazujemy WYLACZNIE
+        // to, co zdobyte. Zadnych szarych kafli „co mozesz odblokowac" — lista
+        // wyzwan miesiecznych rosnie o osiem pozycji miesiecznie i gablota
+        // zamienilaby sie w katalog rzeczy niezrobionych.
+        //
+        // Wyzwania klubowe to JEDEN kafel z licznikiem. Nie chcemy zalewac gabloty
+        // wpisami z kazdego klubu — wystarczy, ze widac dorobek.
+        try {
+            const rt = await fetch(`${BACKEND_URL}/challenges/trophies?userId=${encodeURIComponent(userId)}`);
+            if (rt.ok) {
+                const td = await rt.json();
+                const monthly = td.monthly ?? [];
+                const clubs = td.clubsCompleted ?? 0;
+                let extra = '';
+                if (monthly.length) {
+                    // Grupujemy po miesiacu — podpis mowi, KIEDY to bylo zdobyte.
+                    const byMonth = new Map();
+                    for (const m of monthly) {
+                        if (!byMonth.has(m.monthKey))
+                            byMonth.set(m.monthKey, []);
+                        byMonth.get(m.monthKey).push(m);
+                    }
+                    const kolejnosc = [...byMonth.keys()].sort().reverse();
+                    extra += `<div class="pv-section-title" style="margin-top:24px">🗓️ Monthly Challenges</div>`;
+                    for (const key of kolejnosc) {
+                        const grupa = byMonth.get(key);
+                        extra += `
+              <div class="pv-section-title" style="margin-top:12px;font-size:0.95rem;opacity:.65">
+                ${esc(grupa[0].monthLabel)}</div>
+              <div class="pv-trophy-grid">${grupa.map(m => _buildTrophySVG({
+                            id: m.eventId, label: m.title, desc: m.description,
+                            unlocked: true, count: m.value, color: m.color, icon: m.icon,
+                        })).join('')}</div>`;
+                    }
+                }
+                if (clubs > 0) {
+                    extra += `
+            <div class="pv-section-title" style="margin-top:24px">👥 Clubs</div>
+            <div class="pv-trophy-grid">${_buildTrophySVG({
+                        id: 'clubs_done',
+                        label: clubs === 1 ? 'Club challenge' : 'Club challenges',
+                        desc: `Ukończone wyzwania w klubach: ${clubs}`,
+                        unlocked: true, count: clubs, color: '#8B5CF6', icon: '👥',
+                    })}</div>`;
+                }
+                if (extra)
+                    host.insertAdjacentHTML('beforeend', extra);
+            }
+        }
+        catch { /* brak sieci — strefa wyzwan po prostu sie nie pojawi */ }
     }
     _renderTrophies(el) {
         // ── JEDNO ZRODLO PRAWDY: SERWER ─────────────────────────────────────────

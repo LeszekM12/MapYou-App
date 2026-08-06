@@ -345,10 +345,14 @@ export class StatsView {
         this._bindProgressEvents();
     }
     _weekRingsHTML() {
+        // Ikony wektorowe zamiast emoji: emoji renderuja sie inaczej na kazdym
+        // systemie i rozjezdzaja wyrownanie wewnatrz SVG.
+        // Pierscien czasu mial kolor '#aaa' — szary pierscien wyglada jak wylaczony,
+        // a nie jak wskaznik. Dostal wlasny akcent.
         const rings = [
-            ['svRingKm', '#00c46a', '🏃', 'KM'],
-            ['svRingTime', '#aaa', '⏱', 'TIME'],
-            ['svRingCnt', '#ffb545', '🚴', 'COUNT'],
+            ['svRingKm', '#00c46a', 'M13 4v6h6M4 13a8 8 0 1 0 8-8', 'KM'],
+            ['svRingTime', '#5B8DEF', 'M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18', 'TIME'],
+            ['svRingCnt', '#ffb545', 'M4 6h16M4 12h16M4 18h10', 'COUNT'],
         ];
         return rings.map(([id, col, icon, lbl]) => `
       <div class="sv-ring-wrap">
@@ -358,13 +362,35 @@ export class StatsView {
             stroke="${col}" stroke-width="7" stroke-dasharray="226.2" stroke-dashoffset="226.2"
             stroke-linecap="round" transform="rotate(-90 45 45)"
             style="transition:stroke-dashoffset 0.9s cubic-bezier(0.4,0,0.2,1)"/>
-          <text x="45" y="25" text-anchor="middle" font-size="13">${icon}</text>
+          <g transform="translate(38.5 17) scale(0.55)" fill="none" stroke="${col}"
+             stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity="0.85">
+            <path d="${icon}"/>
+          </g>
           <text x="45" y="42" text-anchor="middle" class="sv-ring-val" font-size="12" font-weight="800"
             font-family="Manrope,sans-serif" id="${id}Val">—</text>
           <text x="45" y="53" text-anchor="middle" class="sv-ring-lbl" font-size="8"
             font-family="Manrope,sans-serif">${lbl}</text>
         </svg>
       </div>`).join('');
+    }
+    /** Zastap wykres komunikatem, gdy nie ma czego rysowac.
+     *
+     *  Pusty wykres pokazywal sama os „1,0 0,8 0,6…" i nic wiecej — to wyglada
+     *  na awarie, nie na brak danych. Zwraca `true`, gdy przejal kontrole. */
+    _emptyChart(canvasId, msg, data) {
+        if (data.some(v => v > 0))
+            return false; // sa dane — rysuj normalnie
+        const wrap = document.getElementById(canvasId)?.parentElement;
+        if (!wrap)
+            return true;
+        wrap.innerHTML = `<div style="height:100%;display:flex;flex-direction:column;
+      align-items:center;justify-content:center;gap:6px;color:var(--app-text-muted);
+      text-align:center;padding:0 16px">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="1.6" stroke-linecap="round" opacity="0.5">
+        <path d="M3 3v18h18M7 15l4-4 3 3 5-6"/></svg>
+      <span style="font-size:1.2rem">${esc(msg)}</span></div>`;
+        return true;
     }
     _renderWeek() {
         const now = new Date();
@@ -470,6 +496,8 @@ export class StatsView {
                 byDay[d.getDate() - 1] += mode === 'dist' ? w.distanceKm : w.durationSec / 60;
             }
         });
+        if (this._emptyChart('svMonthChart', 'No activities this month', byDay))
+            return;
         makeChart('svMonthChart', {
             type: 'bar',
             data: {
@@ -499,6 +527,8 @@ export class StatsView {
             if (d.getFullYear() === year)
                 byMonth[d.getMonth()] += w.distanceKm;
         });
+        if (this._emptyChart('svYearChart', 'No activities this year', byMonth))
+            return;
         makeChart('svYearChart', {
             type: 'line',
             data: {

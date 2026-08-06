@@ -665,6 +665,50 @@ function _renderTrophiesTab(el, activities, weeklyWins, bestStreak, userId) {
         <div class="pv-section-title" style="margin-top:24px">${title}</div>
         <div class="pv-trophy-grid">${kafle}</div>`;
         }).join('');
+        // ── STREFA WYZWAN (cudzy profil) ────────────────────────────────────────
+        // Ta sama zasada co u siebie: wylacznie zdobyte, pogrupowane po miesiacu,
+        // a wyzwania klubowe jako jeden kafel z licznikiem.
+        try {
+            const rt = await fetch(`${BACKEND_URL}/challenges/trophies?userId=${encodeURIComponent(userId)}`);
+            if (rt.ok) {
+                const td = await rt.json();
+                const monthly = td.monthly ?? [];
+                const clubs = td.clubsCompleted ?? 0;
+                let extra = '';
+                if (monthly.length) {
+                    const byMonth = new Map();
+                    for (const m of monthly) {
+                        if (!byMonth.has(m.monthKey))
+                            byMonth.set(m.monthKey, []);
+                        byMonth.get(m.monthKey).push(m);
+                    }
+                    extra += `<div class="pv-section-title" style="margin-top:24px">🗓️ Monthly Challenges</div>`;
+                    for (const key of [...byMonth.keys()].sort().reverse()) {
+                        const grupa = byMonth.get(key);
+                        extra += `
+              <div class="pv-section-title" style="margin-top:12px;font-size:0.95rem;opacity:.65">
+                ${esc(grupa[0].monthLabel)}</div>
+              <div class="pv-trophy-grid">${grupa.map(m => _buildTrophySVG({
+                            id: m.eventId, label: m.title, desc: m.description,
+                            unlocked: true, count: m.value, color: m.color, icon: m.icon,
+                        })).join('')}</div>`;
+                    }
+                }
+                if (clubs > 0) {
+                    extra += `
+            <div class="pv-section-title" style="margin-top:24px">👥 Clubs</div>
+            <div class="pv-trophy-grid">${_buildTrophySVG({
+                        id: 'clubs_done',
+                        label: clubs === 1 ? 'Club challenge' : 'Club challenges',
+                        desc: `Ukończone wyzwania w klubach: ${clubs}`,
+                        unlocked: true, count: clubs, color: '#8B5CF6', icon: '👥',
+                    })}</div>`;
+                }
+                if (extra)
+                    el.insertAdjacentHTML('beforeend', extra);
+            }
+        }
+        catch { /* brak sieci — strefa po prostu sie nie pojawi */ }
     })();
 }
 function _renderActivitiesTab(el, activities) {
