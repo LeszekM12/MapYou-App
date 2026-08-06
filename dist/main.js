@@ -32,6 +32,10 @@ void requestPersistentStorage();
 // Kolejka zapisow offline — wysyla zalegle zadania, gdy siec wroci,
 // i pokazuje pasek statusu.
 void Promise.resolve().then(() => { startOutbox(); mountOfflineBar(); startMediaQueue(); startSocialStore(); });
+// Odznaka zdobyta bez zasiegu nie miala jak sie przeliczyc w swoim momencie —
+// `recompute` wymaga sieci. Nadrabiamy przy starcie, z opoznieniem, zeby nie
+// konkurowac o polaczenie z synchronizacja i kolejka zapisow.
+setTimeout(() => { void celebrateNewAchievements(); }, 6000);
 // App Check musi ruszyc PRZED pierwszym zadaniem do backendu.
 void initAppCheck();
 // ── Faza 3: patch fetch MUSI stanąć zanim jakikolwiek moduł wykona żądanie ──
@@ -60,6 +64,7 @@ import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified } from './modules/UnifiedWorkout.js';
 import { openSportPicker } from './modules/SportPicker.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
+import { celebrateNewAchievements } from './modules/achievementCelebration.js';
 import { liveTracker } from './modules/LiveTracker.js';
 import { FriendsView } from './modules/FriendsView.js';
 import { openChangeNameModal, ensureRecoveryCode, showRecoveryCodeModal, showRestoreAccountModal } from './modules/UserName.js';
@@ -2251,6 +2256,10 @@ class App {
                     photoUrl: enriched.photoUrl,
                 });
                 notifyActivityAdded(enriched.name || enriched.description, enriched.distanceKm, enriched.sport, enriched.id);
+                // Odznaki zdobyte TYM treningiem — przeliczenie i animacja.
+                // Nie czekamy na wynik: zapis jest juz zrobiony, a brak sieci
+                // ma nie blokowac zamkniecia okna.
+                void celebrateNewAchievements();
                 __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
                 await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
                 await statsView.render();
@@ -2917,6 +2926,9 @@ class App {
                     photoUrl: enriched.photoUrl,
                 });
                 notifyActivityAdded(enriched.name || enriched.description, 0, enriched.sport, enriched.id);
+                // Ta sama sciezka co wyzej — trening bez dystansu (silownia, basen)
+                // tez zdobywa odznaki: za liczbe treningow, serie i cele tygodniowe.
+                void celebrateNewAchievements();
                 await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
                 await statsView.render();
                 await homeView.render();

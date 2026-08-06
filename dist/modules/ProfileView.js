@@ -879,8 +879,9 @@ export class ProfileView {
         // Licznik postepu — od razu widac, ile jeszcze zostalo.
         const zdobyte = items.filter(a => a.earned !== false).length;
         const GRUPY = [
-            ['total', '⚡ Activity & Distance Totals'],
-            ['distance', '🎯 Distance Milestones'],
+            ['count', '⚡ Activity Milestones'],
+            ['total', '🚴 Distance Totals'],
+            ['distance', '🎯 Single-Activity Distance'],
             ['weekly', '🏆 Weekly Goal Cups'],
             ['streak', '🔥 Consistency'],
             ['record', '⛰️ Records'],

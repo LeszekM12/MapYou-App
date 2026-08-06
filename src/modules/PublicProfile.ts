@@ -671,8 +671,9 @@ function _renderTrophiesTab(
 
     const zdobyte = items.filter(a => a.earned !== false).length;
     const GRUPY: Array<[string, string]> = [
-      ['total',    '⚡ Activity & Distance Totals'],
-      ['distance', '🎯 Distance Milestones'],
+      ['count',    '⚡ Activity Milestones'],
+      ['total',    '🚴 Distance Totals'],
+      ['distance', '🎯 Single-Activity Distance'],
       ['weekly',   '🏆 Weekly Goal Cups'],
       ['streak',   '🔥 Consistency'],
       ['record',   '⛰️ Records'],
