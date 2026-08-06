@@ -175,6 +175,14 @@ export class StatsView {
     try {
       const q = this._chMonth ? `&month=${this._chMonth}` : '';
       const r = await fetch(`${BACKEND_URL}/challenges/monthly?userId=${encodeURIComponent(userId)}${q}`);
+      // 404 = backend nie ma jeszcze tej trasy. Bez tego sprawdzenia pusta
+      // odpowiedz bledu wygladala identycznie jak „brak wyzwan" i nie bylo
+      // wiadomo, ze problemem jest niewdrozony serwer.
+      if (r.status === 404) {
+        el.innerHTML = this._chEmpty('Update the server to enable challenges');
+        return;
+      }
+      if (!r.ok) { el.innerHTML = this._chEmpty(`Challenges unavailable (${r.status})`); return; }
       const d = await r.json() as { data?: Ch[]; label?: string; month?: string };
       data = d.data ?? []; label = d.label ?? ''; this._chMonth = d.month ?? null;
     } catch {
@@ -202,7 +210,9 @@ export class StatsView {
 
   private _chEmpty(msg: string): string {
     return `<div style="padding:56px 24px;text-align:center;color:var(--app-text-muted)">
-      <div style="font-size:2.2rem;margin-bottom:10px">🏅</div>
+      <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+        stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"
+        style="opacity:.45;margin-bottom:10px"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3"/></svg>
       <div style="font-size:1.25rem">${esc(msg)}</div></div>`;
   }
 
@@ -284,6 +294,12 @@ export class StatsView {
         <div class="sv-chart-wrap"><canvas id="svYearChart"></canvas></div>
       </section>
 
+      <!-- All time -->
+      <section class="sv-section">
+        <div class="sv-section__title">All time</div>
+        <div id="svAllTime" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
+      </section>
+
       <!-- Records -->
       <section class="sv-section">
         <div class="sv-section__title">Personal Records</div>
@@ -322,6 +338,7 @@ export class StatsView {
     this._renderWeek();
     this._renderMonthChart('dist');
     this._renderYearChart();
+    this._renderAllTime();
     this._renderRecords();
     this._renderTrends();
     this._bindProgressEvents();
@@ -539,6 +556,40 @@ export class StatsView {
     });
   }
 
+  /** Dorobek od poczatku — czego Progress do tej pory w ogole nie pokazywal.
+   *
+   *  Zakladka miala wykresy tygodnia, miesiaca i roku, ale nigdzie nie bylo
+   *  odpowiedzi na najprostsze pytanie: „ile w sumie?". Przy aplikacji, ktora
+   *  zbiera dane od miesiecy, to najbardziej satysfakcjonujaca liczba. */
+  private _renderAllTime(): void {
+    const el = document.getElementById('svAllTime');
+    if (!el) return;
+    const ws = this._workouts;
+    if (!ws.length) { el.innerHTML = '<p class="sv-empty">No workouts yet</p>'; return; }
+
+    const km    = ws.reduce((s, w) => s + w.distanceKm, 0);
+    const sec   = ws.reduce((s, w) => s + w.durationSec, 0);
+    const elev  = ws.reduce((s, w) => s + (w.elevGain || 0), 0);
+    const days  = new Set(ws.map(w => String(w.date).slice(0, 10))).size;
+    const first = ws.reduce((a, w) => (w.date < a ? w.date : a), ws[0].date);
+
+    const tiles: Array<[string, string, string]> = [
+      [km.toFixed(0),                 'km',       'Total distance'],
+      [String(Math.round(sec / 3600)), 'h',       'Time moving'],
+      [String(ws.length),             '',         'Workouts'],
+      [String(days),                  '',         'Active days'],
+    ];
+    if (elev > 0) tiles.push([String(Math.round(elev)), 'm', 'Elevation gained']);
+    tiles.push([relDate(first), '', 'First workout']);
+
+    el.innerHTML = tiles.map(([val, unit, lbl]) => `
+      <div style="background:rgba(128,128,128,0.10);border-radius:12px;padding:12px 14px">
+        <div style="font-size:1.9rem;font-weight:800;color:var(--app-text);line-height:1.1">
+          ${esc(val)}<span style="font-size:1.1rem;font-weight:700;opacity:.55"> ${unit}</span></div>
+        <div style="font-size:1.1rem;color:var(--app-text-secondary);margin-top:3px">${lbl}</div>
+      </div>`).join('');
+  }
+
   private _renderRecords(): void {
     const el = document.getElementById('svRecords');
     if (!el || !this._workouts.length) {
@@ -552,17 +603,29 @@ export class StatsView {
     const byElev  = [...ws].sort((a, b) => b.elevGain - a.elevGain)[0];
 
     const bestStreak = getBestStreak();
+    // Ikony wektorowe zamiast emoji — te renderowaly sie inaczej na kazdym
+    // systemie, mialy rozne szerokosci i rozjezdzaly wyrownanie kolumny.
+    const I = {
+      dist: 'M13 4v6h6M4 13a8 8 0 1 0 8-8',
+      time: 'M12 7v5l3 2M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18',
+      pace: 'M13 2L4 14h7l-1 8 9-12h-7l1-8z',
+      elev: 'M3 20l6-11 4 6 2-3 6 8H3z',
+      fire: 'M12 3c1 4 5 5 5 9a5 5 0 0 1-10 0c0-2 1-3 2-4 0 2 1 3 2 3 1-3-1-5 1-8z',
+    };
     const records: Array<[string, string, string, string]> = [
-      ['🏅', 'Longest run',    byDist  ? `${byDist.distanceKm.toFixed(2)} km`    : '—', byDist  ? relDate(byDist.date)  : ''],
-      ['⏱',  'Longest time',  byDur   ? formatDurSec(byDur.durationSec)           : '—', byDur   ? relDate(byDur.date)   : ''],
-      ['⚡',  'Best pace',     byPace  ? `${formatPaceSec(byPace.paceMinKm)}/km`  : '—', byPace  ? relDate(byPace.date)  : ''],
-      ['⛰',  'Most elevation',byElev && byElev.elevGain > 0 ? `${byElev.elevGain}m` : '—', byElev && byElev.elevGain > 0 ? relDate(byElev.date) : ''],
-      ['🔥',  'Best streak',   bestStreak >= 1 ? `${bestStreak} days` : '—', bestStreak >= 1 ? 'All time' : ''],
+      [I.dist, 'Longest run',    byDist  ? `${byDist.distanceKm.toFixed(1)} km`   : '—', byDist  ? relDate(byDist.date)  : ''],
+      [I.time, 'Longest time',   byDur   ? formatDurSec(byDur.durationSec)        : '—', byDur   ? relDate(byDur.date)   : ''],
+      [I.pace, 'Best pace',      byPace  ? `${formatPaceSec(byPace.paceMinKm)}/km`: '—', byPace  ? relDate(byPace.date)  : ''],
+      [I.elev, 'Most elevation', byElev && byElev.elevGain > 0 ? `${Math.round(byElev.elevGain)} m` : '—', byElev && byElev.elevGain > 0 ? relDate(byElev.date) : ''],
+      [I.fire, 'Best streak',    bestStreak >= 1 ? `${bestStreak} days` : '—', bestStreak >= 1 ? 'All time' : ''],
     ];
 
-    el.innerHTML = records.map(([icon, lbl, val, date]) => `
+    el.innerHTML = records.map(([path, lbl, val, date]) => `
       <div class="sv-record">
-        <span class="sv-record__icon">${icon}</span>
+        <span class="sv-record__icon">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="${path}"/></svg>
+        </span>
         <div class="sv-record__info">
           <span class="sv-record__label">${lbl}</span>
           <span class="sv-record__date">${date}</span>
@@ -593,7 +656,7 @@ export class StatsView {
     const cnt = (arr: UnifiedWorkout[]) => arr.length;
 
     const trend = (curr: number, prev: number): string => {
-      if (prev === 0) return curr > 0 ? '🆕 New' : '—';
+      if (prev === 0) return curr > 0 ? '<span class="sv-trend--up">New</span>' : '—';
       const pct = Math.round(((curr - prev) / prev) * 100);
       return pct >= 0 ? `<span class="sv-trend--up">▲ ${pct}%</span>` : `<span class="sv-trend--down">▼ ${Math.abs(pct)}%</span>`;
     };

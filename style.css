@@ -1648,6 +1648,39 @@ body {
 }
 .tab-scroll::-webkit-scrollbar { display: none; }
 /* Collapsed state: only drag bar visible */
+/* --- STATS JAKO STALA STRONA -----------------------------------------------
+   Pozostale zakladki sa arkuszami nad mapa: mozna je zsunac uchwytem i widziec
+   mape pod spodem. Dla Stats to bez sensu - nie ma tam czego odslaniac, a
+   przypadkowe stukniecie w zakladke chowalo cala tresc.
+
+   Trzy rzeczy naraz:
+     1. pelna wysokosc zamiast 88dvh i zaokraglonego arkusza,
+     2. neutralizacja klasy --collapsed (zwijanie przestaje dzialac),
+     3. odstep od gory rowny pasowi stanu telefonu - bez niego zakladki
+        Progress / History / Challenges wchodzily pod zegar i baterie. */
+#tabStats .tab-scroll {
+    max-height: none;
+    height: 100%;
+    border-radius: 0;
+    box-shadow: none;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.8rem);
+}
+#tabStats .tab-scroll.tab-scroll--collapsed {
+    max-height: none !important;
+    overflow-y: auto !important;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 0.8rem) !important;
+    padding-bottom: 1.5rem !important;
+}
+/* Zakladki zostaja widoczne przy przewijaniu - to nawigacja, nie naglowek. */
+#tabStats .sv2-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--app-surface-0, var(--color-dark--1));
+    margin: 0 -2rem;
+    padding: 0 2rem;
+}
+
 .tab-scroll--collapsed {
     max-height: 0 !important;
     overflow: hidden !important;
