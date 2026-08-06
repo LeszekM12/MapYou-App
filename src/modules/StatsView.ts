@@ -20,6 +20,8 @@ import { recordWeeklyGoalWin, getBestStreak } from './ProfileView.js';
 import { verifiedOnly } from './UnifiedWorkout.js';
 import { notifyWeeklyGoal } from './NotificationsService.js';
 import { esc, safeUrl } from '../utils/dom.js';
+import { BACKEND_URL } from '../config.js';
+import { getUserId } from './UserProfile.js';
 
 declare const Chart: any;
 // homeView imported lazily to avoid circular deps
@@ -75,10 +77,12 @@ function makeChart(id: string, cfg: any): void {
 
 // ── StatsView class ───────────────────────────────────────────────────────────
 
+type SubTab = 'progress' | 'history' | 'challenges';
+
 export class StatsView {
   private _workouts: UnifiedWorkout[] = [];
   private _inited   = false;
-  private _subTab:  'progress' | 'history' = 'progress';
+  private _subTab:  SubTab = 'progress';
   private _filter:  WorkoutType | 'all' = 'all';
   private _sort:    'newest'|'oldest'|'longest'|'fastest'|'duration' = 'newest';
   private _detailMap: L.Map | null = null;
@@ -113,33 +117,124 @@ export class StatsView {
     if (!scroll) return;
 
     scroll.innerHTML = `
-      <div class="sv-header">
-        <div class="sv-subtabs">
-          <button class="sv-subtab${this._subTab === 'progress' ? ' sv-subtab--active' : ''}"
-            data-sv="progress">📈 Progress</button>
-          <button class="sv-subtab${this._subTab === 'history' ? ' sv-subtab--active' : ''}"
-            data-sv="history">📋 History</button>
-        </div>
+      <div class="sv2-tabs">
+        ${([['progress','Progress','M3 17l6-6 4 4 8-8'],
+            ['history','History','M12 8v4l3 2M3 12a9 9 0 1 0 9-9 9 9 0 0 0-9 9z'],
+            ['challenges','Challenges','M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3']] as const)
+          .map(([id, label, path]) => `
+          <button class="sv2-tab${this._subTab === id ? ' sv2-tab--active' : ''}" data-sv="${id}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+              stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="${path}"/>
+            </svg>${label}
+          </button>`).join('')}
       </div>
       <div id="svContent"></div>`;
   }
 
   private _bindSubTabs(): void {
-    document.querySelectorAll<HTMLElement>('.sv-subtab').forEach(btn => {
+    document.querySelectorAll<HTMLElement>('.sv2-tab').forEach(btn => {
       btn.addEventListener('click', () => {
-        document.querySelectorAll('.sv-subtab').forEach(b => b.classList.remove('sv-subtab--active'));
-        btn.classList.add('sv-subtab--active');
-        this._subTab = btn.dataset.sv as 'progress' | 'history';
+        document.querySelectorAll('.sv2-tab').forEach(b => b.classList.remove('sv2-tab--active'));
+        btn.classList.add('sv2-tab--active');
+        this._subTab = btn.dataset.sv as SubTab;
         this._showSubTab(this._subTab);
       });
     });
   }
 
-  private _showSubTab(tab: 'progress' | 'history'): void {
+  private _showSubTab(tab: SubTab): void {
     const el = document.getElementById('svContent');
     if (!el) return;
-    if (tab === 'progress') this._renderProgress(el);
-    else                    this._renderHistory(el);
+    if (tab === 'progress')        this._renderProgress(el);
+    else if (tab === 'challenges') void this._renderChallenges(el);
+    else                           this._renderHistory(el);
+  }
+
+  // ════════════════════════════════════════════════════════════════════════════
+  // CHALLENGES TAB
+  // ════════════════════════════════════════════════════════════════════════════
+  //
+  // Wyzwania oferuje aplikacja i obowiazuja automatycznie — nie ma czego
+  // „dolaczac". Postep liczy backend z historii treningow, wiec klient
+  // niczego tu nie sumuje ani nie zapamietuje.
+
+  private _chMonth: string | null = null;
+
+  private async _renderChallenges(el: HTMLElement): Promise<void> {
+    el.innerHTML = `<div class="sv2-section-title">Loading…</div>`;
+    const userId = getUserId();
+    if (!userId) { el.innerHTML = this._chEmpty('Sign in to see challenges'); return; }
+
+    interface Ch {
+      eventId: string; title: string; description: string; icon: string; color: string;
+      goalType: string; goalValue: number; sport: string | null;
+      progress: number; done: boolean; pct: number; endAt: number;
+    }
+    let data: Ch[] = []; let label = '';
+    try {
+      const q = this._chMonth ? `&month=${this._chMonth}` : '';
+      const r = await fetch(`${BACKEND_URL}/challenges/monthly?userId=${encodeURIComponent(userId)}${q}`);
+      const d = await r.json() as { data?: Ch[]; label?: string; month?: string };
+      data = d.data ?? []; label = d.label ?? ''; this._chMonth = d.month ?? null;
+    } catch {
+      el.innerHTML = this._chEmpty('Challenges unavailable — check your connection');
+      return;
+    }
+    if (!data.length) { el.innerHTML = this._chEmpty('No challenges this month'); return; }
+
+    const daysLeft = Math.max(0, Math.ceil((data[0].endAt - Date.now()) / 86_400_000));
+    const doneCnt  = data.filter(c => c.done).length;
+
+    // Ukonczone na gore — to nagroda, ma byc widoczna od razu.
+    const sorted = [...data].sort((a, b) => Number(b.done) - Number(a.done) || b.pct - a.pct);
+
+    el.innerHTML = `
+      <div class="sv2-section-title" style="display:flex;justify-content:space-between;align-items:baseline">
+        <span>${esc(label)}</span>
+        <span style="text-transform:none;letter-spacing:0;font-weight:600">
+          ${doneCnt}/${data.length} · ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'} left</span>
+      </div>
+      <div style="padding:0 16px 32px;display:flex;flex-direction:column;gap:10px">
+        ${sorted.map(c => this._chCard(c)).join('')}
+      </div>`;
+  }
+
+  private _chEmpty(msg: string): string {
+    return `<div style="padding:56px 24px;text-align:center;color:var(--app-text-muted)">
+      <div style="font-size:2.2rem;margin-bottom:10px">🏅</div>
+      <div style="font-size:1.25rem">${esc(msg)}</div></div>`;
+  }
+
+  private _chCard(c: {
+    title: string; description: string; icon: string; color: string;
+    goalType: string; goalValue: number; progress: number; done: boolean; pct: number;
+  }): string {
+    const unit = c.goalType === 'duration'   ? 'min'
+               : c.goalType === 'elevation'  ? 'm'
+               : c.goalType === 'daysActive' ? 'days'
+               : c.goalType === 'count'      ? '×' : 'km';
+    return `
+      <div style="background:var(--app-surface-2,rgba(255,255,255,0.04));border-radius:14px;padding:14px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="width:46px;height:46px;flex-shrink:0;border-radius:50%;
+               background:${c.done ? c.color : `${c.color}22`};color:${c.done ? '#fff' : c.color};
+               display:flex;align-items:center;justify-content:center;font-size:1.4rem">${esc(c.icon)}</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:1.4rem;font-weight:700;color:var(--app-text)">${esc(c.title)}</div>
+            <div style="font-size:1.2rem;color:var(--app-text-secondary);margin-top:3px;
+                 line-height:1.35">${esc(c.description)}</div>
+          </div>
+        </div>
+        <div style="margin-top:12px;height:6px;background:rgba(128,128,128,0.18);
+             border-radius:3px;overflow:hidden">
+          <div style="width:${c.pct}%;height:100%;background:${c.color};transition:width .4s"></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;font-size:1.15rem">
+          <span style="color:var(--app-text-secondary)">${c.progress} / ${c.goalValue} ${unit}</span>
+          <span style="color:${c.color};font-weight:700">${c.done ? 'Completed' : `${c.pct}%`}</span>
+        </div>
+      </div>`;
   }
 
   // ════════════════════════════════════════════════════════════════════════════
