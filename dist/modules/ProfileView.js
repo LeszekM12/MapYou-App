@@ -213,8 +213,8 @@ function _buildTrophySVG(trophy) {
         ? `<polygon points="40,12 68,28 68,62 40,78 12,62 12,28" fill="${fill}cc"/>
              <text x="40" y="50" text-anchor="middle" font-size="22" font-weight="900"
                font-family="Manrope,sans-serif" fill="white">${count}</text>
-             <text x="40" y="65" text-anchor="middle" font-size="11"
-               font-family="Manrope,sans-serif" fill="rgba(255,255,255,0.7)">${trophy.icon === '🏆' ? '🏆' : '⚡'}</text>`
+             <text x="40" y="66" text-anchor="middle" font-size="13"
+               fill="rgba(255,255,255,0.85)">${trophy.icon}</text>`
         : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`}
       </svg>
     </div>
@@ -878,56 +878,66 @@ export class ProfileView {
         ];
         // Licznik postepu — od razu widac, ile jeszcze zostalo.
         const zdobyte = items.filter(a => a.earned !== false).length;
-        const naglowek = items.length > zdobyte
-            ? `<div class="pv-section-title" style="margin-top:24px">🏅 Achievements
-           <span style="opacity:.5;font-weight:400">${zdobyte} / ${items.length}</span>
-         </div>`
-            : '';
-        host.innerHTML = naglowek + GROUPS.map(([g, title]) => {
+        const GRUPY = [
+            ['total', '⚡ Activity & Distance Totals'],
+            ['distance', '🎯 Distance Milestones'],
+            ['weekly', '🏆 Weekly Goal Cups'],
+            ['streak', '🔥 Consistency'],
+            ['record', '⛰️ Records'],
+            ['seasonal', '🗓️ Seasonal Challenges'],
+        ];
+        host.innerHTML = `
+      <div class="pv-trophy-summary">
+        <span class="pv-trophy-summary__count">${zdobyte}</span>
+        <span class="pv-trophy-summary__label">trophies unlocked${items.length > zdobyte ? ` &middot; ${items.length} total` : ''}</span>
+      </div>` + GRUPY.map(([g, title]) => {
             const inGroup = items.filter(a => a.group === g);
             if (!inGroup.length)
                 return '';
+            // Ten sam ksztalt i ten sam kod co trofea lokalne — `_buildTrophySVG`.
+            // Wczesniej osiagniecia serwerowe mialy wlasny, plaski wyglad, wiec
+            // gablota wygladala jak dwie rozne aplikacje sklejone razem.
+            const kafle = inGroup.map(a => _buildTrophySVG({
+                id: a.achId,
+                label: a.label,
+                // Zdobyte pokazuja DATE, niezdobyte WARUNEK — podpowiedz pod kursorem
+                // ma odpowiadac na inne pytanie w kazdym z tych stanow.
+                desc: a.earned === false
+                    ? a.desc
+                    : `${a.desc} — ${new Date(a.earnedAt).toLocaleDateString()}`,
+                unlocked: a.earned !== false,
+                count: a.value ?? undefined,
+                color: a.color,
+                icon: a.icon,
+            })).join('');
             return `
         <div class="pv-section-title" style="margin-top:24px">${title}</div>
-        <div class="pv-trophy-grid">${inGroup.map(a => {
-                // `earned === false` wystepuje tylko w katalogu z nowego backendu.
-                // Starsza odpowiedz nie ma tego pola i zawiera wylacznie zdobyte,
-                // wiec brak pola traktujemy jak „zdobyte" — widok dziala z obiema.
-                const locked = a.earned === false;
-                // Stan zablokowany robimy stylem wbudowanym, nie klasa CSS —
-                // dzieki temu nie trzeba ruszac arkuszy i dokladac osobnego pliku
-                // do wdrozenia. Wyszarzenie + przygaszenie czyta sie jednoznacznie
-                // jako „jeszcze nie", a podpowiedz mowi, co zrobic.
-                const styl = locked
-                    ? 'filter:grayscale(1);opacity:.42'
-                    : '';
-                const tlo = locked ? 'rgba(255,255,255,0.06)' : `${a.color}22`;
-                const kolor = locked ? 'rgba(255,255,255,0.45)' : a.color;
-                const stopka = locked
-                    ? '<span class="pv-ach__date" style="opacity:.75">🔒 Goal</span>'
-                    : `<span class="pv-ach__date">${new Date(a.earnedAt).toLocaleDateString()}</span>`;
-                return `
-          <div class="pv-ach" style="${styl}" title="${esc(a.desc)}">
-            <span class="pv-ach__icon" style="background:${tlo};color:${kolor}">${a.icon}</span>
-            <span class="pv-ach__label">${esc(a.label)}</span>
-            ${stopka}
-          </div>`;
-            }).join('')}</div>`;
+        <div class="pv-trophy-grid">${kafle}</div>`;
         }).join('');
     }
     _renderTrophies(el) {
-        const actTrophies = _activityTrophies(this._workouts);
-        const wkTrophies = _weeklyTrophies();
-        const streakTrophies = _streakTrophies();
-        const totalUnlocked = [...actTrophies, ...wkTrophies, ...streakTrophies].filter(t => t.unlocked).length;
+        // ── JEDNO ZRODLO PRAWDY: SERWER ─────────────────────────────────────────
+        //
+        // Wczesniej gablota laczyla DWA niezalezne systemy:
+        //   • lokalny  — `_activityTrophies`, `_weeklyTrophies`, `_streakTrophies`,
+        //                liczony w przegladarce z IndexedDB i localStorage,
+        //   • serwerowy— katalog regul z `/achievements`.
+        //
+        // Oba liczyly czesciowo TO SAMO, wiec „10 activities", „50 activities",
+        // „100 activities" i cala sekcja serii pojawialy sie DWA RAZY, raz w jednym
+        // stylu, raz w drugim.
+        //
+        // Gorszy byl jednak drugi skutek: odznaki liczone lokalnie NIE ISTNIALY
+        // na serwerze. Po przeniesieniu konta na inny telefon odtwarzalyby sie
+        // tylko o tyle, o ile uda sie odtworzyc dane zrodlowe — a data zdobycia
+        // przepadalaby bezpowrotnie.
+        //
+        // Teraz wszystko liczy backend i wszystko leży w kolekcji `Achievement`,
+        // wraz z data zdobycia. Reguly serwerowe zostaly rozszerzone tak, zeby
+        // pokryc komplet dawnych progow lokalnych (1/3/5/25 aktywnosci, cele
+        // tygodniowe), wiec nic nie znika z gabloty.
         const weeklyWins = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);
-        const bestStreak = getBestStreak();
         el.innerHTML = `
-      <div class="pv-trophy-summary">
-        <span class="pv-trophy-summary__count">${totalUnlocked}</span>
-        <span class="pv-trophy-summary__label">trophies unlocked</span>
-      </div>
-
       ${weeklyWins > 0 ? `
       <div class="pv-goal-cup">
         <span class="pv-goal-cup__icon">🏆</span>
@@ -936,15 +946,6 @@ export class ProfileView {
           <span class="pv-goal-cup__sub">Keep crushing your goals!</span>
         </div>
       </div>` : ''}
-
-      <div class="pv-section-title">⚡ Activity Milestones</div>
-      <div class="pv-trophy-grid">${actTrophies.map(_buildTrophySVG).join('')}</div>
-
-      <div class="pv-section-title" style="margin-top:24px">🏆 Weekly Goal Cups</div>
-      <div class="pv-trophy-grid">${wkTrophies.map(_buildTrophySVG).join('')}</div>
-
-      <div class="pv-section-title" style="margin-top:24px">🔥 Streak Records${bestStreak >= 7 ? ` <span style="color:#f97316;font-size:1.1rem">(Best: ${bestStreak} days)</span>` : ''}</div>
-      <div class="pv-trophy-grid pv-trophy-grid--scroll">${streakTrophies.map(_buildTrophySVG).join('')}</div>
 
       <div id="pvServerTrophies"></div>`;
         // Osiagniecia liczone na serwerze — dociagamy po narysowaniu reszty,

@@ -338,7 +338,7 @@ function _renderFull(
       if (tab === 'activities')   _renderActivitiesTab(content, activities);
       else if (tab === 'stats')   _renderStatsTab(content, activities);
       else if (tab === 'efforts') _renderEffortsTab(content, activities);
-      else if (tab === 'trophies') _renderTrophiesTab(content, activities, profile.weeklyWins ?? 0, profile.bestStreak ?? 0);
+      else if (tab === 'trophies') _renderTrophiesTab(content, activities, profile.weeklyWins ?? 0, profile.bestStreak ?? 0, profile.userId);
       else _renderPostsTab(content, posts);
     });
   });
@@ -416,8 +416,8 @@ function _buildTrophySVG(trophy: Trophy): string {
           ? `<polygon points="40,12 68,28 68,62 40,78 12,62 12,28" fill="${fill}cc"/>
              <text x="40" y="50" text-anchor="middle" font-size="22" font-weight="900"
                font-family="Manrope,sans-serif" fill="white">${count}</text>
-             <text x="40" y="65" text-anchor="middle" font-size="11"
-               font-family="Manrope,sans-serif" fill="rgba(255,255,255,0.7)">${trophy.icon === '🏆' ? '🏆' : '⚡'}</text>`
+             <text x="40" y="66" text-anchor="middle" font-size="13"
+               fill="rgba(255,255,255,0.85)">${trophy.icon}</text>`
           : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`}
       </svg>
     </div>
@@ -629,35 +629,89 @@ function _renderEffortsTab(el: HTMLElement, activities: FeedItem[]): void {
     <p class="pv-efforts__note">Calculated from GPS-tracked running activities only.</p>`;
 }
 
-function _renderTrophiesTab(el: HTMLElement, activities: FeedItem[], weeklyWins: number, bestStreak: number): void {
-  const actTrophies    = _activityTrophies(activities.length);
-  const wkTrophies     = _weeklyTrophies(weeklyWins);
-  const streakTrophies = _streakTrophies(bestStreak);
-  const totalUnlocked  = [...actTrophies, ...wkTrophies, ...streakTrophies].filter(t => t.unlocked).length;
+interface PubAch {
+  achId: string; label: string; desc: string; icon: string;
+  color: string; group: string; value: number | null;
+  earnedAt: string; earned?: boolean;
+}
 
-  el.innerHTML = `
-    <div class="pv-trophy-summary">
-      <span class="pv-trophy-summary__count">${totalUnlocked}</span>
-      <span class="pv-trophy-summary__label">trophies unlocked</span>
-    </div>
+/** Gablota CUDZEGO profilu.
+ *
+ *  Wczesniej liczyla sie tutaj lokalnie — z liczby widocznych aktywnosci,
+ *  `weeklyWins` i `bestStreak`. Dawalo to INNY zestaw odznak niz na wlasnym
+ *  profilu (inne progi, inne grupy, brak dystansow i przewyzszenia), wiec te
+ *  same osiagniecia wygladaly inaczej w zaleznosci od tego, kto na nie patrzy.
+ *
+ *  Teraz zrodlem jest backend — dokladnie ten sam katalog co u siebie.
+ *
+ *  UWAGA: pytamy przez `/achievements/user/<id>`, a NIE `/achievements?userId=`.
+ *  Ta druga trasa stoi za `forceQueryUserId()`, ktory nadpisuje identyfikator
+ *  tym z tokena — czyli po cichu oddawalaby WLASNE odznaki na cudzym profilu. */
+function _renderTrophiesTab(
+  el: HTMLElement, activities: FeedItem[], weeklyWins: number, bestStreak: number, userId: string,
+): void {
+  el.innerHTML = '<div class="pv-empty"><p>Loading trophies…</p></div>';
 
-    ${weeklyWins > 0 ? `
-    <div class="pv-goal-cup">
-      <span class="pv-goal-cup__icon">🏆</span>
-      <div class="pv-goal-cup__info">
-        <span class="pv-goal-cup__title">Weekly goal achieved <strong>${weeklyWins}×</strong></span>
-        <span class="pv-goal-cup__sub">Keep crushing your goals!</span>
+  void (async () => {
+    let items: PubAch[] = [];
+    try {
+      const r = await fetch(`${BACKEND_URL}/achievements/user/${encodeURIComponent(userId)}`,
+        { cache: 'no-store' });
+      const d = await r.json() as { data?: PubAch[]; catalog?: PubAch[] };
+      items = d.catalog ?? d.data ?? [];
+    } catch { items = []; }
+
+    if (!items.length) {
+      // Brak sieci albo starszy backend — pokazujemy to wprost zamiast pustej
+      // sekcji, ktora wygladalaby jak „ten ktos nie ma zadnych odznak".
+      el.innerHTML = '<div class="pv-empty"><div class="pv-empty__icon">🏅</div>'
+        + '<p>Trophies unavailable</p><p class="pv-empty__sub">Check your connection</p></div>';
+      return;
+    }
+
+    const zdobyte = items.filter(a => a.earned !== false).length;
+    const GRUPY: Array<[string, string]> = [
+      ['total',    '⚡ Activity & Distance Totals'],
+      ['distance', '🎯 Distance Milestones'],
+      ['weekly',   '🏆 Weekly Goal Cups'],
+      ['streak',   '🔥 Consistency'],
+      ['record',   '⛰️ Records'],
+      ['seasonal', '🗓️ Seasonal Challenges'],
+    ];
+
+    el.innerHTML = `
+      <div class="pv-trophy-summary">
+        <span class="pv-trophy-summary__count">${zdobyte}</span>
+        <span class="pv-trophy-summary__label">trophies unlocked${
+          items.length > zdobyte ? ` &middot; ${items.length} total` : ''}</span>
       </div>
-    </div>` : ''}
 
-    <div class="pv-section-title">⚡ Activity Milestones</div>
-    <div class="pv-trophy-grid">${actTrophies.map(_buildTrophySVG).join('')}</div>
-
-    <div class="pv-section-title" style="margin-top:24px">🏆 Weekly Goal Cups</div>
-    <div class="pv-trophy-grid">${wkTrophies.map(_buildTrophySVG).join('')}</div>
-
-    <div class="pv-section-title" style="margin-top:24px">🔥 Streak Records${bestStreak >= 7 ? ` <span style="color:#f97316;font-size:1.1rem">(Best: ${bestStreak} days)</span>` : ''}</div>
-    <div class="pv-trophy-grid pv-trophy-grid--scroll">${streakTrophies.map(_buildTrophySVG).join('')}</div>`;
+      ${weeklyWins > 0 ? `
+      <div class="pv-goal-cup">
+        <span class="pv-goal-cup__icon">🏆</span>
+        <div class="pv-goal-cup__info">
+          <span class="pv-goal-cup__title">Weekly goal achieved <strong>${weeklyWins}×</strong></span>
+          <span class="pv-goal-cup__sub">Keep crushing your goals!</span>
+        </div>
+      </div>` : ''}` + GRUPY.map(([g, title]) => {
+      const inGroup = items.filter(a => a.group === g);
+      if (!inGroup.length) return '';
+      const kafle = inGroup.map(a => _buildTrophySVG({
+        id:       a.achId,
+        label:    a.label,
+        desc:     a.earned === false
+                    ? a.desc
+                    : `${a.desc} — ${new Date(a.earnedAt).toLocaleDateString()}`,
+        unlocked: a.earned !== false,
+        count:    a.value ?? undefined,
+        color:    a.color,
+        icon:     a.icon,
+      })).join('');
+      return `
+        <div class="pv-section-title" style="margin-top:24px">${title}</div>
+        <div class="pv-trophy-grid">${kafle}</div>`;
+    }).join('');
+  })();
 }
 
 
