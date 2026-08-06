@@ -3,6 +3,7 @@
 // Inject styles via WeatherStyles.ts or import weather.css.
 import { uvLabel } from './WeatherService.js';
 import { sunriseIcon, sunsetIcon } from './nightIcons.js';
+import { esc } from '../utils/dom.js';
 const MODAL_ID = 'weatherModal';
 // ── Build HTML ────────────────────────────────────────────────────────────────
 function buildModal(data) {
@@ -120,7 +121,7 @@ function buildModal(data) {
     }).join('');
     const dailyHTML = daily.map(d => `
     <div class="wm-daily__row">
-      <span class="wm-daily__day">${d.label}</span>
+      <span class="wm-daily__day">${esc(d.label)}</span>
       <span class="wm-daily__icon">${d.icon}</span>
       <span class="wm-daily__range">
         <span class="wm-daily__max">${d.tempMax}°</span>
@@ -162,7 +163,7 @@ function buildModal(data) {
         <div class="wm-header__weather">
           <span class="wm-header__wicon wm-icon--svg">${c.icon}</span>
           <span class="wm-header__temp">${c.temp}°C</span>
-          <span class="wm-header__desc">${c.description} · Feels ${c.feelsLike}°</span>
+          <span class="wm-header__desc">${esc(c.description)} · Feels ${c.feelsLike}°</span>
         </div>
         <button class="wm-close" id="${MODAL_ID}Close" aria-label="Close weather">✕</button>
       </div>
@@ -174,7 +175,7 @@ function buildModal(data) {
         <section class="wm-hero">
           <div class="wm-hero__icon">${c.icon}</div>
           <div class="wm-hero__temp">${c.temp}°</div>
-          <div class="wm-hero__desc">${c.description}</div>
+          <div class="wm-hero__desc">${esc(c.description)}</div>
           <div class="wm-hero__meta">
             <span>↑ ${daily[0]?.tempMax ?? '—'}°</span>
             <span class="wm-hero__sep">·</span>

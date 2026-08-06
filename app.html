@@ -12,29 +12,57 @@
     <link rel="apple-touch-icon" href="public/icon-192.png"/>
     <link rel="shortcut icon" type="image/png" href="public/icon-192.png"/>
     <link rel="manifest" href="public/manifest.json">
-    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap" rel="stylesheet"/>
+    <!-- ══════════════════════════════════════════════════════════════════════
+         BIBLIOTEKI — WSZYSTKIE LOKALNE, ZERO ZALEZNOSCI OD SIECI PRZY STARCIE
+
+         Wczesniej szly z unpkg / jsDelivr / cdnjs. W apce natywnej to nie byla
+         kwestia szybkosci, tylko dzialania w ogole: `src/modules/db.ts` robi na
+         poziomie modulu `new Dexie('mapty')`, wiec brak Dexie = ReferenceError
+         przy wczytywaniu = cala paczka esbuilda pada = bialy ekran.
+         Bez zasiegu apka nie wstawala — mimo calego trybu offline w srodku.
+         Service worker tego nie ratuje: w WKWebView na iOS nie dziala.
+
+         Pliki bierze `scripts/vendor.mjs` z `node_modules` (wersje przypiete
+         w package.json). Katalog `vendor/` jest generowany — nie trzymamy go
+         w repo. Kolejnosc i atrybuty `defer` sa CELOWO takie same jak wczesniej.
+         ══════════════════════════════════════════════════════════════════════ -->
+
+    <!-- Font: jedyny zasob z sieci, jaki zostal. NIE blokuje renderowania —
+         `media="print"` sprawia, ze przegladarka nie czeka na arkusz, a `onload`
+         przelacza go na `all`, gdy juz doleci. Bez zasiegu apka po prostu uzywa
+         czcionki systemowej. Docelowo warto go tez wrzucic do `vendor/`. -->
+    <link rel="stylesheet" media="print" onload="this.media='all'"
+          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700;800&display=swap"/>
+
     <link rel="stylesheet" href="style.css"/>
   <link rel="stylesheet" href="home_styles.css">
     <link rel="stylesheet" href="weather.css"/>
     <link rel="stylesheet" href="light_theme.css"/>
     <link rel="stylesheet" href="friends.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css"
-          integrity="sha512-xwE/Az9zrjBIphAcBb3F6JVqxf46+CDLwfLMHloNu6KEQCAWi6HcDUbeOfBIptF7tcCzusKFjFw2yuvEpDL9wQ=="
-          crossorigin=""/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+    <link rel="stylesheet" href="vendor/leaflet.css"/>
+    <link rel="stylesheet" href="vendor/MarkerCluster.css"/>
+    <link rel="stylesheet" href="vendor/MarkerCluster.Default.css"/>
+    <script src="vendor/chart.umd.js"></script>
+    <script defer src="vendor/jszip.min.js"></script>
+    <!-- Konfiguracja Chart.js MUSI stac po nieodroczonym `chart.umd.js`
+         (skrypt wbudowany w stronie nie moze byc `defer`). -->
     <script>Chart.defaults.color = "rgba(255,255,255,0.5)"; Chart.defaults.borderColor = "rgba(255,255,255,0.06)";</script>
     <link rel="stylesheet" href="stats_styles.css"/>
     <link rel="stylesheet" href="profile_styles.css"/>
     <link rel="stylesheet" href="search_styles.css"/>
-    <script defer src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"
-            integrity="sha512-gZwIG9x3wUXg2hdXF6+rVkLF/0Vi9U8D2Ntg4Ga5I5BZpVkVxlJWbSQtXPSiUTtC0TjtGOmxa1AJPuV0CPthew=="
-            crossorigin=""></script>
-    <script defer src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/libsodium-wrappers/0.7.15/sodium.min.js"></script>
-    <script src="https://unpkg.com/dexie@3/dist/dexie.min.js"></script>
+    <script defer src="vendor/leaflet.js"></script>
+    <script defer src="vendor/leaflet.markercluster.js"></script>
+
+    <!-- libsodium — WYLACZONY. 744 kB blokujace start dla kodu, ktory sie nie
+         wykonuje: uzywa go wylacznie `src/modules/tlm/`, a ten nie jest nigdzie
+         zaimportowany. Pliki sa juz w `vendor/` — zeby wlaczyc TLM, odkomentuj
+         obie linie. Kolejnosc jest istotna: wrapper robi
+         `root.sodium = a(..., root.libsodium)`, wiec `libsodium.js` idzie pierwszy.
+    <script defer src="vendor/libsodium.js"></script>
+    <script defer src="vendor/libsodium-wrappers.js"></script>
+    -->
+
+    <script src="vendor/dexie.min.js"></script>
     <script type="module" src="./dist/main.js"></script>
     <title>MapYou - Workouts App</title>
 </head>

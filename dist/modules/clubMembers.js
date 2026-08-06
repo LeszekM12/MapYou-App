@@ -9,7 +9,9 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
 import { openPublicProfile } from './PublicProfile.js';
-const esc = (s) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+import { esc } from '../utils/dom.js';
+// `esc` pochodzi teraz z `utils/dom.ts` — wczesniej kazdy plik mial wlasna,
+// identyczna kopie, a pliki bez niej renderowaly tresc uzytkownika surowo.
 const hours = (sec) => sec >= 3600 ? `${Math.floor(sec / 3600)}h` : `${Math.round(sec / 60)}m`;
 export async function renderMembersSection(host, clubId) {
     host.innerHTML = `<div class="ev-loading">Loading members…</div>`;

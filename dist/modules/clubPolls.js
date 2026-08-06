@@ -10,7 +10,9 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
-const esc = (s) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+import { esc } from '../utils/dom.js';
+// `esc` pochodzi teraz z `utils/dom.ts` — wczesniej kazdy plik mial wlasna,
+// identyczna kopie, a pliki bez niej renderowaly tresc uzytkownika surowo.
 const TYPE_META = {
     single: { icon: '⚪', label: 'Single choice', hint: 'Voters pick one option' },
     multiple: { icon: '☑️', label: 'Multiple choice', hint: 'Voters can pick several' },

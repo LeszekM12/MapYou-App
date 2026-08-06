@@ -7,6 +7,7 @@
 
 import { saveProfileToDB, loadProfileFromDB, type ProfileRecord } from './db.js';
 import { CS } from './cloudSync.js';
+import { esc } from '../utils/dom.js';
 
 // ── Keys ──────────────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ function buildModalHTML(profile: ProfileRecord): string {
         <div class="up-field">
           <label class="up-label" for="upName">Name</label>
           <input class="up-input" id="upName" type="text"
-            value="${profile.name}" maxlength="32" autocomplete="off" placeholder="Your name…"/>
+            value="${esc(profile.name)}" maxlength="32" autocomplete="off" placeholder="Your name…"/>
         </div>
 
         <div class="up-field">
@@ -172,7 +173,7 @@ function buildModalHTML(profile: ProfileRecord): string {
           </label>
           <textarea class="up-textarea" id="upBio"
             maxlength="120" rows="3"
-            placeholder="A short bio…">${profile.bio}</textarea>
+            placeholder="A short bio…">${esc(profile.bio)}</textarea>
         </div>
 
         <!-- Location -->
@@ -180,14 +181,14 @@ function buildModalHTML(profile: ProfileRecord): string {
           <div class="up-field__half">
             <label class="up-label" for="upCity">City</label>
             <input class="up-input" id="upCity" type="text"
-              value="${profile.city ?? ''}" maxlength="64" placeholder="e.g. Warsaw"/>
+              value="${esc(profile.city ?? '')}" maxlength="64" placeholder="e.g. Warsaw"/>
           </div>
           <div class="up-field__half">
             <label class="up-label" for="upRegion">Region
               <span style="opacity:.4;font-size:0.9rem">(auto)</span>
             </label>
             <input class="up-input" id="upRegion" type="text"
-              value="${profile.region ?? ''}" maxlength="64" placeholder="auto-filled" readonly style="opacity:.6"/>
+              value="${esc(profile.region ?? '')}" maxlength="64" placeholder="auto-filled" readonly style="opacity:.6"/>
           </div>
         </div>
 

@@ -7,7 +7,8 @@
     "watch": "tsc --watch",
     "clean": "rm -rf dist",
     "dev": "http-server .",
-    "build:app": "tsc && node scripts/assemble-www.mjs && node scripts/bundle-app.mjs",
+    "vendor": "node scripts/vendor.mjs",
+    "build:app": "node scripts/vendor.mjs && tsc && node scripts/assemble-www.mjs && node scripts/bundle-app.mjs",
     "android": "npm run build:app && npx cap copy android && npx cap open android",
     "android:patch": "node scripts/patch-android.mjs"
   },
@@ -32,6 +33,12 @@
     "@capacitor/local-notifications": "^8.2.0",
     "capacitor-health": "^8.1.2",
     "capacitor-live-activities": "^8.0.0",
-    "firebase": "^12.16.0"
+    "chart.js": "4.4.0",
+    "dexie": "3.2.7",
+    "firebase": "^12.16.0",
+    "jszip": "3.10.1",
+    "leaflet": "1.6.0",
+    "leaflet.markercluster": "1.5.3",
+    "libsodium-wrappers": "0.7.15"
   }
 }

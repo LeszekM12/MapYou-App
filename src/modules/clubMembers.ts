@@ -10,14 +10,15 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
 import { openPublicProfile } from './PublicProfile.js';
+import { esc } from '../utils/dom.js';
 
 interface MemberRow {
   userId: string; name: string; avatarB64: string | null;
   km: number; count: number; sec: number;
 }
 
-const esc = (s: string): string =>
-  s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+// `esc` pochodzi teraz z `utils/dom.ts` — wczesniej kazdy plik mial wlasna,
+// identyczna kopie, a pliki bez niej renderowaly tresc uzytkownika surowo.
 
 const hours = (sec: number): string =>
   sec >= 3600 ? `${Math.floor(sec / 3600)}h` : `${Math.round(sec / 60)}m`;

@@ -6,6 +6,7 @@ import { formatDuration, formatPace, formatDistance, SPORT_ICONS, SPORT_COLORS }
 import { loadActivities, deleteActivity } from './db.js';
 import { CS } from './cloudSync.js';
 import { sendActivityFinishedPush } from './PushNotifications.js';
+import { esc } from '../utils/dom.js';
 
 // ── Splash "Dobra robota!" ────────────────────────────────────────────────────
 
@@ -65,7 +66,7 @@ export function showActivitySummary(
           <span style="font-size:2.4rem">${SPORT_ICONS[activity.sport]}</span>
         </div>
         <div>
-          <h2 class="act-sum__name">${activity.description}</h2>
+          <h2 class="act-sum__name">${esc(activity.description)}</h2>
           <p class="act-sum__date">${date}</p>
         </div>
       </div>
@@ -557,7 +558,7 @@ export class ActivityHistoryPanel {
         <div class="act-history__body">
           <div class="act-history__top">
             <span>${SPORT_ICONS[act.sport]}</span>
-            <span class="act-history__name">${act.description}</span>
+            <span class="act-history__name">${esc(act.description)}</span>
             <span class="act-history__date">${months[d.getMonth()]} ${d.getDate()}</span>
           </div>
           <div class="act-history__stats">

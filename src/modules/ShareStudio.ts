@@ -12,6 +12,7 @@
 
 import { EnrichedActivity } from './db.js';
 import { decodePolyline } from './cloudSync.js';
+import { esc } from '../utils/dom.js';
 import {
   _drawMapTiles, _drawRouteFallback, roundRect,
 } from './ShareImage.js';
@@ -420,7 +421,7 @@ export function openShareStudio(act: EnrichedActivity): void {
   // Stat chips.
   const chips = ov.querySelector<HTMLElement>('#ssChips')!;
   chips.innerHTML = STAT_DEFS.filter(d => d.value(act)).map(d =>
-    `<button class="ss-chip${statKeys.includes(d.key) ? ' ss-chip--on' : ''}" data-k="${d.key}">${d.label}</button>`).join('');
+    `<button class="ss-chip${statKeys.includes(d.key) ? ' ss-chip--on' : ''}" data-k="${d.key}">${esc(d.label)}</button>`).join('');
   chips.querySelectorAll<HTMLElement>('.ss-chip').forEach(b => {
     b.addEventListener('click', () => {
       const k = b.dataset.k!;

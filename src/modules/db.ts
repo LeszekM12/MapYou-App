@@ -250,6 +250,45 @@ db.version(7).stores({
 //
 // Dlatego osobna tabela: trzyma sam plik jako Blob plus dane potrzebne
 // do ponowienia wysylki.
+// Wersje MUSZA byc deklarowane rosnaco. Wczesniej bylo 11, 10, 9, 8 —
+// Dexie sam je sortuje, wiec dzialalo, ale przy dopisywaniu wersji 12
+// latwo bylo wstawic ja w zle miejsce i po cichu zgubic migracje.
+db.version(8).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
+  activeSession:      'id',
+  sessionCoords:      '++seq',
+});
+db.version(9).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
+  activeSession:      'id',
+  sessionCoords:      '++seq',
+  outbox:             '++id, createdAt',
+});
+db.version(10).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
+  activeSession:      'id',
+  sessionCoords:      '++seq',
+  outbox:             '++id, createdAt',
+  tiles:              'key, lastUsed',
+});
 db.version(11).stores({
   workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
   activities:         'id, sport, date, distanceKm, durationSec',
@@ -265,44 +304,8 @@ db.version(11).stores({
   mediaQueue:         '++id, createdAt',
 });
 
-db.version(10).stores({
-  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
-  activities:         'id, sport, date, distanceKm, durationSec',
-  enrichedActivities: 'id, sport, date, name',
-  profile:            'userId',
-  postsFeed:          'id, date',
-  unifiedWorkouts:    'id, type, source, date, distanceKm',
-  reels:              'id, userId, expiresAt',
-  activeSession:      'id',
-  sessionCoords:      '++seq',
-  outbox:             '++id, createdAt',
-  tiles:              'key, lastUsed',
-});
 
-db.version(9).stores({
-  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
-  activities:         'id, sport, date, distanceKm, durationSec',
-  enrichedActivities: 'id, sport, date, name',
-  profile:            'userId',
-  postsFeed:          'id, date',
-  unifiedWorkouts:    'id, type, source, date, distanceKm',
-  reels:              'id, userId, expiresAt',
-  activeSession:      'id',
-  sessionCoords:      '++seq',
-  outbox:             '++id, createdAt',
-});
 
-db.version(8).stores({
-  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
-  activities:         'id, sport, date, distanceKm, durationSec',
-  enrichedActivities: 'id, sport, date, name',
-  profile:            'userId',
-  postsFeed:          'id, date',
-  unifiedWorkouts:    'id, type, source, date, distanceKm',
-  reels:              'id, userId, expiresAt',
-  activeSession:      'id',
-  sessionCoords:      '++seq',
-});
 
 // ── Normalizacja workoutu ─────────────────────────────────────────────────────
 

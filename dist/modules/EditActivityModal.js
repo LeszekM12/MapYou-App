@@ -25,6 +25,7 @@
 // natywnego mechanizmu (URLSession / WorkManager) — to osobny temat.
 import { BACKEND_URL } from '../config.js';
 import { dlog } from '../utils/log.js';
+import { safeUrl } from '../utils/dom.js';
 const MAX_NAME = 200;
 const MAX_TEXT = 2000;
 const MAX_PHOTOS = 20;
@@ -91,7 +92,7 @@ export function openEditActivity(act, userId, onSaved) {
         <div class="ea-thumb${pending ? ' ea-thumb--pending' : ''}" data-idx="${i}">
           ${pending
                 ? '<span class="ea-thumb-pending">Uploading…</span>'
-                : `<img src="${url}" alt="">`}
+                : `<img src="${safeUrl(url)}" alt="">`}
           ${i === 0 ? '<span class="ea-cover">Cover</span>' : ''}
           <button class="ea-remove" data-remove="${i}" aria-label="Remove photo">×</button>
         </div>`;

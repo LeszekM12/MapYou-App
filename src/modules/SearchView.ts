@@ -12,6 +12,7 @@ import { getUserId }   from './UserProfile.js';
 import { renderEventsSection, openCreateEventModal } from './clubEvents.js';
 import { renderMembersSection } from './clubMembers.js';
 import { renderPolls, openCreatePollModal } from './clubPolls.js';
+import { esc, safeUrl } from '../utils/dom.js';
 
 // ── Line icons (Strava-like clarity) — single stroke, currentColor.
 //    Emoji were inconsistent across platforms and made the header noisy.
@@ -321,13 +322,13 @@ export class SearchView {
           const isFollowing = this._followingSet.has(u.userId);
           const loc = [u.city, u.region].filter(Boolean).join(', ');
           const avatar = u.avatarB64
-            ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
+            ? `<img src="${safeUrl(u.avatarB64)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%"/>`
             : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
           return `
             <div class="sv2-item" data-userid="${u.userId}" style="cursor:pointer">
               <div class="sv2-item__avatar">${avatar}</div>
               <div class="sv2-item__info">
-                <span class="sv2-item__name">${u.name}</span>
+                <span class="sv2-item__name">${esc(u.name)}</span>
                 ${loc ? `<span class="sv2-item__sub">📍 ${loc}</span>` : ''}
                 ${u.followersCount ? `<span class="sv2-item__desc">${u.followersCount} followers</span>` : ''}
               </div>
@@ -485,15 +486,15 @@ export class SearchView {
             const isMember = c.members.includes(myUserId);
             const icon = sportIcons[c.sport] ?? '🏅';
             const avatar = c.avatarB64
-              ? `<img src="${c.avatarB64}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>`
+              ? `<img src="${safeUrl(c.avatarB64)}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>`
               : `<span style="font-size:24px">${icon}</span>`;
             return `
               <div class="sv2-item" data-club-id="${c.clubId}" style="cursor:pointer">
                 <div class="sv2-item__avatar sv2-item__avatar--club">${avatar}</div>
                 <div class="sv2-item__info">
-                  <span class="sv2-item__name">${c.name}</span>
-                  <span class="sv2-item__sub">${c.members.length} member${c.members.length !== 1 ? 's' : ''} · ${[c.city, (c as Record<string,unknown>)['region'] as string].filter(Boolean).join(', ')}</span>
-                  ${c.description ? `<span class="sv2-item__desc">${c.description.slice(0,60)}</span>` : ''}
+                  <span class="sv2-item__name">${esc(c.name)}</span>
+                  <span class="sv2-item__sub">${c.members.length} member${c.members.length !== 1 ? 's' : ''} · ${esc([c.city, (c as Record<string,unknown>)['region'] as string].filter(Boolean).join(', '))}</span>
+                  ${c.description ? `<span class="sv2-item__desc">${esc(c.description.slice(0,60))}</span>` : ''}
                 </div>
                 <button class="sv2-badge ${isMember ? 'sv2-badge--gray' : 'sv2-badge--green'}"
                   data-club-join="${c.clubId}">${
@@ -683,11 +684,11 @@ export class SearchView {
             const isOwner = c.ownerId === myUserId;
             return `<div class="sv2-item" data-my-club-id="${c.clubId}" style="cursor:pointer">
               <div class="sv2-item__avatar sv2-item__avatar--club">
-                ${c.avatarB64 ? `<img src="${c.avatarB64}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>` : `<span style="font-size:24px">${icon}</span>`}
+                ${c.avatarB64 ? `<img src="${safeUrl(c.avatarB64)}" style="width:100%;height:100%;object-fit:cover;border-radius:14px"/>` : `<span style="font-size:24px">${icon}</span>`}
               </div>
               <div class="sv2-item__info">
-                <span class="sv2-item__name">${c.name}</span>
-                <span class="sv2-item__sub">${c.members.length} members · ${[c.city,(c as Record<string,unknown>).region as string].filter(Boolean).join(', ')}</span>
+                <span class="sv2-item__name">${esc(c.name)}</span>
+                <span class="sv2-item__sub">${c.members.length} members · ${esc([c.city,(c as Record<string,unknown>).region as string].filter(Boolean).join(', '))}</span>
               </div>
               <span class="sv2-badge sv2-badge--gray">${isOwner ? 'Owner' : 'Joined'}</span>
             </div>`;
@@ -775,9 +776,9 @@ export class SearchView {
           ${c.logoB64 ? '' : `<span style="font-size:1.6rem">${icon}</span>`}
         </div>
         <div class="sv2-item__info">
-          <span class="sv2-item__name">${c.name}</span>
+          <span class="sv2-item__name">${esc(c.name)}</span>
           <span class="sv2-item__sub">📍 ${c.location} · ${c.memberCount} member${c.memberCount !== 1 ? 's' : ''}</span>
-          ${c.description ? `<span class="sv2-item__desc">${c.description}</span>` : ''}
+          ${c.description ? `<span class="sv2-item__desc">${esc(c.description)}</span>` : ''}
         </div>
         <div class="sv2-item__actions">
           ${c.isOwner
@@ -849,14 +850,14 @@ export class SearchView {
         </div>
 
         <div class="sv2-club-detail__info">
-          <h2 class="sv2-club-detail__name">${club.name}</h2>
+          <h2 class="sv2-club-detail__name">${esc(club.name)}</h2>
           <div class="sv2-club-detail__meta">
             <span class="sv2-cd-meta__item">${ICO.sport}${club.sport}</span>
             <span class="sv2-cd-meta__item">${ICO.people}${club.memberCount} members</span>
             <span class="sv2-cd-meta__item">${(club as unknown as Record<string,unknown>).isPrivate ? ICO.lock + 'Private' : ICO.globe + 'Public'}</span>
           </div>
           ${club.location ? `<div class="sv2-club-detail__meta"><span class="sv2-cd-meta__item">${ICO.pin}${club.location}</span></div>` : ''}
-          <p class="sv2-club-detail__desc">${club.description || ''}</p>
+          <p class="sv2-club-detail__desc">${esc(club.description || '')}</p>
         </div>
 
         <!-- Action buttons row — Strava style -->
@@ -992,7 +993,7 @@ export class SearchView {
       modal.querySelector('#cdbJoin')?.addEventListener('click', async () => {
         const isPrivate = !!(club as unknown as Record<string,unknown>).isPrivate;
         if (club.joined) {
-          if (!confirm(`Leave "${club.name}"?`)) return;
+          if (!confirm(`Leave "${esc(club.name)}"?`)) return;
           await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}/leave`, { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ userId: myUserId }) });
           club.joined = false; club.memberCount = Math.max(0, club.memberCount - 1);
           removePendingClub(club.id);
@@ -1019,8 +1020,8 @@ export class SearchView {
         // Zmiana widoczności ma realne skutki (prywatny = tylko członkowie widzą
         // klub i feed), więc wymaga świadomego potwierdzenia.
         const q = nowPrivate
-          ? `Zmienić „${club.name}" na PRYWATNY?\n\nKlub nadal będzie widoczny w wyszukiwarce, ale nowi członkowie nie dołączą od razu — będą musieli wysłać prośbę, którą zaakceptujesz.`
-          : `Zmienić „${club.name}" na PUBLICZNY?\n\nKażdy będzie mógł dołączyć od razu, bez Twojej zgody.`;
+          ? `Zmienić „${esc(club.name)}" na PRYWATNY?\n\nKlub nadal będzie widoczny w wyszukiwarce, ale nowi członkowie nie dołączą od razu — będą musieli wysłać prośbę, którą zaakceptujesz.`
+          : `Zmienić „${esc(club.name)}" na PUBLICZNY?\n\nKażdy będzie mógł dołączyć od razu, bez Twojej zgody.`;
         if (!confirm(q)) return;
         (club as unknown as Record<string,unknown>).isPrivate = nowPrivate;
         const lcs = loadClubs(); const lc = lcs.find(c => c.id === club.id);
@@ -1037,7 +1038,7 @@ export class SearchView {
           if (data.status !== 'ok') throw new Error('Failed');
           const link = `${PUBLIC_BASE_URL}/#club=${data.code}`;
           if (navigator.share) {
-            await navigator.share({ title: `Join ${club.name} on MapYou`, url: link });
+            await navigator.share({ title: `Join ${esc(club.name)} on MapYou`, url: link });
           } else {
             await navigator.clipboard.writeText(link);
             const btn = modal.querySelector<HTMLButtonElement>('#cdbShare');
@@ -1048,7 +1049,7 @@ export class SearchView {
 
       // Delete
       modal.querySelector('#cdbDelete')?.addEventListener('click', async () => {
-        if (!confirm(`Delete "${club.name}"?`)) return;
+        if (!confirm(`Delete "${esc(club.name)}"?`)) return;
         await fetch(`${BACKEND_URL}/clubs/${encodeURIComponent(club.id)}`, { method:'DELETE' });
         saveClubs(loadClubs().filter(c => c.id !== club.id));
         close();
@@ -1072,13 +1073,13 @@ export class SearchView {
               optEl.innerHTML = `
                 <div class="sv2-club-feed-item__top" style="display:flex;align-items:center;gap:8px">
                   <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0">
-                    ${myAvatar ? `<img src="${myAvatar}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">${myName[0]}</div>`}
+                    ${myAvatar ? `<img src="${safeUrl(myAvatar)}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff">${myName[0]}</div>`}
                   </div>
                   <span style="flex:1;font-weight:600;color:#fff">${myName}</span>
                   <span style="font-size:1.1rem;color:rgba(255,255,255,0.3)">just now</span>
                 </div>
-                <div style="margin-top:6px;color:#fff">${post.title || post.body || ''}</div>
-                ${post.photoUrl && !post.photoUrl.startsWith('data:video') ? `<img src="${post.photoUrl}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px"/>` : ''}
+                <div style="margin-top:6px;color:#fff">${esc(post.title || post.body || '')}</div>
+                ${post.photoUrl && !post.photoUrl.startsWith('data:video') ? `<img src="${safeUrl(post.photoUrl)}" style="width:100%;border-radius:10px;margin-top:8px;object-fit:cover;max-height:200px"/>` : ''}
                 <div style="margin-top:4px;font-size:1.1rem;color:rgba(255,255,255,0.3)">⏳ Syncing…</div>`;
               feedEl.insertBefore(optEl, feedEl.firstChild);
             }
@@ -1138,9 +1139,9 @@ export class SearchView {
                 </div>
                 <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
                   <div data-profile-uid="${d.userId}" style="width:36px;height:36px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0;cursor:pointer">
-                    ${d.avatarB64 ? `<img src="${d.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff">${(d.authorName as string)[0]}</div>`}
+                    ${d.avatarB64 ? `<img src="${safeUrl(d.avatarB64)}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff">${esc((d.authorName as string)[0])}</div>`}
                   </div>
-                  <span data-profile-uid="${d.userId}" style="flex:1;font-weight:700;color:#fff;cursor:pointer">${d.authorName}</span>
+                  <span data-profile-uid="${d.userId}" style="flex:1;font-weight:700;color:#fff;cursor:pointer">${esc(d.authorName)}</span>
                   <button data-feed-approve="${d.userId}" style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:6px 14px;font-size:1.1rem;cursor:pointer;font-family:inherit;font-weight:700">Accept</button>
                   <button data-feed-reject="${d.userId}" style="background:rgba(248,113,113,0.12);border:1.5px solid #f87171;color:#f87171;border-radius:8px;padding:6px 14px;font-size:1.1rem;cursor:pointer;font-family:inherit;font-weight:700;margin-left:6px">Decline</button>
                 </div>
@@ -1148,7 +1149,7 @@ export class SearchView {
             }
             if (f.kind === 'post' && d.type === 'club_event') {
               return `<div class="sv2-club-feed-item--event">
-                <span style="color:rgba(255,255,255,0.4)">${d.title}</span>
+                <span style="color:rgba(255,255,255,0.4)">${esc(d.title)}</span>
                 <span style="color:rgba(255,255,255,0.25);margin-left:8px;font-size:1.1rem">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>
               </div>`;
             }
@@ -1171,7 +1172,7 @@ export class SearchView {
               if (f.kind === 'post' && d.type === 'club_event') {
                 const ev = document.createElement('div');
                 ev.className = 'sv2-club-feed-item--event';
-                ev.innerHTML = `<span style="color:rgba(255,255,255,0.4)">${d.title as string}</span><span style="color:rgba(255,255,255,0.25);margin-left:8px;font-size:1.1rem">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>`;
+                ev.innerHTML = `<span style="color:rgba(255,255,255,0.4)">${esc(d.title as string)}</span><span style="color:rgba(255,255,255,0.25);margin-left:8px;font-size:1.1rem">${new Date(f.date).toLocaleDateString('en',{month:'short',day:'numeric'})}</span>`;
                 feedEl.appendChild(ev);
                 return;
               }
@@ -1452,9 +1453,9 @@ export class SearchView {
                 <div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.05)">
                   <span style="font-size:1.3rem;font-weight:700;color:rgba(255,255,255,0.4);width:20px">${i+1}</span>
                   <div style="width:32px;height:32px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
-                    ${r.avatarB64 ? `<img src="${r.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff">${r.name[0]}</div>`}
+                    ${r.avatarB64 ? `<img src="${safeUrl(r.avatarB64)}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff">${esc(r.name[0])}</div>`}
                   </div>
-                  <span style="flex:1;font-size:1.3rem;color:#fff">${r.name}</span>
+                  <span style="flex:1;font-size:1.3rem;color:#fff">${esc(r.name)}</span>
                   <span style="font-size:1.3rem;font-weight:700;color:#00c46a">${r.km.toFixed(1)} km</span>
                 </div>`).join('')}
             </div>`;
@@ -1468,10 +1469,10 @@ export class SearchView {
           membersEl.innerHTML = data.data.map(u => `
             <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,0.05)">
               <div style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
-                ${u.avatarB64 ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${u.name[0]}</div>`}
+                ${u.avatarB64 ? `<img src="${safeUrl(u.avatarB64)}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${esc(u.name[0])}</div>`}
               </div>
               <div style="flex:1">
-                <div style="font-size:1.35rem;font-weight:700;color:#fff">${u.name}</div>
+                <div style="font-size:1.35rem;font-weight:700;color:#fff">${esc(u.name)}</div>
                 ${u.userId === data.ownerId ? '<div style="font-size:1.1rem;color:#00c46a">👑 Owner</div>' : '<div style="font-size:1.1rem;color:rgba(255,255,255,0.4)">Member</div>'}
               </div>
             </div>`).join('');
@@ -1497,8 +1498,8 @@ export class SearchView {
                 <div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,0.05)">
                   <div data-open-profile="${u.userId}" style="width:40px;height:40px;border-radius:50%;overflow:hidden;background:#444;flex-shrink:0;cursor:pointer">
                     ${u.avatarB64
-                      ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>`
-                      : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${u.name[0]}</div>`}
+                      ? `<img src="${safeUrl(u.avatarB64)}" style="width:100%;height:100%;object-fit:cover"/>`
+                      : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:#fff">${esc(u.name[0])}</div>`}
                   </div>
                   <span data-open-profile="${u.userId}" style="flex:1;font-size:1.3rem;font-weight:600;color:#fff;cursor:pointer">${u.name}</span>
                   <button style="background:#00c46a;border:none;color:#fff;border-radius:8px;padding:7px 14px;font-size:1.2rem;cursor:pointer;font-family:inherit;margin-right:6px;font-weight:700" data-approve="${u.userId}">Accept</button>

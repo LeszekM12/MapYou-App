@@ -10,6 +10,7 @@
 // preview canvas keeps the swiping smooth; the full-res render happens only on
 // export.
 import { decodePolyline } from './cloudSync.js';
+import { esc } from '../utils/dom.js';
 import { _drawMapTiles, _drawRouteFallback, roundRect, } from './ShareImage.js';
 import { SPORT_COLORS, SPORT_ICONS, getSportLabel, formatDuration, formatPace, formatDistance, } from './Tracker.js';
 const STAT_DEFS = [
@@ -392,7 +393,7 @@ export function openShareStudio(act) {
     });
     // Stat chips.
     const chips = ov.querySelector('#ssChips');
-    chips.innerHTML = STAT_DEFS.filter(d => d.value(act)).map(d => `<button class="ss-chip${statKeys.includes(d.key) ? ' ss-chip--on' : ''}" data-k="${d.key}">${d.label}</button>`).join('');
+    chips.innerHTML = STAT_DEFS.filter(d => d.value(act)).map(d => `<button class="ss-chip${statKeys.includes(d.key) ? ' ss-chip--on' : ''}" data-k="${d.key}">${esc(d.label)}</button>`).join('');
     chips.querySelectorAll('.ss-chip').forEach(b => {
         b.addEventListener('click', () => {
             const k = b.dataset.k;

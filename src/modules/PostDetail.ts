@@ -10,6 +10,7 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
+import { esc } from '../utils/dom.js';
 
 type Visibility = 'everyone' | 'friends' | 'only_me';
 
@@ -26,8 +27,8 @@ interface CommentRow {
   createdAt: string;
 }
 
-const esc = (s: string): string =>
-  s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+// `esc` pochodzi teraz z `utils/dom.ts` — wczesniej kazdy plik mial wlasna,
+// identyczna kopie, a pliki bez niej renderowaly tresc uzytkownika surowo.
 
 /** "just now" · "4m" · "3h" · "2d" · date */
 function ago(ts: number): string {

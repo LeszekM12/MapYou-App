@@ -12,6 +12,7 @@ import { isRouteSaved, saveRoute, unsaveRoute, routeEligible } from './SavedRout
 import { CS, uploadMediaFile } from './cloudSync.js';
 import { getJoinedClubs, addToClubFeed } from './SearchView.js';
 import { openSportPicker } from './SportPicker.js';
+import { esc } from '../utils/dom.js';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -337,9 +338,9 @@ export class SaveActivityModal {
         <div class="sam-share-clubs__title">Share to club</div>
         ${clubs.map(c => `
           <label class="sam-share-clubs__item">
-            <input type="checkbox" class="sam-club-check" data-club-id="${c.id}" data-club-name="${c.name}"/>
+            <input type="checkbox" class="sam-club-check" data-club-id="${c.id}" data-club-name="${esc(c.name)}"/>
             <span class="sam-share-clubs__check-icon"></span>
-            <span class="sam-share-clubs__name">${c.name}</span>
+            <span class="sam-share-clubs__name">${esc(c.name)}</span>
           </label>`).join('')}
       </div>`;
   }

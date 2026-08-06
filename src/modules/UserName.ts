@@ -27,6 +27,11 @@ export async function ensureRecoveryCode(userId: string): Promise<string | null>
       signal:  AbortSignal.timeout(8000),
     });
     if (!res.ok) {
+      // 401/403 = brak konta (tryb goscia). To NIE jest blad, tylko stan:
+      // kod odzyskiwania dotyczy konta na serwerze, a gosc takiego nie ma —
+      // jego dane sa wylacznie lokalne. Zglaszanie tego jako awarii mylilo
+      // uzytkownika komunikatem o problemie, ktorego nie ma.
+      if (res.status === 401 || res.status === 403) return null;
       // Rozrozniamy powody — wczesniej KAZDY blad byl pokazywany jako
       // „nieprawidlowy kod", co mylilo przy limicie zadan (429).
       if (res.status === 429) { _lastRestoreError = 'Zbyt wiele prob. Odczekaj godzine i sprobuj ponownie.'; return null; }

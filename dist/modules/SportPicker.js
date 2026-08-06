@@ -2,6 +2,7 @@
 // Categorized + searchable sport picker used by both the Track tab and the
 // Save Activity modal. Opens a bottom-sheet overlay and calls onSelect(key).
 import { getAllSports, getCustomSports, saveCustomSport, deleteCustomSport, isTrackable } from './Tracker.js';
+import { esc } from '../utils/dom.js';
 export function openSportPicker(onSelect) {
     document.getElementById('trkSportPickerOverlay')?.remove();
     const overlay = document.createElement('div');
@@ -27,8 +28,8 @@ export function openSportPicker(onSelect) {
             sports.forEach(s => {
                 const isCustom = customs.find(c => c.key === s.key);
                 body += `<button class="trk-picker__item" data-pick="${s.key}">
-          <span class="trk-picker__item-icon">${s.icon}</span>
-          <span class="trk-picker__item-label">${s.label}</span>
+          <span class="trk-picker__item-icon">${esc(s.icon)}</span>
+          <span class="trk-picker__item-label">${esc(s.label)}</span>
           ${isTrackable(s.key) ? '<span class="trk-picker__item-tag">📍</span>' : '<span class="trk-picker__item-tag">⏱</span>'}
           ${isCustom ? `<span class="trk-picker__item-del" data-del="${s.key}">×</span>` : ''}
         </button>`;

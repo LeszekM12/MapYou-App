@@ -150,6 +150,9 @@ export async function flush() {
         for (const item of items) {
             if (item.attempts >= MAX_ATTEMPTS)
                 continue;
+            // Karencja po bledzie serwera — patrz nizej.
+            if (item.nextTryAt && Date.now() < item.nextTryAt)
+                continue;
             try {
                 // `X-Outbox-Replay` mowi `authFetch`, ze to JUZ jest ponowienie
                 // z kolejki. Bez tego przechwytywacz zlapalby blad sieci i dolozyl
@@ -198,9 +201,30 @@ export async function flush() {
                     notifyChange();
                     continue;
                 }
-                // 5xx / 408 / 429 — problem po stronie serwera, ma prawo minac.
-                // Tak samo jak przy bledzie sieci: nie zuzywamy limitu prob.
-                await tbl().update(item.id, { lastError: `HTTP ${res.status}` });
+                // ── 5xx / 408 / 429 — serwer odpowiedzial, ale bledem ───────────────
+                //
+                // TO ZUZYWA PROBE. Wczesniej nie zuzywalo jej NIC: zadna galaz nie
+                // zwiekszala `attempts`, wiec `MAX_ATTEMPTS` bylo martwe, a zapis
+                // trwale odrzucany przez serwer wracal co 20 sekund w nieskonczonosc.
+                //
+                // Rozroznienie zostaje takie, jak bylo zamierzone:
+                //   brak sieci  -> NIE zuzywa proby (to nie wina zapisu),
+                //   blad serwera-> zuzywa, bo powtarzanie go w kolko nic nie da.
+                //
+                // Karencja rosnie wykladniczo (20 s, 40 s, 80 s... do godziny), wiec
+                // osiem prob rozklada sie na kilka godzin, a nie na trzy minuty.
+                // To zostawia zapas na zimny start maszyny Fly, ktory bywa 5xx.
+                const attempts = item.attempts + 1;
+                const backoff = Math.min(60 * 60000, 20000 * 2 ** (attempts - 1));
+                await tbl().update(item.id, {
+                    attempts,
+                    nextTryAt: Date.now() + backoff,
+                    lastError: `HTTP ${res.status} (proba ${attempts}/${MAX_ATTEMPTS})`,
+                });
+                if (attempts >= MAX_ATTEMPTS) {
+                    console.error(`[Outbox] PODDAJE SIE po ${MAX_ATTEMPTS} probach: ${item.method} ${item.url}` +
+                        `\n  Rekord ZOSTAJE w kolejce (to dane uzytkownika) — podejrzyj: mapyouOutbox()`);
+                }
             }
             catch (e) {
                 console.warn(`[Outbox] blad sieci: ${item.method} ${item.url.replace(/^https?:\/\/[^/]+/, '')}` +

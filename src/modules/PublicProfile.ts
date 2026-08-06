@@ -26,6 +26,7 @@ interface FeedItem {
 
 import { getIcon as _getIcon, getColor as _getColor, getSportLabel as _getSportLabel } from './Tracker.js';
 import * as SS from './socialStore.js';
+import { esc, safeUrl } from '../utils/dom.js';
 
 function _relDate(ts: number | string): string {
   return new Date(typeof ts === 'number' ? ts : ts).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -65,9 +66,9 @@ async function _showFollowList(title: string, userIds: string[], myUserId: strin
   body.innerHTML = users.map(u => `
     <div data-uid="${u.userId}" style="display:flex;align-items:center;gap:12px;padding:12px 20px;cursor:pointer">
       <div style="width:44px;height:44px;border-radius:50%;overflow:hidden;background:#333;flex-shrink:0">
-        ${u.avatarB64 ? `<img src="${u.avatarB64}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff">${u.name[0]}</div>`}
+        ${u.avatarB64 ? `<img src="${safeUrl(u.avatarB64)}" style="width:100%;height:100%;object-fit:cover"/>` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:#fff">${esc(u.name[0])}</div>`}
       </div>
-      <span style="font-size:1.4rem;font-weight:600;color:#fff;flex:1">${u.name}</span>
+      <span style="font-size:1.4rem;font-weight:600;color:#fff;flex:1">${esc(u.name)}</span>
       ${u.userId === myUserId ? '<span style="font-size:1.1rem;color:rgba(255,255,255,0.3)">You</span>' : ''}
     </div>`).join('');
   body.querySelectorAll<HTMLElement>('[data-uid]').forEach(el => {
@@ -183,7 +184,7 @@ function _renderFull(
 ): void {
   const totalKm = activities.reduce((s, a) => s + (+(a.data.distanceKm ?? 0)), 0);
   const avatarHtml = profile.avatarB64
-    ? `<img src="${profile.avatarB64}" class="pv-avatar__img" alt="avatar"/>`
+    ? `<img src="${safeUrl(profile.avatarB64)}" class="pv-avatar__img" alt="avatar"/>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="44" height="44"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
 
   const reelRingClass = hasReels
@@ -204,8 +205,8 @@ function _renderFull(
     <div class="pv-hero">
       <div class="pv-avatar ${reelRingClass}" id="ppAvatarReel" style="${hasReels ? 'cursor:pointer' : ''}">${avatarHtml}</div>
       <div class="pv-hero__info">
-        <h2 class="pv-name">${profile.name}</h2>
-        ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
+        <h2 class="pv-name">${esc(profile.name)}</h2>
+        ${profile.bio ? `<p class="pv-bio">${esc(profile.bio)}</p>` : ''}
       </div>
     </div>
     <div class="pv-stats-row">
@@ -406,7 +407,7 @@ function _buildTrophySVG(trophy: Trophy): string {
   const glow = trophy.unlocked ? `filter:drop-shadow(0 0 8px ${trophy.color}88)` : '';
   const count = trophy.count ?? '?';
   return `
-  <div class="pv-trophy ${trophy.unlocked ? 'pv-trophy--unlocked' : ''}" title="${trophy.desc}">
+  <div class="pv-trophy ${trophy.unlocked ? 'pv-trophy--unlocked' : ''}" title="${esc(trophy.desc)}">
     <div class="pv-trophy__gem" style="${glow}">
       <svg viewBox="0 0 80 90" width="64" height="72">
         <polygon points="40,2 78,22 78,68 40,88 2,68 2,22"
@@ -420,7 +421,7 @@ function _buildTrophySVG(trophy: Trophy): string {
           : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`}
       </svg>
     </div>
-    <span class="pv-trophy__label">${trophy.label}</span>
+    <span class="pv-trophy__label">${esc(trophy.label)}</span>
   </div>`;
 }
 
@@ -616,7 +617,7 @@ function _renderEffortsTab(el: HTMLElement, activities: FeedItem[]): void {
     <div class="pv-efforts">
       ${efforts.map(e => `
         <div class="pv-effort ${e.timeStr ? 'pv-effort--set' : ''}">
-          <span class="pv-effort__dist">${e.label}</span>
+          <span class="pv-effort__dist">${esc(e.label)}</span>
           <div class="pv-effort__right">
             ${e.timeStr
               ? `<span class="pv-effort__time">${e.timeStr}</span>
@@ -672,7 +673,7 @@ function _renderActivitiesTab(el: HTMLElement, activities: FeedItem[]): void {
     return `<div class="pv-act-item" data-idx="${i}">
       <span class="pv-act-item__icon">${_getIcon(sport)}</span>
       <div class="pv-act-item__info">
-        <span class="pv-act-item__name">${(d.name ?? d.description ?? sport) as string}</span>
+        <span class="pv-act-item__name">${esc((d.name ?? d.description ?? sport) as string)}</span>
         <span class="pv-act-item__date">${_relDate(a.date)}</span>
       </div>
       <div class="pv-act-item__stats">
@@ -773,20 +774,20 @@ function _renderPostsTab(el: HTMLElement, posts: FeedItem[]): void {
     const card = document.createElement('div');
     card.className = 'feed-card';
     const avImg = d.authorAvatarUrl
-      ? `<img src="${d.authorAvatarUrl as string}" loading="lazy" onerror="this.style.display='none'"/>`
+      ? `<img src="${safeUrl(d.authorAvatarUrl as string)}" loading="lazy" onerror="this.style.display='none'"/>`
       : ``;
     card.innerHTML = `
       <div class="feed-card__header">
-        <div class="feed-card__avatar">${avImg || ((d.authorName as string)?.[0] ?? '?')}</div>
+        <div class="feed-card__avatar">${esc(avImg || ((d.authorName as string)?.[0] ?? '?'))}</div>
         <div class="feed-card__meta">
-          <span class="feed-card__author">${(d.authorName ?? '') as string}</span>
+          <span class="feed-card__author">${esc((d.authorName ?? '') as string)}</span>
           <span class="feed-card__date">${_relDate(p.date)}</span>
         </div>
       </div>
-      ${d.photoUrl ? `<img class="feed-card__photo" src="${d.photoUrl as string}" loading="lazy"/>` : ''}
+      ${d.photoUrl ? `<img class="feed-card__photo" src="${safeUrl(d.photoUrl as string)}" loading="lazy"/>` : ''}
       <div class="feed-card__body">
-        ${d.title ? `<div class="feed-card__title">${d.title as string}</div>` : ''}
-        ${d.body  ? `<div class="feed-card__text">${d.body as string}</div>` : ''}
+        ${d.title ? `<div class="feed-card__title">${esc(d.title as string)}</div>` : ''}
+        ${d.body  ? `<div class="feed-card__text">${esc(d.body as string)}</div>` : ''}
       </div>
       ${_actionsHtml((d.postId ?? d._id ?? '') as string, 'post', (d._likeCount ?? 0) as number, (d._commentCount ?? 0) as number)}`;
     const itemId = (d.postId ?? (d._id as Record<string,unknown>|undefined)?.toString?.() ?? '') as string;
@@ -808,7 +809,7 @@ function _renderPhotoStrip(sheet: HTMLElement, activities: FeedItem[], posts: Fe
   const MAX = 4;
   strip.innerHTML = photos.slice(0, MAX).map((ph, i) => `
     <div data-pi="${i}" class="pv-photo-strip__thumb">
-      <img src="${ph.url}" loading="lazy"/>
+      <img src="${safeUrl(ph.url)}" loading="lazy"/>
       ${photos.length > MAX && i === MAX - 1 ? `<div class="pv-photo-strip__more">+${photos.length - MAX + 1}</div>` : ''}
     </div>`).join('');
   strip.querySelectorAll<HTMLElement>('[data-pi]').forEach(el => {
@@ -834,8 +835,8 @@ function _openPhotoViewer(photos: { url: string; title: string }[], parent: HTML
       </div>
       <div id="pvBody" class="pv-photo-viewer__body">
         ${mode === 'grid'
-          ? `<div class="pv-photo-viewer__grid">${photos.map((ph, i) => `<div data-vi="${i}" class="pv-photo-viewer__grid-item"><img src="${ph.url}" loading="lazy"/></div>`).join('')}</div>`
-          : `<div>${photos.map((ph, i) => `<div data-vi="${i}" class="pv-photo-viewer__list-item">${ph.title ? `<div class="pv-photo-viewer__list-title">${ph.title}</div>` : ''}<img class="pv-photo-viewer__list-img" src="${ph.url}" loading="lazy"/></div>`).join('')}</div>`}
+          ? `<div class="pv-photo-viewer__grid">${photos.map((ph, i) => `<div data-vi="${i}" class="pv-photo-viewer__grid-item"><img src="${safeUrl(ph.url)}" loading="lazy"/></div>`).join('')}</div>`
+          : `<div>${photos.map((ph, i) => `<div data-vi="${i}" class="pv-photo-viewer__list-item">${ph.title ? `<div class="pv-photo-viewer__list-title">${esc(ph.title)}</div>` : ''}<img class="pv-photo-viewer__list-img" src="${safeUrl(ph.url)}" loading="lazy"/></div>`).join('')}</div>`}
       </div>`;
     viewer.querySelector('#pvClose')?.addEventListener('click', () => viewer.remove());
     viewer.querySelector('#pvGrid')?.addEventListener('click', () => { mode = 'grid'; render(); });
@@ -845,7 +846,7 @@ function _openPhotoViewer(photos: { url: string; title: string }[], parent: HTML
         const src = (el.querySelector('img') as HTMLImageElement).src;
         const big = document.createElement('div');
         big.className = 'pv-photo-viewer__enlarge';
-        big.innerHTML = `<img src="${src}"/>`;
+        big.innerHTML = `<img src="${safeUrl(src)}"/>`;
         big.addEventListener('click', () => big.remove());
         document.body.appendChild(big);
       });

@@ -3,6 +3,7 @@
 // Save Activity modal. Opens a bottom-sheet overlay and calls onSelect(key).
 
 import { getAllSports, getCustomSports, saveCustomSport, deleteCustomSport, isTrackable } from './Tracker.js';
+import { esc } from '../utils/dom.js';
 
 export function openSportPicker(onSelect: (sport: string) => void): void {
   document.getElementById('trkSportPickerOverlay')?.remove();
@@ -30,8 +31,8 @@ export function openSportPicker(onSelect: (sport: string) => void): void {
       sports.forEach(s => {
         const isCustom = customs.find(c => c.key === s.key);
         body += `<button class="trk-picker__item" data-pick="${s.key}">
-          <span class="trk-picker__item-icon">${s.icon}</span>
-          <span class="trk-picker__item-label">${s.label}</span>
+          <span class="trk-picker__item-icon">${esc(s.icon)}</span>
+          <span class="trk-picker__item-label">${esc(s.label)}</span>
           ${isTrackable(s.key) ? '<span class="trk-picker__item-tag">📍</span>' : '<span class="trk-picker__item-tag">⏱</span>'}
           ${isCustom ? `<span class="trk-picker__item-del" data-del="${s.key}">×</span>` : ''}
         </button>`;

@@ -20,6 +20,9 @@ const copy = (p) => { if (existsSync(p)) cpSync(p, `${OUT}/${p}`, { recursive: t
   // aktualizacji. Lokalna kopia dziala tez bez zasiegu.
   'privacy.html',
   'terms.html',
+  // Biblioteki lokalne (Leaflet, Dexie, Chart.js, JSZip...). BEZ TEGO
+  // apka natywna nie wstanie bez zasiegu — patrz scripts/vendor.mjs.
+  'vendor',
   'dist',
   'public',
   'push-sw.js',

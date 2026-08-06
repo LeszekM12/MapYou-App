@@ -6,8 +6,10 @@
 // track; manual entries and archive imports never do.
 import { BACKEND_URL } from '../config.js';
 import { getUserId } from './UserProfile.js';
+import { esc, safeUrl } from '../utils/dom.js';
 // ── Helpers ──────────────────────────────────────────────────────────────────
-const esc = (s) => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// `esc` pochodzi teraz z `utils/dom.ts` — wczesniej kazdy plik mial wlasna,
+// identyczna kopie, a pliki bez niej renderowaly tresc uzytkownika surowo.
 /** Goal formatting — one place, so the list, the card and the detail agree. */
 export function goalLabel(t, v) {
     if (t === 'distance')
@@ -262,7 +264,7 @@ export function openEventDetail(eventId, onChange) {
         <div class="ev-stand${s.userId === me ? ' ev-stand--me' : ''}">
           <span class="ev-stand__rank">${s.done ? '✓' : i + 1}</span>
           <span class="ev-stand__avatar">${s.avatarB64
-                ? `<img src="${s.avatarB64}" alt=""/>` : '👤'}</span>
+                ? `<img src="${safeUrl(s.avatarB64)}" alt=""/>` : '👤'}</span>
           <div class="ev-stand__body">
             <div class="ev-stand__top">
               <span class="ev-stand__name">${esc(s.name)}</span>

@@ -42,7 +42,7 @@ if (typeof document !== 'undefined' && !(window as unknown as Record<string, unk
     e.stopPropagation();
     const ov = document.createElement('div');
     ov.className = 'sv-lightbox';
-    ov.innerHTML = `<img src="${img.src}" alt=""/>`;
+    ov.innerHTML = `<img src="${safeUrl(img.src)}" alt=""/>`;
     ov.addEventListener('click', () => ov.remove());
     document.body.appendChild(ov);
   });
@@ -135,8 +135,8 @@ function openCommentPanel(card: HTMLElement, actId: string): void {
   const renderAtlasComments = (comments: Array<{authorName: string; text: string; createdAt: string}>) => {
     list.innerHTML = comments.length
       ? comments.map(c => `<div class="hcc__item">
-          <span class="hcc__author">${c.authorName}</span>
-          <span class="hcc__text">${c.text}</span>
+          <span class="hcc__author">${esc(c.authorName)}</span>
+          <span class="hcc__text">${esc(c.text)}</span>
         </div>`).join('')
       : '<p class="hcc__empty">No comments yet</p>';
     list.scrollTop = list.scrollHeight;
@@ -260,14 +260,14 @@ function openCommentsView(card: HTMLElement, actId: string): void {
           const pending = c.photoUrl?.startsWith('mapyou-pending://');
           return `<div class="cv-item${c._pending ? ' cv-item--pending' : ''}" data-cid="${c.commentId ?? ''}">
             <div class="cv-line">
-              <span class="cv-author">${c.authorName}</span>
-              <span class="cv-text">${c.text}</span>
+              <span class="cv-author">${esc(c.authorName)}</span>
+              <span class="cv-text">${esc(c.text)}</span>
               ${c.editedAt ? '<span class="cv-edited">edited</span>' : ''}
             </div>
             ${c.photoUrl
               ? (pending
                   ? '<div class="cv-photo cv-photo--pending">Uploading…</div>'
-                  : `<img class="cv-photo" src="${c.photoUrl}" alt="">`)
+                  : `<img class="cv-photo" src="${safeUrl(c.photoUrl)}" alt="">`)
               : ''}
             ${mine ? `<button class="cv-edit" data-edit="${c.commentId ?? ''}">Edit</button>` : ''}
           </div>`;
@@ -497,7 +497,7 @@ function openLightbox(src: string): void {
     <div class="home-lightbox__backdrop"></div>
     <div class="home-lightbox__inner">
       <button class="home-lightbox__close" aria-label="Close">✕</button>
-      <img class="home-lightbox__img" src="${src}" alt="Activity photo"/>
+      <img class="home-lightbox__img" src="${safeUrl(src)}" alt="Activity photo"/>
     </div>`;
   document.body.appendChild(lb);
 
@@ -520,15 +520,15 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
   card.dataset.id = post.id;
 
   const avatarHtml = post.avatarB64
-    ? `<img src="${post.avatarB64}" class="home-card__avatar-img" alt="avatar"/>`
+    ? `<img src="${safeUrl(post.avatarB64)}" class="home-card__avatar-img" alt="avatar"/>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
 
   const _postIsVideo = post.mediaType === 'video' || (post.photoUrl?.includes('/video/upload/') ?? false);
   const _postHasReel = (post as unknown as Record<string,unknown>)._authorHasReel as boolean | undefined;
   const photoHtml = post.photoUrl
     ? _postIsVideo
-      ? `<div class="home-card__photo"><video src="${post.photoUrl}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
-      : `<div class="home-card__photo" data-photosrc="${post.photoUrl}"><img src="${post.photoUrl}" alt="" loading="lazy" decoding="async"/></div>`
+      ? `<div class="home-card__photo"><video src="${safeUrl(post.photoUrl)}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
+      : `<div class="home-card__photo" data-photosrc="${safeUrl(post.photoUrl)}"><img src="${safeUrl(post.photoUrl)}" alt="" loading="lazy" decoding="async"/></div>`
     : '';
 
   // Truncate body at 250 chars
@@ -536,7 +536,7 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
   const isLong = (post.body?.length ?? 0) > TRUNC;
   const bodyHtml = post.body ? `
     <p class="home-card__desc home-card__post-body" id="pbody-${post.id}">
-      ${isLong ? post.body.slice(0, TRUNC) + '…' : post.body}
+      ${esc(isLong ? post.body.slice(0, TRUNC) + '…' : post.body)}
     </p>
     ${isLong ? `<button class="home-card__read-more" id="pmore-${post.id}">…więcej</button>` : ''}` : '';
 
@@ -544,7 +544,7 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
     <div class="home-card__header">
       <div class="home-card__avatar home-card__avatar--user">${avatarHtml}</div>
       <div class="home-card__meta">
-        <h3 class="home-card__name">${post.authorName}</h3>
+        <h3 class="home-card__name">${esc(post.authorName)}</h3>
         <span class="home-card__time">${relativeDate(post.date)}</span>
       </div>
       <div class="home-card__post-actions">
@@ -553,7 +553,7 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
       </div>
     </div>
 
-    ${post.title ? `<h4 class="home-card__post-title">${post.title}</h4>` : ''}
+    ${post.title ? `<h4 class="home-card__post-title">${esc(post.title)}</h4>` : ''}
     ${bodyHtml}
     ${photoHtml}
 
@@ -721,14 +721,14 @@ function _openEditPostModal(post: PostRecord, onSave: () => void): void {
         <div class="pm-field">
           <label class="pm-label" for="epmTitle">Title</label>
           <input class="pm-input" id="epmTitle" type="text" maxlength="20"
-            value="${post.title ?? ''}" autocomplete="off"/>
+            value="${esc(post.title ?? '')}" autocomplete="off"/>
         </div>
         <div class="pm-field">
           <label class="pm-label" for="epmDesc">
             Description
-            <span class="pm-char-count" id="epmCount">${(post.body ?? '').length}/500</span>
+            <span class="pm-char-count" id="epmCount">${esc((post.body ?? '').length)}/500</span>
           </label>
-          <textarea class="pm-textarea" id="epmDesc" rows="6" maxlength="500">${post.body ?? ''}</textarea>
+          <textarea class="pm-textarea" id="epmDesc" rows="6" maxlength="500">${esc(post.body ?? '')}</textarea>
         </div>
       </div>
       <div class="pm-footer">
@@ -997,7 +997,7 @@ async function _fillWeather(
       <div class="adw__main">
         <div class="adw__icon">${iconHtml}</div>
         <div class="adw__temp">${temp}°</div>
-        <div class="adw__desc">${info.description}</div>
+        <div class="adw__desc">${esc(info.description)}</div>
       </div>
       <div class="adw__grid">
         ${wind != null ? `<div class="adw__cell"><span class="adw__k">Wiatr</span><span class="adw__v">${wind} km/h</span></div>` : ''}
@@ -1121,11 +1121,9 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   // Cudze komentarze zostaja na pelnym ekranie. Backend oddaje go w polu
   // `_authorComment`, wiec karta nie robi zadnego dodatkowego zapytania.
   //
-  // Tresc uciekamy recznie: komentarz pisze uzytkownik, wiec wstawienie go
-  // wprost do `innerHTML` byloby otwarta furtka na wstrzykniecie kodu.
-  const esc = (t: string): string => t
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  // Tresc uciekamy przez wspolne `esc()` z utils/dom.ts — wczesniej byla tu
+  // wlasna, lokalna kopia widoczna tylko w tej funkcji, przez co reszta pliku
+  // (nazwy autorow, tresci postow, komentarze) szla do DOM bez zabezpieczenia.
   const _ac = rec._authorComment as { text?: string } | null | undefined;
   const authorCommentHtml = _ac?.text
     ? `<div class="home-card__author-comment">
@@ -1134,7 +1132,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
        </div>`
     : '';
   const avatarSrc  = (rec.avatarB64 as string | null) ?? (rec.authorAvatarUrl as string | null) ?? (isOwn ? profile.avatarB64 : null);
-  const avatarHtml = avatarSrc ? `<img src="${avatarSrc}" alt="avatar"/>` : `<span>${icon}</span>`;
+  const avatarHtml = avatarSrc ? `<img src="${safeUrl(avatarSrc)}" alt="avatar"/>` : `<span>${icon}</span>`;
   const title      = (full.name || '').replace(/^(undefined|null)\s*/i, '').trim() || getSportLabel(full.sport);
   const dateStr    = new Date(full.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
                    + ' · ' + new Date(full.date).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
@@ -1142,8 +1140,8 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   const photoIsVideo = full.mediaType === 'video' || (full.photoUrl?.includes('/video/upload/') ?? false);
   const photoHtml = full.photoUrl
     ? photoIsVideo
-      ? `<div class="ad-photo"><video src="${full.photoUrl}" playsinline controls preload="metadata"></video></div>`
-      : `<div class="ad-photo"><img src="${full.photoUrl}" alt="Activity photo" loading="lazy"/></div>`
+      ? `<div class="ad-photo"><video src="${safeUrl(full.photoUrl)}" playsinline controls preload="metadata"></video></div>`
+      : `<div class="ad-photo"><img src="${safeUrl(full.photoUrl)}" alt="Activity photo" loading="lazy"/></div>`
     : '';
 
   // Splits — author only, only when real laps exist
@@ -1249,7 +1247,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
   }
 
   const notesHtml = (isOwn && full.notes)
-    ? `<div class="ad-section"><h3 class="ad-section-title">Notatki</h3><p class="ad-notes">🔒 ${full.notes}</p></div>`
+    ? `<div class="ad-section"><h3 class="ad-section-title">Notatki</h3><p class="ad-notes">🔒 ${esc(full.notes)}</p></div>`
     : '';
 
   const itemId       = actId || (rec.activityId as string) || full.id;
@@ -1306,7 +1304,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
       <div class="ad-author">
         <div class="ad-avatar" style="border-color:${color}55;background:${color}22">${avatarHtml}</div>
         <div class="ad-author-text">
-          <span class="ad-author-name">${authorName}</span>
+          <span class="ad-author-name">${esc(authorName)}</span>
           <span class="ad-date">${icon} ${dateStr}</span>
         </div>
         <span class="ad-sport" style="color:${color}">${getSportLabel(full.sport)}</span>
@@ -1314,7 +1312,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
       ${isOwn ? `<div class="ad-vis" id="adVisBadge">${visBadge}</div>` : ''}
 
       <h2 class="ad-title">${title}</h2>
-      ${full.description && full.description !== title ? `<p class="ad-desc">${full.description}</p>` : ''}
+      ${full.description && full.description !== title ? `<p class="ad-desc">${esc(full.description)}</p>` : ''}
 
       <div class="ad-stats">
         <div class="ad-stat"><span class="ad-stat-v">${full.distanceKm.toFixed(2)}</span><span class="ad-stat-l">Dystans (km)</span></div>
@@ -1326,7 +1324,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
       </div>
       ${full.sourceName ? `<div class="ad-device">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="17" height="17"><rect x="7" y="5" width="10" height="14" rx="3"/><path d="M9 2h6M9 22h6"/></svg>
-        <span>${full.sourceName}</span>
+        <span>${esc(full.sourceName)}</span>
       </div>` : ''}
 
       ${photoHtml}
@@ -1424,7 +1422,7 @@ export async function openActivityDetail(act: EnrichedActivity, isOwn: boolean, 
       <button class="ad-topbar__btn" id="adTbClose" aria-label="Collapse">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" width="22" height="22"><polyline points="6 9 12 15 18 9"/></svg>
       </button>
-      <span class="ad-topbar__title">${(full.name || '').replace(/</g, '&lt;') || getSportLabel(full.sport)}</span>
+      <span class="ad-topbar__title">${esc((full.name || '') || getSportLabel(full.sport))}</span>
       <span class="ad-topbar__actions">
         ${hasRoute ? `<button class="ad-topbar__btn" id="adTbBookmark" aria-label="Save route">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"/></svg>
@@ -1597,12 +1595,12 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
   const _actIsVideo = act.mediaType === 'video' || (act.photoUrl?.includes('/video/upload/') ?? false);
   const photoHtml = act.photoUrl
     ? _actIsVideo
-      ? `<div class="home-card__photo"><video src="${act.photoUrl}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
-      : `<div class="home-card__photo" data-photosrc="${act.photoUrl}"><img src="${act.photoUrl}" alt="Activity photo" loading="lazy" decoding="async"/></div>`
+      ? `<div class="home-card__photo"><video src="${safeUrl(act.photoUrl)}" type="video/mp4" playsinline controls preload="metadata" style="width:100%;height:100%;object-fit:cover;display:block;border-radius:14px"></video></div>`
+      : `<div class="home-card__photo" data-photosrc="${safeUrl(act.photoUrl)}"><img src="${safeUrl(act.photoUrl)}" alt="Activity photo" loading="lazy" decoding="async"/></div>`
     : '';
 
   const notesHtml = act.notes
-    ? `<p class="home-card__notes">🔒 ${act.notes}</p>`
+    ? `<p class="home-card__notes">🔒 ${esc(act.notes)}</p>`
     : '';
 
   const profile = loadProfileFromLocal();
@@ -1611,7 +1609,7 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
     ?? (_actRec.authorAvatarUrl as string | null)
     ?? profile.avatarB64;
   const userAvatarHtml = avatarSrc
-    ? `<img src="${avatarSrc}" class="home-card__avatar-img" alt="avatar"/>`
+    ? `<img src="${safeUrl(avatarSrc)}" class="home-card__avatar-img" alt="avatar"/>`
     : `<span>${icon}</span>`;
   const _cleanName = (s: string): string => (s || '')
     .replace(/^(undefined|null)\s+/i, '')
@@ -1625,7 +1623,7 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
         ${userAvatarHtml}
       </div>
       <div class="home-card__meta">
-        ${(act as unknown as Record<string,unknown>).authorName ? `<span class="home-card__author-name" style="font-size:1.2rem;font-weight:700;color:#fff;display:block;line-height:1.2">${(act as unknown as Record<string,unknown>).authorName as string}</span>` : ''}
+        ${(act as unknown as Record<string,unknown>).authorName ? `<span class="home-card__author-name" style="font-size:1.2rem;font-weight:700;color:#fff;display:block;line-height:1.2">${esc((act as unknown as Record<string,unknown>).authorName as string)}</span>` : ''}
         <h3 class="home-card__name">${_displayName}</h3>
         <span class="home-card__time">${relativeDate(act.date)}</span>
       </div>
@@ -1636,7 +1634,7 @@ export function buildCard(act: EnrichedActivity): HTMLElement {
     </div>
 
     ${act.description && act.name && act.description !== act.name
-      ? `<p class="home-card__desc">${act.description}</p>` : ''}
+      ? `<p class="home-card__desc">${esc(act.description)}</p>` : ''}
 
     ${act.coords && act.coords.length > 0 ? `<div class="home-card__map-wrap" id="${mapId}"></div>` : (act as unknown as Record<string,unknown>).coordsEnc ? `<div class="home-card__map-wrap home-card__map-wrap--canvas"></div>` : ''}
 
@@ -1862,8 +1860,8 @@ function _notifItemHtml(n: AppNotification): string {
     <div class="hn-item ${n.read ? '' : 'hn-item--unread'} ${n.target ? 'hn-item--link' : ''}" data-id="${n.id}">
       <div class="hn-item__icon">${n.icon ?? '🔔'}</div>
       <div class="hn-item__body">
-        <div class="hn-item__title">${n.title}</div>
-        <div class="hn-item__body-text">${n.body}</div>
+        <div class="hn-item__title">${esc(n.title)}</div>
+        <div class="hn-item__body-text">${esc(n.body)}</div>
         <div class="hn-item__time">${_relTimeNotif(n.timestamp)}</div>
       </div>
       ${n.target ? '<div class="hn-item__chevron">›</div>' : ''}
@@ -2216,7 +2214,7 @@ export class HomeView {
           <span class="rwp-ic" style="background:${getColor(w.sport)}22;color:${getColor(w.sport)}">${getIcon(w.sport)}</span>
           <span class="rwp-main">
             <span class="rwp-name">${getSportLabel(w.sport)} · ${d.toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })} ${d.toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' })}</span>
-            <span class="rwp-meta">${meta}${w.coords.length ? '' : ' · indoor'} · ${w.sourceName}</span>
+            <span class="rwp-meta">${meta}${w.coords.length ? '' : ' · indoor'} · ${esc(w.sourceName)}</span>
           </span>
           <span class="rwp-chev">${w.imported ? '✓' : '›'}</span>
         </button>`;
@@ -2297,7 +2295,7 @@ export class HomeView {
     const greet   = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
     const profile = loadProfileFromLocal();
     const avatarHtml = profile.avatarB64
-      ? `<img src="${profile.avatarB64}" class="home-greeting__avatar-img" alt="avatar"/>`
+      ? `<img src="${safeUrl(profile.avatarB64)}" class="home-greeting__avatar-img" alt="avatar"/>`
       : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22">
            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
          </svg>`;
@@ -2305,7 +2303,7 @@ export class HomeView {
     greeting.innerHTML = `
       <div class="home-greeting__row">
         <div class="home-greeting__text-wrap">
-          <h2 class="home-greeting__text">${greet}, <strong>${profile.name}</strong> 👋</h2>
+          <h2 class="home-greeting__text">${greet}, <strong>${esc(profile.name)}</strong> 👋</h2>
           <p class="home-greeting__sub">${activityCount} activit${activityCount === 1 ? 'y' : 'ies'} recorded</p>
         </div>
         <div class="home-greeting__actions">
@@ -2430,7 +2428,7 @@ export class HomeView {
       const style = d.active && !d.isToday ? ` style="background:${d.color}"` : '';
       const inner = d.active ? `<span class="hday-ico">${d.icon}</span>` : `<span class="hday-num">${d.num}</span>`;
       return `<div class="hday-col">
-        <span class="hday-label${d.isToday ? ' hday-label--today' : ''}">${d.label}</span>
+        <span class="hday-label${d.isToday ? ' hday-label--today' : ''}">${esc(d.label)}</span>
         <div class="${cls.join(' ')}"${style} ${d.active ? `data-day="${d.key}" role="button"` : ''}>${inner}</div>
       </div>`;
     };
@@ -2601,7 +2599,7 @@ export class HomeView {
         <div class="cal-act" data-actid="${a.id}">
           <span class="cal-act__icon">${getIcon(a.sport)}</span>
           <span class="cal-act__main">
-            <span class="cal-act__title">${a.name || getSportLabel(a.sport)}</span>
+            <span class="cal-act__title">${esc(a.name || getSportLabel(a.sport))}</span>
             <span class="cal-act__meta">${a.distanceKm > 0 ? formatDistance(a.distanceKm) + ' km · ' : ''}${formatDuration(a.durationSec)}</span>
           </span>
           <span class="cal-act__chevron">›</span>
@@ -2698,8 +2696,8 @@ export class HomeView {
     // My avatar with + button
     const profile     = loadProfileFromLocal();
     const myAvatarHtml = profile.avatarB64
-      ? `<img src="${profile.avatarB64}" class="home-reel-avatar__img" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;border:2px solid #141417;"/>`
-      : `<div class="home-reel-avatar__placeholder">${profile.name?.[0] ?? '?'}</div>`;
+      ? `<img src="${safeUrl(profile.avatarB64)}" class="home-reel-avatar__img" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;border:2px solid #141417;"/>`
+      : `<div class="home-reel-avatar__placeholder">${esc(profile.name?.[0] ?? '?')}</div>`;
 
     const myHasReel   = !!myReels;
     const myHasUnseen = myReels?.hasUnseen ?? false;
@@ -2731,13 +2729,13 @@ export class HomeView {
       const item = document.createElement('div');
       item.className = 'home-reel-item';
       const avatarContent = u.avatarB64
-        ? `<img src="${u.avatarB64}" class="home-reel-avatar__img" alt="${u.authorName}" loading="lazy" decoding="async"/>`
-        : `<div class="home-reel-avatar__placeholder">${u.authorName[0] ?? '?'}</div>`;
+        ? `<img src="${safeUrl(u.avatarB64)}" class="home-reel-avatar__img" alt="${esc(u.authorName)}" loading="lazy" decoding="async"/>`
+        : `<div class="home-reel-avatar__placeholder">${esc(u.authorName[0] ?? '?')}</div>`;
       item.innerHTML = `
         <div class="home-reel-avatar ${u.hasUnseen ? 'home-reel-avatar--active' : 'home-reel-avatar--seen'}">
           ${avatarContent}
         </div>
-        <span class="home-reel-name">${u.authorName.split(' ')[0]}</span>`;
+        <span class="home-reel-name">${esc(u.authorName.split(' ')[0])}</span>`;
       item.querySelector('.home-reel-avatar')?.addEventListener('click', () => {
         void this._openReelsViewer(u.userId, 0);
       });
@@ -2760,7 +2758,7 @@ export class HomeView {
           <button class="rwp-item" data-id="${a.id}">
             <span class="rwp-ic" style="background:${getColor(a.sport)}22;color:${getColor(a.sport)}">${getIcon(a.sport)}</span>
             <span class="rwp-main">
-              <span class="rwp-name">${(a.name || '').replace(/^(undefined|null)\s*/i, '').trim() || getSportLabel(a.sport)}</span>
+              <span class="rwp-name">${esc((a.name || '').replace(/^(undefined|null)\s*/i, '').trim() || getSportLabel(a.sport))}</span>
               <span class="rwp-meta">${formatDistance(a.distanceKm)} km · ${formatDuration(a.durationSec)} · ${new Date(a.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short' })}</span>
             </span>
             <span class="rwp-chev">›</span>
@@ -2885,8 +2883,8 @@ export class HomeView {
       stickers.length = 0; selectedSticker = null;
       const url = URL.createObjectURL(file);
       canvas.innerHTML = isVid
-        ? `<video src="${url}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`
-        : `<img src="${url}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
+        ? `<video src="${safeUrl(url)}" class="home-reel-creator__preview" autoplay muted loop playsinline></video><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`
+        : `<img src="${safeUrl(url)}" class="home-reel-creator__preview" alt="preview"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
       stickers.length = 0; selectedSticker = null; renderStickers();
       drawCanvas = null; _spawnN = 0;
       tools.style.display = 'flex';
@@ -2906,7 +2904,7 @@ export class HomeView {
         isVideoMedia = false;
         stickers.length = 0; selectedSticker = null;
         const url = URL.createObjectURL(file);
-        canvas.innerHTML = `<img src="${url}" class="home-reel-creator__preview" alt="reel"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
+        canvas.innerHTML = `<img src="${safeUrl(url)}" class="home-reel-creator__preview" alt="reel"/><div class="home-reel-creator__stickers" id="reelStickers"></div><div class="home-reel-creator__caption-overlay" id="captionOverlay"></div><div class="home-reel-creator__guides" id="reelGuides"></div>`;
         drawCanvas = null; _spawnN = 0; renderStickers();
         tools.style.display = 'flex';
         shareBtn.disabled = false;
@@ -3025,9 +3023,9 @@ export class HomeView {
           const styleCss = _layerStyleCss(STYLES[s.styleIdx] ?? 'none', s.color);
           inner = `<span class="rst-text" style="font-size:${TEXT_BASE}px;font-family:${f.css.replace(/"/g, "'")};font-weight:${f.weight};text-align:${s.align};${styleCss}">${_esc(s.text).replace(/\n/g, '<br>')}</span>`;
         } else if (s.kind === 'emoji') {
-          inner = `<span class="rst-emoji">${s.text}</span>`;
+          inner = `<span class="rst-emoji">${esc(s.text)}</span>`;
         } else {
-          inner = `<span class="rst-pill">${stickerLabel(s)}</span>`;
+          inner = `<span class="rst-pill">${esc(stickerLabel(s))}</span>`;
         }
         return `<div class="rst-layer${sel}" data-id="${s.id}" style="left:${s.x}%;top:${s.y}%;transform:translate(-50%,-50%) rotate(${s.rotation}deg) scale(${s.scale})">${inner}<button class="rst-del" type="button">✕</button></div>`;
       }).join('');
@@ -3385,8 +3383,8 @@ export class HomeView {
       overlay.innerHTML = `
         <div class="home-reel-viewer__bg">
           ${isVideo
-            ? `<video class="home-reel-viewer__media" src="${reel.mediaUrl}" autoplay muted playsinline id="reelViewerVideo" oncontextmenu="return false"></video>`
-            : `<img class="home-reel-viewer__media" src="${reel.mediaUrl}" alt="reel" oncontextmenu="return false" draggable="false"/>`}
+            ? `<video class="home-reel-viewer__media" src="${safeUrl(reel.mediaUrl)}" autoplay muted playsinline id="reelViewerVideo" oncontextmenu="return false"></video>`
+            : `<img class="home-reel-viewer__media" src="${safeUrl(reel.mediaUrl)}" alt="reel" oncontextmenu="return false" draggable="false"/>`}
           ${reel.caption ? `<span class="home-reel-viewer__caption" style="${(() => {
             const ff = reel.captionFont ? `font-family:${reel.captionFont};` : '';
             const fw = `font-weight:${reel.captionWeight ?? '700'};`;
@@ -3395,7 +3393,7 @@ export class HomeView {
             if (st === 'highlight') { const dark = ['#ffffff','#ffcc00','#ffd60a','#00c46a','#5ac8fa'].includes((reel.captionColor||'').toLowerCase()); return `${base}background:${reel.captionColor};color:${dark ? '#000' : '#fff'};padding:0.08em 0.28em;border-radius:0.18em;-webkit-box-decoration-break:clone;box-decoration-break:clone;`; }
             if (st === 'neon') { return `${base}color:#fff;text-shadow:0 0 4px ${reel.captionColor},0 0 12px ${reel.captionColor},0 0 22px ${reel.captionColor};`; }
             return `${base}color:${reel.captionColor};`;
-          })()}">${reel.caption}</span>` : ''}
+          })()}">${esc(reel.caption)}</span>` : ''}
           ${reel.activityId ? `<button class="home-reel-viewer__activity" id="reelViewerActivity">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M3 12h4l3-8 4 16 3-8h4"/></svg>
             View activity
@@ -3408,9 +3406,9 @@ export class HomeView {
           </div>
           <div class="home-reel-viewer__author" id="reelViewerAuthor" style="cursor:pointer">
             <div class="home-reel-avatar ${reel.views.includes(myUserId) ? 'home-reel-avatar--seen' : 'home-reel-avatar--active'} home-reel-avatar--sm">
-              ${group.avatarB64 ? `<img src="${group.avatarB64}" class="home-reel-avatar__img"/>` : `<div class="home-reel-avatar__placeholder">${group.authorName[0]}</div>`}
+              ${group.avatarB64 ? `<img src="${safeUrl(group.avatarB64)}" class="home-reel-avatar__img"/>` : `<div class="home-reel-avatar__placeholder">${esc(group.authorName[0])}</div>`}
             </div>
-            <span class="home-reel-viewer__name">${group.authorName}</span>
+            <span class="home-reel-viewer__name">${esc(group.authorName)}</span>
             <span class="home-reel-viewer__time">${(() => { const s=Math.floor((Date.now()-reel.createdAt)/1000); return s<60?'just now':s<3600?Math.floor(s/60)+'m ago':Math.floor(s/3600)+'h ago'; })()}</span>
           </div>
           <button class="home-reel-viewer__close" id="reelViewerClose">✕</button>
@@ -4352,8 +4350,8 @@ export class HomeView {
       if (avatarEl) {
         const avatar = (data.authorAvatarUrl ?? null) as string | null;
         avatarEl.innerHTML = avatar
-          ? `<img src="${avatar}" class="home-card__avatar-img" alt="avatar"/>`
-          : `<span style="font-size:16px;font-weight:700">${authorName.charAt(0).toUpperCase()}</span>`;
+          ? `<img src="${safeUrl(avatar)}" class="home-card__avatar-img" alt="avatar"/>`
+          : `<span style="font-size:16px;font-weight:700">${esc(authorName.charAt(0).toUpperCase())}</span>`;
         avatarEl.style.background = 'rgba(74,222,128,0.15)';
         avatarEl.style.borderColor = 'rgba(74,222,128,0.3)';
       }
@@ -4467,7 +4465,7 @@ export class HomeView {
         const list = card.querySelector('.ff-comments__list');
         if (list) {
           list.innerHTML = cd.data.map(c =>
-            `<div class="ff-comment"><span class="ff-comment__author">${c.authorName}</span><span class="ff-comment__text">${c.text}</span></div>`
+            `<div class="ff-comment"><span class="ff-comment__author">${esc(c.authorName)}</span><span class="ff-comment__text">${esc(c.text)}</span></div>`
           ).join('');
         }
         const el = card.querySelector('.ff-comment-count');
@@ -4502,5 +4500,6 @@ export function openReelViewer(
 }
 
 import { getIcon as _gi2, getColor as _gc2 } from './Tracker.js';
+import { esc, safeUrl } from '../utils/dom.js';
 (window as unknown as Record<string, unknown>)._mapyouGetIcon  = _gi2;
 (window as unknown as Record<string, unknown>)._mapyouGetColor = _gc2;

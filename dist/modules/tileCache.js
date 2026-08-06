@@ -184,9 +184,13 @@ export function installTileCache() {
                 // 1. Cache
                 const cached = await readTile(key);
                 if (cached) {
-                    img.src = URL.createObjectURL(cached);
-                    img.onload = () => { URL.revokeObjectURL(img.src); finish(null); };
-                    img.onerror = () => finish(null);
+                    const objUrl = URL.createObjectURL(cached);
+                    img.src = objUrl;
+                    // Adres obiektu trzeba zwolnic TAKZE gdy obrazek sie nie wczyta —
+                    // wczesniej sciezka bledu go zostawiala, a kazdy nieudany kafelek
+                    // trzymal blob w pamieci do konca zycia karty.
+                    img.onload = () => { URL.revokeObjectURL(objUrl); finish(null); };
+                    img.onerror = () => { URL.revokeObjectURL(objUrl); finish(null); };
                     return;
                 }
                 // 2. Sieć — pobieramy przez `fetch`, zeby miec dostep do danych
@@ -196,9 +200,10 @@ export function installTileCache() {
                     if (!res.ok)
                         throw new Error(`HTTP ${res.status}`);
                     const blob = await res.blob();
-                    img.src = URL.createObjectURL(blob);
-                    img.onload = () => { URL.revokeObjectURL(img.src); finish(null); };
-                    img.onerror = () => finish(null);
+                    const objUrl = URL.createObjectURL(blob);
+                    img.src = objUrl;
+                    img.onload = () => { URL.revokeObjectURL(objUrl); finish(null); };
+                    img.onerror = () => { URL.revokeObjectURL(objUrl); finish(null); };
                     void writeTile(key, blob);
                 }
                 catch {

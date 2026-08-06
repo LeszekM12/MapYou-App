@@ -11,6 +11,7 @@
 import { BACKEND_URL } from '../config.js';
 import { getUserId }   from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
+import { esc } from '../utils/dom.js';
 
 export type PollType = 'single' | 'multiple' | 'yesno';
 
@@ -26,8 +27,8 @@ interface Poll {
   options: PollOption[];
 }
 
-const esc = (s: string): string =>
-  s.replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]!));
+// `esc` pochodzi teraz z `utils/dom.ts` — wczesniej kazdy plik mial wlasna,
+// identyczna kopie, a pliki bez niej renderowaly tresc uzytkownika surowo.
 
 const TYPE_META: Record<PollType, { icon: string; label: string; hint: string }> = {
   single:   { icon: '⚪', label: 'Single choice',   hint: 'Voters pick one option' },

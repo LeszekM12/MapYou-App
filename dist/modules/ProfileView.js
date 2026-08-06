@@ -13,6 +13,7 @@ import { BACKEND_URL } from '../config.js';
 import { loadProfileFromLocal, getUserId } from './UserProfile.js';
 import { loadPosts } from './db.js';
 import { onSessionReady } from './authFetch.js';
+import { esc, safeUrl } from '../utils/dom.js';
 // ── Constants ─────────────────────────────────────────────────────────────────
 const LS_WEEKLY_WINS = 'mapyou_weekly_wins'; // number — count of weeks goal was hit
 const LS_GOAL_WEEK = 'mapyou_last_goal_week'; // ISO week string — last week goal was checked
@@ -203,7 +204,7 @@ function _buildTrophySVG(trophy) {
     const glow = trophy.unlocked ? `filter:drop-shadow(0 0 8px ${trophy.color}88)` : '';
     const count = trophy.count ?? '?';
     return `
-  <div class="pv-trophy ${trophy.unlocked ? 'pv-trophy--unlocked' : ''}" title="${trophy.desc}">
+  <div class="pv-trophy ${trophy.unlocked ? 'pv-trophy--unlocked' : ''}" title="${esc(trophy.desc)}">
     <div class="pv-trophy__gem" style="${glow}">
       <svg viewBox="0 0 80 90" width="64" height="72">
         <polygon points="40,2 78,22 78,68 40,88 2,68 2,22"
@@ -217,7 +218,7 @@ function _buildTrophySVG(trophy) {
         : `<text x="40" y="52" text-anchor="middle" font-size="24" fill="#4b5563">🔒</text>`}
       </svg>
     </div>
-    <span class="pv-trophy__label">${trophy.label}</span>
+    <span class="pv-trophy__label">${esc(trophy.label)}</span>
   </div>`;
 }
 // ── Main class ────────────────────────────────────────────────────────────────
@@ -383,7 +384,7 @@ export class ProfileView {
         const totalKm = this._workouts.reduce((s, w) => s + w.distanceKm, 0);
         const weeklyWins = parseInt(localStorage.getItem(LS_WEEKLY_WINS) ?? '0', 10);
         const avatarHtml = profile.avatarB64
-            ? `<img src="${profile.avatarB64}" class="pv-avatar__img" alt="avatar"/>`
+            ? `<img src="${safeUrl(profile.avatarB64)}" class="pv-avatar__img" alt="avatar"/>`
             : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="44" height="44">
            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
          </svg>`;
@@ -405,8 +406,8 @@ export class ProfileView {
         <div class="pv-hero">
           <div class="pv-avatar ${hasReels ? (hasUnseen ? 'pv-avatar--reel-active' : 'pv-avatar--reel-seen') : ''}" id="pvAvatarReel" style="${hasReels ? 'cursor:pointer' : ''}">${avatarHtml}</div>
           <div class="pv-hero__info">
-            <h2 class="pv-name">${profile.name}</h2>
-            ${profile.bio ? `<p class="pv-bio">${profile.bio}</p>` : ''}
+            <h2 class="pv-name">${esc(profile.name)}</h2>
+            ${profile.bio ? `<p class="pv-bio">${esc(profile.bio)}</p>` : ''}
           </div>
         </div>
 
@@ -549,7 +550,7 @@ export class ProfileView {
       <div class="pv-act-item" data-idx="${i}">
         <span class="pv-act-item__icon">${_getIcon(w.type)}</span>
         <div class="pv-act-item__info">
-          <span class="pv-act-item__name">${w.name || w.description || w.type}</span>
+          <span class="pv-act-item__name">${esc(w.name || w.description || w.type)}</span>
           <span class="pv-act-item__date">${_relDate(w.date)}</span>
         </div>
         <div class="pv-act-item__stats">
@@ -781,7 +782,7 @@ export class ProfileView {
       <div class="pv-efforts">
         ${efforts.map(e => `
           <div class="pv-effort ${e.timeStr ? 'pv-effort--set' : ''}">
-            <span class="pv-effort__dist">${e.label}</span>
+            <span class="pv-effort__dist">${esc(e.label)}</span>
             <div class="pv-effort__right">
               ${e.timeStr
             ? `<span class="pv-effort__time">${e.timeStr}</span>
@@ -837,9 +838,9 @@ export class ProfileView {
             return `
         <div class="pv-section-title" style="margin-top:24px">${title}</div>
         <div class="pv-trophy-grid">${inGroup.map(a => `
-          <div class="pv-ach" title="${a.desc}">
+          <div class="pv-ach" title="${esc(a.desc)}">
             <span class="pv-ach__icon" style="background:${a.color}22;color:${a.color}">${a.icon}</span>
-            <span class="pv-ach__label">${a.label}</span>
+            <span class="pv-ach__label">${esc(a.label)}</span>
             <span class="pv-ach__date">${new Date(a.earnedAt).toLocaleDateString()}</span>
           </div>`).join('')}</div>`;
         }).join('');
@@ -895,7 +896,7 @@ export class ProfileView {
         visible.forEach(p => {
             const card = document.createElement('div');
             card.className = 'feed-card';
-            const avImg = myAvatar ? `<img src="${myAvatar}" loading="lazy"/>` : '';
+            const avImg = myAvatar ? `<img src="${safeUrl(myAvatar)}" loading="lazy"/>` : '';
             card.innerHTML =
                 '<div class="feed-card__header">'
                     + '<div class="feed-card__avatar">' + (avImg || myName[0] || '?') + '</div>'

@@ -13,3 +13,7 @@ android/keystore.properties
 *.keystore
 node_modules/
 www/
+# Biblioteki kopiowane z node_modules przez scripts/vendor.mjs.
+# Generowane przy kazdym `npm run build:app`, wersje przypiete
+# w package.json — nie ma powodu trzymac ich w repozytorium.
+vendor/

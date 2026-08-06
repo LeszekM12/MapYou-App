@@ -18,6 +18,7 @@ import { getUserId } from './UserProfile.js';
 import { loadProfileFromLocal } from './UserProfile.js';
 import { isSignedIn, signInPromptHtml, bindSignInPrompts, onAccountChange } from './AccountUI.js';
 import * as SS from './socialStore.js';
+import { esc, safeUrl } from '../utils/dom.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const STATUS_POLL_MS = 10000; // sprawdzaj status znajomych co 10s
 // ── FriendsView class ─────────────────────────────────────────────────────────
@@ -355,7 +356,7 @@ export class FriendsView {
         const date = new Date(data.date);
         const dateStr = date.toLocaleDateString('en', { month: 'short', day: 'numeric' });
         const photoHtml = data.photoUrl
-            ? `<img class="ff-card__photo" src="${data.photoUrl}" alt="" loading="lazy"/>`
+            ? `<img class="ff-card__photo" src="${safeUrl(data.photoUrl)}" alt="" loading="lazy"/>`
             : '';
         const authorName = (data.authorName ?? data.name ?? 'Friend');
         const title = (data.title ?? data.description ?? data.name ?? '');
@@ -369,9 +370,9 @@ export class FriendsView {
       </div>` : '';
         card.innerHTML = `
       <div class="ff-card__header">
-        <div class="ff-card__avatar">${authorName.charAt(0).toUpperCase()}</div>
+        <div class="ff-card__avatar">${esc(authorName.charAt(0).toUpperCase())}</div>
         <div class="ff-card__meta">
-          <span class="ff-card__author">${authorName}</span>
+          <span class="ff-card__author">${esc(authorName)}</span>
           <span class="ff-card__date">${dateStr}</span>
         </div>
         <span class="ff-card__type">${kind === 'activity' ? '🏃' : '📝'}</span>
@@ -392,8 +393,8 @@ export class FriendsView {
         <div class="ff-comments__list">
           ${comments.map(c => `
             <div class="ff-comment">
-              <span class="ff-comment__author">${c.authorName}</span>
-              <span class="ff-comment__text">${c.text}</span>
+              <span class="ff-comment__author">${esc(c.authorName)}</span>
+              <span class="ff-comment__text">${esc(c.text)}</span>
             </div>`).join('')}
         </div>
         <div class="ff-comment__input-row">
@@ -446,7 +447,7 @@ export class FriendsView {
                 if (list) {
                     const div = document.createElement('div');
                     div.className = 'ff-comment';
-                    div.innerHTML = `<span class="ff-comment__author">${d.data.authorName}</span><span class="ff-comment__text">${d.data.text}</span>`;
+                    div.innerHTML = `<span class="ff-comment__author">${esc(d.data.authorName)}</span><span class="ff-comment__text">${esc(d.data.text)}</span>`;
                     list.appendChild(div);
                 }
                 input.value = '';
@@ -470,10 +471,10 @@ export class FriendsView {
             : 'Never';
         return `
     <div class="friend-card ${isLive ? 'friend-card--live' : ''}">
-      <div class="friend-card__avatar">${f.name.charAt(0).toUpperCase()}</div>
+      <div class="friend-card__avatar">${esc(f.name.charAt(0).toUpperCase())}</div>
       <div class="friend-card__info">
         <div class="friend-card__name">
-          ${f.name}
+          ${esc(f.name)}
           ${isLive ? '<span class="friend-card__live-badge">● LIVE</span>' : ''}
         </div>
         <div class="friend-card__meta">Last seen: ${lastSeen}</div>
@@ -481,7 +482,7 @@ export class FriendsView {
       <div class="friend-card__actions">
         ${isLive ? `
           <button class="friend-card__btn friend-card__btn--watch"
-            data-watch="${f.liveToken}" data-name="${f.name}">
+            data-watch="${f.liveToken}" data-name="${esc(f.name)}">
             👁 Watch
           </button>` : ''}
         <button class="friend-card__btn friend-card__btn--delete"
@@ -782,7 +783,7 @@ export class FriendsView {
                         inner = this._buildDottedQR(qr.getModuleCount(), (r, c) => qr.isDark(r, c));
                     }
                     catch {
-                        inner = `<img class="mlink-qr__img" alt="QR code" src="${qr.createDataURL(6, 8)}" />`;
+                        inner = `<img class="mlink-qr__img" alt="QR code" src="${safeUrl(qr.createDataURL(6, 8))}" />`;
                     }
                     box.innerHTML = `<div class="mlink-qr__inner">${inner}${logo}</div>`;
                 }

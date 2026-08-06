@@ -173,7 +173,22 @@ export function paint() {
                 if (!raw)
                     return;
                 const e = get(raw);
-                el.textContent = String(e.likes);
+                // ── PISZ TYLKO WTEDY, GDY COS SIE ZMIENILO ──────────────────────────
+                //
+                // To nie jest mikrooptymalizacja, tylko warunek zatrzymania petli.
+                //
+                // `startSocialStore()` obserwuje `document.body` z `childList: true`.
+                // Przypisanie do `textContent` ZAWSZE podmienia wezel tekstowy — nawet
+                // gdy nowa wartosc jest identyczna ze stara. To generuje wpis mutacji,
+                // obserwator wola `paint()`, `paint()` znowu pisze do DOM... i tak
+                // w kolko, klatka po klatce, przez caly czas dzialania apki.
+                //
+                // Efekt byl niewidoczny na ekranie, ale realny: stale ~60 przebiegow
+                // na sekunde po wszystkich kartach feedu. Podczas treningu ta petla
+                // konkurowala o procesor z GPS-em i zjadala baterie.
+                const next = String(e.likes);
+                if (el.textContent !== next)
+                    el.textContent = next;
                 el.closest('.home-card__action')?.classList.toggle('home-card__action--liked', e.liked);
             });
             document.querySelectorAll('[data-comment-count]').forEach(el => {
@@ -183,8 +198,11 @@ export function paint() {
                 const e = get(raw);
                 // Zero z serwera jest prawda; zero „bo nie wiemy" nie powinno kasowac
                 // wartosci, ktora juz jest na ekranie.
-                if (e.comments > 0 || e.fromServer)
-                    el.textContent = String(e.comments);
+                if (e.comments > 0 || e.fromServer) {
+                    const next = String(e.comments);
+                    if (el.textContent !== next)
+                        el.textContent = next;
+                }
             });
         }
         catch { /* DOM w trakcie przerysowania */ }

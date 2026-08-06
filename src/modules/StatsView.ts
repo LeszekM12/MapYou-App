@@ -19,6 +19,7 @@ import { CS } from './cloudSync.js';
 import { recordWeeklyGoalWin, getBestStreak } from './ProfileView.js';
 import { verifiedOnly } from './UnifiedWorkout.js';
 import { notifyWeeklyGoal } from './NotificationsService.js';
+import { esc, safeUrl } from '../utils/dom.js';
 
 declare const Chart: any;
 // homeView imported lazily to avoid circular deps
@@ -591,7 +592,7 @@ export class StatsView {
           <div class="sv-item__body">
             <div class="sv-item__top">
               <span class="sv-item__icon">${_svIcon(sportKey)}</span>
-              <span class="sv-item__name">${w.name || w.description || _svLabel(sportKey)}</span>
+              <span class="sv-item__name">${esc(w.name || w.description || _svLabel(sportKey))}</span>
               <span class="sv-item__date">${relDate(w.date)}</span>
             </div>
             <div class="sv-item__stats">
@@ -676,7 +677,7 @@ export class StatsView {
         <div class="sv-detail-header" style="--wcolor:${color}">
           <span class="sv-detail-header__icon">${_svIcon(sportKey)}</span>
           <div>
-            <div class="sv-detail-header__name">${w.name || w.description || _svLabel(sportKey)}</div>
+            <div class="sv-detail-header__name">${esc(w.name || w.description || _svLabel(sportKey))}</div>
             <div class="sv-detail-header__date">${new Date(w.date).toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric',year:'numeric'})}</div>
           </div>
           <button class="sv-detail-close" id="svDetailClose">✕</button>
@@ -699,8 +700,8 @@ export class StatsView {
 
         ${w.coords.length >= 1 ? `<div class="sv-detail-map" id="svDetailMap"></div>` : ''}
 
-        ${w.notes ? `<div class="sv-detail-notes">🔒 ${w.notes}</div>` : ''}
-        ${w.photoUrl ? `<div class="sv-detail-photo"><img src="${w.photoUrl}" alt=""/></div>` : ''}
+        ${w.notes ? `<div class="sv-detail-notes">🔒 ${esc(w.notes)}</div>` : ''}
+        ${w.photoUrl ? `<div class="sv-detail-photo"><img src="${safeUrl(w.photoUrl)}" alt=""/></div>` : ''}
         ${w.intensity ? `<div class="sv-detail-intensity">Intensity: ${'●'.repeat(w.intensity)}${'○'.repeat(5-w.intensity)}</div>` : ''}
         <div class="sv-detail-src">Source: <strong>${w.source}</strong></div>
       </div>`;
