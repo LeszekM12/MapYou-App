@@ -68,6 +68,11 @@ export async function initAppCheck(): Promise<void> {
   try {
     await p.initialize({ debug });
     _ready = true;
+    // Pobierz token OD RAZU, w tle. Nikt na to nie czeka, ale dzieki temu
+    // pierwsze zadania uzytkownika zastana go juz w pamieci. Gdy sie nie uda
+    // (jak teraz — klucz iOS ma zablokowane firebaseappcheck.googleapis.com),
+    // karencja zablokuje kolejne proby i zadania po prostu poleca bez naglowka.
+    void prefetchAppCheckToken();
     dlog(`[AppCheck] zainicjalizowany${debug ? ' (TRYB DEBUG)' : ''}`);
   } catch (e) {
     console.warn('[AppCheck] inicjalizacja nieudana:', e instanceof Error ? e.message : e);
@@ -79,6 +84,44 @@ export async function initAppCheck(): Promise<void> {
  *  Token trzymamy w pamieci do wygasniecia minus minuta zapasu. Bez tego
  *  KAZDE zadanie do backendu odpalaloby natywna weryfikacje (App Attest
  *  potrafi mielic sekundy i ma limity po stronie Apple). */
+let _inflight: Promise<string | null> | null = null;
+
+/** Token WYLACZNIE z pamieci. NIGDY nie czeka — zwraca od razu.
+ *
+ *  TO JEST WLASCIWE WEJSCIE DLA SCIEZKI ZADANIA.
+ *
+ *  DLACZEGO POWSTALO
+ *  App Check jest OPCJONALNY (backend chodzi w trybie audytu), ale kazde
+ *  zadanie na niego CZEKALO: sciezka zalogowana do 2 sekund przez
+ *  `Promise.race`, a sciezka goscia BEZ ZADNEGO limitu. Gdy klucz iOS ma
+ *  zablokowane `firebaseappcheck.googleapis.com` — a tak jest teraz — kazda
+ *  proba konczy sie bledem 403 dopiero po kilkuset milisekundach.
+ *
+ *  Efekt byl dokladnie taki, jak zglaszany: przycisk reaguje, uchwyt sie
+ *  wykonuje, ale AKCJA wisi 2 sekundy. Glowny watek jest przy tym CALKOWICIE
+ *  WOLNY (profiler pokazal zero zastojow), bo to czekanie asynchroniczne —
+ *  dlatego szukanie „co blokuje watek" nie moglo niczego znalezc.
+ *
+ *  Teraz: jest token w pamieci — dokladamy go. Nie ma — wysylamy zadanie BEZ
+ *  niego i pobieramy w tle, na nastepny raz. Zadanie nie czeka nigdy. */
+export function getAppCheckTokenNow(): string | null {
+  if (_token && Date.now() < _expiresAt) return _token;
+  void prefetchAppCheckToken();   // odswiez w tle
+  return null;
+}
+
+/** Pobierz token w tle. Wolne, ale nikt na to nie czeka.
+ *
+ *  Rownolegle wywolania wspoldziela JEDNO zapytanie. Bez tego kazde zadanie
+ *  odpalalo osobna weryfikacje natywna, bo `_retryAfter` ustawia sie dopiero
+ *  PO niepowodzeniu — czyli przy starcie, gdy leci kilkanascie zadan naraz,
+ *  zadne z nich jeszcze o karencji nie wiedzialo. */
+export function prefetchAppCheckToken(): Promise<string | null> {
+  if (_inflight) return _inflight;
+  _inflight = getAppCheckToken().finally(() => { _inflight = null; });
+  return _inflight;
+}
+
 export async function getAppCheckToken(): Promise<string | null> {
   if (!_ready) return null;
   if (_token && Date.now() < _expiresAt) return _token;
@@ -87,6 +130,9 @@ export async function getAppCheckToken(): Promise<string | null> {
 
   const p = plugin();
   if (!p) return null;
+  // Karencje wstawiamy JUZ TERAZ, nie dopiero po bledzie. Inaczej wszystko,
+  // co ruszy w trakcie tej proby, przejdzie obok bramki i odpali wlasna.
+  _retryAfter = Date.now() + 10_000;
   try {
     const res = await p.getToken();
     _token = res.token ?? null;

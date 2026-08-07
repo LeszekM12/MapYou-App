@@ -17,7 +17,7 @@
 
 import { BACKEND_URL } from '../config.js';
 import { dlog, dwarn } from '../utils/log.js';
-import { getAppCheckToken } from './appCheck.js';
+import { getAppCheckTokenNow } from './appCheck.js';
 
 type TokenProvider = () => Promise<string | null>;
 
@@ -118,7 +118,10 @@ export function installAuthFetch(): void {
       if (isGuestAllowed(url)) {
         // Nawet zadania goscia (logowanie, planowanie trasy) niosa App Check —
         // to wlasnie one sa celem masowego naduzycia z przepisanym kluczem.
-        const ac = await getAppCheckToken();
+        // Bez czekania. Ta sciezka obsluguje m.in. `/auth/session`, czyli
+        // pierwsze zadanie po starcie — i to ona czekala NAJDLUZEJ, bo nie
+        // miala nawet limitu czasu. W pomiarze: 716 ms na jedno zadanie.
+        const ac = getAppCheckTokenNow();
         if (!ac) return original(input, init);
         const gh = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
         gh.set('X-Firebase-AppCheck', ac);
@@ -147,10 +150,11 @@ export function installAuthFetch(): void {
     // cos, co jest CALKOWICIE opcjonalne — i cala apka zwalniala.
     // Dwie sekundy albo lecimy bez naglowka; backend jest w trybie audytu
     // i tak go nie wymaga.
-    const appCheck = await Promise.race([
-      getAppCheckToken(),
-      new Promise<null>(r => setTimeout(() => r(null), 2_000)),
-    ]);
+    // Zero czekania — token albo jest w pamieci, albo lecimy bez niego.
+    // Poprzednie `Promise.race` z limitem 2 s wygladalo na zabezpieczenie,
+    // ale w praktyce oznaczalo, ze KAZDE wczesne zadanie moglo stracic
+    // do dwoch sekund. Backend jest w trybie audytu i naglowka nie wymaga.
+    const appCheck = getAppCheckTokenNow();
     if (appCheck) headers.set('X-Firebase-AppCheck', appCheck);
 
     // ── Zapisy: kolejka offline (Etap 2) ────────────────────────────────────
