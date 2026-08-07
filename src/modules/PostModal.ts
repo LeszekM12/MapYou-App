@@ -60,6 +60,20 @@ function buildHTML(): string {
 
       </div>
 
+      <!-- Kto to zobaczy. Aktywnosci mialy ten wybor od dawna, posty nie,
+           choc pole visibility istnieje w modelu Post i backend je obsluguje
+           przez PATCH /posts/:postId/visibility. Brakowalo tylko ekranu.
+           UWAGA: zadnych backtickow w tym komentarzu — caly szablon jest
+           literalem szablonowym i backtick by go zamknal. -->
+      <div class="pm-field">
+        <label class="pm-label">Who can see this?</label>
+        <div class="sam-vis-btns" id="pmVis">
+          <button type="button" class="sam-vis-btn sam-vis-btn--active" data-vis="everyone"><span>🌐</span> Everyone</button>
+          <button type="button" class="sam-vis-btn" data-vis="friends"><span>👥</span> Friends</button>
+          <button type="button" class="sam-vis-btn" data-vis="only_me"><span>🔒</span> Only me</button>
+        </div>
+      </div>
+
       <div class="pm-share-clubs" id="pmShareClubs"></div>
       <div id="pmAddToHomeWrap" style="display:none;padding:8px 16px">
         <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:1.3rem;color:rgba(255,255,255,0.7)">
@@ -98,6 +112,15 @@ export class PostModal {
     wrapper.innerHTML = buildHTML();
     const el = wrapper.firstElementChild as HTMLElement;
     document.body.appendChild(el);
+
+    // Wybor widocznosci — jeden aktywny na raz, tak jak przy aktywnosci.
+    el.querySelectorAll<HTMLElement>('#pmVis .sam-vis-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        el.querySelectorAll('#pmVis .sam-vis-btn')
+          .forEach(b => b.classList.remove('sam-vis-btn--active'));
+        btn.classList.add('sam-vis-btn--active');
+      });
+    });
     this._el = el;
 
     requestAnimationFrame(() => {
@@ -306,6 +329,8 @@ export class PostModal {
       mediaType:     finalMediaType ?? undefined,
       authorName:    localStorage.getItem('mapyou_userName') ?? 'Athlete',
       avatarB64:  localStorage.getItem('mapyou_avatar') ?? null,
+      visibility: (el.querySelector<HTMLElement>('#pmVis .sam-vis-btn--active')
+        ?.dataset.vis as 'everyone' | 'friends' | 'only_me') ?? 'everyone',
     };
 
     // Share to selected clubs — set clubIds BEFORE saving

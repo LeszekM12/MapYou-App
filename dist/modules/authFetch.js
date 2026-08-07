@@ -215,6 +215,13 @@ export function installAuthFetch() {
         }
         // Token wygasł/nieprawidłowy → jedna próba z odświeżonym tokenem
         if (res.status === 401) {
+            // 401 znaczy, ze token jest nieaktualny — cache trzeba wyrzucic,
+            // inaczej dostalibysmy z powrotem ten sam, odrzucony token.
+            try {
+                const { invalidateIdToken } = await import('./authService.js');
+                invalidateIdToken();
+            }
+            catch { /* modul niedostepny — probujemy dalej */ }
             const fresh = await _getToken();
             if (fresh && fresh !== token) {
                 headers.set('Authorization', `Bearer ${fresh}`);

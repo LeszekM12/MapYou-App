@@ -519,8 +519,14 @@ export function buildPostCard(post: PostRecord, onRefresh: () => Promise<void> |
   card.className = 'home-card home-card--post';
   card.dataset.id = post.id;
 
-  const avatarHtml = post.avatarB64
-    ? `<img src="${safeUrl(post.avatarB64)}" class="home-card__avatar-img" alt="avatar"/>`
+  // Awatar: rekord z serwera bywa bez `avatarB64` (starsze posty zapisane,
+  // zanim pole zaczelo byc wysylane). Dla WLASNYCH postow mamy zdjecie
+  // lokalnie, wiec nie ma powodu pokazywac szarego ludzika.
+  const _ownAvatar = post.authorName === (localStorage.getItem('mapyou_userName') ?? '')
+    ? localStorage.getItem('mapyou_avatar') : null;
+  const _avatarSrc = post.avatarB64 ?? _ownAvatar;
+  const avatarHtml = _avatarSrc
+    ? `<img src="${safeUrl(_avatarSrc)}" class="home-card__avatar-img" alt="avatar"/>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="22" height="22"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>`;
 
   const _postIsVideo = post.mediaType === 'video' || (post.photoUrl?.includes('/video/upload/') ?? false);

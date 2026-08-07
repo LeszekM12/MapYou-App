@@ -58,25 +58,84 @@ function auth() {
     return _auth;
 }
 // ── Token dla authFetch ───────────────────────────────────────────────────────
-export function initAuthTokenProvider() {
-    setTokenProvider(async () => {
-        if (useNative()) {
-            try {
-                const { token } = await plugin().getIdToken();
-                return token || null;
-            }
-            catch {
-                return null; // nikt nie jest zalogowany
-            }
-        }
-        const u = auth().currentUser;
-        if (!u)
-            return null;
+// ─── CACHE TOKENU ────────────────────────────────────────────────────────────
+//
+// PROBLEM, KTORY TO ROZWIAZUJE
+// Kazde zadanie do backendu wolalo `getIdToken()` OD NOWA. Na urzadzeniu
+// natywnym to nie jest odczyt zmiennej, tylko PRZESKOK PRZEZ MOSTEK Capacitora
+// do kodu natywnego. Mostek jest szeregowany na glownym watku, wiec kilkanascie
+// takich wywolan pod rzad — a tyle wlasnie leci przy starcie apki (feed,
+// profil, powiadomienia, kluby, osiagniecia, wyzwania, polubienia) — potrafi
+// zablokowac interfejs na kilka sekund. Objaw: apka jest juz narysowana,
+// ale przyciski nie reaguja.
+//
+// Token Firebase to JWT wazny GODZINE. Nie ma zadnego powodu, zeby pytac
+// o niego przy kazdym zadaniu.
+//
+// Trzymamy go wiec w pamieci do czasu wygasniecia (minus zapas), a rownolegle
+// zadania wspoldziela JEDNO zapytanie zamiast ustawiac sie w kolejce.
+let _tok = null;
+let _tokInflight = null;
+/** Data wygasniecia z ladunku JWT. Gdy sie nie uda — zakladamy krotka waznosc,
+ *  zeby w najgorszym razie odpytac czesciej, a nie uzywac martwego tokenu. */
+function tokenExpiry(jwt) {
+    try {
+        const part = jwt.split('.')[1];
+        if (!part)
+            return Date.now() + 60000;
+        const json = atob(part.replace(/-/g, '+').replace(/_/g, '/'));
+        const exp = JSON.parse(json).exp;
+        return typeof exp === 'number' ? exp * 1000 : Date.now() + 60000;
+    }
+    catch {
+        return Date.now() + 60000;
+    }
+}
+/** Wyrzuc token z pamieci. Wolac przy wylogowaniu i zmianie konta —
+ *  inaczej apka wysylalaby token poprzedniego uzytkownika az do wygasniecia. */
+export function invalidateIdToken() {
+    _tok = null;
+    _tokInflight = null;
+}
+async function fetchIdToken() {
+    if (useNative()) {
         try {
-            return await u.getIdToken();
+            const { token } = await plugin().getIdToken();
+            return token || null;
         }
         catch {
-            return null;
+            return null; // nikt nie jest zalogowany
+        }
+    }
+    const u = auth().currentUser;
+    if (!u)
+        return null;
+    try {
+        return await u.getIdToken();
+    }
+    catch {
+        return null;
+    }
+}
+export function initAuthTokenProvider() {
+    setTokenProvider(async () => {
+        // Zapas 5 minut — zadanie wyslane tuz przed wygasnieciem ma zdazyc dojsc.
+        if (_tok && _tok.expMs - Date.now() > 5 * 60000)
+            return _tok.token;
+        // Rownolegle zadania czekaja na TO SAMO zapytanie, zamiast wywolywac
+        // kilkanascie osobnych przeskokow przez mostek.
+        if (_tokInflight)
+            return _tokInflight;
+        _tokInflight = (async () => {
+            const t = await fetchIdToken();
+            _tok = t ? { token: t, expMs: tokenExpiry(t) } : null;
+            return t;
+        })();
+        try {
+            return await _tokInflight;
+        }
+        finally {
+            _tokInflight = null;
         }
     });
 }
@@ -175,6 +234,9 @@ export async function linkProvider(provider) {
         throw new Error('Laczenie anulowane.');
 }
 export async function signOutEverywhere() {
+    // Najpierw cache — inaczej apka wysylalaby token poprzedniego uzytkownika
+    // az do jego wygasniecia, nawet po wylogowaniu.
+    invalidateIdToken();
     if (useNative()) {
         try {
             await plugin().signOut();

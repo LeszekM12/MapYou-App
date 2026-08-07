@@ -146,6 +146,10 @@ export interface PostRecord {
   clubOnly?:   boolean;
   authorName: string;
   avatarB64:  string | null;
+  /** Kto zobaczy post. Pole istnialo w modelu `Post` na backendzie i bylo
+   *  obslugiwane przez `PATCH /posts/:postId/visibility`, ale zaden ekran go
+   *  nie ustawial przy tworzeniu — kazdy post szedl jako `everyone`. */
+  visibility?: 'everyone' | 'friends' | 'only_me';
 }
 
 // ── Inicjalizacja Dexie ───────────────────────────────────────────────────────
