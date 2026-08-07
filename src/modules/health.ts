@@ -160,7 +160,36 @@ class NativeHealthProvider implements HealthProvider {
     } catch { return false; }
   }
 
+  /** Kroki z Health — z krotkim cache i scalaniem rownoleglych zapytan.
+   *
+   *  Pomiar pokazal SIEDEM identycznych wywolan `queryAggregated` przy jednym
+   *  starcie: te same daty, ten sam `dataType`, ten sam `bucket`. Kazde z nich
+   *  to przeskok przez mostek Capacitora, a mostek jest szeregowany na glownym
+   *  watku — wiec siedem zapytan nie dzieje sie rownolegle, tylko jedno po
+   *  drugim, blokujac kolejke innym wtyczkom.
+   *
+   *  Cache trwa 30 sekund. Liczba krokow zmienia sie powoli, a to w zupelnosci
+   *  wystarcza, zeby jeden start apki albo jedno odswiezenie feedu pytalo RAZ. */
+  private static _stepsCache = new Map<string, { v: number; t: number }>();
+  private static _stepsInflight = new Map<string, Promise<number>>();
+  private static readonly STEPS_TTL = 30_000;
+
   async getSteps(startMs: number, endMs: number): Promise<number> {
+    const klucz = `${startMs}-${endMs}`;
+    const c = NativeHealthProvider._stepsCache.get(klucz);
+    if (c && Date.now() - c.t < NativeHealthProvider.STEPS_TTL) return c.v;
+
+    const wLocie = NativeHealthProvider._stepsInflight.get(klucz);
+    if (wLocie) return wLocie;
+
+    const zadanie = this._getStepsRaw(startMs, endMs)
+      .then(v => { NativeHealthProvider._stepsCache.set(klucz, { v, t: Date.now() }); return v; })
+      .finally(() => { NativeHealthProvider._stepsInflight.delete(klucz); });
+    NativeHealthProvider._stepsInflight.set(klucz, zadanie);
+    return zadanie;
+  }
+
+  private async _getStepsRaw(startMs: number, endMs: number): Promise<number> {
     const p = this.plugin();
     if (!p) return 0;
     try {
