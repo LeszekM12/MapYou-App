@@ -159,6 +159,11 @@
   flex-direction: column;
   gap: 10px;
 }
+.sv-record__icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; flex-shrink: 0;
+  color: var(--color-light--1, #aaa);
+}
 .sv-record {
   display: flex;
   align-items: center;
@@ -201,6 +206,13 @@
 
 /* ── Goal editor ── */
 .sv-goal-editor { display: flex; flex-direction: column; gap: 10px; }
+/* Wiersz celu jest osobna karta - tak samo jak wiersz rekordu. Wczesniej byl
+   golym tekstem na tle sekcji i wygladal jak niedokonczony formularz. */
+.sv-goal-row {
+  background: var(--app-surface-1);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
 .sv-goal-row {
   display: flex;
   align-items: center;

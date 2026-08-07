@@ -44,7 +44,12 @@ function startOfWeek(d = new Date()): Date {
 }
 
 function relDate(iso: string): string {
-  const diff  = Date.now() - new Date(iso).getTime();
+  // Czesc starszych rekordow ma date pusta albo w innym formacie
+  // (`String(a.date)` przy migracji). Bez tej bramki `MONTHS[NaN]` dawalo
+  // doslowne „undefined NaN" na ekranie.
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const diff  = Date.now() - t;
   const days  = Math.floor(diff / 86_400_000);
   if (days === 0) return 'Today';
   if (days === 1) return 'Yesterday';
@@ -300,6 +305,18 @@ export class StatsView {
         <div id="svAllTime" style="display:grid;grid-template-columns:repeat(2,1fr);gap:10px"></div>
       </section>
 
+      <!-- Sport split -->
+      <section class="sv-section">
+        <div class="sv-section__title">Sport breakdown</div>
+        <div id="svSportSplit"></div>
+      </section>
+
+      <!-- Activity map -->
+      <section class="sv-section">
+        <div class="sv-section__title">Activity map</div>
+        <div id="svHeatmap"></div>
+      </section>
+
       <!-- Records -->
       <section class="sv-section">
         <div class="sv-section__title">Personal Records</div>
@@ -339,6 +356,8 @@ export class StatsView {
     this._renderMonthChart('dist');
     this._renderYearChart();
     this._renderAllTime();
+    this._renderSportSplit();
+    this._renderHeatmap();
     this._renderRecords();
     this._renderTrends();
     this._bindProgressEvents();
@@ -571,7 +590,11 @@ export class StatsView {
     const sec   = ws.reduce((s, w) => s + w.durationSec, 0);
     const elev  = ws.reduce((s, w) => s + (w.elevGain || 0), 0);
     const days  = new Set(ws.map(w => String(w.date).slice(0, 10))).size;
-    const first = ws.reduce((a, w) => (w.date < a ? w.date : a), ws[0].date);
+    // Najstarszy trening wybieramy po ZNACZNIKU CZASU, nie po porownaniu
+    // tekstow. Wystarczyl jeden rekord z pusta data, zeby wygral leksykalnie
+    // i kafel pokazywal „undefined NaN".
+    const czasy = ws.map(w => Date.parse(String(w.date))).filter(t => Number.isFinite(t));
+    const first = czasy.length ? new Date(Math.min(...czasy)).toISOString() : null;
 
     const tiles: Array<[string, string, string]> = [
       [km.toFixed(0),                 'km',       'Total distance'],
@@ -580,7 +603,8 @@ export class StatsView {
       [String(days),                  '',         'Active days'],
     ];
     if (elev > 0) tiles.push([String(Math.round(elev)), 'm', 'Elevation gained']);
-    tiles.push([relDate(first), '', 'First workout']);
+    // Kafel tylko wtedy, gdy data jest sensowna — pusty wyglada jak awaria.
+    if (first) tiles.push([relDate(first), '', 'First workout']);
 
     el.innerHTML = tiles.map(([val, unit, lbl]) => `
       <div style="background:rgba(128,128,128,0.10);border-radius:12px;padding:12px 14px">
@@ -588,6 +612,97 @@ export class StatsView {
           ${esc(val)}<span style="font-size:1.1rem;font-weight:700;opacity:.55"> ${unit}</span></div>
         <div style="font-size:1.1rem;color:var(--app-text-secondary);margin-top:3px">${lbl}</div>
       </div>`).join('');
+  }
+
+  /** Udzial poszczegolnych sportow w dorobku.
+   *
+   *  Profil pokazuje jeden wykres tygodniowy — tu chodzi o cos innego:
+   *  z czego SKLADA sie caly Twoj kilometraz. Same dane, ktore juz masz. */
+  private _renderSportSplit(): void {
+    const el = document.getElementById('svSportSplit');
+    if (!el) return;
+    const ws = this._workouts;
+    if (!ws.length) { el.innerHTML = '<p class="sv-empty">No workouts yet</p>'; return; }
+
+    const agg = new Map<string, { km: number; n: number }>();
+    for (const w of ws) {
+      const k = w.sport || w.type || 'other';
+      const a = agg.get(k) ?? { km: 0, n: 0 };
+      a.km += w.distanceKm; a.n += 1; agg.set(k, a);
+    }
+    const rows = [...agg.entries()].sort((a, b) => b[1].km - a[1].km || b[1].n - a[1].n);
+    const maxKm = Math.max(...rows.map(r => r[1].km), 1);
+    const total = rows.reduce((s, r) => s + r[1].km, 0);
+
+    el.innerHTML = rows.map(([sport, v]) => {
+      const pct = total > 0 ? Math.round((v.km / total) * 100) : 0;
+      return `
+      <div style="margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;font-size:1.2rem;margin-bottom:5px">
+          <span style="color:var(--app-text);font-weight:600">${esc(_svLabel(sport as never))}</span>
+          <span style="color:var(--app-text-secondary)">
+            ${v.km >= 1 ? `${v.km.toFixed(0)} km · ` : ''}${v.n}×${total > 0 ? ` · ${pct}%` : ''}</span>
+        </div>
+        <div style="height:7px;background:rgba(128,128,128,0.15);border-radius:4px;overflow:hidden">
+          <div style="width:${Math.max(3, (v.km / maxKm) * 100)}%;height:100%;
+               background:${_svColor(sport as never)};border-radius:4px"></div>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  /** Mapa aktywnosci — kwadrat na kazdy dzien ostatnich 26 tygodni.
+   *
+   *  Jedno spojrzenie mowi o regularnosci wiecej niz slupki: widac przerwy,
+   *  serie i to, czy trenujesz w te same dni tygodnia. */
+  private _renderHeatmap(): void {
+    const el = document.getElementById('svHeatmap');
+    if (!el) return;
+    const WEEKS = 26;
+
+    const byDay = new Map<string, number>();
+    for (const w of this._workouts) {
+      const t = Date.parse(String(w.date));
+      if (!Number.isFinite(t)) continue;
+      const k = new Date(t).toISOString().slice(0, 10);
+      byDay.set(k, (byDay.get(k) ?? 0) + Math.max(w.distanceKm, w.durationSec / 3600));
+    }
+    if (!byDay.size) { el.innerHTML = '<p class="sv-empty">No workouts yet</p>'; return; }
+
+    const koniec = startOfWeek(new Date());
+    koniec.setDate(koniec.getDate() + 7);
+    const start = new Date(koniec); start.setDate(start.getDate() - WEEKS * 7);
+    const max = Math.max(...byDay.values(), 1);
+
+    let kolumny = '';
+    for (let w = 0; w < WEEKS; w++) {
+      let kom = '';
+      for (let d = 0; d < 7; d++) {
+        const day = new Date(start);
+        day.setDate(start.getDate() + w * 7 + d);
+        const k = day.toISOString().slice(0, 10);
+        const v = byDay.get(k) ?? 0;
+        const przyszlosc = day.getTime() > Date.now();
+        // Cztery poziomy nasycenia — wiecej i tak nie da sie rozroznic okiem.
+        const alpha = v === 0 ? 0 : v / max > 0.66 ? 1 : v / max > 0.33 ? 0.68 : 0.38;
+        const bg = przyszlosc ? 'transparent'
+                 : alpha === 0 ? 'rgba(128,128,128,0.14)'
+                 : `rgba(0,196,106,${alpha})`;
+        kom += `<div title="${k}${v ? ` — ${v.toFixed(1)}` : ''}"
+          style="width:100%;aspect-ratio:1;border-radius:2px;background:${bg}"></div>`;
+      }
+      kolumny += `<div style="display:grid;grid-template-rows:repeat(7,1fr);gap:2px">${kom}</div>`;
+    }
+
+    el.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(${WEEKS},1fr);gap:2px">${kolumny}</div>
+      <div style="display:flex;align-items:center;gap:5px;margin-top:10px;
+           font-size:1.05rem;color:var(--app-text-secondary)">
+        <span>Less</span>
+        ${[0.14, 0.38, 0.68, 1].map(a => `<div style="width:10px;height:10px;border-radius:2px;
+          background:rgba(${a === 0.14 ? '128,128,128,0.14' : `0,196,106,${a}`})"></div>`).join('')}
+        <span>More</span>
+      </div>`;
   }
 
   private _renderRecords(): void {

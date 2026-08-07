@@ -318,14 +318,24 @@ body.light-mode .sv-icon-btn { background: #fff !important; color: #555 !importa
 body.light-mode .sv-seg { background: #e5e5ea !important; }
 body.light-mode .sv-seg__btn { color: #888 !important; }
 body.light-mode .sv-seg__btn--active { background: #fff !important; color: #1a1a1a !important; box-shadow: 0 1px 4px rgba(0,0,0,0.12) !important; }
-body.light-mode .sv-records { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+/* `.sv-records` to tylko kontener listy, nie karta. Bialy prostokat wewnatrz
+   szarej sekcji dawal to samo zagniezdzenie co wczesniej przy wykresach.
+   Karta jest KAZDY wiersz z osobna - i to wystarcza. */
+body.light-mode .sv-records { background: transparent !important; box-shadow: none !important; }
+body.light-mode .sv-record { background: #fff !important; box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important; }
+body.light-mode .sv-record__icon { color: #8a8a8e !important; }
+body.light-mode .sv-record__val { font-variant-numeric: tabular-nums; }
 body.light-mode .sv-record { border-color: rgba(0,0,0,0.07) !important; }
 body.light-mode .sv-record__label { color: #1a1a1a !important; }
 body.light-mode .sv-record__date { color: #999 !important; }
-body.light-mode .sv-goal-editor { background: #fff !important; box-shadow: 0 1px 4px rgba(0,0,0,0.07) !important; }
+/* To samo z celami: wiersz jest karta, kontener nie. */
+body.light-mode .sv-goal-editor { background: transparent !important; box-shadow: none !important; }
+body.light-mode .sv-goal-row { background: #fff !important; border-radius: 12px !important;
+  padding: 12px 14px !important; box-shadow: 0 1px 3px rgba(0,0,0,0.06) !important; }
 body.light-mode .sv-goal-row { border-color: rgba(0,0,0,0.07) !important; }
 body.light-mode .sv-goal-row span { color: #1a1a1a !important; }
-body.light-mode .sv-goal-input { background: #f2f2f7 !important; color: #1a1a1a !important; border-color: rgba(0,0,0,0.1) !important; }
+body.light-mode .sv-goal-input { background: #f2f2f7 !important; color: #1a1a1a !important;
+  border-color: transparent !important; font-weight: 700 !important; }
 body.light-mode .sv-filter { background: #fff !important; color: #555 !important; border-color: rgba(0,0,0,0.08) !important; }
 body.light-mode .sv-filter--active { background: #00c46a !important; color: #fff !important; border-color: #00c46a !important; }
 body.light-mode .sv-sort { background: #fff !important; color: #555 !important; }
