@@ -6,6 +6,8 @@
 
 
 
+// Profiler startu — MUSI byc pierwszym importem, zeby zmierzyc caly rozruch.
+import { bootMark } from './modules/bootProfiler.js';
 import { BACKEND_URL, PUBLIC_BASE_URL } from './config.js';
 import { dlog, isDebug, setDebug } from './utils/log.js';
 import { initAppCheck } from './modules/appCheck.js';
@@ -22,6 +24,7 @@ installTileCache();
 void requestPersistentStorage();
 // Kolejka zapisow offline — wysyla zalegle zadania, gdy siec wroci,
 // i pokazuje pasek statusu.
+bootMark('moduly startowe');
 void Promise.resolve().then(() => { startOutbox(); mountOfflineBar(); startMediaQueue(); startSocialStore(); });
 // Odznaka zdobyta bez zasiegu nie miala jak sie przeliczyc w swoim momencie —
 // `recompute` wymaga sieci. Nadrabiamy przy starcie, z opoznieniem, zeby nie
@@ -1413,11 +1416,17 @@ class App {
     // Migruj dane z localStorage do IndexedDB (tylko raz, przy pierwszym uruchomieniu)
     await migrateLocalStorageToIndexedDB();
     // Wczytaj z IndexedDB
+    bootMark('przed loadWorkoutsFromDB');
     const data = await loadWorkoutsFromDB();
+    bootMark(`po loadWorkoutsFromDB (${data.length} rekordow)`);
     if (!data.length) return;
     this.#workouts = data.map((d: any) => Workout.fromData(d));
+    bootMark('po Workout.fromData');
+    // TU jest podejrzenie: petla wstawia do DOM jeden po drugim, synchronicznie.
     this.#workouts.forEach(w => this._renderWorkout(w));
+    bootMark('po renderWorkout (petla DOM)');
     this._renderStats(); this._renderStreak();
+    bootMark('po renderStats/Streak');
   }
 
   // ── TRACKER ───────────────────────────────────────────────────────────────
@@ -3517,7 +3526,9 @@ declare global {
   }
 }
 
+bootMark('przed new App()');
 window.app = new App();
+bootMark('po new App()');
 
 // ─── BOTTOM NAV (exact copy of script.js initBottomNav IIFE) ─────────────────
 (function initBottomNav() {
