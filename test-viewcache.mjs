@@ -240,6 +240,39 @@ console.log('\n=== 13. WYBÓR ZAKŁADKI PRZEŻYWA ODŚWIEŻENIE (jak w X) ===');
   sprawdz('nieznana wartość → bezpieczny Home', wczytaj() === 'home');
 }
 
+console.log('\n=== 14. PONAWIANIE SESJI PO TIMEOUCIE (mój błąd z 17) ===');
+{
+  // Poprzednia wersja ponawiała TYLKO na zdarzenie `online`. Przy timeoucie
+  // (sieć działa, maszyna Fly się budzi) `online` nigdy nie nadchodzi,
+  // więc sesja nie odtwarzała się do końca działania aplikacji.
+  const symuluj = ({ tylkoNaOnline, zdarzenieOnline, udaSieProbie }) => {
+    let proba = 0, odtworzona = false;
+    if (tylkoNaOnline) {
+      if (zdarzenieOnline) odtworzona = true;
+      return { odtworzona, prob: zdarzenieOnline ? 1 : 0 };
+    }
+    const ODSTEPY = [5000, 15000, 45000];
+    while (proba < ODSTEPY.length) {
+      proba++;
+      if (proba === udaSieProbie) { odtworzona = true; break; }
+    }
+    return { odtworzona, prob: proba };
+  };
+
+  const stary = symuluj({ tylkoNaOnline: true, zdarzenieOnline: false });
+  sprawdz('STARY kod: timeout bez `online` → sesja NIE wraca', !stary.odtworzona);
+
+  const nowy = symuluj({ tylkoNaOnline: false, udaSieProbie: 2 });
+  sprawdz('NOWY kod: wraca bez zdarzenia `online`', nowy.odtworzona);
+  sprawdz('udaje się przy 2. próbie', nowy.prob === 2);
+
+  const trudny = symuluj({ tylkoNaOnline: false, udaSieProbie: 3 });
+  sprawdz('daje 3 szanse zanim odpuści', trudny.odtworzona && trudny.prob === 3);
+
+  const beznadziejny = symuluj({ tylkoNaOnline: false, udaSieProbie: 99 });
+  sprawdz('nie ponawia w nieskończoność', !beznadziejny.odtworzona && beznadziejny.prob === 3);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

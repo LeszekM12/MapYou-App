@@ -43,6 +43,10 @@ export async function initAccountSilent() {
     // (Wywolanie zylo wczesniej w authGate.ts, usunietym przy przebudowie
     //  na tryb goscia — i nie zostalo tu przeniesione.)
     initAuthTokenProvider();
+    // Poza `try`, zeby galaz `catch` mogla podac, ILE trwala nieudana proba.
+    // To wazniejsze, niz wyglada: 8000 ms w logu oznacza uspiona maszyne Fly,
+    // a 30 ms — realny brak sieci. Dwie zupelnie rozne przyczyny.
+    const _t0 = Date.now();
     try {
         const user = await getSignedInUser();
         if (!user) {
@@ -59,7 +63,10 @@ export async function initAccountSilent() {
         // TRYB CICHY: przy starcie tylko PRZYWRACAMY istniejace powiazanie.
         // Nigdy nie zakladamy ani nie przejmujemy konta w tle — to decyzja
         // uzytkownika podejmowana swiadomie w oknie logowania.
-        const session = await exchangeSession(undefined, { silentOnly: true });
+        // 8 s zamiast 15: aplikacja i tak dziala na znanej sesji, wiec dluzsze
+        // czekanie niczego nie daje — opoznia tylko wlaczenie trybu zapasowego.
+        const session = await exchangeSession(undefined, { silentOnly: true, timeoutMs: 8000 });
+        dlog(`[Account] sesja ustalona w ${Date.now() - _t0} ms`);
         _signedIn = true;
         setSessionReady(true); // dopiero teraz wolno dokladac token do zadan
         dlog(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
@@ -101,16 +108,48 @@ export async function initAccountSilent() {
         if (znanyUserId) {
             _signedIn = true;
             setSessionReady(true);
-            console.warn('[Account] serwer nieosiagalny — dzialam na znanej sesji '
-                + `(${znanyUserId}). Powiazanie odswiezy sie po powrocie sieci.`);
-            // Ponow po powrocie sieci, zeby stan po stronie serwera sie wyrownal.
-            const ponow = () => {
-                window.removeEventListener('online', ponow);
+            // PODAJEMY PRAWDZIWY POWOD. Poprzednia wersja pisala „serwer
+            // nieosiagalny" niezaleznie od tego, co naprawde sie stalo — a `catch`
+            // lapie tu wszystko: przekroczony limit czasu, blad 4xx, zla odpowiedz.
+            // Przez to w logach Xcode nie dalo sie odroznic braku sieci od maszyny,
+            // ktora po prostu za dlugo sie budzi.
+            const powod = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+            console.warn(`[Account] wymiana sesji nieudana po ${Date.now() - _t0} ms `
+                + `(${powod}) — dzialam na znanej sesji (${znanyUserId}).`);
+            // ── PONAWIANIE NIEZALEZNE OD ZDARZENIA `online` ────────────────────────
+            //
+            // Poprzednia wersja czekala WYLACZNIE na `online`. To bylo bledne
+            // zalozenie: najczestszy powod niepowodzenia to nie brak sieci, tylko
+            // PRZEKROCZONY LIMIT CZASU przy budzeniu uspionej maszyny Fly. Siec
+            // dziala przez caly czas, wiec `online` nigdy nie nastepuje — a sesja
+            // nie odtwarzala sie az do nastepnego uruchomienia aplikacji.
+            // W praktyce oznaczalo to, ze `syncAfterSignIn` nie startowal w ogole.
+            //
+            // Teraz ponawiamy z rosnacym odstepem (5 s, 15 s, 45 s), a `online`
+            // jest tylko dodatkowym bodzcem do natychmiastowej proby.
+            let proba = 0;
+            const ODSTEPY = [5000, 15000, 45000];
+            let zakonczone = false;
+            const sprobuj = () => {
+                if (zakonczone)
+                    return;
                 void exchangeSession(undefined, { silentOnly: true })
-                    .then(ses => { dlog(`[Account] sesja odswiezona (${ses.mode})`); void syncAfterSignIn(ses.mode); })
-                    .catch(() => { });
+                    .then(ses => {
+                    zakonczone = true;
+                    window.removeEventListener('online', naOnline);
+                    dlog(`[Account] sesja odswiezona (${ses.mode})`);
+                    void syncAfterSignIn(ses.mode);
+                })
+                    .catch(() => {
+                    if (proba < ODSTEPY.length)
+                        setTimeout(sprobuj, ODSTEPY[proba++]);
+                    else
+                        dlog('[Account] rezygnuje z odswiezania sesji — zostaje znana sesja');
+                });
             };
-            window.addEventListener('online', ponow);
+            const naOnline = () => { proba = 0; sprobuj(); };
+            window.addEventListener('online', naOnline);
+            setTimeout(sprobuj, ODSTEPY[proba++]);
         }
         else {
             // Naprawde nie wiemy, kim jestes — dopiero teraz stan wylogowany.

@@ -295,7 +295,7 @@ export interface SessionResult {
  *  extraRecoveryCode — kod wpisany ręcznie (migracja starego konta). */
 export async function exchangeSession(
   extraRecoveryCode?: string,
-  opts?: { silentOnly?: boolean },
+  opts?: { silentOnly?: boolean; timeoutMs?: number },
 ): Promise<SessionResult> {
   let idToken: string;
   if (useNative()) {
@@ -320,7 +320,11 @@ export async function exchangeSession(
       'Authorization': `Bearer ${idToken}`,
     },
     body: JSON.stringify({ deviceUserId, recoveryCode, silentOnly: opts?.silentOnly === true }),
-    signal: AbortSignal.timeout(15000),
+    // Limit konfigurowalny. Przy CICHYM starcie skracamy go: aplikacja i tak
+    // dziala na znanej sesji, wiec nie ma po co trzymac uzytkownika w
+    // zawieszeniu, gdy maszyna Fly dopiero sie budzi. Ponowienie w tle
+    // dostaje pelne 15 s.
+    signal: AbortSignal.timeout(opts?.timeoutMs ?? 15000),
   });
 
   const data = await res.json() as SessionResult & { status: string; message?: string; code?: string };
