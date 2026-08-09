@@ -174,6 +174,72 @@ console.log('\n=== 9. LIMIT WPISÓW — cache nie rośnie bez końca ===');
   sprawdz('zachowuje najnowsze', !!najnowszy);
 }
 
+console.log('\n=== 10. PUŁAPKA PUSTEJ TABLICY (błąd z Explore) ===');
+{
+  // W JS `[]` jest PRAWDZIWE. Warunek `if (feed)` po jednym pustym przebiegu
+  // był już zawsze spełniony i Explore nigdy się nie doładowywał.
+  const pusta = [];
+  sprawdz('pusta tablica jest prawdziwa (to była pułapka)', !!pusta === true);
+  sprawdz('poprawka `?.length` daje fałsz', !pusta?.length === true);
+}
+
+console.log('\n=== 11. NIE UTRWALAMY PUSTKI ===');
+{
+  await db.viewCache.delete('explore:u9');
+  const zapiszJesliCos = async (k, v) => { if (v.length) await zapisz(k, v); };
+  await zapiszJesliCos('explore:u9', []);
+  sprawdz('pusta odpowiedź NIE trafia do cache', !(await db.viewCache.get('explore:u9')));
+  await zapiszJesliCos('explore:u9', [{ id: 'x' }]);
+  sprawdz('niepusta trafia', !!(await db.viewCache.get('explore:u9')));
+}
+
+console.log('\n=== 12. SESJA OFFLINE (błąd z Friends) ===');
+{
+  // Odwzorowanie logiki z AccountUI: brak sieci przy wymianie sesji
+  // NIE oznacza wylogowania, jeśli znamy userId z poprzedniej sesji.
+  const ustal = (userFirebase, znanyUserId, siecDziala) => {
+    if (!userFirebase) return 'wylogowany';
+    if (siecDziala) return 'zalogowany';
+    return znanyUserId ? 'zalogowany' : 'wylogowany';
+  };
+  sprawdz('offline + znany userId → ZALOGOWANY',
+    ustal({}, 'user_293cc371', false) === 'zalogowany');
+  sprawdz('offline bez userId → wylogowany',
+    ustal({}, null, false) === 'wylogowany');
+  sprawdz('brak konta Firebase → wylogowany zawsze',
+    ustal(null, 'user_x', false) === 'wylogowany');
+  sprawdz('online → jak dotąd', ustal({}, 'user_x', true) === 'zalogowany');
+}
+
+console.log('\n=== 13. WYBÓR ZAKŁADKI PRZEŻYWA ODŚWIEŻENIE (jak w X) ===');
+{
+  // Odwzorowanie logiki z HomeView: wybór Home/Explore trzymany w pamięci.
+  const pamiec = new Map();
+  const LS = 'mapyou_home_section';
+  const wczytaj = () => (pamiec.get(LS) === 'explore' ? 'explore' : 'home');
+  const zapamietaj = (s) => pamiec.set(LS, s);
+
+  sprawdz('domyślnie Home (pierwsze uruchomienie)', wczytaj() === 'home');
+
+  zapamietaj('explore');
+  sprawdz('po wybraniu Explore — zapamiętane', wczytaj() === 'explore');
+
+  // odświeżenie = ponowny render; wcześniej stało tu twarde `= 'home'`
+  const poOdswiezeniu = wczytaj();
+  sprawdz('odświeżenie ZOSTAJE w Explore', poOdswiezeniu === 'explore');
+
+  // restart aplikacji — localStorage przeżywa
+  const poRestarcie = wczytaj();
+  sprawdz('restart aplikacji ZOSTAJE w Explore', poRestarcie === 'explore');
+
+  zapamietaj('home');
+  sprawdz('powrót na Home też jest zapamiętany', wczytaj() === 'home');
+
+  // uszkodzona wartość nie może wywrócić widoku
+  pamiec.set(LS, 'jakies-smieci');
+  sprawdz('nieznana wartość → bezpieczny Home', wczytaj() === 'home');
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

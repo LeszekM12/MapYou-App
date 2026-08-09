@@ -78,9 +78,47 @@ export async function initAccountSilent(): Promise<void> {
     // do wypchniecia brakow zamiast pobierac wszystko od nowa.
     void syncAfterSignIn(session.mode).then(() => fillProfileFromProvider(user));
   } catch (e) {
-    _signedIn = false;
-    setSessionReady(false);
-    console.warn('[Account] brak sesji:', e instanceof Error ? e.message : e);
+    // ── „NIE MOGE ZAPYTAC" TO NIE TO SAMO CO „NIE JESTES ZALOGOWANY" ────────
+    //
+    // Ta galaz lapala OBA przypadki naraz i traktowala je identycznie. Skutek
+    // byl taki, ze bez sieci apka uznawala Cie za wylogowanego: zakladka
+    // Friends pokazywala „Zaloguj sie, aby korzystac ze znajomych", mimo ze
+    // konto bylo w porzadku, a Firebase doskonale wiedzial, kto jest zalogowany.
+    //
+    // Wiemy dwie rzeczy, ktore wystarcza:
+    //   • `getSignedInUser()` ZWROCIL uzytkownika — wtyczka Firebase trzyma go
+    //     lokalnie i dziala bez sieci,
+    //   • mamy zapamietany `userId` z poprzedniej udanej sesji.
+    //
+    // `exchangeSession` sluzy wylacznie do powiazania konta Firebase z naszym
+    // `userId`. Skoro to powiazanie juz znamy, brak sieci niczego nie zmienia.
+    //
+    // Token i tak weryfikuje backend niezaleznie, wiec `setSessionReady(true)`
+    // jest bezpieczne: bez sieci zadania i tak nie wyjda, a po jej powrocie
+    // beda mialy poprawny naglowek od pierwszej proby.
+    const znanyUserId = (() => {
+      try { return localStorage.getItem('mapyou_userId_profile'); } catch { return null; }
+    })();
+
+    if (znanyUserId) {
+      _signedIn = true;
+      setSessionReady(true);
+      console.warn('[Account] serwer nieosiagalny — dzialam na znanej sesji '
+        + `(${znanyUserId}). Powiazanie odswiezy sie po powrocie sieci.`);
+      // Ponow po powrocie sieci, zeby stan po stronie serwera sie wyrownal.
+      const ponow = (): void => {
+        window.removeEventListener('online', ponow);
+        void exchangeSession(undefined, { silentOnly: true })
+          .then(ses => { dlog(`[Account] sesja odswiezona (${ses.mode})`); void syncAfterSignIn(ses.mode); })
+          .catch(() => { /* nadal brak — zostajemy na znanej sesji */ });
+      };
+      window.addEventListener('online', ponow);
+    } else {
+      // Naprawde nie wiemy, kim jestes — dopiero teraz stan wylogowany.
+      _signedIn = false;
+      setSessionReady(false);
+      console.warn('[Account] brak sesji:', e instanceof Error ? e.message : e);
+    }
   }
   _resolved = true;
   emitChange();

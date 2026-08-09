@@ -1971,7 +1971,28 @@ export class HomeView {
   private _feedCursor:   number                    = Date.now();
   private _feedHasMore:  boolean                   = true;
   private _ptrInited:    boolean                   = false;
-  private _homeSection:  'home' | 'explore'        = 'home';
+  /** Ktora sekcja jest wybrana. Odtwarzana z pamieci przy starcie —
+   *  patrz `_wczytajSekcje`. */
+  private _homeSection:  'home' | 'explore'        = HomeView._wczytajSekcje();
+
+  /** Klucz pamieci wyboru Home/Explore. */
+  private static readonly LS_SEKCJA = 'mapyou_home_section';
+
+  /** Odtworz ostatnio wybrana sekcje.
+   *
+   *  Tak dziala X: „Dla Ciebie" i „Obserwowani" sa ROWNORZEDNE, a wybor
+   *  przezywa odswiezenie i restart aplikacji. U nas Home byl wymuszany przy
+   *  kazdym renderowaniu, wiec Explore sprawial wrazenie zakladki drugiej
+   *  kategorii — wracalo sie z niej samo, bez powodu. */
+  private static _wczytajSekcje(): 'home' | 'explore' {
+    try {
+      return localStorage.getItem(HomeView.LS_SEKCJA) === 'explore' ? 'explore' : 'home';
+    } catch { return 'home'; }
+  }
+
+  private _zapamietajSekcje(sec: 'home' | 'explore'): void {
+    try { localStorage.setItem(HomeView.LS_SEKCJA, sec); } catch { /* prywatny tryb */ }
+  }
   private _switcherAutohideInited: boolean         = false;
   private _exploreFeed:    Array<{ kind: string; date: number; data: Record<string, unknown> }> | null = null;
   private _exploreOffset:  number                  = 0;
@@ -3616,7 +3637,11 @@ export class HomeView {
     this._inited = true;
     const scroll = this.container;
     this._setupPullToRefresh(scroll);
-    this._homeSection = 'home';
+    // NIE resetujemy sekcji. Wczesniej stalo tu `this._homeSection = 'home'`,
+    // przez co KAZDE odswiezenie — pociagniecie w dol, powrot z innej zakladki,
+    // start apki — przerzucalo z Explore z powrotem na Home. Wygladalo to tak,
+    // jakby Home byl wazniejszy, a maja byc rownorzedne.
+    this._homeSection = HomeView._wczytajSekcje();
 
     scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
 
@@ -3818,7 +3843,10 @@ export class HomeView {
     }
     const initialFeed = (cached && cached.feed.length > 0) ? (cached.feed as FeedItem[]) : localFeed;
     this._lastHomeFeed = initialFeed;
-    paintFeed(initialFeed);
+    // Feed Home trzymamy w pamieci ZAWSZE — nawet gdy uzytkownik siedzi
+    // w Explore. Dzieki temu powrot na Home jest natychmiastowy, bez
+    // ponownego pobierania.
+    if (this._homeSection === 'home') paintFeed(initialFeed);
     const shownSig = this._feedSig(initialFeed);
 
     // 2) Revalidate from server in the background (timeout-guarded), repaint only if changed
@@ -3833,6 +3861,15 @@ export class HomeView {
         if (this._homeSection !== 'home') return;            // don't clobber the Explore view
         if (this._feedSig(result.feed as FeedItem[]) !== shownSig) paintFeed(result.feed as FeedItem[]);
       }).catch(() => { /* ignore */ });
+    }
+
+    // Wybrany byl Explore — pokazujemy WLASNIE JEGO, nie Home.
+    // Bez tego odswiezenie w Explore konczylo sie widokiem Home, mimo ze
+    // przelacznik pokazywal Explore. To wlasnie sprawialo wrazenie, ze Home
+    // jest „glowna" zakladka, a Explore tylko dodatkiem.
+    if (this._homeSection === 'explore') {
+      this._positionSwitcherDot();
+      void this._loadExplore();
     }
   }
 
@@ -3869,6 +3906,7 @@ export class HomeView {
     if (this._homeSection === sec && !fromSwipe) return;
     const dir = sec === 'explore' ? -1 : 1;
     this._homeSection = sec;
+    this._zapamietajSekcje(sec);
 
     const sw = document.getElementById('homeSwitcher');
     sw?.querySelectorAll<HTMLElement>('.home-switcher__tab').forEach(t =>
@@ -3889,8 +3927,12 @@ export class HomeView {
     }
 
     if (sec === 'explore') {
-      if (this._exploreFeed) this._repaintFeed?.(this._exploreFeed);   // instant from memory
-      else { this._paintFeedLoading(); void this._loadExplore(); }
+      // `?.length`, nie sama prawdziwosc: PUSTA TABLICA JEST PRAWDZIWA w JS.
+      // Przez to po jednym przebiegu, ktory nic nie zwrocil, `_exploreFeed`
+      // stawal sie `[]` i ten warunek byl juz ZAWSZE spelniony — Explore
+      // malowal pustke i NIGDY wiecej nie probowal sie zaladowac.
+      if (this._exploreFeed?.length) this._repaintFeed?.(this._exploreFeed);
+      else { void this._loadExplore(); }
     } else {
       this._repaintFeed?.(this._lastHomeFeed);
     }
@@ -3988,8 +4030,13 @@ export class HomeView {
       this._exploreFeed    = d.data ?? [];
       this._exploreOffset  = this._exploreFeed.length;
       this._exploreHasMore = d.hasMore ?? false;
-      this._exploreCacheRam = this._exploreFeed;
-      void cacheZapisz(`explore:${userId}`, this._exploreFeed);
+      // Pustej odpowiedzi NIE zapisujemy. Cache ma przyspieszac pokazywanie
+      // tresci, a nie utrwalac jej brak — inaczej jeden nieudany przebieg
+      // (albo chwilowo pusty Explore) zamrazalby pustke na stale.
+      if (this._exploreFeed.length) {
+        this._exploreCacheRam = this._exploreFeed;
+        void cacheZapisz(`explore:${userId}`, this._exploreFeed);
+      }
       if (this._homeSection === 'explore') {
         koniecSzkieletu(document.getElementById('homeFeedList'));
         this._repaintFeed?.(this._exploreFeed);

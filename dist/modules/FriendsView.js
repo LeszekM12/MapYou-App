@@ -19,6 +19,8 @@ import { loadProfileFromLocal } from './UserProfile.js';
 import { isSignedIn, signInPromptHtml, bindSignInPrompts, onAccountChange } from './AccountUI.js';
 import * as SS from './socialStore.js';
 import { esc, safeUrl } from '../utils/dom.js';
+import { odczytaj as cacheOdczytaj, zapisz as cacheZapisz } from './viewCache.js';
+import { pokazSzkieletFeedu, koniecSzkieletu } from './skeleton.js';
 // ── Stałe ─────────────────────────────────────────────────────────────────────
 const STATUS_POLL_MS = 10000; // sprawdzaj status znajomych co 10s
 // ── FriendsView class ─────────────────────────────────────────────────────────
@@ -302,25 +304,45 @@ export class FriendsView {
         const userId = getUserId();
         if (!userId)
             return;
-        feedEl.innerHTML = '<div class="friends-feed__loading">Loading feed…</div>';
+        const rysuj = async (poz) => {
+            feedEl.innerHTML = '';
+            koniecSzkieletu(feedEl);
+            for (const item of poz)
+                feedEl.appendChild(await this._buildFeedCard(item.kind, item.data));
+        };
+        // ── POKAZ, CO MASZ — POTEM ODSWIEZ ──────────────────────────────────────
+        // Wczesniej bylo tu „Loading feed…" i czekanie na siec. Bez zasiegu
+        // konczylo sie pustym ekranem, mimo ze chwile wczesniej te same wpisy
+        // byly widoczne.
+        const zCache = await cacheOdczytaj(`friendsfeed:${userId}`);
+        if (zCache?.value?.length)
+            await rysuj(zCache.value);
+        else
+            pokazSzkieletFeedu(feedEl, 2);
         try {
             const res = await fetch(`${BACKEND_URL}/feed?userId=${encodeURIComponent(userId)}`);
             if (!res.ok) {
-                feedEl.innerHTML = '';
+                if (!zCache?.value?.length)
+                    feedEl.innerHTML = '';
                 return;
             }
             const data = await res.json();
+            if (data.data.length)
+                void cacheZapisz(`friendsfeed:${userId}`, data.data);
             if (!data.data.length) {
+                if (zCache?.value?.length)
+                    return; // mamy tresc — nie kasujemy jej
+                koniecSzkieletu(feedEl);
                 feedEl.innerHTML = '<div class="friends-feed__empty">No activity from friends yet 🏃</div>';
                 return;
             }
-            feedEl.innerHTML = '';
-            for (const item of data.data) {
-                const card = await this._buildFeedCard(item.kind, item.data);
-                feedEl.appendChild(card);
-            }
+            await rysuj(data.data);
         }
         catch {
+            // Brak sieci — jesli cokolwiek pokazalismy z cache, ZOSTAWIAMY to.
+            if (zCache?.value?.length)
+                return;
+            koniecSzkieletu(feedEl);
             feedEl.innerHTML = '';
         }
     }

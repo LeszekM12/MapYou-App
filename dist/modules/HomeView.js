@@ -1980,11 +1980,13 @@ export class HomeView {
             writable: true,
             value: false
         });
+        /** Ktora sekcja jest wybrana. Odtwarzana z pamieci przy starcie —
+         *  patrz `_wczytajSekcje`. */
         Object.defineProperty(this, "_homeSection", {
             enumerable: true,
             configurable: true,
             writable: true,
-            value: 'home'
+            value: HomeView._wczytajSekcje()
         });
         Object.defineProperty(this, "_switcherAutohideInited", {
             enumerable: true,
@@ -2125,6 +2127,26 @@ export class HomeView {
             writable: true,
             value: null
         });
+    }
+    /** Odtworz ostatnio wybrana sekcje.
+     *
+     *  Tak dziala X: „Dla Ciebie" i „Obserwowani" sa ROWNORZEDNE, a wybor
+     *  przezywa odswiezenie i restart aplikacji. U nas Home byl wymuszany przy
+     *  kazdym renderowaniu, wiec Explore sprawial wrazenie zakladki drugiej
+     *  kategorii — wracalo sie z niej samo, bez powodu. */
+    static _wczytajSekcje() {
+        try {
+            return localStorage.getItem(HomeView.LS_SEKCJA) === 'explore' ? 'explore' : 'home';
+        }
+        catch {
+            return 'home';
+        }
+    }
+    _zapamietajSekcje(sec) {
+        try {
+            localStorage.setItem(HomeView.LS_SEKCJA, sec);
+        }
+        catch { /* prywatny tryb */ }
     }
     _observeMinimap(mapEl, coordsEnc, sport) {
         if (!this._miniObserver) {
@@ -3896,7 +3918,11 @@ export class HomeView {
         this._inited = true;
         const scroll = this.container;
         this._setupPullToRefresh(scroll);
-        this._homeSection = 'home';
+        // NIE resetujemy sekcji. Wczesniej stalo tu `this._homeSection = 'home'`,
+        // przez co KAZDE odswiezenie — pociagniecie w dol, powrot z innej zakladki,
+        // start apki — przerzucalo z Explore z powrotem na Home. Wygladalo to tak,
+        // jakby Home byl wazniejszy, a maja byc rownorzedne.
+        this._homeSection = HomeView._wczytajSekcje();
         scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
         const [activities, posts, workouts] = await Promise.all([
             loadEnrichedActivities(),
@@ -4092,7 +4118,11 @@ export class HomeView {
         }
         const initialFeed = (cached && cached.feed.length > 0) ? cached.feed : localFeed;
         this._lastHomeFeed = initialFeed;
-        paintFeed(initialFeed);
+        // Feed Home trzymamy w pamieci ZAWSZE — nawet gdy uzytkownik siedzi
+        // w Explore. Dzieki temu powrot na Home jest natychmiastowy, bez
+        // ponownego pobierania.
+        if (this._homeSection === 'home')
+            paintFeed(initialFeed);
         const shownSig = this._feedSig(initialFeed);
         // 2) Revalidate from server in the background (timeout-guarded), repaint only if changed
         if (userId) {
@@ -4111,6 +4141,14 @@ export class HomeView {
                 if (this._feedSig(result.feed) !== shownSig)
                     paintFeed(result.feed);
             }).catch(() => { });
+        }
+        // Wybrany byl Explore — pokazujemy WLASNIE JEGO, nie Home.
+        // Bez tego odswiezenie w Explore konczylo sie widokiem Home, mimo ze
+        // przelacznik pokazywal Explore. To wlasnie sprawialo wrazenie, ze Home
+        // jest „glowna" zakladka, a Explore tylko dodatkiem.
+        if (this._homeSection === 'explore') {
+            this._positionSwitcherDot();
+            void this._loadExplore();
         }
     }
     // ── Section switcher: Home / Explore (style 3 — texts + dot) ────────────────
@@ -4145,6 +4183,7 @@ export class HomeView {
             return;
         const dir = sec === 'explore' ? -1 : 1;
         this._homeSection = sec;
+        this._zapamietajSekcje(sec);
         const sw = document.getElementById('homeSwitcher');
         sw?.querySelectorAll('.home-switcher__tab').forEach(t => t.classList.toggle('home-switcher__tab--active', t.dataset.sec === sec));
         this._positionSwitcherDot();
@@ -4161,10 +4200,13 @@ export class HomeView {
             }
         }
         if (sec === 'explore') {
-            if (this._exploreFeed)
-                this._repaintFeed?.(this._exploreFeed); // instant from memory
+            // `?.length`, nie sama prawdziwosc: PUSTA TABLICA JEST PRAWDZIWA w JS.
+            // Przez to po jednym przebiegu, ktory nic nie zwrocil, `_exploreFeed`
+            // stawal sie `[]` i ten warunek byl juz ZAWSZE spelniony — Explore
+            // malowal pustke i NIGDY wiecej nie probowal sie zaladowac.
+            if (this._exploreFeed?.length)
+                this._repaintFeed?.(this._exploreFeed);
             else {
-                this._paintFeedLoading();
                 void this._loadExplore();
             }
         }
@@ -4271,8 +4313,13 @@ export class HomeView {
             this._exploreFeed = d.data ?? [];
             this._exploreOffset = this._exploreFeed.length;
             this._exploreHasMore = d.hasMore ?? false;
-            this._exploreCacheRam = this._exploreFeed;
-            void cacheZapisz(`explore:${userId}`, this._exploreFeed);
+            // Pustej odpowiedzi NIE zapisujemy. Cache ma przyspieszac pokazywanie
+            // tresci, a nie utrwalac jej brak — inaczej jeden nieudany przebieg
+            // (albo chwilowo pusty Explore) zamrazalby pustke na stale.
+            if (this._exploreFeed.length) {
+                this._exploreCacheRam = this._exploreFeed;
+                void cacheZapisz(`explore:${userId}`, this._exploreFeed);
+            }
             if (this._homeSection === 'explore') {
                 koniecSzkieletu(document.getElementById('homeFeedList'));
                 this._repaintFeed?.(this._exploreFeed);
@@ -4891,6 +4938,13 @@ export class HomeView {
         btn?.click();
     }
 }
+/** Klucz pamieci wyboru Home/Explore. */
+Object.defineProperty(HomeView, "LS_SEKCJA", {
+    enumerable: true,
+    configurable: true,
+    writable: true,
+    value: 'mapyou_home_section'
+});
 export const homeView = new HomeView();
 /** Eksportowana funkcja do otwierania viewera z zewnątrz (ProfileView, PublicProfile) */
 export function openReelViewer(group, onSeen) {
