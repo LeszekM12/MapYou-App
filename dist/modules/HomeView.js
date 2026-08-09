@@ -4176,6 +4176,23 @@ export class HomeView {
         // jest „glowna" zakladka, a Explore tylko dodatkiem.
         if (this._homeSection === 'explore') {
             this._positionSwitcherDot();
+            // ── NAJPIERW SYNCHRONICZNIE, DOPIERO POTEM ASYNCHRONICZNIE ─────────────
+            //
+            // To jest przyczyna znikania Explore po odswiezeniu. `_loadExplore`
+            // zanim cokolwiek namaluje, CZEKA na odczyt z IndexedDB — a przez ten
+            // czas `feedList` jest juz wyczyszczony przez `render()`. Efekt: pustka
+            // albo komunikat o bledzie.
+            //
+            // Przelaczenie zakladek dzialalo, bo `_setSection` siega po
+            // `this._exploreFeed` OD RAZU, bez zadnego czekania. Robimy tu to samo:
+            // jesli mamy tresc w pamieci, malujemy ja natychmiast, a `_loadExplore`
+            // dostaje juz tylko zadanie odswiezenia.
+            if (this._exploreFeed?.length) {
+                this._repaintFeed?.(this._exploreFeed);
+            }
+            else {
+                pokazSzkieletFeedu(document.getElementById('homeFeedList'), 3);
+            }
             void this._loadExplore();
         }
     }

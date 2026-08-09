@@ -312,6 +312,61 @@ console.log('\n=== 16. OFFLINE NIE KASUJE TREŚCI (zachowanie X) ===');
   sprawdz('bez cache → dopiero wtedy ekran błędu', pusty.blad);
 }
 
+console.log('\n=== 17. EXPLORE: maluj z pamięci ZANIM sięgniesz do bazy ===');
+{
+  // Po odświeżeniu render czyści listę. Jeśli malowanie czeka na IndexedDB,
+  // przez ten czas widać pustkę — a przełączanie zakładek działało, bo
+  // sięgało po pamięć synchronicznie.
+  const kolejnosc = [];
+  const stary = async (feedWPamieci) => {
+    const zBazy = await sleep(30).then(() => feedWPamieci);   // odczyt IndexedDB
+    kolejnosc.push('maluj-po-czekaniu');
+    return zBazy;
+  };
+  const nowy = async (feedWPamieci) => {
+    if (feedWPamieci?.length) kolejnosc.push('maluj-natychmiast');
+    await sleep(30);
+    kolejnosc.push('odswiez');
+  };
+
+  kolejnosc.length = 0;
+  await stary([{id:'a'}]);
+  sprawdz('STARY: pierwsze malowanie dopiero po czekaniu',
+    kolejnosc[0] === 'maluj-po-czekaniu');
+
+  kolejnosc.length = 0;
+  await nowy([{id:'a'}]);
+  sprawdz('NOWY: maluje natychmiast, potem odświeża',
+    kolejnosc.join(' → ') === 'maluj-natychmiast → odswiez', kolejnosc.join(' → '));
+
+  kolejnosc.length = 0;
+  await nowy([]);
+  sprawdz('bez treści w pamięci → tylko odświeżenie (szkielet)',
+    kolejnosc.join(' → ') === 'odswiez');
+}
+
+console.log('\n=== 18. STRONICOWANIE: ten sam wzorzec wszędzie ===');
+{
+  const PAGE = 20;
+  const strona = (wszystkie, offset) => {
+    const pobrane = wszystkie.slice(offset, offset + PAGE + 1);   // PAGE+1
+    const hasMore = pobrane.length > PAGE;
+    return { data: hasMore ? pobrane.slice(0, PAGE) : pobrane, hasMore };
+  };
+  const baza = Array.from({length: 47}, (_, i) => i);
+
+  const s1 = strona(baza, 0);
+  sprawdz('pierwsza strona: 20 pozycji', s1.data.length === 20);
+  sprawdz('wie, że jest więcej', s1.hasMore === true);
+
+  const s3 = strona(baza, 40);
+  sprawdz('ostatnia strona: 7 pozycji', s3.data.length === 7);
+  sprawdz('wie, że to koniec', s3.hasMore === false);
+
+  const pusto = strona([], 0);
+  sprawdz('pusty wynik nie udaje, że jest więcej', pusto.hasMore === false);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));
