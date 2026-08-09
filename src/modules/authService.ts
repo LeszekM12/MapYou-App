@@ -269,6 +269,13 @@ export async function signOutEverywhere(): Promise<void> {
   // Najpierw cache — inaczej apka wysylalaby token poprzedniego uzytkownika
   // az do jego wygasniecia, nawet po wylogowaniu.
   invalidateIdToken();
+  // Cache widokow tez musi zniknac. Feed, Explore i profile sa teraz trwale
+  // (IndexedDB), wiec BEZ TEGO nastepny zalogowany zobaczylby tresci
+  // poprzedniego — i to natychmiast, bo po to ten cache jest.
+  try {
+    const { wyczysc } = await import('./viewCache.js');
+    await wyczysc();
+  } catch { /* baza niedostepna — trudno */ }
   if (useNative()) {
     try { await plugin()!.signOut(); } catch { /* noop */ }
     return;

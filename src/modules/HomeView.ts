@@ -928,7 +928,12 @@ function openActivityOptionsMenu(
         const arr = JSON.parse(localStorage.getItem(k) || '[]') as string[];
         if (Array.isArray(arr) && !arr.includes(itemId)) { arr.push(itemId); localStorage.setItem(k, JSON.stringify(arr)); }
       } catch { /* ignore */ }
-      try { sessionStorage.removeItem(`mapyou_feedcache_${userId}`); } catch { /* ignore */ }
+      // Uniewaznienie cache po skasowaniu wpisu. MUSI dotykac tej samej
+      // pamieci, w ktorej cache teraz mieszka (IndexedDB) — inaczej usuniety
+      // post wrocilby na ekran przy nastepnym wejsciu.
+      // To jest zwykla funkcja, nie metoda klasy — `this` tu nie istnieje.
+      // Kopie w RAM czyscimy przez instancje widoku, ktora jest w zasiegu.
+      homeView.uniewaznijCacheFeedu(userId);
       closeMenu();
       closeDetail();
       adToast('Activity deleted');
@@ -3800,6 +3805,12 @@ export class HomeView {
     this._repaintFeed = paintFeed;
 
     // 1) Instant paint — cached server feed (incl. friends) if present, else local-only
+    //
+    // Cache mieszka teraz w IndexedDB, wiec trzeba go najpierw wciagnac do
+    // pamieci. To jedno krotkie zapytanie do bazy na urzadzeniu — bez sieci,
+    // bez czekania na serwer. Dzieki temu po ubiciu i ponownym wejsciu feed
+    // pojawia sie od razu, zamiast czekac na odpowiedz z Fly.
+    await this._wgrajCacheFeedu(userId);
     const cached = this._readFeedCache(userId);
     if (cached) {
       this._feedHasMore = cached.hasMore;
@@ -3947,6 +3958,28 @@ export class HomeView {
   private async _loadExplore(): Promise<void> {
     const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     if (!userId) return;
+
+    // ── NAJPIERW POKAZ, POTEM ODSWIEZ ────────────────────────────────────────
+    //
+    // Explore nie mial cache W OGOLE — kazde wejscie oznaczalo czekanie na
+    // siec, a przy jej braku ekran „nie udalo sie wczytac". Po ubiciu apki
+    // uzytkownik zawsze widzial pustke, mimo ze chwile wczesniej cos ogladal.
+    //
+    // Teraz: jest cache → rysujemy natychmiast; nie ma → szkielet, zeby bylo
+    // widac, ze cos sie dzieje. Ekran bledu zostaje wylacznie dla sytuacji,
+    // w ktorej naprawde nie mamy NIC do pokazania.
+    if (!this._exploreCacheRam) {
+      const z = await cacheOdczytaj<Array<{ kind: string; date: number; data: Record<string, unknown> }>>(`explore:${userId}`);
+      if (z) this._exploreCacheRam = z.value;
+    }
+    if (this._exploreCacheRam?.length) {
+      this._exploreFeed    = this._exploreCacheRam;
+      this._exploreOffset  = this._exploreFeed.length;
+      if (this._homeSection === 'explore') this._repaintFeed?.(this._exploreFeed);
+    } else if (this._homeSection === 'explore') {
+      pokazSzkieletFeedu(document.getElementById('homeFeedList'), 3);
+    }
+
     const geo = await this._getGeo();
     const geoQ = geo ? `&lat=${geo.lat}&lng=${geo.lng}` : '';
     try {
@@ -3955,9 +3988,18 @@ export class HomeView {
       this._exploreFeed    = d.data ?? [];
       this._exploreOffset  = this._exploreFeed.length;
       this._exploreHasMore = d.hasMore ?? false;
-      if (this._homeSection === 'explore') this._repaintFeed?.(this._exploreFeed);
-    } catch {
+      this._exploreCacheRam = this._exploreFeed;
+      void cacheZapisz(`explore:${userId}`, this._exploreFeed);
       if (this._homeSection === 'explore') {
+        koniecSzkieletu(document.getElementById('homeFeedList'));
+        this._repaintFeed?.(this._exploreFeed);
+      }
+    } catch {
+      // Siec padla. Jesli mamy cokolwiek na ekranie — ZOSTAWIAMY to.
+      // Lepiej tresc sprzed godziny niz komunikat o bledzie.
+      if (this._exploreCacheRam?.length) return;
+      if (this._homeSection === 'explore') {
+        koniecSzkieletu(document.getElementById('homeFeedList'));
         const fl = document.getElementById('homeFeedList');
         if (fl) fl.innerHTML = `
           <div class="home-empty">
@@ -4134,7 +4176,7 @@ export class HomeView {
       spinner.style.transform = '';
       try {
         const uid = localStorage.getItem('mapyou_userId_profile') ?? '';
-        if (uid) { try { sessionStorage.removeItem(`mapyou_feedcache_${uid}`); } catch { /* ignore */ } }
+        if (uid) homeView.uniewaznijCacheFeedu(uid);
         await this.render();
       } finally {
         refreshing = false;
@@ -4154,20 +4196,52 @@ export class HomeView {
     ).join('|');
   }
 
+  /** Kopia w RAM, zeby `_readFeedCache` mogl zostac synchroniczny.
+   *  Wypelniana z IndexedDB przy starcie widoku (`_wgrajCacheFeedu`). */
+  private _feedCacheRam: { feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore: boolean } | null = null;
+  private _exploreCacheRam: Array<{ kind: string; date: number; data: Record<string, unknown> }> | null = null;
+
+  /** Wczytaj cache z IndexedDB do pamieci. Wolane PRZED pierwszym rysowaniem.
+   *
+   *  Wczesniej cache siedzial w `sessionStorage`, ktory na iOS ginie razem
+   *  z procesem apki — wiec po ubiciu i ponownym wejsciu feed byl pusty.
+   *  IndexedDB to przezywa. */
+  private async _wgrajCacheFeedu(userId: string): Promise<void> {
+    if (!userId) return;
+    const [f, e] = await Promise.all([
+      cacheOdczytaj<{ feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore: boolean }>(`feed:${userId}`),
+      cacheOdczytaj<Array<{ kind: string; date: number; data: Record<string, unknown> }>>(`explore:${userId}`),
+    ]);
+    if (f) this._feedCacheRam = f.value;
+    if (e) this._exploreCacheRam = e.value;
+  }
+
+  /** Wyrzuc cache feedu — po skasowaniu wpisu albo zmianie widocznosci.
+   *  Bez tego usuniety post wracalby na ekran przy nastepnym wejsciu,
+   *  bo cache jest teraz TRWALY i przezywa restart aplikacji. */
+  uniewaznijCacheFeedu(userId: string): void {
+    this._feedCacheRam = null;
+    this._exploreCacheRam = null;
+    if (userId) {
+      void cacheZapisz(`feed:${userId}`, { feed: [], hasMore: false });
+      void cacheZapisz(`explore:${userId}`, []);
+    }
+  }
+
   private _readFeedCache(userId: string): { feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore: boolean } | null {
     if (!userId) return null;
     try {
-      const raw = sessionStorage.getItem(`mapyou_feedcache_${userId}`);
-      if (!raw) return null;
-      const o = JSON.parse(raw) as { feed?: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore?: boolean };
-      return Array.isArray(o.feed) ? { feed: o.feed, hasMore: !!o.hasMore } : null;
+      // Czytamy z kopii w RAM, ktora `_wgrajCacheFeedu` napelnil z IndexedDB.
+      // `sessionStorage` zniknal stad celowo: ginie razem z procesem apki.
+      return this._feedCacheRam;
     } catch { return null; }
   }
 
   private _writeFeedCache(userId: string, feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>, hasMore: boolean): void {
     if (!userId) return;
-    try { sessionStorage.setItem(`mapyou_feedcache_${userId}`, JSON.stringify({ feed, hasMore })); }
-    catch { /* quota exceeded — skip caching */ }
+    this._feedCacheRam = { feed, hasMore };
+    // Zapis do IndexedDB w tle — nikt na niego nie czeka.
+    void cacheZapisz(`feed:${userId}`, { feed, hasMore });
   }
 
   private async _fetchServerFeed(userId: string): Promise<{ feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore: boolean } | null> {
@@ -4507,5 +4581,7 @@ export function openReelViewer(
 
 import { getIcon as _gi2, getColor as _gc2 } from './Tracker.js';
 import { esc, safeUrl } from '../utils/dom.js';
+import { odczytaj as cacheOdczytaj, zapisz as cacheZapisz } from './viewCache.js';
+import { pokazSzkieletFeedu, koniecSzkieletu } from './skeleton.js';
 (window as unknown as Record<string, unknown>)._mapyouGetIcon  = _gi2;
 (window as unknown as Record<string, unknown>)._mapyouGetColor = _gc2;

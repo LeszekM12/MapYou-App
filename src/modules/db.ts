@@ -308,6 +308,30 @@ db.version(11).stores({
   mediaQueue:         '++id, createdAt',
 });
 
+// Wersja 12 — trwaly cache widokow (feed, Explore, znajomi).
+//
+// Wczesniej cache feedu mieszkal w `sessionStorage`, ktory na iOS GINIE razem
+// z procesem aplikacji. Dzialal wiec tylko dopoki apka byla otwarta — czyli
+// dokladnie wtedy, gdy nie byl potrzebny. Po ubiciu i ponownym wejsciu feed
+// byl pusty, a Explore pokazywal „nic tu nie ma", dopoki nie doszla siec.
+//
+// IndexedDB przezywa ubicie procesu i miesci setki megabajtow zamiast pieciu.
+db.version(12).stores({
+  workouts:           'id, type, date, distance, duration, cadence, pace, elevGain, speed',
+  activities:         'id, sport, date, distanceKm, durationSec',
+  enrichedActivities: 'id, sport, date, name',
+  profile:            'userId',
+  postsFeed:          'id, date',
+  unifiedWorkouts:    'id, type, source, date, distanceKm',
+  reels:              'id, userId, expiresAt',
+  activeSession:      'id',
+  sessionCoords:      '++seq',
+  outbox:             '++id, createdAt',
+  tiles:              'key, lastUsed',
+  mediaQueue:         '++id, createdAt',
+  viewCache:          'key, at',
+});
+
 
 
 

@@ -33,6 +33,10 @@ installTileCache();
 void requestPersistentStorage();
 // Kolejka zapisow offline — wysyla zalegle zadania, gdy siec wroci,
 // i pokazuje pasek statusu.
+// Niewczytane zdjecia dostaja neutralny kafelek zamiast polamanej ikony
+// i dziury w ukladzie. Jeden nasluch obsluguje cala apke, takze tresc
+// dodana pozniej — patrz `skeleton.ts`.
+void import('./modules/skeleton.js').then(m => m.podepnijZastepnikiObrazkow());
 bootMark('moduly startowe');
 void Promise.resolve().then(() => { startOutbox(); mountOfflineBar(); startMediaQueue(); startSocialStore(); });
 // Odznaka zdobyta bez zasiegu nie miala jak sie przeliczyc w swoim momencie —
