@@ -3643,7 +3643,20 @@ export class HomeView {
     // jakby Home byl wazniejszy, a maja byc rownorzedne.
     this._homeSection = HomeView._wczytajSekcje();
 
-    scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
+    // ── NIE KASUJEMY TEGO, CO JUZ WIDAC ─────────────────────────────────────
+    //
+    // Wczesniej stalo tu bezwarunkowe wyczyszczenie ekranu do spinnera. Przy
+    // KAZDYM odswiezeniu — takze pociagnieciem w dol bez zasiegu — cala tresc
+    // znikala, a gdy siec zawiodla, na jej miejscu zostawal komunikat o bledzie.
+    //
+    // X nigdy tak nie robi: os czasu zostaje na ekranie, a odswiezanie sygnalizuje
+    // spinner NAD nia. Tresc znika dopiero wtedy, gdy jest czym ja zastapic.
+    //
+    // Spinner pokazujemy wiec TYLKO wtedy, gdy ekran i tak jest pusty.
+    const bylaTresc = scroll.querySelector('#homeFeedList')?.children.length;
+    if (!bylaTresc) {
+      scroll.innerHTML = '<div class="home-loading"><div class="home-loading__spinner"></div></div>';
+    }
 
     const [activities, posts, workouts] = await Promise.all([
       loadEnrichedActivities(),
@@ -3835,6 +3848,7 @@ export class HomeView {
     // pamieci. To jedno krotkie zapytanie do bazy na urzadzeniu — bez sieci,
     // bez czekania na serwer. Dzieki temu po ubiciu i ponownym wejsciu feed
     // pojawia sie od razu, zamiast czekac na odpowiedz z Fly.
+    this._podepnijAutoOdswiezanie(userId);
     await this._wgrajCacheFeedu(userId);
     const cached = this._readFeedCache(userId);
     if (cached) {
@@ -3997,6 +4011,68 @@ export class HomeView {
     });
   }
 
+  // ── PASEK „BRAK POLACZENIA" ────────────────────────────────────────────────
+  //
+  // Nieinwazyjny: pojawia sie NAD trescia i sam znika po powrocie sieci.
+  // Nie zastepuje niczego, bo tresc sprzed godziny jest warta wiecej niz
+  // komunikat o bledzie. Tak samo robi X — os czasu zostaje, a informacja
+  // o problemie jest osobnym, malym elementem.
+  private _pasekOffline(): void {
+    if (document.getElementById('mapyouOfflineBanner')) return;
+    const lista = document.getElementById('homeFeedList');
+    if (!lista?.parentElement) return;
+
+    const b = document.createElement('div');
+    b.id = 'mapyouOfflineBanner';
+    b.setAttribute('role', 'status');
+    b.style.cssText = 'display:flex;align-items:center;gap:8px;margin:0 16px 10px;'
+      + 'padding:9px 13px;border-radius:10px;background:rgba(128,128,128,0.14);'
+      + 'color:var(--app-text-secondary);font-size:1.15rem';
+    b.innerHTML = `
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round"><path d="M1 1l22 22M16.7 16.7A9 9 0 0 1 12 18M5 12.5a7 7 0 0 1 3-2M2 8.8A15 15 0 0 1 6 6.3M22 8.8a15 15 0 0 0-6.4-3.6"/></svg>
+      <span>Brak połączenia — pokazuję zapisane treści</span>`;
+    lista.parentElement.insertBefore(b, lista);
+  }
+
+  private _schowajPasekOffline(): void {
+    document.getElementById('mapyouOfflineBanner')?.remove();
+  }
+
+  /** Po powrocie sieci dociagnij to, czego nie udalo sie pobrac.
+   *
+   *  W X tresc, ktora nie doszla bez zasiegu, pojawia sie SAMA po jego
+   *  powrocie — uzytkownik nie musi nic odswiezac. Tu jest to samo:
+   *  nasluch na `online` odpala ponowne pobranie aktywnej sekcji.
+   *
+   *  Podpinane raz; `_onlinePodpiete` chroni przed dublowaniem przy kazdym
+   *  renderowaniu. */
+  private _onlinePodpiete = false;
+
+  private _podepnijAutoOdswiezanie(userId: string): void {
+    if (this._onlinePodpiete) return;
+    this._onlinePodpiete = true;
+
+    window.addEventListener('online', () => {
+      this._schowajPasekOffline();
+      // Odswiezamy TE sekcje, ktora uzytkownik ma przed oczami.
+      if (this._homeSection === 'explore') {
+        void this._loadExplore();
+      } else {
+        void this._fetchServerFeed(userId).then(r => {
+          if (!r) return;
+          this._writeFeedCache(userId, r.feed, r.hasMore);
+          // `FeedItem` jest typem lokalnym wewnatrz `render()`, wiec tutaj
+          // opisujemy ten sam ksztalt wprost.
+          const poz = r.feed as Array<{ kind: string; date: number; data: Record<string, unknown> }>;
+          this._lastHomeFeed = poz as typeof this._lastHomeFeed;
+          this._feedHasMore = r.hasMore;
+          if (this._homeSection === 'home') this._repaintFeed?.(poz);
+        });
+      }
+    });
+  }
+
   private async _loadExplore(): Promise<void> {
     const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     if (!userId) return;
@@ -4039,12 +4115,13 @@ export class HomeView {
       }
       if (this._homeSection === 'explore') {
         koniecSzkieletu(document.getElementById('homeFeedList'));
+        this._schowajPasekOffline();
         this._repaintFeed?.(this._exploreFeed);
       }
     } catch {
-      // Siec padla. Jesli mamy cokolwiek na ekranie — ZOSTAWIAMY to.
-      // Lepiej tresc sprzed godziny niz komunikat o bledzie.
-      if (this._exploreCacheRam?.length) return;
+      // Siec padla. Jesli mamy cokolwiek na ekranie — ZOSTAWIAMY to
+      // i pokazujemy nieinwazyjny pasek zamiast zastepowania tresci bledem.
+      if (this._exploreCacheRam?.length) { this._pasekOffline(); return; }
       if (this._homeSection === 'explore') {
         koniecSzkieletu(document.getElementById('homeFeedList'));
         const fl = document.getElementById('homeFeedList');

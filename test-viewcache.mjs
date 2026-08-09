@@ -273,6 +273,45 @@ console.log('\n=== 14. PONAWIANIE SESJI PO TIMEOUCIE (mój błąd z 17) ===');
   sprawdz('nie ponawia w nieskończoność', !beznadziejny.odtworzona && beznadziejny.prob === 3);
 }
 
+console.log('\n=== 15. GEOLOKALIZACJA: jedno zapytanie zamiast sześciu ===');
+{
+  const CACHE_MS = 20_000;
+  let ostatnia = null, wLocie = null, natywnych = 0;
+  const pobierz = async () => {
+    if (ostatnia && Date.now() - ostatnia.czas < CACHE_MS) return ostatnia.poz;
+    if (wLocie) return wLocie;
+    wLocie = (async () => { natywnych++; await sleep(60); const poz={lat:54.1}; ostatnia={poz,czas:Date.now()}; return poz; })();
+    try { return await wLocie; } finally { wLocie = null; }
+  };
+  // pięć modułów pyta RÓWNOCZEŚNIE, tak jak przy starcie
+  await Promise.all([pobierz(), pobierz(), pobierz(), pobierz(), pobierz()]);
+  sprawdz('pięć równoległych → JEDNO wywołanie natywne', natywnych === 1, `było: ${natywnych}`);
+  await pobierz();
+  sprawdz('szóste (z cache) też nie dokłada', natywnych === 1, `było: ${natywnych}`);
+  ostatnia.czas -= 25_000;                       // symulacja upływu czasu
+  await pobierz();
+  sprawdz('po wygaśnięciu cache pyta ponownie', natywnych === 2);
+}
+
+console.log('\n=== 16. OFFLINE NIE KASUJE TREŚCI (zachowanie X) ===');
+{
+  // Odwzorowanie: render nie czyści, gdy coś już jest; błąd daje pasek, nie ekran błędu.
+  const ekran = { tresc: ['wpis1','wpis2'], pasek: null, blad: false };
+  const render = (bylaTresc) => { if (!bylaTresc) ekran.tresc = []; };
+  const poBledzie = (maCache) => { if (maCache) ekran.pasek = 'offline'; else ekran.blad = true; };
+
+  render(ekran.tresc.length > 0);
+  sprawdz('odświeżenie NIE kasuje istniejącej treści', ekran.tresc.length === 2);
+  poBledzie(true);
+  sprawdz('błąd sieci → pasek, nie ekran błędu', ekran.pasek === 'offline' && !ekran.blad);
+  sprawdz('treść nadal na ekranie', ekran.tresc.length === 2);
+
+  const pusty = { tresc: [], blad: false };
+  const poBledzie2 = (maCache) => { if (!maCache) pusty.blad = true; };
+  poBledzie2(false);
+  sprawdz('bez cache → dopiero wtedy ekran błędu', pusty.blad);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

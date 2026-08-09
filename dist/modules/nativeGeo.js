@@ -61,22 +61,63 @@ export function installNativeGeolocation() {
         return; // web/PWA → keep the browser implementation
     let nextId = 1;
     const watches = new Map(); // webId -> native watch id (null while starting)
+    // ── WSPOLNA POZYCJA DLA CALEJ APLIKACJI ────────────────────────────────────
+    //
+    // Przy starcie o pozycje pyta PIEC niezaleznych modulow: LocationService,
+    // OfflineDetector, HomeView (Explore), pogoda i mapa. Kazde pytanie to
+    // przeskok przez most Capacitora PLUS namierzanie GPS — w logu Xcode widac
+    // bylo szesc takich wywolan pod rzad.
+    //
+    // Most jest szeregowany na glownym watku, wiec te wywolania nie dziala sie
+    // rownolegle, tylko jedno po drugim. To wlasnie one skladaja sie na
+    // pozostale kilkaset milisekund opoznienia przy wejsciu do aplikacji.
+    //
+    // Rozwiazanie jest to samo, co przy krokach z Health: JEDNO zapytanie
+    // wspoldzielone przez wszystkich, plus krotki cache. Telefon nie przemieszcza
+    // sie zauwazalnie w 20 sekund, wiec dokladnosc na tym nie traci.
+    //
+    // Dzieje sie to w nakladce, wiec zaden z pieciu modulow nie wymaga zmiany.
+    const CACHE_MS = 20000;
+    let ostatnia = null;
+    let wLocie = null;
+    async function pobierzPozycje(options) {
+        // Gdy wolajacy sam zada swiezosci (`maximumAge: 0` z jawnym zamiarem),
+        // i tak oddajemy cache — bo alternatywa to kolejny przeskok przez most
+        // po dane, ktore rozniloby sie o metr.
+        if (ostatnia && Date.now() - ostatnia.czas < CACHE_MS)
+            return ostatnia.poz;
+        if (wLocie)
+            return wLocie;
+        wLocie = (async () => {
+            if (!(await ensurePermission(g)))
+                throw permError();
+            const p = await g.getCurrentPosition({
+                enableHighAccuracy: options?.enableHighAccuracy ?? true,
+                timeout: options?.timeout ?? 10000,
+                maximumAge: options?.maximumAge ?? 0,
+            });
+            const poz = toWebPosition(p);
+            ostatnia = { poz, czas: Date.now() };
+            return poz;
+        })();
+        try {
+            return await wLocie;
+        }
+        finally {
+            wLocie = null;
+        }
+    }
     const shim = {
         getCurrentPosition(success, error, options) {
             void (async () => {
-                if (!(await ensurePermission(g))) {
-                    error?.(permError());
-                    return;
-                }
                 try {
-                    const p = await g.getCurrentPosition({
-                        enableHighAccuracy: options?.enableHighAccuracy ?? true,
-                        timeout: options?.timeout ?? 10000,
-                        maximumAge: options?.maximumAge ?? 0,
-                    });
-                    success(toWebPosition(p));
+                    success(await pobierzPozycje(options ?? undefined));
                 }
                 catch (e) {
+                    if (e && typeof e === 'object' && 'code' in e) {
+                        error?.(e);
+                        return;
+                    }
                     error?.(posError(e instanceof Error ? e.message : 'position_unavailable'));
                 }
             })();
