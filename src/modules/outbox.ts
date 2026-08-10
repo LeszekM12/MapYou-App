@@ -85,9 +85,49 @@ function newKey(): string {
 // ── Operacje na kolejce ──────────────────────────────────────────────────────
 
 /** Odloz zapis na pozniej. Zwraca klucz idempotencji nadany temu zadaniu. */
+/** Czy IDENTYCZNY zapis wolno sklein w jeden?
+ *
+ *  UWAGA — to nie moze byc regula ogolna. Dwa identyczne `POST /feed/comment`
+ *  to dwa OSOBNE komentarze o tej samej tresci i sklejenie ich zgubiloby jeden.
+ *  Podobnie `POST /feed/like` jest PRZELACZNIKIEM: dwa wyslania to polub
+ *  i cofniecie polubienia, czyli co innego niz jedno.
+ *
+ *  Sklejamy wiec tylko to, co z natury jest idempotentne — powtorzenie daje
+ *  ten sam skutek co pojedyncze wykonanie:
+ *    • PUT i PATCH  — z definicji HTTP „ustaw stan na X"
+ *    • wybrane POST — wypisane jawnie, po jednym sprawdzeniu kazdego
+ *
+ *  Powod, dla ktorego to powstalo: w kolejce uzbieraly sie CZTERY kopie tych
+ *  samych zapisow. Kazda nieudana sesja offline dokladala nastepna, bo
+ *  `enqueue` nie sprawdzalo, czy identyczny zapis juz czeka. */
+const IDEMPOTENTNE_POST = [
+  '/achievements/recompute',   // przeliczenie od zera — wynik zawsze ten sam
+  '/friends/',                 // dodanie do znajomych; drugie nic nie zmienia
+];
+
+function wolnoSkleic(url: string, method: string): boolean {
+  const m = method.toUpperCase();
+  if (m === 'PUT' || m === 'PATCH') return true;
+  if (m !== 'POST') return false;
+  return IDEMPOTENTNE_POST.some(frag => url.includes(frag));
+}
+
 export async function enqueue(
   url: string, method: string, headers: Record<string, string>, body: string | null,
 ): Promise<string> {
+  // Identyczny zapis juz czeka? Nie dokladamy drugiego.
+  if (wolnoSkleic(url, method)) {
+    try {
+      const czekajace = await tbl().toArray() as OutboxItem[];
+      const bliznjak = czekajace.find(i =>
+        i.url === url && i.method === method && i.body === body);
+      if (bliznjak) {
+        dlog(`[Outbox] pominieto duplikat ${method} ${url}`);
+        return bliznjak.idemKey;
+      }
+    } catch { /* baza niedostepna — dokladamy normalnie */ }
+  }
+
   const idemKey = newKey();
   // Token NIE trafia do kolejki. Zapis moze poczekac godziny, a token wygasa
   // po ~60 minutach — zapisany bylby bezuzyteczny. Swiezy dolozy `authFetch`

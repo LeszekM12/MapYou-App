@@ -104,6 +104,27 @@ let _inflight: Promise<string | null> | null = null;
  *
  *  Teraz: jest token w pamieci — dokladamy go. Nie ma — wysylamy zadanie BEZ
  *  niego i pobieramy w tle, na nastepny raz. Zadanie nie czeka nigdy. */
+/** Wyciagnij SEDNO bledu App Check zamiast wypisywac caly blok.
+ *
+ *  Wtyczka zwraca komunikat zawierajacy pelna odpowiedz serwera — okolo dwoch
+ *  kilobajtow JSON-a z powtorzonym trzykrotnie opisem. Kazde takie wypisanie
+ *  idzie przez most Capacitora jako `Console.log`, a w pomiarze te wypisy
+ *  stanowily 22 z 40 wszystkich przeskokow przy starcie. Wiecej niz polowe
+ *  ruchu przez most generowalo nasze wlasne logowanie.
+ *
+ *  Interesuje nas kod i jedno zdanie. Reszta i tak jest w logach Xcode,
+ *  wypisana przez samo Firebase. */
+function krotkiPowod(e: unknown): string {
+  const pelny = e instanceof Error ? e.message : String(e);
+  // Kod HTTP z komunikatu wtyczki.
+  const kod = /HTTP status code:\s*(\d+)/.exec(pelny)?.[1];
+  // Pole `message` z ciala odpowiedzi — najkrotszy sensowny opis.
+  const opis = /"message"\s*:\s*"([^"]{0,120})/.exec(pelny)?.[1];
+  if (kod && opis) return `HTTP ${kod} — ${opis}`;
+  if (kod) return `HTTP ${kod}`;
+  return pelny.slice(0, 140).replace(/\s+/g, ' ');
+}
+
 export function getAppCheckTokenNow(): string | null {
   if (_token && Date.now() < _expiresAt) return _token;
   void prefetchAppCheckToken();   // odswiez w tle
@@ -156,8 +177,7 @@ export async function getAppCheckToken(): Promise<string | null> {
     _retryAfter = Date.now() + Math.min(30 * 60_000, 5_000 * 2 ** Math.min(_failures, 9));
     console.warn(
       `[AppCheck] token niedostepny (${_failures}. raz) — kolejna proba za ` +
-      `${Math.round((_retryAfter - Date.now()) / 1000)} s:`,
-      e instanceof Error ? e.message : e,
+      `${Math.round((_retryAfter - Date.now()) / 1000)} s: ${krotkiPowod(e)}`,
     );
     _token = null;
     return null;

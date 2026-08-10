@@ -128,9 +128,22 @@ export class FriendsView {
 
     // Od razu zweryfikuj statusy — nie czekaj 30s
     void this._pollFriendsStatus();
+    this._podepnijWidocznosc();
 
-    // Polling statusu znajomych co 30s
-    this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
+    // ── ODPYTYWANIE TYLKO WTEDY, GDY KTOS PATRZY ────────────────────────────
+    //
+    // Wczesniej `setInterval` chodzil od pierwszego uruchomienia do konca
+    // zycia aplikacji — takze wtedy, gdy uzytkownik przeszedl na inna zakladke
+    // albo zminimalizowal apke.
+    //
+    // To nie jest jedno zadanie co 10 sekund. To JEDNO ZADANIE NA KAZDEGO
+    // OBSERWOWANEGO: przy trzech znajomych szescdziesiat zadan na minute, przez
+    // caly czas dzialania. W pomiarze widac bylo `/live/active/...` piec razy
+    // w ciagu dwudziestu sekund.
+    //
+    // Na darmowym Atlasie M0 przy stu uzytkownikach robi sie z tego realne
+    // obciazenie — i to za dane, ktorych nikt w tym momencie nie oglada.
+    this._wznowOdpytywanie();
 
     // Odbieraj wiadomości z Service Workera.
     // UWAGA: `navigator.serviceWorker` NIE ISTNIEJE w natywnym WKWebView (iOS) —
@@ -186,8 +199,37 @@ export class FriendsView {
     }
   }
 
+  /** Wlacz odpytywanie. Bezpieczne do wielokrotnego wolania. */
+  private _wznowOdpytywanie(): void {
+    if (this._pollTimer) return;
+    this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
+  }
+
+  private _wstrzymajOdpytywanie(): void {
+    if (!this._pollTimer) return;
+    clearInterval(this._pollTimer);
+    this._pollTimer = null;
+  }
+
+  /** Podepnij reakcje na ukrycie i powrot aplikacji. Raz na instancje. */
+  private _widocznoscPodpieta = false;
+
+  private _podepnijWidocznosc(): void {
+    if (this._widocznoscPodpieta) return;
+    this._widocznoscPodpieta = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        // Po powrocie odswiez OD RAZU — stan sprzed minuty jest bezuzyteczny.
+        void this._pollFriendsStatus();
+        this._wznowOdpytywanie();
+      } else {
+        this._wstrzymajOdpytywanie();
+      }
+    });
+  }
+
   destroy(): void {
-    if (this._pollTimer) clearInterval(this._pollTimer);
+    this._wstrzymajOdpytywanie();
     this._liveMap.stop();
   }
 

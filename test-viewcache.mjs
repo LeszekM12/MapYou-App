@@ -367,6 +367,74 @@ console.log('\n=== 18. STRONICOWANIE: ten sam wzorzec wszędzie ===');
   sprawdz('pusty wynik nie udaje, że jest więcej', pusto.hasMore === false);
 }
 
+console.log('\n=== 19. SKLEJANIE DUPLIKATÓW — tylko idempotentne ===');
+{
+  const IDEMPOTENTNE_POST = ['/achievements/recompute', '/friends/'];
+  const wolnoSkleic = (url, method) => {
+    const m = method.toUpperCase();
+    if (m === 'PUT' || m === 'PATCH') return true;
+    if (m !== 'POST') return false;
+    return IDEMPOTENTNE_POST.some(f => url.includes(f));
+  };
+
+  // MUSZĄ się sklejać — to właśnie one rosły do czterech kopii
+  sprawdz('PUT /users/x → sklejamy', wolnoSkleic('/users/x', 'PUT'));
+  sprawdz('PATCH → sklejamy', wolnoSkleic('/posts/1/visibility', 'PATCH'));
+  sprawdz('POST /achievements/recompute → sklejamy', wolnoSkleic('/achievements/recompute', 'POST'));
+  sprawdz('POST /users/a/friends/b → sklejamy', wolnoSkleic('/users/a/friends/b', 'POST'));
+
+  // NIE WOLNO sklejać — dwa identyczne to dwie różne intencje
+  sprawdz('POST /feed/comment → NIE sklejamy (dwa komentarze)',
+    !wolnoSkleic('/feed/comment', 'POST'));
+  sprawdz('POST /feed/like → NIE sklejamy (przełącznik!)',
+    !wolnoSkleic('/feed/like', 'POST'));
+  sprawdz('DELETE → NIE sklejamy', !wolnoSkleic('/feed/comment/1', 'DELETE'));
+
+  // symulacja kolejki
+  const kolejka = [];
+  const enqueue = (url, method, body) => {
+    if (wolnoSkleic(url, method)) {
+      const blizniak = kolejka.find(i => i.url === url && i.method === method && i.body === body);
+      if (blizniak) return 'pominieto';
+    }
+    kolejka.push({ url, method, body });
+    return 'dodano';
+  };
+  for (let i = 0; i < 4; i++) enqueue('/users/a/friends/b', 'POST', '{}');
+  sprawdz('cztery próby tego samego → JEDNA pozycja', kolejka.length === 1, `${kolejka.length}`);
+
+  enqueue('/feed/like', 'POST', '{"id":1}');
+  enqueue('/feed/like', 'POST', '{"id":1}');
+  sprawdz('dwa polubienia zostają osobno', kolejka.length === 3, `${kolejka.length}`);
+
+  enqueue('/users/a/friends/c', 'POST', '{}');
+  sprawdz('inny znajomy = nowa pozycja', kolejka.length === 4);
+}
+
+console.log('\n=== 20. ODPYTYWANIE ZNAJOMYCH — stop w tle ===');
+{
+  let timer = null, zapytan = 0;
+  const wznow = () => { if (!timer) timer = 'running'; };
+  const wstrzymaj = () => { timer = null; };
+  const tick = () => { if (timer) zapytan++; };
+
+  wznow();
+  for (let i = 0; i < 3; i++) tick();
+  sprawdz('widoczna → odpytuje', zapytan === 3);
+
+  wstrzymaj();                     // aplikacja w tle
+  for (let i = 0; i < 10; i++) tick();
+  sprawdz('w tle → NIE odpytuje', zapytan === 3, `${zapytan}`);
+
+  wznow();
+  tick();
+  sprawdz('po powrocie → wznawia', zapytan === 4);
+
+  wznow(); wznow();                // wielokrotne wywołanie
+  tick();
+  sprawdz('podwójne wznowienie nie dubluje timera', zapytan === 5, `${zapytan}`);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

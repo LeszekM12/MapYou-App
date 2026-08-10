@@ -56,6 +56,13 @@ export class FriendsView {
             writable: true,
             value: null
         });
+        /** Podepnij reakcje na ukrycie i powrot aplikacji. Raz na instancje. */
+        Object.defineProperty(this, "_widocznoscPodpieta", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: false
+        });
         // ── Render friends list ────────────────────────────────────────────────────
         /** Czy podpieto juz nasluch zmian konta (jednorazowo na instancje). */
         Object.defineProperty(this, "_accountHooked", {
@@ -165,8 +172,21 @@ export class FriendsView {
         void this.render();
         // Od razu zweryfikuj statusy — nie czekaj 30s
         void this._pollFriendsStatus();
-        // Polling statusu znajomych co 30s
-        this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
+        this._podepnijWidocznosc();
+        // ── ODPYTYWANIE TYLKO WTEDY, GDY KTOS PATRZY ────────────────────────────
+        //
+        // Wczesniej `setInterval` chodzil od pierwszego uruchomienia do konca
+        // zycia aplikacji — takze wtedy, gdy uzytkownik przeszedl na inna zakladke
+        // albo zminimalizowal apke.
+        //
+        // To nie jest jedno zadanie co 10 sekund. To JEDNO ZADANIE NA KAZDEGO
+        // OBSERWOWANEGO: przy trzech znajomych szescdziesiat zadan na minute, przez
+        // caly czas dzialania. W pomiarze widac bylo `/live/active/...` piec razy
+        // w ciagu dwudziestu sekund.
+        //
+        // Na darmowym Atlasie M0 przy stu uzytkownikach robi sie z tego realne
+        // obciazenie — i to za dane, ktorych nikt w tym momencie nie oglada.
+        this._wznowOdpytywanie();
         // Odbieraj wiadomości z Service Workera.
         // UWAGA: `navigator.serviceWorker` NIE ISTNIEJE w natywnym WKWebView (iOS) —
         // service workery działają tylko w Safari/PWA. Bez tego guarda leciał tu
@@ -219,9 +239,35 @@ export class FriendsView {
             }
         }
     }
-    destroy() {
+    /** Wlacz odpytywanie. Bezpieczne do wielokrotnego wolania. */
+    _wznowOdpytywanie() {
         if (this._pollTimer)
-            clearInterval(this._pollTimer);
+            return;
+        this._pollTimer = setInterval(() => void this._pollFriendsStatus(), STATUS_POLL_MS);
+    }
+    _wstrzymajOdpytywanie() {
+        if (!this._pollTimer)
+            return;
+        clearInterval(this._pollTimer);
+        this._pollTimer = null;
+    }
+    _podepnijWidocznosc() {
+        if (this._widocznoscPodpieta)
+            return;
+        this._widocznoscPodpieta = true;
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                // Po powrocie odswiez OD RAZU — stan sprzed minuty jest bezuzyteczny.
+                void this._pollFriendsStatus();
+                this._wznowOdpytywanie();
+            }
+            else {
+                this._wstrzymajOdpytywanie();
+            }
+        });
+    }
+    destroy() {
+        this._wstrzymajOdpytywanie();
         this._liveMap.stop();
     }
     async render() {
