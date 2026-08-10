@@ -84,9 +84,9 @@ export function showActivitySummary(activity, map, onDiscard, onSave) {
             const miniMap = L.map(container, {
                 zoomControl: false, dragging: false, touchZoom: false,
                 scrollWheelZoom: false, doubleClickZoom: false,
-                boxZoom: false, keyboard: false, attributionControl: false,
+                boxZoom: false, keyboard: false, attributionControl: true,
             });
-            L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(miniMap);
+            L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(miniMap);
             const line = L.polyline(activity.coords.map(c => L.latLng(c[0], c[1])), { color, weight: 4, opacity: 0.95 }).addTo(miniMap);
             miniMap.fitBounds(line.getBounds(), { padding: [20, 20] });
             const first = activity.coords[0];

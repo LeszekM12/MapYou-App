@@ -38,9 +38,9 @@ async function captureMapPreview(
     const color = SPORT_COLORS[sport] ?? '#00c46a';
     const map = L.map(container, {
       zoomControl: false, dragging: false, scrollWheelZoom: false,
-      attributionControl: false, touchZoom: false,
+      attributionControl: true, touchZoom: false,
     });
-    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(map);
+    L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
     const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), {
       color, weight: 5, opacity: 0.95,
     }).addTo(map);
@@ -384,9 +384,9 @@ export class SaveActivityModal {
         const map = L.map(container, {
           zoomControl: true, dragging: true, touchZoom: true,
           scrollWheelZoom: true, doubleClickZoom: false,
-          attributionControl: false,
+          attributionControl: true,
         });
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
         map.setView(initCoords, 13);
 
         let marker: L.Marker | null = null;
@@ -415,9 +415,9 @@ export class SaveActivityModal {
         const map = L.map(container, {
           zoomControl: false, dragging: false, touchZoom: false,
           scrollWheelZoom: false, doubleClickZoom: false,
-          boxZoom: false, keyboard: false, attributionControl: false,
+          boxZoom: false, keyboard: false, attributionControl: true,
         });
-        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(map);
         const line = L.polyline(coords.map(c => L.latLng(c[0], c[1])), {
           color, weight: 4, opacity: 0.95,
         }).addTo(map);

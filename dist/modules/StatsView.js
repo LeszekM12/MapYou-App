@@ -1064,9 +1064,11 @@ export class StatsView {
                 if (!mapEl)
                     return;
                 this._detailMap = L.map(mapEl, {
-                    zoomControl: false, dragging: true, attributionControl: false,
+                    zoomControl: false, dragging: true, attributionControl: true,
                 });
-                L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png').addTo(this._detailMap);
+                // Podpis wymagany licencja ODbL — bez niego uzywanie danych OSM jest
+                // naruszeniem warunkow, niezaleznie od tego, ze kafelki sa darmowe.
+                L.tileLayer('https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>' }).addTo(this._detailMap);
                 if (w.coords.length === 1) {
                     // Single point — pin marker, zoom 15
                     const [lat, lng] = w.coords[0];

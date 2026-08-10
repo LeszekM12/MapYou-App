@@ -527,6 +527,60 @@ console.log('\n=== 23. PODGLĄD SĄSIEDNIEJ ZAKŁADKI (D4) ===');
   sprawdz('pusty sąsiad → brak podglądu, bez błędu', stan.podglad === null);
 }
 
+console.log('\n=== 24. BLOKADA DZIAŁA OBUSTRONNIE ===');
+{
+  const users = {
+    A: { blocked: [] }, B: { blocked: [] }, C: { blocked: [] },
+  };
+  const ukryciDla = (me) => {
+    const moje = users[me].blocked;
+    const obcy = Object.keys(users).filter(u => users[u].blocked.includes(me));
+    return [...new Set([...moje, ...obcy])];
+  };
+
+  sprawdz('bez blokad nikt nie jest ukryty', ukryciDla('A').length === 0);
+
+  users.A.blocked.push('B');                    // A blokuje B
+  sprawdz('A nie widzi B', ukryciDla('A').includes('B'));
+  sprawdz('B TEŻ nie widzi A (obustronnie)', ukryciDla('B').includes('A'));
+  sprawdz('C widzi obu — blokada go nie dotyczy', ukryciDla('C').length === 0);
+
+  users.A.blocked = users.A.blocked.filter(x => x !== 'B');   // odblokowanie
+  sprawdz('po odblokowaniu widoczność wraca',
+    ukryciDla('A').length === 0 && ukryciDla('B').length === 0);
+}
+
+console.log('\n=== 25. ZGŁOSZENIA — jedno na osobę i treść ===');
+{
+  const zgloszenia = new Set();
+  const zglos = (kto, rodzaj, id) => {
+    const klucz = `${kto}|${rodzaj}|${id}`;
+    if (zgloszenia.has(klucz)) return 'alreadyReported';
+    zgloszenia.add(klucz); return 'ok';
+  };
+
+  sprawdz('pierwsze zgłoszenie przechodzi', zglos('A','post','p1') === 'ok');
+  sprawdz('drugie od tej samej osoby → już zgłoszone',
+    zglos('A','post','p1') === 'alreadyReported');
+  sprawdz('inna osoba może zgłosić to samo', zglos('B','post','p1') === 'ok');
+  sprawdz('ta sama osoba, inna treść → przechodzi', zglos('A','post','p2') === 'ok');
+  sprawdz('w bazie 3 zgłoszenia, nie 4', zgloszenia.size === 3, `${zgloszenia.size}`);
+}
+
+console.log('\n=== 26. MENU: kolejność od najłagodniejszej reakcji ===');
+{
+  const menu = (autorId, ja) => {
+    const o = ['hide', 'report'];
+    if (autorId && autorId !== ja) o.push('block');
+    return o;
+  };
+  sprawdz('cudza treść → trzy opcje', menu('B','A').length === 3);
+  sprawdz('najłagodniejsza pierwsza', menu('B','A')[0] === 'hide');
+  sprawdz('blokada ostatnia', menu('B','A')[2] === 'block');
+  sprawdz('własna treść → bez blokady siebie', menu('A','A').length === 2);
+  sprawdz('brak autora → bez blokady', menu(null,'A').length === 2);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

@@ -65,7 +65,7 @@ export class LiveMap {
             return;
         this._map = L.map(this._container, {
             zoomControl: true,
-            attributionControl: false,
+            attributionControl: true,
         });
         // BEZ `setView` na start. Wczesniej stalo tu `setView([52, 19], 13)` —
         // geometryczny srodek Polski. Mapa renderowala sie tam, sciagala komplet

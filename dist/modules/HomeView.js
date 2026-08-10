@@ -1472,10 +1472,10 @@ export async function openActivityDetail(act, isOwn, actId) {
         // be panned on other people's workouts.
         const routePts = ownCoords ? full.coords : (friendCoords ?? []);
         if (routePts.length > 0) {
-            _adMap = L.map(mapEl, { zoomControl: false, attributionControl: false, dragging: true });
+            _adMap = L.map(mapEl, { zoomControl: false, attributionControl: true, dragging: true });
             // CARTO Voyager — ta sama „standardowa" warstwa co bazowa mapa w zakładce Map,
             // żeby szczegóły nie wyglądały jak inna aplikacja (HOT OSM był dużo gęstszy).
-            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png').addTo(_adMap);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>' }).addTo(_adMap);
             const pts = routePts.map(c => L.latLng(c[0], c[1]));
             if (pts.length === 1) {
                 _adMap.setView(pts[0], 15);
@@ -4097,6 +4097,42 @@ export class HomeView {
                         void openActivityDetail(item.data, isOwn, (item.data.activityId ?? item.data.id));
                     });
                 }
+                // ── ZGLOSZENIE / BLOKADA NA CUDZEJ TRESCI ──────────────────────────
+                //
+                // Wymagane przez wytyczne App Store 1.2. Przycisk pojawia sie WYLACZNIE
+                // na cudzych kartach — na wlasnych masz juz Edit i Delete, a zglaszanie
+                // samego siebie nie ma sensu.
+                if (!isOwn) {
+                    const autorId = (item.data.userId ?? null);
+                    const autorNazwa = (item.data.authorName ?? '');
+                    const zglos = document.createElement('button');
+                    zglos.type = 'button';
+                    zglos.setAttribute('aria-label', 'Opcje treści');
+                    zglos.dataset.action = 'moderate';
+                    zglos.textContent = '⋯';
+                    zglos.style.cssText = 'position:absolute;top:10px;right:10px;z-index:3;'
+                        + 'width:32px;height:32px;border:none;border-radius:50%;'
+                        + 'background:rgba(128,128,128,0.16);color:var(--app-text-secondary);'
+                        + 'font-size:1.5rem;line-height:1;cursor:pointer';
+                    zglos.addEventListener('click', async (e) => {
+                        e.stopPropagation();
+                        const wynik = await menuCudzejTresci(item.kind === 'post' ? 'post' : 'activity', (item.data.postId ?? item.data.activityId ?? item.data.id), autorId, autorNazwa);
+                        // Po zablokowaniu tresc znika natychmiast — czekanie na odswiezenie
+                        // feedu byloby dziwne akurat w tym momencie.
+                        // Blokada usuwa tresc i przerysowuje feed. „Nie interesuje mnie"
+                        // tylko chowa karte — bez przerysowania, zeby nie gubic pozycji
+                        // przewijania przy zwyklym odrzuceniu jednego wpisu.
+                        if (wynik === 'zablokowano') {
+                            card.remove();
+                            void this.render();
+                        }
+                        else if (wynik === 'ukryto')
+                            card.remove();
+                    });
+                    if (getComputedStyle(card).position === 'static')
+                        card.style.position = 'relative';
+                    card.appendChild(zglos);
+                }
                 feedList.appendChild(card);
                 // Od tej chwili karta moze zostac zdjeta z drzewa, gdy oddali sie
                 // od ekranu — i wrocic, gdy uzytkownik przewinie z powrotem.
@@ -5154,6 +5190,7 @@ import { esc, safeUrl } from '../utils/dom.js';
 import { odczytaj as cacheOdczytaj, zapisz as cacheZapisz } from './viewCache.js';
 import { pokazSzkieletFeedu, koniecSzkieletu } from './skeleton.js';
 import { feedRecycler } from './feedRecycler.js';
+import { menuCudzejTresci } from './moderation.js';
 window._mapyouGetIcon = _gi2;
 window._mapyouGetColor = _gc2;
 //# sourceMappingURL=HomeView.js.map
