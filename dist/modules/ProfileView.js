@@ -1150,6 +1150,67 @@ function _buildPushTogglesHtml(settings, togId) {
             + '</span></label></div>';
     }).join('');
 }
+/** Wypelnij zakladke „Blocked" i podepnij odblokowywanie.
+ *
+ *  Apple sprawdza przy recenzji, czy blokade da sie cofnac — dlatego kazdy
+ *  wiersz ma przycisk, a nie tylko nazwe. */
+async function _wypelnijZablokowanych(modal, userId) {
+    const box = modal.querySelector('#pvBlockedList');
+    if (!box)
+        return;
+    const pusto = () => {
+        box.innerHTML = '<div style="padding:28px 20px;text-align:center;'
+            + 'color:rgba(255,255,255,0.35);font-size:1.3rem">'
+            + 'Nikogo nie zablokowałeś.</div>';
+    };
+    try {
+        const r = await fetch(`${BACKEND_URL}/moderation/blocked?userId=${encodeURIComponent(userId)}`);
+        if (!r.ok) {
+            pusto();
+            return;
+        }
+        const d = await r.json();
+        const osoby = d.data ?? [];
+        if (!osoby.length) {
+            pusto();
+            return;
+        }
+        box.innerHTML = osoby.map(o => `
+      <div data-wiersz="${esc(o.userId)}"
+        style="display:flex;align-items:center;gap:12px;padding:12px 0;
+               border-bottom:1px solid rgba(255,255,255,0.06)">
+        <div style="width:38px;height:38px;border-radius:50%;flex-shrink:0;
+             background:rgba(255,255,255,0.08);overflow:hidden">
+          ${o.avatarB64 ? `<img src="${safeUrl(o.avatarB64)}" alt=""
+             style="width:100%;height:100%;object-fit:cover"/>` : ''}
+        </div>
+        <span style="flex:1;color:#fff;font-size:1.35rem">${esc(o.name || 'Użytkownik')}</span>
+        <button data-odblokuj="${esc(o.userId)}"
+          style="background:rgba(0,196,106,0.14);color:#00c46a;border:none;
+                 border-radius:999px;padding:7px 16px;font-size:1.2rem;
+                 font-family:inherit;cursor:pointer">Odblokuj</button>
+      </div>`).join('');
+        box.querySelectorAll('[data-odblokuj]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.odblokuj;
+                btn.textContent = '…';
+                try {
+                    await fetch(`${BACKEND_URL}/moderation/block/${encodeURIComponent(id)}`
+                        + `?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
+                    box.querySelector(`[data-wiersz="${id}"]`)?.remove();
+                    if (!box.querySelector('[data-odblokuj]'))
+                        pusto();
+                }
+                catch {
+                    btn.textContent = 'Odblokuj';
+                }
+            });
+        });
+    }
+    catch {
+        pusto();
+    }
+}
 async function _openSettingsModal(parent, userId) {
     document.getElementById('pvSettingsModal')?.remove();
     const modal = document.createElement('div');
@@ -1178,9 +1239,18 @@ async function _openSettingsModal(parent, userId) {
         <div style="display:flex;border-bottom:1px solid rgba(255,255,255,0.07)">
           <button id="pvTabProfile" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'profile' ? 700 : 500};color:${activeTab === 'profile' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'profile' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Profile</button>
           <button id="pvTabNotif" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'notifications' ? 700 : 500};color:${activeTab === 'notifications' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'notifications' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Notifications</button>
+          <button id="pvTabBlocked" style="flex:1;padding:12px;border:none;background:none;font-size:1.35rem;font-weight:${activeTab === 'blocked' ? 700 : 500};color:${activeTab === 'blocked' ? '#fff' : 'rgba(255,255,255,0.4)'};border-bottom:${activeTab === 'blocked' ? '2px solid #00c46a' : '2px solid transparent'};cursor:pointer;font-family:inherit;transition:all 0.15s">Blocked</button>
         </div>
         <div style="overflow-y:auto;padding:16px 20px 40px">
-          ${activeTab === 'profile' ? `
+          ${activeTab === 'blocked' ? `
+          <!-- ── ZABLOKOWANE OSOBY ────────────────────────────────────────────
+               Apple sprawdza przy recenzji, czy blokade DA SIE COFNAC.
+               Lista bez mozliwosci odblokowania jest tak samo zla jak jej brak.
+               Wypelniana asynchronicznie — BEZ BACKTICKOW w tym komentarzu,
+               bo caly szablon jest literalem szablonowym i backtick by go zamknal. -->
+          <div id="pvBlockedList">
+            <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.35);font-size:1.3rem">Ładowanie…</div>
+          </div>` : activeTab === 'profile' ? `
           <!-- Konto (Faza 3) -->
           ${renderAccountCard()}
           <!-- Privacy -->
@@ -1207,6 +1277,9 @@ async function _openSettingsModal(parent, userId) {
             modal.remove(); });
         modal.querySelector('#pvTabProfile')?.addEventListener('click', () => { activeTab = 'profile'; renderModal(); });
         modal.querySelector('#pvTabNotif')?.addEventListener('click', () => { activeTab = 'notifications'; renderModal(); });
+        modal.querySelector('#pvTabBlocked')?.addEventListener('click', () => { activeTab = 'blocked'; renderModal(); });
+        if (activeTab === 'blocked')
+            void _wypelnijZablokowanych(modal, userId);
         // Private toggle
         const privCb = modal.querySelector('#pvPrivateToggle');
         const privSlider = modal.querySelector('#pvPrivateSlider');

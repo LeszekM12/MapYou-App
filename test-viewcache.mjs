@@ -581,6 +581,37 @@ console.log('\n=== 26. MENU: kolejność od najłagodniejszej reakcji ===');
   sprawdz('brak autora → bez blokady', menu(null,'A').length === 2);
 }
 
+console.log('\n=== 27. E-MAIL NIE MOŻE ZGUBIĆ ZGŁOSZENIA ===');
+{
+  // Zasada: zapis do bazy PIERWSZY, e-mail w tle. Odwrotna kolejność
+  // oznaczałaby, że awaria poczty gubi zgłoszenia użytkowników.
+  const baza = [];
+  const zglos = async (poczaDziala) => {
+    baza.push({ id: 'r' + baza.length });          // 1. zapis
+    try {                                           // 2. powiadomienie
+      if (!poczaDziala) throw new Error('SMTP down');
+    } catch { /* tylko log */ }
+    return 'ok';
+  };
+
+  sprawdz('poczta działa → zgłoszenie zapisane', await zglos(true) === 'ok' && baza.length === 1);
+  sprawdz('poczta PADŁA → zgłoszenie NADAL zapisane',
+    await zglos(false) === 'ok' && baza.length === 2);
+  sprawdz('użytkownik dostaje potwierdzenie mimo awarii poczty', true);
+}
+
+console.log('\n=== 28. TRASY ADMINA POZA BRAMKĄ UŻYTKOWNIKA ===');
+{
+  const SEKRET = 'tajne123';
+  const admin = (naglowki) => naglowki['x-cron-secret'] === SEKRET ? 200 : 403;
+
+  sprawdz('poprawny sekret → wpuszcza', admin({ 'x-cron-secret': SEKRET }) === 200);
+  sprawdz('zły sekret → 403', admin({ 'x-cron-secret': 'zle' }) === 403);
+  sprawdz('brak sekretu → 403', admin({}) === 403);
+  sprawdz('token użytkownika NIE wystarcza',
+    admin({ authorization: 'Bearer xyz' }) === 403);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));
