@@ -2127,6 +2127,28 @@ export class HomeView {
             writable: true,
             value: false
         });
+        /** Panel PODGLADU sasiedniej zakladki, widoczny podczas przesuwania.
+         *
+         *  W X podczas przeciagania widac obie osie czasu naraz: jedna wyjezdza,
+         *  druga wjezdza. U nas przesuwala sie tylko jedna lista, przygaszajac sie —
+         *  wygladalo to jak zanikanie, a nie jak przechodzenie do sasiada.
+         *
+         *  DLACZEGO PODGLAD, A NIE DRUGI PELNY FEED
+         *  Zrobienie z listy prawdziwego dwuelementowego przesuwaka oznaczaloby, ze
+         *  obserwatory doladowywania, wyswietlen, minimap i recyklera musialyby
+         *  wedrowac miedzy panelami przy kazdej zmianie. To najbardziej obciazona
+         *  czesc aplikacji i nie warto jej przebudowywac dla efektu wizualnego.
+         *
+         *  Panel podgladu jest jednorazowy: powstaje w chwili rozpoczecia przesuniecia,
+         *  pokazuje kilka pierwszych kart sasiada Z PAMIECI i znika po puszczeniu.
+         *  Nie ma wlasnych nasluchow, nie da sie w niego kliknac — sluzy wylacznie
+         *  temu, zeby ruch mial ciag dalszy zamiast konczyc sie pustka. */
+        Object.defineProperty(this, "_panelPodgladu", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: null
+        });
         /** Kopia w RAM, zeby `_readFeedCache` mogl zostac synchroniczny.
          *  Wypelniana z IndexedDB przy starcie widoku (`_wgrajCacheFeedu`). */
         Object.defineProperty(this, "_feedCacheRam", {
@@ -4004,6 +4026,9 @@ export class HomeView {
             feedList.innerHTML = '';
             this._feedObserver?.disconnect();
             document.getElementById('feedSentinel')?.remove();
+            // Nowa lista = nowy zestaw kart. Poprzedni obserwator musi odejsc,
+            // inaczej pilnowalby wezlow, ktorych juz nie ma w drzewie.
+            feedRecycler.start();
             if (feed.length === 0) {
                 const empty = document.createElement('div');
                 empty.className = 'home-empty';
@@ -4073,6 +4098,9 @@ export class HomeView {
                     });
                 }
                 feedList.appendChild(card);
+                // Od tej chwili karta moze zostac zdjeta z drzewa, gdy oddali sie
+                // od ekranu — i wrocic, gdy uzytkownik przewinie z powrotem.
+                feedRecycler.pilnuj(card);
                 if (item.kind === 'activity')
                     this._observeImpression(card, (item.data.activityId ?? item.data.id));
                 const actId = (item.data.activityId ?? item.data.id);
@@ -4273,7 +4301,14 @@ export class HomeView {
         fl.style.transition = 'transform .16s ease, opacity .16s ease';
         fl.style.transform = `translateX(${out}px)`;
         fl.style.opacity = '0';
+        // Podglad dojezdza na miejsce listy — dzieki temu ruch konczy sie plynnie
+        // sasiednia trescia, a nie mignieciem pustki przed przerysowaniem.
+        if (this._panelPodgladu) {
+            this._panelPodgladu.style.transition = 'transform .16s ease';
+            this._panelPodgladu.style.transform = `translateX(${out}px)`;
+        }
         setTimeout(() => {
+            this._usunPodglad(); // prawdziwa lista przejmuje
             this._setSection(sec, true); // repaint, no built-in slide
             fl.style.transition = 'none';
             fl.style.transform = `translateX(${-out}px)`;
@@ -4518,6 +4553,42 @@ export class HomeView {
             lastY = y;
         }, { passive: true });
     }
+    _pokazPodglad(kierunek) {
+        this._usunPodglad();
+        const lista = document.getElementById('homeFeedList');
+        if (!lista?.parentElement)
+            return;
+        // Sasiad to zawsze ta druga sekcja.
+        const sasiad = this._homeSection === 'home' ? this._exploreFeed : this._lastHomeFeed;
+        if (!sasiad?.length)
+            return;
+        const panel = document.createElement('div');
+        panel.id = 'homeFeedPreview';
+        panel.setAttribute('aria-hidden', 'true');
+        panel.style.cssText = 'position:absolute;top:0;width:100%;pointer-events:none;'
+            + `left:${kierunek === -1 ? '100%' : '-100%'};`;
+        // Kilka pierwszych kart wystarczy — podczas przesuwania i tak widac
+        // wylacznie gore sasiedniej listy.
+        const ile = Math.min(4, sasiad.length);
+        for (let i = 0; i < ile; i++) {
+            const it = sasiad[i];
+            try {
+                panel.appendChild(this._buildFriendFeedCard(it.kind, it.data, localStorage.getItem('mapyou_userId_profile') ?? ''));
+            }
+            catch { /* karta sie nie zbudowala — podglad moze byc krotszy */ }
+        }
+        if (!panel.children.length)
+            return;
+        if (getComputedStyle(lista.parentElement).position === 'static') {
+            lista.parentElement.style.position = 'relative';
+        }
+        lista.parentElement.appendChild(panel);
+        this._panelPodgladu = panel;
+    }
+    _usunPodglad() {
+        this._panelPodgladu?.remove();
+        this._panelPodgladu = null;
+    }
     _setupSectionSwipe(feedList) {
         let sx = 0, sy = 0, dx = 0, active = false, decided = false, horizontal = false;
         const width = () => feedList.clientWidth || window.innerWidth || 1;
@@ -4542,8 +4613,11 @@ export class HomeView {
                 if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
                     decided = true;
                     horizontal = Math.abs(dx) > Math.abs(dy) * 1.3;
-                    if (horizontal)
+                    if (horizontal) {
                         feedList.style.transition = 'none';
+                        // Sasiad wjezdza z tej strony, w ktora przesuwamy palec.
+                        this._pokazPodglad(dx < 0 ? -1 : 1);
+                    }
                 }
             }
             if (!horizontal)
@@ -4558,7 +4632,13 @@ export class HomeView {
             const w = width();
             const cl = Math.max(-w, Math.min(w, d));
             feedList.style.transform = `translateX(${cl}px)`;
-            feedList.style.opacity = String(1 - Math.min(0.45, Math.abs(cl) / w * 0.6));
+            // Panel podgladu jedzie RAZEM z lista — stad wrazenie dwoch osi czasu
+            // przesuwanych jednoczesnie, zamiast jednej zanikajacej.
+            if (this._panelPodgladu)
+                this._panelPodgladu.style.transform = `translateX(${cl}px)`;
+            // Przygaszenie tylko lekkie: przy widocznym sasiedzie mocne zanikanie
+            // wyglada jak blad, a nie jak przejscie.
+            feedList.style.opacity = String(1 - Math.min(0.18, Math.abs(cl) / w * 0.25));
             const p = cur === 'home' ? -cl / w : 1 - (cl / w); // 0 = Home, 1 = Explore
             this._dragDot(p);
         }, { passive: false });
@@ -4569,6 +4649,7 @@ export class HomeView {
             if (!horizontal) {
                 feedList.style.transform = '';
                 feedList.style.opacity = '1';
+                this._usunPodglad();
                 return;
             }
             const w = width();
@@ -4582,6 +4663,12 @@ export class HomeView {
                 feedList.style.transition = 'transform .2s ease, opacity .2s ease';
                 feedList.style.transform = '';
                 feedList.style.opacity = '1';
+                // Podglad wraca na swoje miejsce razem z lista, potem znika.
+                if (this._panelPodgladu) {
+                    this._panelPodgladu.style.transition = 'transform .2s ease';
+                    this._panelPodgladu.style.transform = '';
+                }
+                setTimeout(() => this._usunPodglad(), 220);
                 this._positionSwitcherDot();
             }
         };
@@ -5066,6 +5153,7 @@ import { getIcon as _gi2, getColor as _gc2 } from './Tracker.js';
 import { esc, safeUrl } from '../utils/dom.js';
 import { odczytaj as cacheOdczytaj, zapisz as cacheZapisz } from './viewCache.js';
 import { pokazSzkieletFeedu, koniecSzkieletu } from './skeleton.js';
+import { feedRecycler } from './feedRecycler.js';
 window._mapyouGetIcon = _gi2;
 window._mapyouGetColor = _gc2;
 //# sourceMappingURL=HomeView.js.map

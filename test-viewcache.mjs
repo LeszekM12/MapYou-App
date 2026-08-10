@@ -435,6 +435,98 @@ console.log('\n=== 20. ODPYTYWANIE ZNAJOMYCH — stop w tle ===');
   sprawdz('podwójne wznowienie nie dubluje timera', zapytan === 5, `${zapytan}`);
 }
 
+console.log('\n=== 21. WIRTUALIZACJA: wysokość zachowana co do piksela ===');
+{
+  // Odwzorowanie logiki recyklera. Kluczowe: pasek przewijania NIE MOŻE drgnąć.
+  const lista = [];
+  const zdjete = new Map();
+
+  const dodaj = (h) => { const k = { typ:'karta', h }; lista.push(k); return k; };
+  const zdejmij = (k) => {
+    if (k.h <= 0) return false;                    // nie ułożona — nie ruszamy
+    const i = lista.indexOf(k);
+    const miejsce = { typ:'miejsce', h: k.h };
+    lista[i] = miejsce; zdjete.set(miejsce, k);
+    return true;
+  };
+  const przywroc = (m) => {
+    const k = zdjete.get(m); if (!k) return false;
+    lista[lista.indexOf(m)] = k; zdjete.delete(m);
+    return true;
+  };
+  const wysokoscCalkowita = () => lista.reduce((s, x) => s + x.h, 0);
+
+  const karty = [90, 520, 340, 90, 610, 275].map(dodaj);
+  const przed = wysokoscCalkowita();
+
+  karty.slice(0, 4).forEach(zdejmij);
+  sprawdz('po zdjęciu 4 kart wysokość BEZ ZMIAN', wysokoscCalkowita() === przed,
+    `${wysokoscCalkowita()} vs ${przed}`);
+  sprawdz('w drzewie zostały 2 karty',
+    lista.filter(x => x.typ === 'karta').length === 2);
+
+  [...zdjete.keys()].forEach(przywroc);
+  sprawdz('po przywróceniu wysokość nadal ta sama', wysokoscCalkowita() === przed);
+  sprawdz('wszystkie karty wróciły',
+    lista.filter(x => x.typ === 'karta').length === 6);
+  sprawdz('kolejność zachowana',
+    lista.map(x => x.h).join() === [90,520,340,90,610,275].join());
+
+  // przypadek brzegowy: karta jeszcze się nie ułożyła
+  const nieulozona = dodaj(0);
+  sprawdz('karty o wysokości 0 NIE zdejmujemy', zdejmij(nieulozona) === false);
+}
+
+console.log('\n=== 22. DOŁADOWYWANIE WYSZUKIWARKI ===');
+{
+  const WSZYSCY = Array.from({length: 47}, (_, i) => ({ userId: 'u'+i }));
+  const PAGE = 20;
+  const pobierz = (off) => {
+    const p = WSZYSCY.slice(off, off + PAGE + 1);
+    const hasMore = p.length > PAGE;
+    return { data: hasMore ? p.slice(0, PAGE) : p, hasMore };
+  };
+
+  let widoczne = [], offset = 0, strzalow = 0;
+  let r = pobierz(offset); widoczne.push(...r.data); offset += r.data.length; strzalow++;
+  sprawdz('pierwsza strona: 20', widoczne.length === 20);
+  sprawdz('wie, że jest więcej', r.hasMore);
+
+  while (r.hasMore) { r = pobierz(offset); widoczne.push(...r.data); offset += r.data.length; strzalow++; }
+  sprawdz('doładowało wszystkich 47', widoczne.length === 47, `${widoczne.length}`);
+  sprawdz('bez duplikatów', new Set(widoczne.map(u=>u.userId)).size === 47);
+  sprawdz('trzy żądania (20+20+7)', strzalow === 3, `${strzalow}`);
+}
+
+console.log('\n=== 23. PODGLĄD SĄSIEDNIEJ ZAKŁADKI (D4) ===');
+{
+  const stan = { sekcja: 'home', home: [1,2,3], explore: [9,8,7], podglad: null };
+  const pokaz = (kierunek) => {
+    const sasiad = stan.sekcja === 'home' ? stan.explore : stan.home;
+    if (!sasiad?.length) return;                       // nie ma czego pokazać
+    stan.podglad = { kierunek, kart: Math.min(4, sasiad.length), zrodlo: sasiad };
+  };
+  const usun = () => { stan.podglad = null; };
+
+  pokaz(-1);
+  sprawdz('w Home podgląd pokazuje Explore', stan.podglad?.zrodlo === stan.explore);
+  sprawdz('wjeżdża z prawej (kierunek -1)', stan.podglad?.kierunek === -1);
+  sprawdz('najwyżej 4 karty', stan.podglad?.kart === 3);
+
+  usun();
+  sprawdz('po puszczeniu znika', stan.podglad === null);
+
+  stan.sekcja = 'explore';
+  pokaz(1);
+  sprawdz('w Explore podgląd pokazuje Home', stan.podglad?.zrodlo === stan.home);
+
+  // sąsiad pusty — podglądu nie ma, ale nic się nie wywala
+  usun();
+  stan.sekcja = 'home'; stan.explore = [];
+  pokaz(-1);
+  sprawdz('pusty sąsiad → brak podglądu, bez błędu', stan.podglad === null);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

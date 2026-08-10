@@ -311,14 +311,82 @@ export class SearchView {
     const resultsEl = el.querySelector<HTMLElement>('#sv2FriendResults')!;
     const myUserId  = getUserId();
 
+    // ── DOLADOWYWANIE WYNIKOW ────────────────────────────────────────────────
+    //
+    // Backend (paczka 21) zwraca `hasMore` i przyjmuje `offset`, ale klient
+    // pokazywal tylko pierwsza strone i sie zatrzymywal. Przy paru tysiacach
+    // uzytkownikow ktos dalszy w kolejnosci po prostu nie istnial dla
+    // wyszukiwarki i nikt sie o tym nie dowiadywal.
+    //
+    // Ten sam wzorzec co w feedzie: znacznik na koncu listy, `IntersectionObserver`
+    // dociaga kolejna strone, gdy uzytkownik do niego dojedzie.
+    let _szukObserver: IntersectionObserver | null = null;
+    let _szukTrwa = false;
+
+    const dolaczWyniki = (users: {userId:string;name:string;bio:string;avatarB64:string|null;city:string;region:string;followersCount:number}[]): void => {
+      const lista = resultsEl.querySelector('.sv2-user-list');
+      if (!lista) return;
+      lista.insertAdjacentHTML('beforeend', users.map(u => kartaUzytkownika(u)).join(''));
+      // Nowe wiersze nie maja jeszcze wlasnych nasluchow — bez tego przyciski
+      // Follow na doladowanych pozycjach byly martwe.
+      podepnijAkcje();
+    };
+
+    /** Podepnij doladowywanie. `pobierz(offset)` ma oddac kolejna strone. */
+    const podepnijDoladowywanie = (
+      pobierz: (offset: number) => Promise<{ data: {userId:string;name:string;bio:string;avatarB64:string|null;city:string;region:string;followersCount:number}[]; hasMore: boolean } | null>,
+      startOffset: number,
+    ): void => {
+      _szukObserver?.disconnect();
+      _szukObserver = null;
+      let offset = startOffset;
+
+      const sentinel = document.createElement('div');
+      sentinel.style.height = '1px';
+      resultsEl.appendChild(sentinel);
+
+      _szukObserver = new IntersectionObserver(async entries => {
+        if (!entries[0]?.isIntersecting || _szukTrwa) return;
+        _szukTrwa = true;
+        // Wskaznik na czas pobierania — bez niego przy wolnej sieci wyglada,
+        // jakby lista sie po prostu skonczyla.
+        sentinel.innerHTML = '<div style="padding:16px;text-align:center;'
+          + 'color:var(--app-text-muted);font-size:1.15rem">Ładowanie…</div>';
+        try {
+          const r = await pobierz(offset);
+          if (r && r.data.length) {
+            dolaczWyniki(r.data);
+            offset += r.data.length;
+          }
+          if (!r || !r.hasMore) { _szukObserver?.disconnect(); sentinel.remove(); }
+          else sentinel.innerHTML = '';
+        } catch {
+          sentinel.innerHTML = '';
+        } finally { _szukTrwa = false; }
+      }, { rootMargin: '300px' });
+      _szukObserver.observe(sentinel);
+    };
+
     const renderUserList = (users: {userId:string;name:string;bio:string;avatarB64:string|null;city:string;region:string;followersCount:number}[], title: string) => {
+      _szukObserver?.disconnect();
+      _szukObserver = null;
       if (!users.length) {
         resultsEl.innerHTML = `<div class="sv2-empty"><div class="sv2-empty__icon">👥</div><p class="sv2-empty__title">No results</p></div>`;
         return;
       }
       resultsEl.innerHTML = `
         <div class="sv2-section-title">${title}</div>
-        <div class="sv2-list">${users.map(u => {
+        <div class="sv2-list">${users.map(u => kartaUzytkownika(u)).join('')}</div>`;
+      podepnijAkcje();
+    };
+
+    /** Jedna pozycja listy. Wyodrebnione z `renderUserList`, zeby
+     *  doladowywanie moglo dokladac kolejne strony tym samym kodem —
+     *  wczesniej znacznik byl budowany w miejscu i nie dalo sie go ponownie
+     *  uzyc bez przepisywania calej listy. */
+    const kartaUzytkownika = (u: {userId:string;name:string;bio:string;avatarB64:string|null;city:string;region:string;followersCount:number}): string => {
+      {
+        {
           const isFollowing = this._followingSet.has(u.userId);
           const loc = [u.city, u.region].filter(Boolean).join(', ');
           const avatar = u.avatarB64
@@ -338,9 +406,14 @@ export class SearchView {
                 data-pending="false"
               >${isFollowing ? 'Following' : ((u as unknown as Record<string,unknown>).isPrivate ? 'Request' : 'Follow')}</button>
             </div>`;
-        }).join('')}
-        </div>`;
+        }
+      }
+    };
 
+    /** Podepnij obsluge klikniec. Wolane po KAZDYM wstawieniu pozycji —
+     *  takze po doladowaniu kolejnej strony, bo nowe wiersze nie maja jeszcze
+     *  wlasnych nasluchow. */
+    const podepnijAkcje = (): void => {
       // Follow buttons
       resultsEl.querySelectorAll<HTMLButtonElement>('[data-follow]').forEach(btn => {
         btn.addEventListener('click', async e => {
@@ -423,9 +496,19 @@ export class SearchView {
       if (!q.trim()) { void loadSuggestions(); return; }
       resultsEl.innerHTML = '<div style="padding:24px;text-align:center;color:rgba(255,255,255,0.3)">Searching…</div>';
       try {
-        const res  = await fetch(`${BACKEND_URL}/users/search?q=${encodeURIComponent(q)}&exclude=${encodeURIComponent(myUserId)}`);
-        const data = await res.json() as { status: string; data: {userId:string;name:string;bio:string;avatarB64:string|null;city:string;region:string;followersCount:number}[] };
+        const url = (off: number): string =>
+          `${BACKEND_URL}/users/search?q=${encodeURIComponent(q)}`
+          + `&exclude=${encodeURIComponent(myUserId)}&offset=${off}`;
+        const res  = await fetch(url(0));
+        const data = await res.json() as { status: string; hasMore?: boolean; data: {userId:string;name:string;bio:string;avatarB64:string|null;city:string;region:string;followersCount:number}[] };
         renderUserList(data.data ?? [], `Results for "${q}"`);
+        if (data.hasMore) {
+          podepnijDoladowywanie(async off => {
+            const r = await fetch(url(off));
+            const d = await r.json() as { hasMore?: boolean; data?: typeof data.data };
+            return { data: d.data ?? [], hasMore: !!d.hasMore };
+          }, (data.data ?? []).length);
+        }
       } catch {
         resultsEl.innerHTML = '<div class="sv2-empty"><p class="sv2-empty__title">Error</p></div>';
       }
