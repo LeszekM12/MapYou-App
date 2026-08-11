@@ -17,3 +17,5 @@ www/
 # Generowane przy kazdym `npm run build:app`, wersje przypiete
 # w package.json — nie ma powodu trzymac ich w repozytorium.
 vendor/
+.DS_Store
+ios/App/App/GoogleService-Info.plist

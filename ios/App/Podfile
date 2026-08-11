@@ -1,0 +1,50 @@
+require_relative '../../node_modules/@capacitor/ios/scripts/pods_helpers'
+
+platform :ios, '15.0'
+use_frameworks!
+
+# workaround to avoid Xcode caching of Pods that requires
+# Product -> Clean Build Folder after new Cordova plugins installed
+# Requires CocoaPods 1.6 or newer
+install! 'cocoapods', :disable_input_output_paths => true
+
+def capacitor_pods
+  pod 'Capacitor', :path => '../../node_modules/@capacitor/ios'
+  pod 'CapacitorCordova', :path => '../../node_modules/@capacitor/ios'
+  pod 'CapacitorCommunityBackgroundGeolocation', :path => '../../node_modules/@capacitor-community/background-geolocation'
+  pod 'CapacitorCommunityMedia', :path => '../../node_modules/@capacitor-community/media'
+  pod 'CapacitorFirebaseAppCheck', :path => '../../node_modules/@capacitor-firebase/app-check'
+  pod 'CapacitorFirebaseAuthentication', :path => '../../node_modules/@capacitor-firebase/authentication'
+  pod 'CapacitorFirebaseMessaging', :path => '../../node_modules/@capacitor-firebase/messaging'
+  pod 'CapacitorApp', :path => '../../node_modules/@capacitor/app'
+  pod 'CapacitorGeolocation', :path => '../../node_modules/@capacitor/geolocation'
+  pod 'CapacitorLocalNotifications', :path => '../../node_modules/@capacitor/local-notifications'
+  pod 'CapacitorHealth', :path => '../../node_modules/capacitor-health'
+  pod 'CapacitorLiveActivities', :path => '../../node_modules/capacitor-live-activities'
+end
+
+target 'App' do
+  capacitor_pods
+  # Add your Pods here
+  #
+  # Faza 3 — logowanie Google na iOS.
+  # Podspec wtyczki ma `default_subspec = 'Lite'`, ktory NIE zawiera obslugi
+  # Google: brakuje zaleznosci GoogleSignIn oraz flagi kompilacji
+  # -DRGCFA_INCLUDE_GOOGLE, przez co kod logowania Google jest wyciety
+  # przez preprocesor. Objaw: getCurrentUser dziala, ale signInWithGoogle
+  # nigdy nie zwraca odpowiedzi, a przy starcie leci
+  # CapacitorFirebaseAuthentication.RuntimeError.
+  #
+  # Ponizsza linia dokłada subspec 'Google'.
+  # WAZNE: musi byc TUTAJ, a nie w `def capacitor_pods` — tamta sekcja jest
+  # nadpisywana przy kazdym `npx cap sync`.
+  pod 'CapacitorFirebaseAuthentication/Google', :path => '../../node_modules/@capacitor-firebase/authentication'
+end
+
+post_install do |installer|
+  assertDeploymentTarget(installer)
+end
+
+target 'LiveActivitiesExtension' do
+  pod 'LiveActivitiesKit', :path => '../../node_modules/capacitor-live-activities'
+end
