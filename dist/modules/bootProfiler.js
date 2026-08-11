@@ -21,6 +21,34 @@
 //
 // Modul jest celowo lekki: 400 tykniec timera przez 20 s to nic, a mierzy
 // tylko przez pierwsze 20 sekund i potem sam sie wylacza.
+// ─── WYLACZONY DOMYSLNIE ─────────────────────────────────────────────────────
+//
+// Ten modul PODMIENIA GLOBALNY `fetch` i rysuje czerwone kropki przy kazdym
+// dotknieciu. Swietne przy diagnozowaniu, niedopuszczalne w wersji dla sklepu:
+// nadpisywanie wbudowanych funkcji przegladarki w produkcji to dokladnie ten
+// rodzaj rzeczy, ktory potrafi wywolac trudny do znalezienia blad u kogos,
+// kto nigdy nie prosil o diagnostyke.
+//
+// Zamiast usuwac narzedzie, ktore trzy razy uratowalo nam tydzien szukania —
+// chowamy je za ta sama flaga co `dlog`:
+//
+//     mapyouDebug(true)   → potem RESTART aplikacji
+//     mapyouDebug(false)  → cisza
+//
+// Przy wylaczonej fladze modul nie robi NIC: nie podmienia `fetch`, nie
+// uruchamia timerow, nie podpina nasluchow, `bootMark` jest pusta funkcja.
+// Koszt w wersji produkcyjnej: zero.
+//
+// `mapyouBoot()` nadal istnieje i przy wylaczonej fladze mowi wprost,
+// jak ja wlaczyc — zeby nie wygladalo na awarie narzedzia.
+const WLACZONY = (() => {
+    try {
+        return localStorage.getItem('mapyou_debug') === '1';
+    }
+    catch {
+        return false;
+    }
+})();
 const T0 = performance.now();
 const stalls = [];
 const reqs = [];
@@ -30,6 +58,8 @@ const bridgeByPlugin = new Map();
 const since = () => Math.round(performance.now() - T0);
 /** Znacznik fazy startu. Wolany z `main.ts` w kilku miejscach. */
 export function bootMark(name) {
+    if (!WLACZONY)
+        return;
     marks.push({ name, at: since() });
 }
 // ── 1. Wykrywanie zastojow glownego watku ────────────────────────────────────
@@ -49,7 +79,8 @@ function tyknij() {
     if (teraz - T0 < 20000)
         setTimeout(tyknij, KROK);
 }
-setTimeout(tyknij, KROK);
+if (WLACZONY)
+    setTimeout(tyknij, KROK);
 // ── 2. Pomiar zadan sieciowych ───────────────────────────────────────────────
 //
 // Owijamy `fetch` NA WIERZCHU tego, co juz jest (authFetch tez go podmienia),
@@ -59,28 +90,31 @@ setTimeout(tyknij, KROK);
 // wladowalibysmy sie POD niego i mierzyli sam ruch sieciowy, bez czasu
 // czekania na token Firebase i App Check. A to wlasnie tam moze siedziec
 // problem, wiec musimy byc na zewnatrz.
-setTimeout(() => {
-    const _fetch = window.fetch.bind(window);
-    window.fetch = async function (...args) {
-        const start = performance.now();
-        const url = typeof args[0] === 'string' ? args[0]
-            : args[0]?.url ?? String(args[0]);
-        try {
-            const r = await _fetch(...args);
-            reqs.push({ url, at: Math.round(start - T0), ms: Math.round(performance.now() - start), status: r.status });
-            return r;
-        }
-        catch (e) {
-            reqs.push({ url, at: Math.round(start - T0), ms: Math.round(performance.now() - start), status: 'ERR' });
-            throw e;
-        }
-    };
-}, 0);
+if (WLACZONY)
+    setTimeout(() => {
+        const _fetch = window.fetch.bind(window);
+        window.fetch = async function (...args) {
+            const start = performance.now();
+            const url = typeof args[0] === 'string' ? args[0]
+                : args[0]?.url ?? String(args[0]);
+            try {
+                const r = await _fetch(...args);
+                reqs.push({ url, at: Math.round(start - T0), ms: Math.round(performance.now() - start), status: r.status });
+                return r;
+            }
+            catch (e) {
+                reqs.push({ url, at: Math.round(start - T0), ms: Math.round(performance.now() - start), status: 'ERR' });
+                throw e;
+            }
+        };
+    }, 0);
 // ── 3. Zliczanie przeskokow przez mostek Capacitora ──────────────────────────
 //
 // Kazde wywolanie wtyczki natywnej to komunikat przez most, obslugiwany na
 // glownym watku. Kilkanascie pod rzad potrafi zablokowac interfejs.
 try {
+    if (!WLACZONY)
+        throw new Error('profiler wylaczony');
     const cap = window.Capacitor;
     if (cap && typeof cap.toNative === 'function') {
         const orig = cap.toNative.bind(cap);
@@ -94,9 +128,64 @@ try {
 }
 catch { /* przegladarka bez Capacitora */ }
 // ── 4. Znaczniki z przegladarki ──────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', () => bootMark('DOMContentLoaded'));
-window.addEventListener('load', () => bootMark('window.load'));
-bootMark('profiler start');
+if (WLACZONY) {
+    document.addEventListener('DOMContentLoaded', () => bootMark('DOMContentLoaded'));
+    window.addEventListener('load', () => bootMark('window.load'));
+    bootMark('profiler start');
+}
+const tapy = [];
+function opisz(el) {
+    if (!el)
+        return '(brak)';
+    const id = el.id ? `#${el.id}` : '';
+    const cls = typeof el.className === 'string' && el.className
+        ? '.' + el.className.trim().split(/\s+/).slice(0, 3).join('.') : '';
+    return `${el.tagName.toLowerCase()}${id}${cls}`.slice(0, 90);
+}
+// ── ZNACZNIK DOTKNIECIA NA EKRANIE ───────────────────────────────────────────
+//
+// Nagranie ekranu na iOS NIE POKAZUJE dotkniec. Widac wiec reakcje interfejsu,
+// ale nie widac, kiedy palec dotknal — czyli nie da sie zmierzyc opoznienia.
+//
+// Rozwiazanie: rysujemy czerwona kropke DOKLADNIE w chwili, gdy JavaScript
+// dostaje zdarzenie. Na nagraniu widac wtedy jedno i drugie, a odstep miedzy
+// kropka a reakcja to szukane opoznienie — mierzalne wprost z wideo, bez
+// zgadywania i bez korelowania z logami.
+//
+// Kropka pojawia sie w fazie PRZECHWYTYWANIA, czyli zanim jakikolwiek inny
+// kod zobaczy zdarzenie. Jesli kropka nie zapali sie wcale — dotkniecie
+// nie doszlo do WebView i problem jest w warstwie natywnej.
+function znacznik(x, y) {
+    const d = document.createElement('div');
+    d.style.cssText = `position:fixed;left:${x - 16}px;top:${y - 16}px;width:32px;height:32px;`
+        + 'border-radius:50%;background:rgba(255,0,0,0.55);border:2px solid #fff;'
+        + 'z-index:2147483647;pointer-events:none;';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 400);
+}
+for (const typ of (WLACZONY ? ['pointerdown', 'touchstart', 'click'] : [])) {
+    document.addEventListener(typ, (e) => {
+        if (tapy.length > 60)
+            return;
+        const pe = e;
+        const x = pe.clientX ?? 0, y = pe.clientY ?? 0;
+        tapy.push({
+            at: since(),
+            typ,
+            cel: opisz(e.target),
+            // KLUCZOWE: co system uwaza za element pod palcem. Gdy rozni sie od celu,
+            // znaczy, ze cos lezy na wierzchu i zjada dotkniecie.
+            naWierzchu: opisz(document.elementFromPoint(x, y)),
+            domyslnieZablokowane: e.defaultPrevented || undefined,
+        });
+        if (typ === 'pointerdown')
+            znacznik(x, y);
+    }, true); // faza przechwytywania — lapiemy PRZED wszystkimi innymi
+}
+// Widocznosc strony: gdyby WebView budzil sie z opoznieniem, zobaczymy to tutaj.
+if (WLACZONY) {
+    document.addEventListener('visibilitychange', () => bootMark(`visibility: ${document.visibilityState}`));
+}
 // ── Raport ───────────────────────────────────────────────────────────────────
 function raport() {
     const sumaZastojow = stalls.reduce((s, x) => s + x.ms, 0);
@@ -135,14 +224,29 @@ function raport() {
         '6_MOSTEK_wg_wtyczki': [...bridgeByPlugin.entries()]
             .sort((a, b) => b[1] - a[1]).slice(0, 10)
             .map(([k, n]) => ({ wywolanie: k, ile: n })),
-        '7_PRZEGLADARKA': {
+        '7_DOTKNIECIA': tapy.length
+            ? tapy
+            : 'BRAK — zadne dotkniecie nie doszlo nawet do nasluchu na document. '
+                + 'To znaczy, ze problem jest PONIZEJ JavaScriptu (warstwa natywna).',
+        '8_PRZEGLADARKA': {
             parsowanie_html_ms: Math.round((nav.domContentLoadedEventStart ?? 0) - (nav.responseEnd ?? 0)),
             do_zaladowania_ms: Math.round(nav.loadEventStart ?? 0),
             wezlow_DOM: document.getElementsByTagName('*').length,
+            // Kiedy przegladarka zaczela wczytywac strone, liczac od epoki.
+            // Porownaj z momentem dotkniecia ikony — roznica to czas, ktory zjada
+            // warstwa natywna ZANIM JavaScript w ogole ruszy.
+            start_nawigacji_iso: new Date(performance.timeOrigin).toISOString(),
         },
     };
 }
 window.mapyouBoot = () => {
+    // Bez tego komunikatu pusty raport wygladalby na awarie narzedzia,
+    // a nie na jego swiadome wylaczenie.
+    if (!WLACZONY) {
+        console.warn('[Boot] Profiler jest WYLACZONY (tak ma byc w wersji dla sklepu).\n'
+            + 'Zeby wlaczyc:  mapyouDebug(true)  → potem zrestartuj aplikacje.');
+        return { profiler: 'wylaczony', jak_wlaczyc: 'mapyouDebug(true) + restart' };
+    }
     const r = raport();
     // Wypis tekstowy — latwiej skopiowac z konsoli Safari niz rozwijac obiekty.
     console.log('%c=== MAPYOU BOOT PROFILE ===', 'font-weight:bold');
@@ -150,9 +254,10 @@ window.mapyouBoot = () => {
     return r;
 };
 // Automatyczny wypis, gdyby ktos zapomnial wpisac polecenie.
-setTimeout(() => {
-    const suma = stalls.reduce((s, x) => s + x.ms, 0);
-    console.warn(`[Boot] zastoje glownego watku: ${Math.round(suma)} ms w ${stalls.length} kawalkach, ` +
-        `zadan: ${reqs.length}, mostek: ${bridgeCalls}. Szczegoly: mapyouBoot()`);
-}, 15000);
+if (WLACZONY)
+    setTimeout(() => {
+        const suma = stalls.reduce((s, x) => s + x.ms, 0);
+        console.warn(`[Boot] zastoje glownego watku: ${Math.round(suma)} ms w ${stalls.length} kawalkach, ` +
+            `zadan: ${reqs.length}, mostek: ${bridgeCalls}. Szczegoly: mapyouBoot()`);
+    }, 15000);
 //# sourceMappingURL=bootProfiler.js.map

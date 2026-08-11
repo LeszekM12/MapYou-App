@@ -612,6 +612,49 @@ console.log('\n=== 28. TRASY ADMINA POZA BRAMKĄ UŻYTKOWNIKA ===');
     admin({ authorization: 'Bearer xyz' }) === 403);
 }
 
+console.log('\n=== 29. PROFILER WYŁĄCZONY W WERSJI DLA SKLEPU ===');
+{
+  // Odwzorowanie: przy wyłączonej fladze modul NIE MOŻE dotknąć niczego
+  // globalnego. Podmiana `fetch` w produkcji to dokładnie ten rodzaj rzeczy,
+  // który wywołuje trudny do znalezienia błąd u kogoś, kto o nic nie prosił.
+  const symuluj = (flaga) => {
+    const efekty = [];
+    if (flaga) efekty.push('podmiana-fetch', 'timer-zastojow', 'nasłuch-dotknięć',
+                           'nasłuch-widoczności', 'auto-wypis', 'licznik-mostka');
+    const bootMark = () => flaga ? efekty.push('znacznik') : undefined;
+    bootMark();
+    return efekty;
+  };
+
+  sprawdz('flaga WYŁĄCZONA → zero efektów ubocznych',
+    symuluj(false).length === 0, `${symuluj(false).length}`);
+  sprawdz('flaga WŁĄCZONA → narzędzie działa',
+    symuluj(true).length === 7, `${symuluj(true).length}`);
+
+  // najważniejsze pojedyncze sprawdzenie
+  sprawdz('globalny `fetch` NIE jest podmieniany w produkcji',
+    !symuluj(false).includes('podmiana-fetch'));
+  sprawdz('bootMark nic nie zapisuje w produkcji',
+    !symuluj(false).includes('znacznik'));
+}
+
+console.log('\n=== 30. IKONA APLIKACJI — wymagania Apple ===');
+{
+  const sprawdzIkone = (w, h, maAlfe) => ({
+    rozmiar: w === 1024 && h === 1024,
+    bezAlfy: !maAlfe,
+    ok: w === 1024 && h === 1024 && !maAlfe,
+  });
+
+  const stara = sprawdzIkone(1024, 1024, true);    // icon-512.png przed poprawką
+  sprawdz('STARA: rozmiar dobry, ale ma alfę → odrzucenie', stara.rozmiar && !stara.ok);
+
+  const nowa = sprawdzIkone(1024, 1024, false);
+  sprawdz('NOWA: 1024x1024 bez alfy → przechodzi', nowa.ok);
+
+  sprawdz('za mała → odrzucenie', !sprawdzIkone(512, 512, false).ok);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));
