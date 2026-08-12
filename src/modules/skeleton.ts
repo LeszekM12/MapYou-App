@@ -139,6 +139,34 @@ export function podepnijZastepnikiObrazkow(): void {
     if (!el || el.tagName !== 'IMG') return;
     const img = el as HTMLImageElement;
     if (img.dataset.fallbackDone === '1') return;
+
+    // ── NIE PODMIENIAJ ZBYT POCHOPNIE ────────────────────────────────────────
+    //
+    // Pierwotna wersja zastepowala obrazek przy PIERWSZYM bledzie, na stale.
+    // Przy starcie aplikacji zdarzenie `error` potrafi paść przejsciowo — na
+    // przyklad gdy zrodlo jest jeszcze puste albo dane z pamieci nie zdazyly
+    // sie wczytac. Skutek: zdjecie profilowe w naglowku zamienialo sie
+    // w szary prostokat i zostawalo tak do przerysowania widoku.
+    //
+    // Dwa zabezpieczenia:
+    //   1. Puste zrodlo to nie blad — obrazek jeszcze nie dostal czego wczytac.
+    //   2. Jedna ponowna proba po chwili. Dopiero jej niepowodzenie oznacza,
+    //      ze plik naprawde nie istnieje.
+    const zrodlo = img.getAttribute('src') ?? '';
+    if (!zrodlo || zrodlo === 'null' || zrodlo === 'undefined') return;
+
+    if (img.dataset.fallbackRetry !== '1') {
+      img.dataset.fallbackRetry = '1';
+      setTimeout(() => {
+        if (!img.isConnected || img.dataset.fallbackDone === '1') return;
+        // Podmiana `src` na te sama wartosc nie wywoluje ponownego pobrania —
+        // trzeba przejsc przez pusta wartosc.
+        img.src = '';
+        img.src = zrodlo;
+      }, 400);
+      return;
+    }
+
     img.dataset.fallbackDone = '1';
 
     const box = document.createElement('div');

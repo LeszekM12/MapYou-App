@@ -3797,13 +3797,14 @@ export class HomeView {
         const autorNazwa = (item.data.authorName ?? '') as string;
         const zglos = document.createElement('button');
         zglos.type = 'button';
+        zglos.className = 'home-card__action';
         zglos.setAttribute('aria-label', 'Opcje treści');
         zglos.dataset.action = 'moderate';
         zglos.textContent = '⋯';
-        zglos.style.cssText = 'position:absolute;top:10px;right:10px;z-index:3;'
-          + 'width:32px;height:32px;border:none;border-radius:50%;'
-          + 'background:rgba(128,128,128,0.16);color:var(--app-text-secondary);'
-          + 'font-size:1.5rem;line-height:1;cursor:pointer';
+        // Bez pozycjonowania bezwzglednego — przycisk dolacza do WIERSZA AKCJI,
+        // obok udostepniania. Wczesniej siedzial w prawym gornym rogu karty
+        // i ZASLANIAL oznaczenie trudnosci („Hard", „Moderate").
+        zglos.style.cssText = 'font-size:1.6rem;line-height:1;letter-spacing:1px';
         zglos.addEventListener('click', async e => {
           e.stopPropagation();
           const wynik = await menuCudzejTresci(
@@ -3818,8 +3819,13 @@ export class HomeView {
           if (wynik === 'zablokowano') { card.remove(); void this.render(); }
           else if (wynik === 'ukryto') card.remove();
         });
-        if (getComputedStyle(card).position === 'static') card.style.position = 'relative';
-        card.appendChild(zglos);
+        // Doklejamy na koncu wiersza akcji, tuz za udostepnianiem. Gdyby karta
+        // go nie miala (np. inny uklad), wracamy do doklejenia na koncu karty —
+        // lepiej zeby przycisk byl w nietypowym miejscu niz zeby go nie bylo,
+        // bo to wymog wytycznych App Store.
+        const wiersz = card.querySelector('.home-card__action--share')?.parentElement;
+        if (wiersz) wiersz.appendChild(zglos);
+        else card.appendChild(zglos);
       }
 
       feedList.appendChild(card);
@@ -3845,10 +3851,25 @@ export class HomeView {
       // First batch synchronously (content above the fold appears instantly),
       // the rest in rAF-sized chunks so taps are handled between batches.
       feed.slice(0, FIRST_BATCH).forEach((it, i) => buildOne(it, i));
+      // ── POKOLENIE MALOWANIA ─────────────────────────────────────────────
+      //
+      // Bez tego przerysowanie feedu NIE ZATRZYMYWALO poprzedniej petli.
+      // Warunek `!feedList.isConnected` nie wystarczal, bo przy przerysowaniu
+      // element ZOSTAJE w drzewie — czyscimy tylko jego zawartosc. Stara petla
+      // spokojnie dopisywala wiec swoje karty do juz wyczyszczonej listy.
+      //
+      // Objaw: wchodzisz w Explore, widzisz „Nothing here yet", a pod spodem
+      // dosypuja sie karty z poprzedniego malowania. Po odswiezeniu wszystko
+      // wyglada dobrze, bo wtedy leci juz tylko jedno malowanie.
+      this._pokolenieMalowania++;
+      const mojePokolenie = this._pokolenieMalowania;
+
       let next = FIRST_BATCH;
       const pump = (): void => {
+        // Nowsze malowanie przejelo liste — ta petla ma sie wycofac.
+        if (mojePokolenie !== this._pokolenieMalowania) return;
         if (next >= feed.length) return;
-        if (!feedList.isConnected) return;   // view re-rendered — stop streaming
+        if (!feedList.isConnected) return;   // widok zniknal
         const end = Math.min(next + BATCH, feed.length);
         for (let i = next; i < end; i++) buildOne(feed[i], i);
         next = end;
@@ -4294,7 +4315,13 @@ export class HomeView {
     const panel = document.createElement('div');
     panel.id = 'homeFeedPreview';
     panel.setAttribute('aria-hidden', 'true');
-    panel.style.cssText = 'position:absolute;top:0;width:100%;pointer-events:none;'
+    // `top: 0` odnosilo sie do POCZATKU KONTENERA, ktory obejmuje takze
+    // powitanie, pasek serii i przelacznik. Na dole ekranu bylo tego nie widac,
+    // bo naglowek juz odjechal — ale na samej gorze podglad wjezdzal NA naglowek.
+    //
+    // Wyrownujemy go do pozycji samej listy.
+    panel.style.cssText = 'position:absolute;width:100%;pointer-events:none;'
+      + `top:${lista.offsetTop}px;`
       + `left:${kierunek === -1 ? '100%' : '-100%'};`;
 
     // Kilka pierwszych kart wystarczy — podczas przesuwania i tak widac
@@ -4464,6 +4491,10 @@ export class HomeView {
    *  Wypelniana z IndexedDB przy starcie widoku (`_wgrajCacheFeedu`). */
   private _feedCacheRam: { feed: Array<{ kind: string; date: number; data: Record<string, unknown> }>; hasMore: boolean } | null = null;
   private _exploreCacheRam: Array<{ kind: string; date: number; data: Record<string, unknown> }> | null = null;
+
+  /** Numer biezacego malowania feedu. Kazde nowe podnosi licznik, przez co
+   *  petle poprzednich malowan same sie zatrzymuja. */
+  private _pokolenieMalowania = 0;
 
   /** Wczytaj cache z IndexedDB do pamieci. Wolane PRZED pierwszym rysowaniem.
    *

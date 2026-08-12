@@ -655,6 +655,66 @@ console.log('\n=== 30. IKONA APLIKACJI — wymagania Apple ===');
   sprawdz('za mała → odrzucenie', !sprawdzIkone(512, 512, false).ok);
 }
 
+console.log('\n=== 31. MALOWANIE PARTIAMI — stara pętla musi się wycofać ===');
+{
+  // Objaw: „Nothing here yet", a pod spodem dosypują się karty z poprzedniego
+  // malowania. Przyczyna: `pump` sprawdzał tylko, czy lista jest w drzewie —
+  // a przy przerysowaniu element ZOSTAJE, czyszczona jest tylko zawartość.
+  const lista = [];
+  let pokolenie = 0;
+
+  const maluj = (dane, przerywalne) => {
+    pokolenie++;
+    const moje = pokolenie;
+    lista.length = 0;                       // feedList.innerHTML = ''
+    const pump = (i) => {
+      if (przerywalne && moje !== pokolenie) return;   // nowsze przejęło
+      if (i >= dane.length) return;
+      lista.push(dane[i]);
+      pump(i + 1);
+    };
+    return () => pump(0);
+  };
+
+  // STARY kod: obie pętle dopisują do tej samej listy
+  const staryA = maluj(['home1','home2','home3'], false);
+  const staryB = maluj(['expl1','expl2'], false);
+  staryB(); staryA();
+  sprawdz('STARY: treść pomieszana', lista.length === 5, lista.join(','));
+
+  // NOWY kod: starsza pętla się wycofuje
+  lista.length = 0; pokolenie = 0;
+  const nowyA = maluj(['home1','home2','home3'], true);
+  const nowyB = maluj(['expl1','expl2'], true);
+  nowyB(); nowyA();
+  sprawdz('NOWY: tylko najnowsze malowanie', lista.length === 2, lista.join(','));
+  sprawdz('i są to właściwe karty', lista.join(',') === 'expl1,expl2');
+}
+
+console.log('\n=== 32. PODGLĄD WYRÓWNANY DO LISTY ===');
+{
+  // Kontener zawiera powitanie + serię + przełącznik, potem dopiero listę.
+  const offsetListy = 620;
+  const pozycja = (doKontenera) => doKontenera ? 0 : offsetListy;
+
+  sprawdz('STARY: top=0 → wjeżdża na nagłówek', pozycja(true) === 0);
+  sprawdz('NOWY: wyrównany do listy', pozycja(false) === offsetListy);
+  sprawdz('na dole różnicy nie widać (nagłówek odjechał)', true);
+}
+
+console.log('\n=== 33. ZASTĘPNIK OBRAZKA — nie podmieniaj pochopnie ===');
+{
+  const zachowanie = (src, proba) => {
+    if (!src || src === 'null') return 'pomijamy';       // puste źródło
+    if (proba === 0) return 'ponow';                      // pierwsza szansa
+    return 'zastępnik';
+  };
+  sprawdz('puste źródło → nie podmieniamy', zachowanie('', 0) === 'pomijamy');
+  sprawdz('"null" jako tekst → nie podmieniamy', zachowanie('null', 0) === 'pomijamy');
+  sprawdz('pierwszy błąd → ponawiamy', zachowanie('foto.jpg', 0) === 'ponow');
+  sprawdz('drugi błąd → dopiero zastępnik', zachowanie('foto.jpg', 1) === 'zastępnik');
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));
