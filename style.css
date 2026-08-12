@@ -2067,6 +2067,36 @@ body {
 .trk-permission__icon  { font-size: 5rem; display: block; margin-bottom: 2rem; }
 .trk-permission__title { font-size: 2.2rem; font-weight: 800; color: var(--color-light--1); margin-bottom: 1.2rem; }
 .trk-permission__desc  { font-size: 1.5rem; color: var(--color-light--2); line-height: 1.6; margin-bottom: 2.8rem; }
+/* Lista gwarancji na ekranie zgody na lokalizacje.
+   Wymagana przez Google Play: uzytkownik musi widziec, KIEDY dane sa zbierane,
+   a kiedy nie — zanim system pokaze swoje okno. */
+.trk-permission__list {
+    list-style: none;
+    margin: 4px 0 20px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(128, 128, 128, 0.10);
+    text-align: left;
+}
+.trk-permission__list li {
+    position: relative;
+    padding-left: 24px;
+    margin-bottom: 9px;
+    font-size: 1.25rem;
+    line-height: 1.45;
+    color: var(--app-text-secondary, #9aa0a6);
+}
+.trk-permission__list li:last-child { margin-bottom: 0; }
+.trk-permission__list li::before {
+    content: "";
+    position: absolute;
+    left: 2px; top: 6px;
+    width: 11px; height: 6px;
+    border-left: 2px solid #00c46a;
+    border-bottom: 2px solid #00c46a;
+    transform: rotate(-45deg);
+}
+
 .trk-permission__allow {
     display: block; width: 100%; padding: 1.8rem;
     background: var(--color-brand--2); color: var(--app-text-primary);

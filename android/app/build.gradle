@@ -22,8 +22,8 @@ android {
         // Google Play odrzuca kolejny plik AAB z tym samym `versionCode`.
         // PODNIES O 1 PRZY KAZDYM WYSLANIU — takze przy poprawce w tescie
         // zamknietym. `versionName` jest dla uzytkownika i moze zostac.
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 3
+        versionName "1.0.2"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
