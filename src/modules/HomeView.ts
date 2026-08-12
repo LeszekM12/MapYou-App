@@ -4158,6 +4158,39 @@ export class HomeView {
     });
   }
 
+  /** Pobierz swieze dane AKTYWNEJ sekcji, nie ruszajac widoku.
+   *
+   *  Wolane przez pociagniecie w dol. Nie kasuje cache i nie przebudowuje
+   *  drzewa — dzieki temu bez zasiegu nic nie znika, a przy dzialajacej sieci
+   *  tresc podmienia sie tylko wtedy, gdy naprawde sie zmienila. */
+  private async _odswiezDane(): Promise<void> {
+    const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
+    if (!userId) return;
+
+    if (this._homeSection === 'explore') {
+      // `_loadExplore` sam maluje z pamieci i odswieza w tle.
+      await this._loadExplore();
+      return;
+    }
+
+    const r = await this._fetchServerFeed(userId);
+    if (!r) {
+      // Brak sieci. Zostawiamy to, co na ekranie — plus dyskretna informacja.
+      this._pasekOffline();
+      return;
+    }
+    this._schowajPasekOffline();
+    this._writeFeedCache(userId, r.feed, r.hasMore);
+    this._feedHasMore = r.hasMore;
+    const poz = r.feed as Array<{ kind: string; date: number; data: Record<string, unknown> }>;
+    // Przerysowujemy TYLKO przy zmianie — inaczej gubimy pozycje przewijania
+    // i ekran mruga bez powodu.
+    if (this._feedSig(poz as never) !== this._feedSig(this._lastHomeFeed as never)) {
+      this._lastHomeFeed = poz as typeof this._lastHomeFeed;
+      this._repaintFeed?.(poz);
+    }
+  }
+
   private async _loadExplore(): Promise<void> {
     const userId = localStorage.getItem('mapyou_userId_profile') ?? '';
     if (!userId) return;
@@ -4180,7 +4213,17 @@ export class HomeView {
       this._exploreOffset  = this._exploreFeed.length;
       if (this._homeSection === 'explore') this._repaintFeed?.(this._exploreFeed);
     } else if (this._homeSection === 'explore') {
-      pokazSzkieletFeedu(document.getElementById('homeFeedList'), 3);
+      // SZKIELET TYLKO NA PUSTY EKRAN.
+      //
+      // Wczesniej pojawial sie zawsze, gdy zabrakło kopii w pamieci — takze
+      // przy odswiezaniu, gdy tresc byla juz na ekranie. Stad te dwa puste
+      // kafle w miejscu widocznych wpisow.
+      //
+      // Szkielet odpowiada na pytanie „czy cos sie dzieje", ktore ma sens
+      // tylko wtedy, gdy nie ma czego ogladac. Gdy tresc juz jest,
+      // odswiezanie sygnalizuje wskaznik pociagniecia.
+      const lista = document.getElementById('homeFeedList');
+      if (!lista?.querySelector('.home-card')) pokazSzkieletFeedu(lista, 3);
     }
 
     const geo = await this._getGeo();
@@ -4466,9 +4509,23 @@ export class HomeView {
       ind.style.opacity = '1';
       spinner.style.transform = '';
       try {
-        const uid = localStorage.getItem('mapyou_userId_profile') ?? '';
-        if (uid) homeView.uniewaznijCacheFeedu(uid);
-        await this.render();
+        // ── ODSWIEZANIE NIE PRZEBUDOWUJE WIDOKU ─────────────────────────────
+        //
+        // Bylo tu `uniewaznijCacheFeedu()` + `render()`. Dwie rzeczy naraz
+        // i obie destrukcyjne:
+        //
+        //   1. Kasowanie cache — offline nie ma czym go potem odbudowac.
+        //      Stad znikajaca tresc i dwa puste kafle.
+        //   2. `render()` przebudowuje CALY widok: powitanie, pasek serii,
+        //      przelacznik, liste. To przeladowanie strony, nie odswiezenie.
+        //
+        // X robi to inaczej: os czasu ZOSTAJE na ekranie, kreci sie tylko
+        // wskaznik nad nia, a nowe wpisy wskakuja na gore, gdy przyjda.
+        // Tresc znika wylacznie wtedy, gdy jest czym ja zastapic.
+        //
+        // Teraz pobieramy same DANE aktywnej sekcji. Cache zostaje nietkniety,
+        // wiec brak sieci niczego nie psuje.
+        await this._odswiezDane();
       } finally {
         refreshing = false;
         ind.classList.remove('home-ptr--active');

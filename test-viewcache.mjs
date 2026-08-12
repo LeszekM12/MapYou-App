@@ -715,6 +715,46 @@ console.log('\n=== 33. ZASTĘPNIK OBRAZKA — nie podmieniaj pochopnie ===');
   sprawdz('drugi błąd → dopiero zastępnik', zachowanie('foto.jpg', 1) === 'zastępnik');
 }
 
+console.log('\n=== 34. ODŚWIEŻANIE NIE NISZCZY TREŚCI (jak w X) ===');
+{
+  const ekran = { tresc: ['a','b','c'], cache: ['a','b','c'], szkielet: false, przebudowa: 0 };
+
+  // STARY: kasuje cache + render() = przebudowa całego widoku
+  const stary = (siec) => {
+    ekran.cache = [];                       // uniewaznijCacheFeedu
+    ekran.przebudowa++;                     // render()
+    if (!siec) { ekran.tresc = []; ekran.szkielet = true; }
+  };
+  // NOWY: pobiera tylko dane, cache nietknięty
+  const nowy = (siec) => {
+    if (!siec) return 'pasek-offline';      // treść zostaje
+    ekran.tresc = ['a','b','c','d'];        // nowe dane
+    return 'ok';
+  };
+
+  stary(false);
+  sprawdz('STARY offline: treść zniknęła', ekran.tresc.length === 0);
+  sprawdz('STARY: cache skasowany — nie ma czym odbudować', ekran.cache.length === 0);
+  sprawdz('STARY: przebudowa całego widoku', ekran.przebudowa === 1);
+
+  ekran.tresc = ['a','b','c']; ekran.cache = ['a','b','c']; ekran.przebudowa = 0;
+  const wynik = nowy(false);
+  sprawdz('NOWY offline: treść ZOSTAJE', ekran.tresc.length === 3);
+  sprawdz('NOWY: cache nietknięty', ekran.cache.length === 3);
+  sprawdz('NOWY: bez przebudowy widoku', ekran.przebudowa === 0);
+  sprawdz('NOWY: pokazuje pasek zamiast pustki', wynik === 'pasek-offline');
+
+  sprawdz('NOWY online: dociąga nowe wpisy', nowy(true) === 'ok' && ekran.tresc.length === 4);
+}
+
+console.log('\n=== 35. SZKIELET TYLKO NA PUSTY EKRAN ===');
+{
+  const pokazac = (kartNaEkranie) => kartNaEkranie === 0;
+  sprawdz('pusty ekran → szkielet', pokazac(0));
+  sprawdz('treść na ekranie → BEZ szkieletu', !pokazac(5));
+  sprawdz('jedna karta też wystarczy', !pokazac(1));
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));
