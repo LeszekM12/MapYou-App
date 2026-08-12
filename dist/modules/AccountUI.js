@@ -69,7 +69,7 @@ export async function initAccountSilent() {
         dlog(`[Account] sesja ustalona w ${Date.now() - _t0} ms`);
         _signedIn = true;
         setSessionReady(true); // dopiero teraz wolno dokladac token do zadan
-        dlog(`[Account] przywrócono sesję (${session.mode}) userId=${session.userId}`);
+        dlog(`[Account] session restored (${session.mode}) userId=${session.userId}`);
         // ZAWSZE synchronizuj po ustaleniu sesji — takze przy zwyklym 'login'.
         // Przy starcie apki hydratacja odpala sie ZANIM sesja jest gotowa, wiec
         // leci w trybie goscia i wraca pusta. To jest ten drugi, poprawny przebieg.
@@ -194,7 +194,7 @@ export function renderAccountCard() {
                  border:1px solid rgba(239,68,68,0.45);background:none;
                  color:#ef4444;font-size:1.15rem;font-weight:600;
                  font-family:inherit;cursor:pointer">
-          Usuń konto
+          Delete account
         </button>
       </div>`;
     }
@@ -344,8 +344,8 @@ export function bindAccountCard(root, onChanged) {
     });
     root.querySelector('#accSignOut')?.addEventListener('click', () => {
         void (async () => {
-            if (!confirm('Wylogować?\n\n' +
-                'Dane zostaną usunięte z tego telefonu i wrócą po ponownym zalogowaniu. ' +
+            if (!confirm('Sign out?\n\n' +
+                'Data will be removed from this phone and will come back when you sign in again. ' +
                 'Nic nie tracisz — wszystko jest bezpieczne w chmurze.'))
                 return;
             try {
@@ -387,7 +387,7 @@ export function bindAccountCard(root, onChanged) {
 // Operacja jest nieodwracalna, wiec wymagamy przepisania slowa zamiast
 // zwyklego „OK". Przy `confirm()` wystarczy jedno odruchowe tapniecie —
 // przy koncie z 235 rekordami to za malo.
-const DELETE_WORD = 'USUŃ';
+const DELETE_WORD = 'DELETE';
 export function showDeleteAccountModal() {
     return new Promise(resolve => {
         document.getElementById('delAccModal')?.remove();
@@ -419,7 +419,7 @@ export function showDeleteAccountModal() {
           <strong>Wyloguj</strong> — dane zostaną w chmurze.
         </p>
         <p class="name-modal__sub" style="text-align:left;margin-top:-4px">
-          Aby potwierdzić, wpisz <strong>${DELETE_WORD}</strong>:
+          To confirm, type <strong>${DELETE_WORD}</strong>:
         </p>
         <input id="delAccInput" type="text" autocomplete="off" autocapitalize="characters"
           spellcheck="false" placeholder="${DELETE_WORD}"
@@ -429,7 +429,7 @@ export function showDeleteAccountModal() {
                  text-align:center;letter-spacing:2px;box-sizing:border-box">
         <button class="name-modal__btn" id="delAccGo" disabled
           style="margin-top:14px;background:#ef4444;color:#fff;opacity:0.45">
-          Usuń konto na zawsze
+          Delete account permanently
         </button>
         <button class="name-modal__recover-link" id="delAccCancel" style="margin-top:12px">
           Anuluj
@@ -463,7 +463,7 @@ export function showDeleteAccountModal() {
                     });
                     const data = await res.json().catch(() => ({}));
                     if (!res.ok || data.status !== 'ok') {
-                        throw new Error(data.message ?? `Błąd ${res.status}`);
+                        throw new Error(data.message ?? `Error ${res.status}`);
                     }
                     // Konto po stronie serwera juz nie istnieje — sprzatamy telefon.
                     _signedIn = false;
@@ -494,10 +494,10 @@ export function showDeleteAccountModal() {
                 catch (e) {
                     const raw = e instanceof Error ? e.message : String(e);
                     errEl.textContent = /network|timeout|Load failed|aborted/i.test(raw)
-                        ? 'Brak połączenia z siecią. Konto NIE zostało usunięte — spróbuj ponownie.'
-                        : `Nie udało się usunąć konta: ${raw}`;
+                        ? 'No network connection. Your account was NOT deleted — please try again.'
+                        : `Could not delete account: ${raw}`;
                     errEl.style.display = 'block';
-                    goBtn.textContent = 'Usuń konto na zawsze';
+                    goBtn.textContent = 'Delete account permanently';
                     goBtn.disabled = false;
                     input.disabled = false;
                 }
@@ -594,7 +594,7 @@ export function showAuthModal() {
             modal.querySelector('#authClose')?.addEventListener('click', () => finish(false));
             modal.querySelector('#authGoogle')?.addEventListener('click', () => void run('google'));
             modal.querySelector('#authApple')?.addEventListener('click', () => void run('apple'));
-            modal.querySelector('#authTransfer')?.addEventListener('click', () => renderCode('Wpisz kod odzyskiwania ze starego telefonu (Profil → Kod odzyskiwania). Potem zaloguj się tym samym kontem Google lub Apple.'));
+            modal.querySelector('#authTransfer')?.addEventListener('click', () => renderCode('Enter the recovery code from your old phone (Profile → Recovery code), then sign in with the same Google or Apple account.'));
         };
         const showErr = (msg) => {
             const el = modal.querySelector('#authError');
@@ -680,7 +680,7 @@ export function showAuthModal() {
                 const msg = e instanceof Error ? e.message : String(e);
                 // Backend mówi: to userId ma już konto → potrzebny kod odzyskiwania
                 if (/NEEDS_RECOVERY_CODE/i.test(msg) || /kod odzyskiwania/i.test(msg)) {
-                    renderCode('To konto istnieje już na serwerze. Podaj kod odzyskiwania, aby połączyć je z tym logowaniem.');
+                    renderCode('This account already exists on the server. Enter your recovery code to link it with this sign-in.');
                 }
                 else if (isUserCancellation(msg)) {
                     // Uzytkownik zamknal okno dostawcy — bez czerwonego komunikatu.
@@ -761,7 +761,7 @@ async function syncAfterSignIn(mode, opts = {}) {
             const { resetSyncFlag, syncToMongoIfNeeded } = await import('./syncToMongo.js');
             resetSyncFlag();
             await syncToMongoIfNeeded();
-            dlog('[Account] lokalne treningi wysłane do chmury');
+            dlog('[Account] local workouts pushed to cloud');
         }
     }
     catch (e) {

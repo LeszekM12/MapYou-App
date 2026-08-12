@@ -68,6 +68,10 @@ const SPORT_MAP: Record<string, string> = {
   'yoga': 'yoga', 'golf': 'golf', 'soccer': 'football', 'football': 'football',
   // PL (localised CSV)
   'bieg': 'running', 'bieg terenowy': 'trail_run', 'spacer': 'walking',
+  // UWAGA: te polskie nazwy to DANE WEJSCIOWE z eksportu Stravy, nie tekst
+  // interfejsu. Strava eksportuje plik CSV w jezyku konta uzytkownika, wiec
+  // mapowanie MUSI rozpoznawac polskie nazwy sportow i skroty miesiecy.
+  // Tlumaczenie ich zepsuloby import polskim uzytkownikom.
   'wędrówka': 'hiking', 'jazda na rowerze': 'cycling', 'kolarstwo górskie': 'mtb',
   'jazda gravelem': 'gravel', 'jazda na rowerze elektrycznym': 'ebike',
   'pływanie': 'swimming', 'narciarstwo alpejskie': 'skiing',
@@ -574,7 +578,7 @@ export function showStravaImportModal(): void {
     const file = input.files?.[0];
     if (!file) return;
     if (typeof JSZip === 'undefined') {
-      status.textContent = '❌ Brak biblioteki ZIP (JSZip) — sprawdź połączenie i odśwież aplikację.';
+      status.textContent = '❌ ZIP library (JSZip) missing — check your connection and refresh the app.';
       return;
     }
     startBtn.disabled = true; input.disabled = true; closeBtn.textContent = 'Przerwij i zamknij';

@@ -230,10 +230,10 @@ export async function migrateLocalStorageToIndexedDB() {
     const normalized = parsed.map(w => normalizeWorkout(w));
     try {
         await db.workouts.bulkAdd(normalized);
-        dlog(`[DB] ✅ Zmigrowano ${normalized.length} workoutów.`);
+        dlog(`[DB] ✅ Migrated ${normalized.length} workouts.`);
     }
     catch (err) {
-        console.error('[DB] ❌ Błąd migracji:', err);
+        console.error('[DB] ❌ Migration failed:', err);
         return 0;
     }
     localStorage.removeItem('workouts');
@@ -245,7 +245,7 @@ export async function loadWorkoutsFromDB() {
         return await db.workouts.orderBy('date').reverse().toArray();
     }
     catch (err) {
-        console.error('[DB] Błąd wczytywania:', err);
+        console.error('[DB] Load failed:', err);
         return [];
     }
 }
@@ -264,11 +264,11 @@ export async function clearAllWorkoutsFromDB() {
 export async function saveActivity(activity) {
     try {
         await db.activities.put(activity);
-        dlog(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
+        dlog(`[DB] ✅ Activity saved: ${activity.id}`);
         return activity.id;
     }
     catch (err) {
-        console.error('[DB] Błąd zapisu aktywności:', err);
+        console.error('[DB] Activity save failed:', err);
         throw err;
     }
 }
@@ -277,7 +277,7 @@ export async function loadActivities() {
         return await db.activities.orderBy('date').reverse().toArray();
     }
     catch (err) {
-        console.error('[DB] Błąd wczytywania aktywności:', err);
+        console.error('[DB] Activity load failed:', err);
         return [];
     }
 }
@@ -286,7 +286,7 @@ export async function loadActivityById(id) {
         return await db.activities.get(id);
     }
     catch (err) {
-        console.error('[DB] Błąd wczytywania aktywności:', err);
+        console.error('[DB] Activity load failed:', err);
         return undefined;
     }
 }
@@ -301,7 +301,7 @@ export async function saveEnrichedActivity(activity) {
         return activity.id;
     }
     catch (err) {
-        console.error('[DB] Błąd zapisu enrichedActivity:', err);
+        console.error('[DB] enrichedActivity save failed:', err);
         throw err;
     }
 }
@@ -310,7 +310,7 @@ export async function loadEnrichedActivities() {
         return await db.enrichedActivities.orderBy('date').reverse().toArray();
     }
     catch (err) {
-        console.error('[DB] Błąd wczytywania enrichedActivities:', err);
+        console.error('[DB] enrichedActivities load failed:', err);
         return [];
     }
 }

@@ -403,9 +403,9 @@ export async function migrateLocalStorageToIndexedDB(): Promise<number> {
   const normalized = parsed.map(w => normalizeWorkout(w as Record<string, unknown>));
   try {
     await db.workouts.bulkAdd(normalized);
-    dlog(`[DB] ✅ Zmigrowano ${normalized.length} workoutów.`);
+    dlog(`[DB] ✅ Migrated ${normalized.length} workouts.`);
   } catch (err) {
-    console.error('[DB] ❌ Błąd migracji:', err);
+    console.error('[DB] ❌ Migration failed:', err);
     return 0;
   }
 
@@ -419,7 +419,7 @@ export async function loadWorkoutsFromDB(): Promise<WorkoutRecord[]> {
   try {
     return await db.workouts.orderBy('date').reverse().toArray();
   } catch (err) {
-    console.error('[DB] Błąd wczytywania:', err);
+    console.error('[DB] Load failed:', err);
     return [];
   }
 }
@@ -443,10 +443,10 @@ export async function clearAllWorkoutsFromDB(): Promise<void> {
 export async function saveActivity(activity: ActivityRecord): Promise<string> {
   try {
     await db.activities.put(activity);
-    dlog(`[DB] ✅ Aktywność zapisana: ${activity.id}`);
+    dlog(`[DB] ✅ Activity saved: ${activity.id}`);
     return activity.id;
   } catch (err) {
-    console.error('[DB] Błąd zapisu aktywności:', err);
+    console.error('[DB] Activity save failed:', err);
     throw err;
   }
 }
@@ -455,7 +455,7 @@ export async function loadActivities(): Promise<ActivityRecord[]> {
   try {
     return await db.activities.orderBy('date').reverse().toArray();
   } catch (err) {
-    console.error('[DB] Błąd wczytywania aktywności:', err);
+    console.error('[DB] Activity load failed:', err);
     return [];
   }
 }
@@ -464,7 +464,7 @@ export async function loadActivityById(id: string): Promise<ActivityRecord | und
   try {
     return await db.activities.get(id);
   } catch (err) {
-    console.error('[DB] Błąd wczytywania aktywności:', err);
+    console.error('[DB] Activity load failed:', err);
     return undefined;
   }
 }
@@ -481,7 +481,7 @@ export async function saveEnrichedActivity(activity: EnrichedActivity): Promise<
     dlog(`[DB] ✅ EnrichedActivity saved: ${activity.id}`);
     return activity.id;
   } catch (err) {
-    console.error('[DB] Błąd zapisu enrichedActivity:', err);
+    console.error('[DB] enrichedActivity save failed:', err);
     throw err;
   }
 }
@@ -490,7 +490,7 @@ export async function loadEnrichedActivities(): Promise<EnrichedActivity[]> {
   try {
     return await db.enrichedActivities.orderBy('date').reverse().toArray();
   } catch (err) {
-    console.error('[DB] Błąd wczytywania enrichedActivities:', err);
+    console.error('[DB] enrichedActivities load failed:', err);
     return [];
   }
 }

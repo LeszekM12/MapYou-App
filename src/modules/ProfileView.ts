@@ -959,7 +959,7 @@ export class ProfileView {
             <div class="pv-trophy-grid">${_buildTrophySVG({
               id: 'clubs_done',
               label: clubs === 1 ? 'Club challenge' : 'Club challenges',
-              desc: `Ukończone wyzwania w klubach: ${clubs}`,
+              desc: `Club challenges completed: ${clubs}`,
               unlocked: true, count: clubs, color: '#8B5CF6', icon: '👥',
             })}</div>`;
         }
@@ -1172,7 +1172,7 @@ async function _wypelnijZablokowanych(modal: HTMLElement, userId: string): Promi
   const pusto = (): void => {
     box.innerHTML = '<div style="padding:28px 20px;text-align:center;'
       + 'color:rgba(255,255,255,0.35);font-size:1.3rem">'
-      + 'Nikogo nie zablokowałeś.</div>';
+      + 'You haven’t blocked anyone.</div>';
   };
 
   try {
@@ -1191,11 +1191,11 @@ async function _wypelnijZablokowanych(modal: HTMLElement, userId: string): Promi
           ${o.avatarB64 ? `<img src="${safeUrl(o.avatarB64)}" alt=""
              style="width:100%;height:100%;object-fit:cover"/>` : ''}
         </div>
-        <span style="flex:1;color:#fff;font-size:1.35rem">${esc(o.name || 'Użytkownik')}</span>
+        <span style="flex:1;color:#fff;font-size:1.35rem">${esc(o.name || 'User')}</span>
         <button data-odblokuj="${esc(o.userId)}"
           style="background:rgba(0,196,106,0.14);color:#00c46a;border:none;
                  border-radius:999px;padding:7px 16px;font-size:1.2rem;
-                 font-family:inherit;cursor:pointer">Odblokuj</button>
+                 font-family:inherit;cursor:pointer">Unblock</button>
       </div>`).join('');
 
     box.querySelectorAll<HTMLElement>('[data-odblokuj]').forEach(btn => {
@@ -1207,7 +1207,7 @@ async function _wypelnijZablokowanych(modal: HTMLElement, userId: string): Promi
             + `?userId=${encodeURIComponent(userId)}`, { method: 'DELETE' });
           box.querySelector(`[data-wiersz="${id}"]`)?.remove();
           if (!box.querySelector('[data-odblokuj]')) pusto();
-        } catch { btn.textContent = 'Odblokuj'; }
+        } catch { btn.textContent = 'Unblock'; }
       });
     });
   } catch { pusto(); }
@@ -1253,7 +1253,7 @@ async function _openSettingsModal(parent: HTMLElement, userId: string): Promise<
                Wypelniana asynchronicznie — BEZ BACKTICKOW w tym komentarzu,
                bo caly szablon jest literalem szablonowym i backtick by go zamknal. -->
           <div id="pvBlockedList">
-            <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.35);font-size:1.3rem">Ładowanie…</div>
+            <div style="padding:24px;text-align:center;color:rgba(255,255,255,0.35);font-size:1.3rem">Loading…</div>
           </div>` : activeTab === 'profile' ? `
           <!-- Konto (Faza 3) -->
           ${renderAccountCard()}

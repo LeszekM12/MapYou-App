@@ -337,7 +337,7 @@ export class SearchView {
                 // Wskaznik na czas pobierania — bez niego przy wolnej sieci wyglada,
                 // jakby lista sie po prostu skonczyla.
                 sentinel.innerHTML = '<div style="padding:16px;text-align:center;'
-                    + 'color:var(--app-text-muted);font-size:1.15rem">Ładowanie…</div>';
+                    + 'color:var(--app-text-muted);font-size:1.15rem">Loading…</div>';
                 try {
                     const r = await pobierz(offset);
                     if (r && r.data.length) {
@@ -1762,7 +1762,7 @@ export class SearchView {
         <div class="sv2-modal__body">
           <div class="sv2-modal__field">
             <label class="sv2-modal__label">Club Name *</label>
-            <input class="sv2-modal__input" id="ccName" type="text" maxlength="50" placeholder="e.g. Morning Runners Gdańsk"/>
+            <input class="sv2-modal__input" id="ccName" type="text" maxlength="50" placeholder="e.g. Morning Runners Gdansk"/>
           </div>
           <div class="sv2-modal__field">
             <label class="sv2-modal__label">Sport</label>
@@ -1778,7 +1778,7 @@ export class SearchView {
           <div class="sv2-modal__field">
             <label class="sv2-modal__label">City <span style="color:#ef4444">*</span></label>
             <input class="sv2-modal__input" id="ccLocation" type="text" maxlength="60"
-              placeholder="e.g. Elbląg" value="${userLoc}"/>
+              placeholder="e.g. Warsaw" value="${userLoc}"/>
           </div>
           <div class="sv2-modal__field">
             <label class="sv2-modal__label">Region

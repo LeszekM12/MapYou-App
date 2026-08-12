@@ -568,7 +568,7 @@ export function buildPostCard(post, onRefresh) {
             if (bodyEl)
                 bodyEl.textContent = expanded ? post.body : post.body.slice(0, TRUNC) + '…';
             if (moreBtn)
-                moreBtn.textContent = expanded ? 'mniej' : '…więcej';
+                moreBtn.textContent = expanded ? 'mniej' : '…more';
         });
     }
     // Mark as own card
@@ -969,7 +969,7 @@ async function _fillWeather(root, full, friendCoords, canPersist) {
       </div>
       <div class="adw__grid">
         ${wind != null ? `<div class="adw__cell"><span class="adw__k">Wiatr</span><span class="adw__v">${wind} km/h</span></div>` : ''}
-        ${humid != null ? `<div class="adw__cell"><span class="adw__k">Wilgotność</span><span class="adw__v">${humid}%</span></div>` : ''}
+        ${humid != null ? `<div class="adw__cell"><span class="adw__k">Humidity</span><span class="adw__v">${humid}%</span></div>` : ''}
       </div>
     </div>
   </div>`;
@@ -1219,11 +1219,11 @@ export async function openActivityDetail(act, isOwn, actId) {
         <polyline points="${line}" class="adc-hr-line"/>
       </svg>
       <div class="adc-meta">
-        ${full.avgHr != null ? `<span>Średnie <b>${full.avgHr} BPM</b></span>` : ''}
+        ${full.avgHr != null ? `<span>Avg <b>${full.avgHr} BPM</b></span>` : ''}
         ${full.maxHr != null ? `<span>Maksymalne <b>${full.maxHr} BPM</b></span>` : ''}
       </div>
       <h3 class="ad-section-title" style="margin-top:14px">Strefy tętna</h3>
-      <p class="adz-note">Na podstawie tętna maksymalnego ${hrMaxTheo} BPM${bd ? '' : ' (ustaw datę urodzenia w profilu, aby doprecyzować)'}.</p>
+      <p class="adz-note">Na podstawie tętna maksymalnego ${hrMaxTheo} BPM${bd ? '' : ' (set your date of birth in profile for a better estimate)'}.</p>
       ${zoneRows}
     </div>`;
     }
@@ -1295,7 +1295,7 @@ export async function openActivityDetail(act, isOwn, actId) {
       <div class="ad-stats">
         <div class="ad-stat"><span class="ad-stat-v">${full.distanceKm.toFixed(2)}</span><span class="ad-stat-l">Dystans (km)</span></div>
         <div class="ad-stat"><span class="ad-stat-v">${timeFmt}</span><span class="ad-stat-l">Czas</span></div>
-        <div class="ad-stat"><span class="ad-stat-v">${paceFmt}</span><span class="ad-stat-l">${isCycle ? 'Prędkość' : 'Tempo'} (${paceLbl})</span></div>
+        <div class="ad-stat"><span class="ad-stat-v">${paceFmt}</span><span class="ad-stat-l">${isCycle ? 'Speed' : 'Pace'} (${paceLbl})</span></div>
         <div class="ad-stat"><span class="ad-stat-v">${full.calories ?? kcal}</span><span class="ad-stat-l">${full.calories != null ? 'Kalorie' : 'Kalorie (szac.)'}</span></div>
         ${full.avgHr != null ? `<div class="ad-stat"><span class="ad-stat-v">${full.avgHr}</span><span class="ad-stat-l">Śr. tętno (BPM)</span></div>` : ''}
         ${full.maxHr != null ? `<div class="ad-stat"><span class="ad-stat-v">${full.maxHr}</span><span class="ad-stat-l">Maks. tętno (BPM)</span></div>` : ''}
@@ -4116,7 +4116,7 @@ export class HomeView {
                     const zglos = document.createElement('button');
                     zglos.type = 'button';
                     zglos.className = 'home-card__action';
-                    zglos.setAttribute('aria-label', 'Opcje treści');
+                    zglos.setAttribute('aria-label', 'Content options');
                     zglos.dataset.action = 'moderate';
                     zglos.textContent = '⋯';
                     // Bez pozycjonowania bezwzglednego — przycisk dolacza do WIERSZA AKCJI,
@@ -4445,7 +4445,7 @@ export class HomeView {
         b.innerHTML = `
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
         stroke-width="1.8" stroke-linecap="round"><path d="M1 1l22 22M16.7 16.7A9 9 0 0 1 12 18M5 12.5a7 7 0 0 1 3-2M2 8.8A15 15 0 0 1 6 6.3M22 8.8a15 15 0 0 0-6.4-3.6"/></svg>
-      <span>Brak połączenia — pokazuję zapisane treści</span>`;
+      <span>No connection — showing saved content</span>`;
         lista.parentElement.insertBefore(b, lista);
     }
     _schowajPasekOffline() {

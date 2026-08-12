@@ -174,7 +174,7 @@ export async function initNativePush(): Promise<void> {
       try { await p.deleteChannel({ id: 'mapyou_alerts' }); } catch { /* absent — fine */ }
       await p.createChannel({
         id: 'mapyou_alerts_v2', name: 'Powiadomienia MapYou',
-        description: 'Polubienia, obserwacje, komentarze i aktywność znajomych',
+        description: 'Likes, follows, comments and friends’ activity',
         importance: 5,          // MAX — heads-up banner + system default sound.
                                 // NOTE: no `sound` field on purpose — it expects a
                                 // file name in res/raw; pointing it at a missing
@@ -183,7 +183,7 @@ export async function initNativePush(): Promise<void> {
       });
       await p.createChannel({
         id: 'silent', name: 'Ciche powiadomienia',
-        description: 'Pogoda i przypomnienia — bez dźwięku',
+        description: 'Weather and reminders — silent',
         importance: 2,          // LOW — status bar only, no sound
         visibility: 1, vibration: false,
       });

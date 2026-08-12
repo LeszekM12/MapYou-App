@@ -160,11 +160,11 @@ export function getSportLabel(key) {
         return byLabel.label;
     // Fallback — capitalize and replace underscores
     const polishNames = {
-        'silownia': 'Siłownia', 'si_ownia': 'Siłownia',
+        'silownia': 'Gym', 'si_ownia': 'Gym',
         'bieganie': 'Bieganie', 'spacer': 'Spacer',
-        'rower': 'Rower', 'plywanie': 'Pływanie',
-        'pilka_nozna': 'Piłka nożna', 'koszykowka': 'Koszykówka',
-        'siatkowka': 'Siatkówka', 'boks': 'Boks',
+        'rower': 'Rower', 'plywanie': 'Swimming',
+        'pilka_nozna': 'Football', 'koszykowka': 'Basketball',
+        'siatkowka': 'Volleyball', 'boks': 'Boks',
         'taniec': 'Taniec', 'joga': 'Joga',
     };
     if (polishNames[key.toLowerCase()])

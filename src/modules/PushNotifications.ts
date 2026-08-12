@@ -238,11 +238,11 @@ async function sendPushToSelf(title: string, body: string, url = '/', silent = f
 // ── Publiczne triggery ────────────────────────────────────────────────────────
 
 export async function sendWorkoutAddedPush(): Promise<void> {
-  await sendPushToSelf('Nowy trening zapisany! 💪', 'Świetna robota! Tak trzymaj!');
+  await sendPushToSelf('Nowy trening zapisany! 💪', 'Great job! Keep it up!');
 }
 
 export async function sendWorkoutDeletedPush(): Promise<void> {
-  await sendPushToSelf('Trening usunięty.', 'Chcesz go przywrócić? Wróć do aplikacji.');
+  await sendPushToSelf('Workout deleted.', 'Want it back? Open the app.');
 }
 
 export async function sendActivityFinishedPush(
@@ -258,8 +258,8 @@ export async function sendActivityFinishedPush(
   const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
 
   await sendPushToSelf(
-    `${emoji} Aktywność zakończona!`,
-    `${distanceKm.toFixed(2)} km · ${timeStr} — nieźle! Zapisano w historii.`,
+    `${emoji} Workout complete!`,
+    `${distanceKm.toFixed(2)} km · ${timeStr} — nice one! Saved to your history.`,
   );
 }
 
@@ -291,12 +291,12 @@ export async function sendLongBreakPush(): Promise<boolean> {
   if (hoursSinceSent < 3) return false;
 
   if (hoursAway >= 24) {
-    await sendPushToSelf('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!', '/', true);
+    await sendPushToSelf('Good to see you again! 🏃', 'What are we doing today? Time to move!', '/', true);
     localStorage.setItem(KEY_SENT, String(now));
     return true;
   }
   if (hoursAway >= 3) {
-    await sendPushToSelf('Gotowy na kolejny trening? 💪', 'Dawno Cię nie było — czas na aktywność!', '/', true);
+    await sendPushToSelf('Gotowy na kolejny trening? 💪', 'Long time no see — time for a workout!', '/', true);
     localStorage.setItem(KEY_SENT, String(now));
     return true;
   }
@@ -304,7 +304,7 @@ export async function sendLongBreakPush(): Promise<boolean> {
 }
 
 export async function sendArrivedAtDestinationPush(): Promise<void> {
-  await sendPushToSelf('Dotarłeś na miejsce! 🎯', 'Chcesz zapisać trasę? Wróć do aplikacji.');
+  await sendPushToSelf('You’ve arrived! 🎯', 'Want to save the route? Open the app.');
 }
 
 // Persist user location on the backend so it can send scheduled weather pushes
@@ -381,7 +381,7 @@ export async function sendWeatherPush(): Promise<void> {
 
 export async function testPushNotification(
   title = 'Mapty Test',
-  body  = 'Push notifications działają! 🎉',
+  body  = 'Push notifications are working! 🎉',
 ): Promise<void> {
   await sendPushToSelf(title, body);
 }

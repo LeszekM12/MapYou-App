@@ -170,7 +170,7 @@ export function podepnijZastepnikiObrazkow() {
         box.style.height = img.height ? `${img.height}px` : '';
         box.style.aspectRatio = img.width && img.height ? `${img.width}/${img.height}` : '';
         box.setAttribute('role', 'img');
-        box.setAttribute('aria-label', img.alt || 'Zdjęcie niedostępne');
+        box.setAttribute('aria-label', img.alt || 'Image unavailable');
         box.innerHTML = `<svg viewBox="0 0 24 24" width="26" height="26" fill="none"
       stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
       <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>

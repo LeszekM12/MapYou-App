@@ -700,7 +700,7 @@ function _renderTrophiesTab(el, activities, weeklyWins, bestStreak, userId) {
             <div class="pv-trophy-grid">${_buildTrophySVG({
                         id: 'clubs_done',
                         label: clubs === 1 ? 'Club challenge' : 'Club challenges',
-                        desc: `Ukończone wyzwania w klubach: ${clubs}`,
+                        desc: `Club challenges completed: ${clubs}`,
                         unlocked: true, count: clubs, color: '#8B5CF6', icon: '👥',
                     })}</div>`;
                 }

@@ -147,7 +147,7 @@ export async function getSignedInUser() {
         try {
             const { user } = await plugin().getCurrentUser();
             if (!user) {
-                dlog('[Auth] natywnie: brak zalogowanego użytkownika');
+                dlog('[Auth] native: no signed-in user');
                 return null;
             }
             dlog('[Auth] natywnie: zalogowany', user.uid);
@@ -162,7 +162,7 @@ export async function getSignedInUser() {
             };
         }
         catch (e) {
-            console.warn('[Auth] getCurrentUser błąd:', e instanceof Error ? e.message : e);
+            console.warn('[Auth] getCurrentUser failed:', e instanceof Error ? e.message : e);
             return null;
         }
     }

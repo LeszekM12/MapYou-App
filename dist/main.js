@@ -4187,7 +4187,7 @@ import('./modules/AccountUI.js')
     initUserProfile();
 })
     .catch(err => {
-    console.error('[Account] błąd inicjalizacji konta:', err);
+    console.error('[Account] account init failed:', err);
     // Apka musi działać nawet gdy warstwa konta padnie — gość korzysta lokalnie.
 });
 // UWAGA: modal „podaj imię" NIE jest już pokazywany na starcie.

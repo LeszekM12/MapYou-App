@@ -216,10 +216,10 @@ async function sendPushToSelf(title, body, url = '/', silent = false) {
 }
 // ── Publiczne triggery ────────────────────────────────────────────────────────
 export async function sendWorkoutAddedPush() {
-    await sendPushToSelf('Nowy trening zapisany! 💪', 'Świetna robota! Tak trzymaj!');
+    await sendPushToSelf('Nowy trening zapisany! 💪', 'Great job! Keep it up!');
 }
 export async function sendWorkoutDeletedPush() {
-    await sendPushToSelf('Trening usunięty.', 'Chcesz go przywrócić? Wróć do aplikacji.');
+    await sendPushToSelf('Workout deleted.', 'Want it back? Open the app.');
 }
 export async function sendActivityFinishedPush(sport, distanceKm, durationSec) {
     if (!_isPushEnabled('activity_saved'))
@@ -229,7 +229,7 @@ export async function sendActivityFinishedPush(sport, distanceKm, durationSec) {
     const h = Math.floor(durationSec / 3600);
     const m = Math.floor((durationSec % 3600) / 60);
     const timeStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
-    await sendPushToSelf(`${emoji} Aktywność zakończona!`, `${distanceKm.toFixed(2)} km · ${timeStr} — nieźle! Zapisano w historii.`);
+    await sendPushToSelf(`${emoji} Workout complete!`, `${distanceKm.toFixed(2)} km · ${timeStr} — nice one! Saved to your history.`);
 }
 export async function sendWelcomeBackPush() {
     if (!_isPushEnabled('break_reminder'))
@@ -260,19 +260,19 @@ export async function sendLongBreakPush() {
     if (hoursSinceSent < 3)
         return false;
     if (hoursAway >= 24) {
-        await sendPushToSelf('Miło Cię widzieć ponownie! 🏃', 'Co dziś robimy? Czas na trening!', '/', true);
+        await sendPushToSelf('Good to see you again! 🏃', 'What are we doing today? Time to move!', '/', true);
         localStorage.setItem(KEY_SENT, String(now));
         return true;
     }
     if (hoursAway >= 3) {
-        await sendPushToSelf('Gotowy na kolejny trening? 💪', 'Dawno Cię nie było — czas na aktywność!', '/', true);
+        await sendPushToSelf('Gotowy na kolejny trening? 💪', 'Long time no see — time for a workout!', '/', true);
         localStorage.setItem(KEY_SENT, String(now));
         return true;
     }
     return false;
 }
 export async function sendArrivedAtDestinationPush() {
-    await sendPushToSelf('Dotarłeś na miejsce! 🎯', 'Chcesz zapisać trasę? Wróć do aplikacji.');
+    await sendPushToSelf('You’ve arrived! 🎯', 'Want to save the route? Open the app.');
 }
 // Persist user location on the backend so it can send scheduled weather pushes
 // (12:00 / 18:00) even when the app is closed. Uses GPS if already granted,
@@ -347,7 +347,7 @@ export async function sendWeatherPush() {
 }
 // ── Eksponuj do testów z konsoli ──────────────────────────────────────────────
 // Użycie: window.testPush('Test', 'Treść')
-export async function testPushNotification(title = 'Mapty Test', body = 'Push notifications działają! 🎉') {
+export async function testPushNotification(title = 'Mapty Test', body = 'Push notifications are working! 🎉') {
     await sendPushToSelf(title, body);
 }
 window.testPush = testPushNotification;

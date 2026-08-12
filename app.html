@@ -222,7 +222,7 @@
 
 <!-- TAB 1: WORKOUTS -->
 
-<!-- TRACKER OVERLAY — fullscreen nad mapą podczas nagrywania -->
+<!-- TRACKER OVERLAY — fullscreen over the map while recording -->
 
 
 <div id="tabMap" class="tab-panel">
@@ -394,7 +394,7 @@
     <button class="trk-ghost-pill__x" id="trkGhostPillClear" aria-label="Stop following">✕</button>
   </div>
 
-  <!-- Permission overlay — widoczny gdy brak uprawnień GPS -->
+  <!-- Permission overlay — shown when GPS permission is missing -->
   <div class="trk-permission hidden" id="trkPermission">
     <div class="trk-permission__sheet">
       <!-- ── WYMAGANIE GOOGLE PLAY ────────────────────────────────────────────
@@ -411,20 +411,20 @@
 
            Przy okazji: bylo tu „Mapty", stara nazwa projektu. -->
       <div class="trk-permission__icon">📍</div>
-      <h2 class="trk-permission__title">Zapis trasy przy wyłączonym ekranie</h2>
+      <h2 class="trk-permission__title">Route recording with the screen off</h2>
       <p class="trk-permission__desc">
-        MapYou nagrywa Twoją trasę GPS podczas treningu — także wtedy, gdy
-        schowasz telefon do kieszeni i ekran się zablokuje. Dlatego prosimy
-        o dostęp do lokalizacji <b>przez cały czas</b>.
+        MapYou records your GPS route during a workout — including when you put
+        the phone in your pocket and the screen locks. That’s why we ask for
+        location access <b>all the time</b>.
       </p>
       <ul class="trk-permission__list">
-        <li>Lokalizacja zbierana jest <b>wyłącznie podczas trwającego treningu</b></li>
-        <li>Przez cały czas widoczne jest powiadomienie o nagrywaniu</li>
-        <li>Zapis kończy się razem z treningiem</li>
-        <li>Trasa należy do Ciebie — nie udostępniamy jej nikomu</li>
+        <li>Location is collected <b>only while a workout is running</b></li>
+        <li>A notification is shown the whole time you’re recording</li>
+        <li>Recording stops when your workout ends</li>
+        <li>Your route is yours — we never share it with anyone</li>
       </ul>
-      <button class="trk-permission__allow" id="trkPermAllow">Rozumiem, zezwól</button>
-      <button class="trk-permission__skip"  id="trkPermSkip">Nie teraz</button>
+      <button class="trk-permission__allow" id="trkPermAllow">Got it, allow</button>
+      <button class="trk-permission__skip"  id="trkPermSkip">Not now</button>
     </div>
   </div>
 

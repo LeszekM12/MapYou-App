@@ -23,12 +23,12 @@ import { esc } from '../utils/dom.js';
 export type RodzajTresci = 'post' | 'activity' | 'comment' | 'user' | 'reel';
 
 const POWODY: Array<[string, string]> = [
-  ['spam',           'Spam lub treść komercyjna'],
-  ['harassment',     'Nękanie lub obraźliwe zachowanie'],
-  ['inappropriate',  'Treść nieodpowiednia'],
-  ['violence',       'Przemoc lub groźby'],
-  ['impersonation',  'Podszywanie się pod kogoś'],
-  ['other',          'Inny powód'],
+  ['spam',           'Spam or commercial content'],
+  ['harassment',     'Harassment or abusive behaviour'],
+  ['inappropriate',  'Inappropriate content'],
+  ['violence',       'Violence or threats'],
+  ['impersonation',  'Impersonation'],
+  ['other',          'Something else'],
 ];
 
 const STYLE_ID = 'mapyouModStyle';
@@ -89,7 +89,7 @@ function arkusz(tytul: string, opcje: Array<[string, string, boolean?]>): Promis
         <div class="mapyou-mod__tytul">${esc(tytul)}</div>
         ${opcje.map(([v, t, gr]) => `
           <button class="mapyou-mod__poz${gr ? ' mapyou-mod__poz--gr' : ''}" data-v="${esc(v)}">${esc(t)}</button>`).join('')}
-        <button class="mapyou-mod__poz mapyou-mod__anuluj" data-v="">Anuluj</button>
+        <button class="mapyou-mod__poz mapyou-mod__anuluj" data-v="">Cancel</button>
       </div>`;
 
     const zamknij = (v: string | null): void => { tlo.remove(); resolve(v); };
@@ -128,10 +128,10 @@ export async function zglosTresc(
   targetId: string,
   targetOwner?: string | null,
 ): Promise<void> {
-  const powod = await arkusz('Zgłoś treść', POWODY.map(([v, t]) => [v, t] as [string, string]));
+  const powod = await arkusz('Report content', POWODY.map(([v, t]) => [v, t] as [string, string]));
   if (!powod) return;
 
-  komunikat('Dziękujemy. Zgłoszenie zostało przyjęte.');
+  komunikat('Thanks. Your report has been received.');
 
   try {
     await fetch(`${BACKEND_URL}/moderation/report`, {
@@ -152,11 +152,11 @@ export async function zglosTresc(
  *  Zwraca `true`, gdy blokada zostala nalozona — wolajacy moze wtedy zamknac
  *  profil albo odswiezyc feed. */
 export async function zablokujUzytkownika(targetUserId: string, nazwa?: string): Promise<boolean> {
-  const kto = nazwa ? `„${nazwa}"` : 'tę osobę';
+  const kto = nazwa ? `“${nazwa}”` : 'this person';
   const wybor = await arkusz(
-    `Zablokować ${kto}?`,
+    `Block ${kto}?`,
     [
-      ['ok', 'Zablokuj — nie będziecie się nawzajem widzieć', true],
+      ['ok', 'Block — you won’t see each other', true],
     ],
   );
   if (wybor !== 'ok') return false;
@@ -167,11 +167,11 @@ export async function zablokujUzytkownika(targetUserId: string, nazwa?: string):
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: getUserId(), targetUserId }),
     });
-    if (!r.ok) { komunikat('Nie udało się zablokować. Spróbuj ponownie.'); return false; }
-    komunikat('Zablokowano. Odblokujesz w Ustawieniach.');
+    if (!r.ok) { komunikat('Could not block. Please try again.'); return false; }
+    komunikat('Blocked. You can undo this in Settings.');
     return true;
   } catch {
-    komunikat('Brak połączenia. Spróbuj ponownie później.');
+    komunikat('No connection. Please try again later.');
     return false;
   }
 }
@@ -197,17 +197,17 @@ export async function menuCudzejTresci(
   autorNazwa?: string,
 ): Promise<'zablokowano' | 'zgloszono' | 'ukryto' | null> {
   const opcje: Array<[string, string, boolean?]> = [
-    ['hide',   'Nie interesuje mnie to'],
-    ['report', 'Zgłoś treść'],
+    ['hide',   'Not interested in this'],
+    ['report', 'Report content'],
   ];
   if (autorId && autorId !== getUserId()) {
-    opcje.push(['block', `Zablokuj ${autorNazwa ? `„${autorNazwa}"` : 'autora'}`, true]);
+    opcje.push(['block', `Block ${autorNazwa ? `“${autorNazwa}”` : 'author'}`, true]);
   }
 
-  const wybor = await arkusz('Opcje', opcje);
+  const wybor = await arkusz('Options', opcje);
   if (wybor === 'hide') {
     ukryteLokalnie.add(targetId);
-    komunikat('Ukryto. Będziemy pokazywać mniej takich treści.');
+    komunikat('Hidden. We’ll show less content like this.');
     return 'ukryto';
   }
   if (wybor === 'report') { await zglosTresc(rodzaj, targetId, autorId); return 'zgloszono'; }
@@ -233,11 +233,11 @@ export async function pokazZablokowanych(): Promise<void> {
   tlo.innerHTML = `
     <div class="mapyou-mod__panel">
       <div class="mapyou-mod__uchwyt"></div>
-      <div class="mapyou-mod__tytul">Zablokowane osoby</div>
+      <div class="mapyou-mod__tytul">Blocked people</div>
       <div id="modBlockedList" style="max-height:52vh;overflow-y:auto">
-        <div style="padding:20px;text-align:center;color:var(--app-text-secondary)">Ładowanie…</div>
+        <div style="padding:20px;text-align:center;color:var(--app-text-secondary)">Loading…</div>
       </div>
-      <button class="mapyou-mod__poz mapyou-mod__anuluj" data-zamknij="1">Zamknij</button>
+      <button class="mapyou-mod__poz mapyou-mod__anuluj" data-zamknij="1">Close</button>
     </div>`;
   tlo.addEventListener('click', e => {
     if (e.target === tlo || (e.target as HTMLElement).dataset.zamknij) tlo.remove();
@@ -252,7 +252,7 @@ export async function pokazZablokowanych(): Promise<void> {
 
     if (!osoby.length) {
       lista.innerHTML = '<div style="padding:26px 20px;text-align:center;'
-        + 'color:var(--app-text-secondary)">Nikogo nie zablokowałeś.</div>';
+        + 'color:var(--app-text-secondary)">You haven’t blocked anyone.</div>';
       return;
     }
 
@@ -260,10 +260,10 @@ export async function pokazZablokowanych(): Promise<void> {
       <div style="display:flex;align-items:center;gap:12px;padding:11px 20px">
         <div style="width:38px;height:38px;border-radius:50%;background:rgba(128,128,128,0.2);
              overflow:hidden;flex-shrink:0"></div>
-        <span style="flex:1;color:var(--app-text)">${esc(o.name || 'Użytkownik')}</span>
+        <span style="flex:1;color:var(--app-text)">${esc(o.name || 'User')}</span>
         <button data-odblokuj="${esc(o.userId)}"
           style="background:rgba(0,196,106,0.14);color:#00c46a;border:none;border-radius:999px;
-                 padding:7px 15px;font-size:1.2rem;font-family:inherit">Odblokuj</button>
+                 padding:7px 15px;font-size:1.2rem;font-family:inherit">Unblock</button>
       </div>`).join('');
 
     lista.querySelectorAll<HTMLElement>('[data-odblokuj]').forEach(btn => {
@@ -276,13 +276,13 @@ export async function pokazZablokowanych(): Promise<void> {
           btn.closest('div')?.remove();
           if (!lista.querySelector('[data-odblokuj]')) {
             lista.innerHTML = '<div style="padding:26px 20px;text-align:center;'
-              + 'color:var(--app-text-secondary)">Nikogo nie zablokowałeś.</div>';
+              + 'color:var(--app-text-secondary)">You haven’t blocked anyone.</div>';
           }
-        } catch { btn.textContent = 'Odblokuj'; }
+        } catch { btn.textContent = 'Unblock'; }
       });
     });
   } catch {
     lista.innerHTML = '<div style="padding:26px 20px;text-align:center;'
-      + 'color:var(--app-text-secondary)">Brak połączenia.</div>';
+      + 'color:var(--app-text-secondary)">No connection.</div>';
   }
 }
