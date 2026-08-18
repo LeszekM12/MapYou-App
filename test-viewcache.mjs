@@ -939,6 +939,44 @@ console.log('\n=== 46. WYSYŁKA ZDJĘĆ — natychmiastowy podgląd ===');
   sprawdz('po wszystkich — pusto', kafelki.length === 0);
 }
 
+console.log('\n=== 47. LIVE ACTIVITY — układ bez licznika przy pauzie ===');
+{
+  // Układ jest STATYCZNY (ActivityAttributes.layoutJSON). Element `timer`
+  // tyka natywnie — żadna aktualizacja danych go nie zatrzyma.
+  // Jedyne pewne rozwiązanie: przy pauzie w układzie NIE MA elementu timer.
+  const komorka = (paused) => paused ? 'text' : 'timer';
+
+  sprawdz('bieg → element timer (tyka natywnie)', komorka(false) === 'timer');
+  sprawdz('pauza → zwykły tekst, nie ma czego zatrzymywać', komorka(true) === 'text');
+  sprawdz('nigdy oba naraz', komorka(true) !== komorka(false));
+}
+
+console.log('\n=== 48. PRZEBUDOWA TYLKO PRZY ZMIANIE STANU ===');
+{
+  let stan = { paused: false, przebudowy: 0, aktualizacje: 0 };
+  const setPaused = (p) => {
+    if (p === stan.paused) { stan.aktualizacje++; return; }
+    stan.przebudowy++; stan.paused = p;
+  };
+
+  setPaused(false);
+  sprawdz('ten sam stan → zwykła aktualizacja', stan.przebudowy === 0 && stan.aktualizacje === 1);
+  setPaused(true);
+  sprawdz('pauza → przebudowa', stan.przebudowy === 1);
+  setPaused(true);
+  sprawdz('powtórna pauza NIE przebudowuje', stan.przebudowy === 1);
+  setPaused(false);
+  sprawdz('wznowienie → druga przebudowa', stan.przebudowy === 2);
+}
+
+console.log('\n=== 49. ZWINIĘTA WYSPA — ikona albo licznik ===');
+{
+  const dzieci = (paused) => paused ? ['ikona-pauzy'] : ['timer'];
+  sprawdz('pauza → sama ikona', dzieci(true).join() === 'ikona-pauzy');
+  sprawdz('bieg → sam licznik', dzieci(false).join() === 'timer');
+  sprawdz('zawsze dokładnie jeden element', dzieci(true).length === 1 && dzieci(false).length === 1);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

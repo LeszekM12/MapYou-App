@@ -28,28 +28,56 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 
 const PLIK = 'node_modules/capacitor-live-activities/ios/Plugin/LiveActivities.swift';
-const SZUKAJ  = 'dismissalPolicy: .default';
-const ZAMIEN  = 'dismissalPolicy: .immediate';
+
+// Dwie osobne łatki. Obie idempotentne.
+const LATKI = [
+  {
+    nazwa:  'natychmiastowe zamknięcie karty',
+    szukaj: 'dismissalPolicy: .default',
+    zamien: 'dismissalPolicy: .immediate',
+    // `.default` trzyma kartę na ekranie blokady nawet cztery godziny.
+    // Ponieważ czas tyka natywnie, przez ten czas leciał licznik
+    // nieistniejącego treningu.
+  },
+  {
+    nazwa:  'pierwsza aktualizacja po odzyskaniu aktywności',
+    szukaj: `                Logger.viewCycle.error("📊 Available activities: \\(self.activities.keys)")
+                throw LiveActivitiesError.activityNotFound
+            }
+            
+            return`,
+    zamien: `                Logger.viewCycle.error("📊 Available activities: \\(self.activities.keys)")
+                throw LiveActivitiesError.activityNotFound
+            }
+            // BYŁO: `+ '`return`' + ` — wtyczka odnajdywała aktywność w systemie,
+            // po czym wychodziła BEZ jej zaktualizowania. Pierwsza aktualizacja
+            // po ponownym uruchomieniu aplikacji ginęła po cichu.`,
+  },
+];
 
 if (!existsSync(PLIK)) {
   console.log('[patch-la] pomijam — wtyczki nie ma (to normalne przy instalacji bez iOS)');
   process.exit(0);
 }
 
-const tresc = readFileSync(PLIK, 'utf8');
+let tresc = readFileSync(PLIK, 'utf8');
+let nalozone = 0;
 
-if (tresc.includes(ZAMIEN)) {
-  console.log('[patch-la] łatka już nałożona');
-  process.exit(0);
+for (const l of LATKI) {
+  if (tresc.includes(l.zamien)) continue;          // już nałożona
+  if (!tresc.includes(l.szukaj)) {
+    // Wtyczka się zmieniła — lepiej głośno ostrzec niż po cichu nic nie zrobić.
+    console.warn(`[patch-la] UWAGA: nie znalazłem wzorca dla łatki "${l.nazwa}".`);
+    console.warn('[patch-la] Wtyczka mogła się zmienić — sprawdź zachowanie Live Activity.');
+    continue;
+  }
+  tresc = tresc.replace(l.szukaj, l.zamien);
+  nalozone++;
 }
 
-if (!tresc.includes(SZUKAJ)) {
-  // Wtyczka się zmieniła — lepiej głośno ostrzec niż po cichu nic nie zrobić.
-  console.warn(`[patch-la] UWAGA: nie znalazłem "${SZUKAJ}" w ${PLIK}.`);
-  console.warn('[patch-la] Wtyczka mogła się zmienić — sprawdź, czy Live Activity');
-  console.warn('[patch-la] nadal zostaje na ekranie blokady po zakończeniu treningu.');
-  process.exit(0);   // nie przerywamy instalacji
+if (nalozone) {
+  writeFileSync(PLIK, tresc, 'utf8');
+  console.log(`[patch-la] OK — nałożono ${nalozone} z ${LATKI.length} łatek`);
+} else {
+  console.log('[patch-la] łatki już nałożone');
 }
-
-writeFileSync(PLIK, tresc.replace(SZUKAJ, ZAMIEN), 'utf8');
-console.log('[patch-la] OK — Live Activity zamyka się natychmiast po zakończeniu');

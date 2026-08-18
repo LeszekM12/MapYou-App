@@ -95,32 +95,40 @@ function laData(s: LiveStats, pal: Palette): Record<string, unknown> {
  *  Apple's Text(.timer) is width-greedy and left-aligned, which shoved the
  *  lock-screen value sideways and inflated the Dynamic Island pill — hence
  *  the FIXED width + centered alignment on both layers. */
+// ─── KOMORKA CZASU ───────────────────────────────────────────────────────────
+//
+// DLACZEGO TO WYGLADA TERAZ INACZEJ
+// ─────────────────────────────────
+// Wczesniej bylo tu DWA elementy nalozone na siebie: natywny licznik i tekst
+// z zamrozonym czasem, a o widocznosci decydowaly dane (`opacity`, `color`).
+// Nie dzialalo — i teraz wiadomo dlaczego.
+//
+// Uklad Live Activity jest STATYCZNY: trafia do `ActivityAttributes.layoutJSON`
+// przy `startActivity` i juz sie nie zmienia. `updateActivity` podmienia
+// wylacznie DANE. Element `timer` tyka NATYWNIE, po stronie urzadzenia —
+// zadna aktualizacja danych go nie zatrzyma, a proba ukrycia go przez
+// przezroczystosc okazala sie zawodna.
+//
+// Nowe podejscie: gdy trening jest zapauzowany, w ukladzie NIE MA elementu
+// `timer`. Jest zwykly tekst. Nie ma czego zatrzymywac, bo nie ma co tykac.
+//
+// Zmiana ukladu wymaga przebudowania aktywnosci — patrz `_przebuduj()`.
 function timeStack(
   fontSize: number,
   colorKey: 'lock' | 'cmp' | 'exp',
   width: number,
-  // Gdy `true`, zamrozony czas NIE pojawia sie podczas pauzy.
-  //
-  // Potrzebne w zwinietej wyspie: tam na tym samym miejscu lezy ikona pauzy.
-  // Bez tego przy pauzie widac OBA naraz — symbol pauzy narysowany na cyfrach.
-  // Na ekranie blokady jest odwrotnie: tam zamrozony czas ma byc widoczny,
-  // bo ikona stoi obok, a nie na nim.
-  ukryjZamrozony = false,
+  paused: boolean,
 ) {
   const base = [
     { fontSize }, { fontWeight: 'bold' }, { monospacedDigit: true },
     { width }, { alignment: 'center' },
   ];
-  return {
-    type: 'container',
-    properties: [{ direction: 'stack' }],
-    children: [
-      { type: 'timer', properties: [{ endTime: '{{timerRef}}' }, { style: 'timer' }, ...base, { color: `{{${colorKey}T}}` }, { opacity: '{{runOp}}' }] },
-      { type: 'text',  properties: [{ text: '{{time}}' },                            ...base,
-        { color: ukryjZamrozony ? 'clear' : `{{${colorKey}F}}` },
-        { opacity: ukryjZamrozony ? '0' : '{{pauseOp}}' }] },
-    ],
-  };
+  return paused
+    // Pauza: sam tekst. Zero elementow tykajacych.
+    ? { type: 'text',  properties: [{ text: '{{time}}' }, ...base, { color: `{{${colorKey}F}}` }] }
+    // Bieg: sam licznik natywny. Tyka bez udzialu aplikacji, takze przy
+    // zgaszonym ekranie — i o to chodzi.
+    : { type: 'timer', properties: [{ endTime: '{{timerRef}}' }, { style: 'timer' }, ...base, { color: `{{${colorKey}T}}` }] };
 }
 
 // ── CZESTOTLIWOSC AKTUALIZACJI ───────────────────────────────────────────────
@@ -149,7 +157,7 @@ function statCol(valueKey: string, label: string, valueColor: string, p: Palette
   };
 }
 
-function lockLayout(sport: string, sportLabel: string, p: Palette) {
+function lockLayout(sport: string, sportLabel: string, p: Palette, paused: boolean) {
   return {
     type: 'container',
     properties: [
@@ -173,7 +181,7 @@ function lockLayout(sport: string, sportLabel: string, p: Palette) {
           { type: 'container',
             properties: [{ direction: 'vertical' }, { spacing: 2 }, { alignment: 'center' }],
             children: [
-              timeStack(22, 'lock', 96),
+              timeStack(22, 'lock', 96, paused),
               { type: 'text', properties: [{ text: 'TIME' }, { fontSize: 11 }, { color: p.muted }] },
             ] },
           statCol('dist',  'DISTANCE',        p.accent, p),
@@ -189,7 +197,7 @@ function lockLayout(sport: string, sportLabel: string, p: Palette) {
   };
 }
 
-function islandLayout(sport: string, sportLabel: string) {
+function islandLayout(sport: string, sportLabel: string, paused: boolean) {
   const icon = { type: 'image', properties: [{ systemName: sfIcon(sport) }, { color: ISLAND_ACCENT }] };
   return {
     compactLeading:  icon,
@@ -206,20 +214,20 @@ function islandLayout(sport: string, sportLabel: string) {
       type: 'container',
       properties: [{ direction: 'stack' }],
       children: [
-        // `true` — w zwinietej wyspie zamrozony czas ustepuje miejsca ikonie
-        // pauzy. Inaczej symbol nakladalby sie na cyfry.
-        timeStack(13, 'cmp', 50, true),
-        { type: 'image', properties: [
-          { systemName: 'pause.fill' },
-          { color: ISLAND_PAUSE },
-          { opacity: '{{pauseOp}}' },
-        ] },
+        // Przy pauzie — SAMA ikona, bez cyfr pod spodem.
+        // Przy biegu — sam licznik. Nigdy oba naraz, bo uklad powstaje
+        // od nowa przy kazdej zmianie stanu.
+        ...(paused
+          ? [{ type: 'image', properties: [
+              { systemName: 'pause.fill' }, { color: ISLAND_PAUSE }, { fontSize: 13 },
+            ] }]
+          : [timeStack(13, 'cmp', 50, false)]),
       ],
     },
     minimal:         icon,
     expanded: {
       leading:  { type: 'text', properties: [{ text: '{{dist}}' }, { fontSize: 16 }, { fontWeight: 'bold' }, { color: ISLAND_ACCENT }] },
-      trailing: timeStack(16, 'exp', 64),
+      trailing: timeStack(16, 'exp', 64, paused),
       bottom:   { type: 'text', properties: [{ text: `${sportLabel} · {{third}} {{state}}` }, { fontSize: 13 }, { color: ISLAND_MUTED }] },
     },
   };
@@ -230,6 +238,12 @@ class WorkoutLiveActivity {
   private _starting = false;
   private _lastPush = 0;
   private _pal: Palette = DARK_P;   // chosen at start(), reused by update/end
+  // Zapamietane, zeby dalo sie odtworzyc aktywnosc z INNYM ukladem przy
+  // zmianie stanu (bieg ↔ pauza). Uklad jest statyczny, wiec przelaczenie
+  // wymaga zbudowania aktywnosci od nowa.
+  private _sport = '';
+  private _label = '';
+  private _paused = false;
 
   isAvailable(): boolean { return laPlugin() !== null; }
   get active(): boolean  { return this._id !== null; }
@@ -242,15 +256,62 @@ class WorkoutLiveActivity {
     try {
       const pal = systemPalette();
       this._pal = pal;
+      this._sport = sportKey;
+      this._label = sportLabel;
+      this._paused = false;
       const res = await p.startActivity({
-        layout: lockLayout(sportKey, sportLabel, pal),
-        dynamicIslandLayout: islandLayout(sportKey, sportLabel),
+        layout: lockLayout(sportKey, sportLabel, pal, false),
+        dynamicIslandLayout: islandLayout(sportKey, sportLabel, false),
         data: laData({ time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '', timerRef: Date.now(), paused: false }, pal),
         behavior: { systemActionForegroundColor: pal.accent, keyLineTint: pal.accent },
       });
       this._id = res?.activityId ?? null;
     } catch (e) {
       console.warn('[LiveActivity] start failed:', e);
+    }
+    this._starting = false;
+  }
+
+  /** Przelacz miedzy biegiem a pauza.
+   *
+   *  Uklad Live Activity jest STATYCZNY — zapisany w atrybutach przy starcie
+   *  i nie da sie go podmienic przez `updateActivity`. A skoro w ukladzie
+   *  biegowym siedzi natywny licznik, ktory tyka po stronie urzadzenia,
+   *  to zadna aktualizacja DANYCH go nie zatrzyma.
+   *
+   *  Dlatego przy zmianie stanu budujemy aktywnosc OD NOWA, z ukladem, w ktorym
+   *  po prostu nie ma czego zatrzymywac: przy pauzie zamiast licznika jest
+   *  zwykly tekst.
+   *
+   *  Koszt: krotkie mrugniecie karty. Warte tego, bo poprzednie podejscie
+   *  (ukrywanie licznika przezroczystoscia) po prostu nie dzialalo — czas
+   *  leciał dalej mimo pauzy, a po zakonczeniu treningu trzeba bylo recznie
+   *  zmiatac karte z ekranu blokady. */
+  async setPaused(paused: boolean, s: LiveStats): Promise<void> {
+    const p = laPlugin();
+    if (!p || !this._id || this._starting) return;
+    if (paused === this._paused) { void this.update(s, true); return; }
+
+    this._starting = true;
+    const stary = this._id;
+    this._id = null;
+    try {
+      // Zamykamy stara kartę. Z `dismissalPolicy: .immediate` (latka
+      // `scripts/patch-live-activities.mjs`) znika od razu, bez czterogodzinnego
+      // ogona, ktory wczesniej zostawal na ekranie blokady.
+      await p.endActivity({ activityId: stary, data: laData({ ...s, paused }, this._pal) });
+
+      const res = await p.startActivity({
+        layout: lockLayout(this._sport, this._label, this._pal, paused),
+        dynamicIslandLayout: islandLayout(this._sport, this._label, paused),
+        data: laData({ ...s, paused }, this._pal),
+        behavior: { systemActionForegroundColor: this._pal.accent, keyLineTint: this._pal.accent },
+      });
+      this._id = res?.activityId ?? null;
+      this._paused = paused;
+      this._lastPush = Date.now();
+    } catch (e) {
+      console.warn('[LiveActivity] przebudowa nieudana:', e);
     }
     this._starting = false;
   }

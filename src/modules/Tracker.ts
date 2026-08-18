@@ -433,7 +433,9 @@ export class Tracker {
     this._belowSince = null;
     this._apAnchor = null;
     // Ticks freeze while paused — push the "Paused" state to the island now.
-    void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
+    // Zmiana stanu — Live Activity budowana od nowa, z ukladem
+    // BEZ tykajacego licznika.
+    void workoutLiveActivity.setPaused(true, this._liveStats(this._buildStats()));
     void saveSessionState({ paused: true, pauseStart: this.pauseStart, autoPaused: false });
   }
 
@@ -446,7 +448,9 @@ export class Tracker {
     this._startGPS();
     if (this._autoPauseOn && this._useMotionAP) this._startMotion();
     this.onUpdate(this._buildStats());
-    void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
+    // Zmiana stanu — Live Activity budowana od nowa, z ukladem
+    // z tykajacym licznikiem.
+    void workoutLiveActivity.setPaused(false, this._liveStats(this._buildStats()));
     void saveSessionState({ paused: false, pausedTime: this.pausedTime, pauseStart: 0 });
   }
 
@@ -698,7 +702,9 @@ export class Tracker {
     this._autoPaused = true;
     this._autoPauseStart = Date.now();
     this.onUpdate(this._buildStats());
-    void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
+    // Zmiana stanu — Live Activity budowana od nowa, z ukladem
+    // bez tykajacego licznika.
+    void workoutLiveActivity.setPaused(true, this._liveStats(this._buildStats()));
   }
 
   private _exitAutoPause(): void {
@@ -706,7 +712,9 @@ export class Tracker {
     this.pausedTime += Date.now() - this._autoPauseStart;  // freeze elapsed
     this._autoPaused = false;
     this.onUpdate(this._buildStats());
-    void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
+    // Zmiana stanu — Live Activity budowana od nowa, z ukladem
+    // z tykajacym licznikiem.
+    void workoutLiveActivity.setPaused(false, this._liveStats(this._buildStats()));
   }
 
   // ── Accelerometer-based rest detection (foot sports, like Strava running) ──
