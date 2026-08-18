@@ -216,7 +216,7 @@ function buildModalHtml(activity, isManual) {
 
       <!-- Footer -->
       <div class="sam-footer">
-        <button class="sam-btn sam-btn--cancel" id="samBtnCancel">Cancel</button>
+        <button class="sam-btn sam-btn--cancel" id="samBtnDiscard">Discard</button>
         <button class="sam-btn sam-btn--save" id="samBtnSave" style="background:${color}">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
           Save Activity
@@ -273,7 +273,7 @@ export class SaveActivityModal {
         renderPicker();
         document.body.appendChild(overlay);
     }
-    constructor(_activity, _onSave, _onCancel) {
+    constructor(_activity, _onSave, _onCancel, _onDismiss) {
         Object.defineProperty(this, "_activity", {
             enumerable: true,
             configurable: true,
@@ -291,6 +291,12 @@ export class SaveActivityModal {
             configurable: true,
             writable: true,
             value: _onCancel
+        });
+        Object.defineProperty(this, "_onDismiss", {
+            enumerable: true,
+            configurable: true,
+            writable: true,
+            value: _onDismiss
         });
         Object.defineProperty(this, "_el", {
             enumerable: true,
@@ -370,15 +376,65 @@ export class SaveActivityModal {
           </label>`).join('')}
       </div>`;
     }
-    close(saved = false) {
+    /**
+     * Take the sheet off screen.
+     *
+     * DISMISSING IS NOT DISCARDING
+     * ----------------------------
+     * Every exit used to run `onCancel`, which threw the workout away. Five of
+     * them did — the ✕, the Cancel button, a tap outside the sheet, Escape, and
+     * a downward swipe of a hundred pixels. Three of those are things people do
+     * by accident, and any one of them silently destroyed a finished workout.
+     *
+     * Now closing the sheet only closes the sheet. The workout stays on disk and
+     * the caller is told through `onDismiss`, so it can show a way back to it.
+     * Throwing the workout away is a separate, deliberate act — see
+     * `_confirmDiscard()`.
+     *
+     * @param reason  `saved` — stored, nothing left to do.
+     *                `discarded` — the user confirmed they want it gone.
+     *                `dismissed` — the sheet was closed; the workout survives.
+     */
+    close(reason = 'dismissed') {
         if (!this._el)
             return;
         const sheet = this._el.querySelector('.sam-sheet');
         sheet?.classList.remove('sam-sheet--open');
         this._el.classList.remove('sam-overlay--visible');
         setTimeout(() => { this._el?.remove(); this._el = null; }, 350);
-        if (!saved)
+        if (reason === 'discarded')
             this._onCancel?.();
+        else if (reason === 'dismissed')
+            this._onDismiss?.();
+    }
+    /**
+     * Ask before throwing away a finished workout.
+     *
+     * Deliberately blunt about the consequence: this is the one action in the
+     * app that destroys something the user cannot get back by any other means.
+     */
+    _confirmDiscard() {
+        const ov = document.createElement('div');
+        ov.className = 'sam-confirm';
+        ov.innerHTML = `
+      <div class="sam-confirm__box">
+        <div class="sam-confirm__title">Discard this workout?</div>
+        <div class="sam-confirm__text">
+          Your route, time and distance will be deleted. This cannot be undone.
+        </div>
+        <button class="sam-confirm__keep" id="samKeep">Keep it</button>
+        <button class="sam-confirm__go"   id="samDiscardGo">Discard</button>
+      </div>`;
+        ov.addEventListener('click', e => {
+            const t = e.target;
+            if (t.id === 'samDiscardGo') {
+                ov.remove();
+                this.close('discarded');
+            }
+            else if (t.id === 'samKeep' || e.target === ov)
+                ov.remove();
+        });
+        this._el?.appendChild(ov);
     }
     _initMiniMap() {
         const container = document.getElementById('samMapPreview');
@@ -457,12 +513,14 @@ export class SaveActivityModal {
     _bindEvents() {
         const el = this._el;
         // Close
-        el.querySelector('#saveActivityClose')?.addEventListener('click', () => this.close());
-        el.querySelector('#samBtnCancel')?.addEventListener('click', () => this.close());
+        // These four just put the sheet away. The workout is safe.
+        el.querySelector('#saveActivityClose')?.addEventListener('click', () => this.close('dismissed'));
         el.addEventListener('click', e => { if (e.target === el)
-            this.close(); });
+            this.close('dismissed'); });
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape')
-            this.close(); }, { once: true });
+            this.close('dismissed'); }, { once: true });
+        // This one destroys it, so it asks first.
+        el.querySelector('#samBtnDiscard')?.addEventListener('click', () => this._confirmDiscard());
         // Save-as-route star (only present when the route is long enough)
         const starBtn = el.querySelector('#samRouteStar');
         starBtn?.addEventListener('click', () => {
@@ -619,7 +677,7 @@ export class SaveActivityModal {
         handle.addEventListener('touchend', e => {
             sheet.style.transition = '';
             if (e.changedTouches[0].clientY - this._touchStartY > 100)
-                this.close();
+                this.close('dismissed');
             else
                 sheet.style.transform = '';
         });
@@ -746,12 +804,17 @@ export class SaveActivityModal {
         }
         await CS.saveEnrichedActivity(enriched);
         this._onSave(enriched); // render first, then close
-        this.close(true); // saved=true → skip onCancel
+        this.close('saved');
     }
 }
 // ── Factory ───────────────────────────────────────────────────────────────────
-export function openSaveActivityModal(activity, onSave, onCancel) {
-    const modal = new SaveActivityModal(activity, onSave, onCancel);
+/**
+ * @param onCancel   The user confirmed they want the workout gone.
+ * @param onDismiss  The sheet was closed without deciding. The workout is
+ *                   still there and the caller should offer a way back to it.
+ */
+export function openSaveActivityModal(activity, onSave, onCancel, onDismiss) {
+    const modal = new SaveActivityModal(activity, onSave, onCancel, onDismiss);
     modal.open();
 }
 //# sourceMappingURL=SaveActivityModal.js.map

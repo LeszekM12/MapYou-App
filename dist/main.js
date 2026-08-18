@@ -1487,6 +1487,35 @@ class App {
      * @returns `true` when something was restored, so the caller can skip the
      *          normal session restore.
      */
+    /**
+     * A standing reminder that a finished workout has not been saved yet.
+     *
+     * Without this, dismissing the sheet would hide the workout completely: it
+     * would still be on disk, but nothing on screen would say so and the only
+     * way back would be to restart the app. Strava keeps a similar banner for
+     * the same reason.
+     */
+    _showUnsavedBar() {
+        document.getElementById('mapyouUnsavedBar')?.remove();
+        const bar = document.createElement('button');
+        bar.id = 'mapyouUnsavedBar';
+        bar.type = 'button';
+        bar.className = 'unsaved-bar';
+        bar.innerHTML = `
+      <span class="unsaved-bar__dot"></span>
+      <span class="unsaved-bar__text"><b>Unsaved workout</b> — tap to finish saving</span>
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>`;
+        bar.addEventListener('click', () => {
+            bar.remove();
+            this._restorePendingSave();
+        });
+        document.body.appendChild(bar);
+    }
+    /** Take the reminder away once the workout is no longer waiting. */
+    _hideUnsavedBar() {
+        document.getElementById('mapyouUnsavedBar')?.remove();
+    }
     _restorePendingSave() {
         const activity = loadPending('save-activity');
         if (!activity)
@@ -2342,6 +2371,7 @@ class App {
                 // above throws, the entry survives and the workout can still be
                 // rescued on the next launch.
                 clearPending('save-activity');
+                this._hideUnsavedBar();
                 __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
                 await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
                 await statsView.render();
@@ -2350,7 +2380,14 @@ class App {
             }, () => {
                 // Discard is still a decision — the workout is no longer pending.
                 clearPending('save-activity');
+                this._hideUnsavedBar();
                 __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
+            }, () => {
+                // Sheet closed without a decision. The workout is still on disk —
+                // put a way back to it in front of the user, otherwise it is
+                // invisible until the next launch.
+                __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
+                this._showUnsavedBar();
             });
         };
         // No splash when restoring: the celebration already played when the

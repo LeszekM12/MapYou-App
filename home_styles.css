@@ -3061,3 +3061,131 @@ video.home-reel-viewer__media {
 }
 .pv-ach__label { font-size: 12.5px; font-weight: 600; line-height: 1.25; }
 .pv-ach__date  { font-size: 10.5px; color: #9AA4AE; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   UNSAVED WORKOUT
+   ───────────────────────────────────────────────────────────────────────────
+   A finished workout must never disappear without the user deciding so.
+   Two pieces: a standing reminder, and a confirmation before destroying it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Standing reminder — visible while a workout is waiting to be saved.
+   Without it, dismissing the save sheet hid the workout completely: still on
+   disk, but nothing on screen said so, and the only way back was relaunching
+   the app. */
+.unsaved-bar {
+    position: fixed;
+    left: 12px;
+    right: 12px;
+    /* Clears the bottom nav (5.8rem) plus the iPhone home indicator. */
+    bottom: calc(5.8rem + env(safe-area-inset-bottom, 0px) + 12px);
+    z-index: 9000;
+
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 13px 16px;
+    border: none;
+    border-radius: 14px;
+
+    background: #f5a623;
+    color: #1a1a1a;
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.25rem;
+    text-align: left;
+    cursor: pointer;
+
+    box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+    animation: unsavedBarIn 0.28s ease both;
+}
+
+@keyframes unsavedBarIn {
+    from { transform: translateY(120%); opacity: 0; }
+    to   { transform: none;             opacity: 1; }
+}
+
+.unsaved-bar__text { flex: 1; line-height: 1.35; }
+.unsaved-bar__text b { font-weight: 700; }
+
+/* Pulsing dot — signals that something is waiting, not that something broke. */
+.unsaved-bar__dot {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: #1a1a1a;
+    animation: unsavedDot 1.8s ease-in-out infinite;
+}
+
+@keyframes unsavedDot {
+    0%, 100% { opacity: 1;    }
+    50%      { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .unsaved-bar,
+    .unsaved-bar__dot { animation: none; }
+}
+
+/* Discard confirmation — the only action in the app that destroys user data
+   for good, so it names the consequence plainly. */
+.sam-confirm {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.sam-confirm__box {
+    width: 100%;
+    max-width: 340px;
+    padding: 24px 22px 16px;
+    border-radius: 18px;
+    background: #1c1f24;
+    text-align: center;
+}
+
+.sam-confirm__title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.sam-confirm__text {
+    font-size: 1.25rem;
+    line-height: 1.5;
+    color: rgba(255, 255, 255, 0.55);
+    margin-bottom: 22px;
+}
+
+/* Keeping is the default and looks like the primary action. */
+.sam-confirm__keep {
+    width: 100%;
+    padding: 14px;
+    margin-bottom: 8px;
+    border: none;
+    border-radius: 12px;
+    background: #00c46a;
+    color: #fff;
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.35rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Destroying is available, but does not invite. */
+.sam-confirm__go {
+    width: 100%;
+    padding: 12px;
+    border: none;
+    background: none;
+    color: #ef4444;
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.25rem;
+    cursor: pointer;
+}
