@@ -10,7 +10,8 @@
     "vendor": "node scripts/vendor.mjs",
     "build:app": "node scripts/vendor.mjs && tsc && node scripts/assemble-www.mjs && node scripts/bundle-app.mjs",
     "android": "npm run build:app && npx cap copy android && npx cap open android",
-    "android:patch": "node scripts/patch-android.mjs"
+    "android:patch": "node scripts/patch-android.mjs",
+    "postinstall": "node scripts/patch-live-activities.mjs"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.4.1",

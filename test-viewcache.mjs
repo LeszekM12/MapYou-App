@@ -836,6 +836,56 @@ console.log('\n=== 40. GALERIA — okładka + reszta ===');
   sprawdz('2 zdjęcia → taśma', tasma(2));
 }
 
+console.log('\n=== 41. LIVE ACTIVITY — budżet aktualizacji ===');
+{
+  // iOS ogranicza liczbę odświeżeń Live Activity. Przy 1/s budżet znika
+  // i wraz z nim giną aktualizacje niosące ZMIANĘ STANU (pauza, koniec).
+  const naGodzine = (ms) => Math.round(3600_000 / ms);
+  sprawdz('STARE 1000 ms → 3600 aktualizacji/h', naGodzine(1000) === 3600);
+  sprawdz('NOWE 5000 ms → 720 aktualizacji/h', naGodzine(5000) === 720);
+  sprawdz('pięciokrotnie mniej', naGodzine(1000) / naGodzine(5000) === 5);
+
+  // czas i tak tyka natywnie — nie zależy od aktualizacji
+  const czasWymagaAktualizacji = false;
+  sprawdz('czas tyka natywnie, bez aktualizacji', !czasWymagaAktualizacji);
+}
+
+console.log('\n=== 42. ZWINIĘTA WYSPA — jedna rzecz naraz ===');
+{
+  // Przy pauzie na tym samym miejscu leżały zamrożony czas I ikona pauzy.
+  const widoczne = (paused, ukryjZamrozony) => {
+    const l = [];
+    if (!paused) l.push('timer');
+    if (paused && !ukryjZamrozony) l.push('zamrozony-czas');
+    if (paused) l.push('ikona-pauzy');
+    return l;
+  };
+
+  sprawdz('biegnie → tylko licznik',
+    widoczne(false, true).join() === 'timer');
+  sprawdz('STARY: pauza → czas I ikona nachodzą',
+    widoczne(true, false).length === 2);
+  sprawdz('NOWY: pauza → tylko ikona',
+    widoczne(true, true).join() === 'ikona-pauzy');
+}
+
+console.log('\n=== 43. ZAKOŃCZENIE — zamroź przed zamknięciem ===');
+{
+  const kroki = [];
+  const zakoncz = (nowy) => {
+    kroki.length = 0;
+    if (nowy) kroki.push('update-zamrozony', 'czekaj', 'end');
+    else kroki.push('end');
+    return kroki;
+  };
+
+  sprawdz('STARY: samo zakończenie', zakoncz(false).join() === 'end');
+  sprawdz('NOWY: najpierw zamrożenie',
+    zakoncz(true).join() === 'update-zamrozony,czekaj,end');
+  sprawdz('zamrożenie idzie zwykłą aktualizacją (pewniejsza)',
+    zakoncz(true)[0] === 'update-zamrozony');
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

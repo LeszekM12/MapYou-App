@@ -65,7 +65,14 @@ function laData(s, pal) {
  *  Apple's Text(.timer) is width-greedy and left-aligned, which shoved the
  *  lock-screen value sideways and inflated the Dynamic Island pill — hence
  *  the FIXED width + centered alignment on both layers. */
-function timeStack(fontSize, colorKey, width) {
+function timeStack(fontSize, colorKey, width, 
+// Gdy `true`, zamrozony czas NIE pojawia sie podczas pauzy.
+//
+// Potrzebne w zwinietej wyspie: tam na tym samym miejscu lezy ikona pauzy.
+// Bez tego przy pauzie widac OBA naraz — symbol pauzy narysowany na cyfrach.
+// Na ekranie blokady jest odwrotnie: tam zamrozony czas ma byc widoczny,
+// bo ikona stoi obok, a nie na nim.
+ukryjZamrozony = false) {
     const base = [
         { fontSize }, { fontWeight: 'bold' }, { monospacedDigit: true },
         { width }, { alignment: 'center' },
@@ -75,11 +82,26 @@ function timeStack(fontSize, colorKey, width) {
         properties: [{ direction: 'stack' }],
         children: [
             { type: 'timer', properties: [{ endTime: '{{timerRef}}' }, { style: 'timer' }, ...base, { color: `{{${colorKey}T}}` }, { opacity: '{{runOp}}' }] },
-            { type: 'text', properties: [{ text: '{{time}}' }, ...base, { color: `{{${colorKey}F}}` }, { opacity: '{{pauseOp}}' }] },
+            { type: 'text', properties: [{ text: '{{time}}' }, ...base,
+                    { color: ukryjZamrozony ? 'clear' : `{{${colorKey}F}}` },
+                    { opacity: ukryjZamrozony ? '0' : '{{pauseOp}}' }] },
         ],
     };
 }
-const UPDATE_MS = 1000; // tracker ticks at 1 s — push every tick, no faster
+// ── CZESTOTLIWOSC AKTUALIZACJI ───────────────────────────────────────────────
+//
+// Bylo 1000 ms, czyli 3600 aktualizacji na godzine treningu. iOS ma budzet na
+// odswiezanie Live Activity i przy takim tempie zaczyna je ODRZUCAC — a wraz
+// z nimi te WAZNE, niosace zmiane stanu (pauza, wznowienie, koniec).
+//
+// Stad objaw „ikonka pauzy czasami jest, czasami nie": binding dziala,
+// tylko aktualizacja nie dociera.
+//
+// Czas na wyspie i tak tyka NATYWNIE z kotwicy `timerRef` — nie wymaga
+// zadnych aktualizacji. Przez most ida wylacznie dystans i tempo, a te
+// spokojnie moga sie odswiezac co pare sekund. Nikt nie zauwazy roznicy,
+// za to budzet zostaje na zmiany stanu, ktore MUSZA dojsc.
+const UPDATE_MS = 5000;
 function statCol(valueKey, label, valueColor, p) {
     return {
         type: 'container',
@@ -146,7 +168,9 @@ function islandLayout(sport, sportLabel) {
             type: 'container',
             properties: [{ direction: 'stack' }],
             children: [
-                timeStack(13, 'cmp', 50),
+                // `true` — w zwinietej wyspie zamrozony czas ustepuje miejsca ikonie
+                // pauzy. Inaczej symbol nakladalby sie na cyfry.
+                timeStack(13, 'cmp', 50, true),
                 { type: 'image', properties: [
                         { systemName: 'pause.fill' },
                         { color: ISLAND_PAUSE },
@@ -250,6 +274,22 @@ class WorkoutLiveActivity {
                     time: '', dist: '', third: '', thirdLabel: '',
                     state: 'Finished', timerRef: Date.now(), paused: true,
                 }, this._pal);
+            // ── ZAMROZ ZANIM ZAKONCZYSZ ────────────────────────────────────────────
+            //
+            // Wtyczka konczy aktywnosc z `dismissalPolicy: .default`, a to znaczy,
+            // ze iOS trzyma karte na ekranie blokady nawet do CZTERECH GODZIN.
+            // Natywny licznik tyka przez caly ten czas, bo dziala po stronie
+            // urzadzenia i nie potrzebuje aplikacji.
+            //
+            // Stad objaw: po zakonczeniu treningu zegar leci dalej, a jedynym
+            // wyjsciem jest recznie zmiecienie karty.
+            //
+            // `endActivity` DODATKOWO kasuje uklad ze wspoldzielonych ustawien
+            // (`removeObject(_layout)`), wiec tresc koncowa moze sie nie narysowac.
+            // Dlatego stan zamrozony wysylamy ZWYKLA aktualizacja — ta na pewno
+            // trafia do widzetu — i dopiero potem konczymy.
+            await p.updateActivity({ activityId: id, data: finalData });
+            await new Promise(r => setTimeout(r, 350)); // daj iOS narysowac
             await p.endActivity({ activityId: id, data: finalData });
         }
         catch { /* non-critical */ }
