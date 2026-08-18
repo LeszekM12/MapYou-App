@@ -244,7 +244,16 @@ class WorkoutLiveActivity {
     isAvailable() { return laPlugin() !== null; }
     get active() { return this._id !== null; }
     /** Begin the Live Activity for a new workout. Safe no-op off-iOS. */
-    async start(sportKey, sportLabel) {
+    /**
+     * @param paused  Start straight into the paused layout.
+     *
+     *   Needed when a workout is restored after the app was killed: the session
+     *   may well have been paused when the process died. Without this the island
+     *   came back with the running layout — a ticking clock on a stopped
+     *   workout — and no data update could fix it, because the layout is frozen
+     *   into the activity when it is created.
+     */
+    async start(sportKey, sportLabel, paused = false) {
         const p = laPlugin();
         if (!p || this._id || this._starting)
             return;
@@ -254,11 +263,11 @@ class WorkoutLiveActivity {
             this._pal = pal;
             this._sport = sportKey;
             this._label = sportLabel;
-            this._paused = false;
+            this._paused = paused;
             const res = await p.startActivity({
-                layout: lockLayout(sportKey, sportLabel, pal, false),
-                dynamicIslandLayout: islandLayout(sportKey, sportLabel, false),
-                data: laData({ time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: '', timerRef: Date.now(), paused: false }, pal),
+                layout: lockLayout(sportKey, sportLabel, pal, paused),
+                dynamicIslandLayout: islandLayout(sportKey, sportLabel, paused),
+                data: laData({ time: '0:00', dist: '0.00 km', third: '--:--', thirdLabel: 'PACE', state: paused ? 'Paused' : '', timerRef: Date.now(), paused }, pal),
                 behavior: { systemActionForegroundColor: pal.accent, keyLineTint: pal.accent },
             });
             this._id = res?.activityId ?? null;
@@ -331,45 +340,64 @@ class WorkoutLiveActivity {
     }
     /** End the activity. Pass final stats to leave a "Finished" card briefly;
      *  omit them (discard/reset) to just dismiss. */
+    /**
+     * Dismiss the Live Activity for good.
+     *
+     * WHY THIS IS SPLIT INTO TWO SEPARATE try BLOCKS
+     * ----------------------------------------------
+     * The previous version chained the freeze and the dismissal inside one try:
+     *
+     *     try {
+     *       await p.updateActivity(...);   // could throw
+     *       await p.endActivity(...);      // then never ran
+     *     } catch { }
+     *
+     * `updateActivity` throws `activityNotFound` whenever the plugin's in-memory
+     * dictionary is stale — which happens after the app is relaunched, and also
+     * right after `setPaused()` rebuilds the activity. The catch swallowed it and
+     * the card was never dismissed, so both islands kept sitting there until the
+     * user swiped them away by hand.
+     *
+     * Dismissal is the part that must not be skipped, so it gets its own try and
+     * a second attempt. Freezing the numbers first is only a nicety.
+     */
     async end(final) {
         const p = laPlugin();
         const id = this._id;
         this._id = null;
         this._lastPush = 0;
+        this._paused = false;
         if (!p || !id)
             return;
+        const finalData = final
+            ? laData({ ...final, state: 'Finished', paused: true }, this._pal)
+            : laData({
+                time: '', dist: '', third: '', thirdLabel: '',
+                state: 'Finished', timerRef: Date.now(), paused: true,
+            }, this._pal);
+        // Best effort: freeze the numbers so the card cannot show a running clock
+        // during the brief moment before iOS removes it. Failure here is harmless.
         try {
-            // `paused: true` ZAWSZE, takze gdy nie ma statystyk koncowych.
-            //
-            // iOS trzyma karte Live Activity jeszcze jakis czas po zakonczeniu —
-            // to normalne zachowanie systemu. Problem w tym, ze bez zamrozonej
-            // kotwicy natywny licznik TYKAL DALEJ i pokazywal nieistniejacy trening,
-            // dopoki uzytkownik sam nie zmiotl karty z ekranu blokady.
-            const finalData = final
-                ? laData({ ...final, state: 'Finished', paused: true }, this._pal)
-                : laData({
-                    time: '', dist: '', third: '', thirdLabel: '',
-                    state: 'Finished', timerRef: Date.now(), paused: true,
-                }, this._pal);
-            // ── ZAMROZ ZANIM ZAKONCZYSZ ────────────────────────────────────────────
-            //
-            // Wtyczka konczy aktywnosc z `dismissalPolicy: .default`, a to znaczy,
-            // ze iOS trzyma karte na ekranie blokady nawet do CZTERECH GODZIN.
-            // Natywny licznik tyka przez caly ten czas, bo dziala po stronie
-            // urzadzenia i nie potrzebuje aplikacji.
-            //
-            // Stad objaw: po zakonczeniu treningu zegar leci dalej, a jedynym
-            // wyjsciem jest recznie zmiecienie karty.
-            //
-            // `endActivity` DODATKOWO kasuje uklad ze wspoldzielonych ustawien
-            // (`removeObject(_layout)`), wiec tresc koncowa moze sie nie narysowac.
-            // Dlatego stan zamrozony wysylamy ZWYKLA aktualizacja — ta na pewno
-            // trafia do widzetu — i dopiero potem konczymy.
             await p.updateActivity({ activityId: id, data: finalData });
-            await new Promise(r => setTimeout(r, 350)); // daj iOS narysowac
-            await p.endActivity({ activityId: id, data: finalData });
+            await new Promise(r => setTimeout(r, 250));
         }
-        catch { /* non-critical */ }
+        catch { /* the dismissal below is what actually matters */ }
+        // The part that must happen. Two attempts, because the first one can hit
+        // the same stale-dictionary window described above — and by then the
+        // plugin has re-synced, so the retry succeeds.
+        for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+                await p.endActivity({ activityId: id, data: finalData });
+                return;
+            }
+            catch (e) {
+                if (attempt === 2) {
+                    console.warn('[LiveActivity] could not dismiss the card:', e);
+                    return;
+                }
+                await new Promise(r => setTimeout(r, 400));
+            }
+        }
     }
 }
 export const workoutLiveActivity = new WorkoutLiveActivity();

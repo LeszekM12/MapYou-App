@@ -71,6 +71,7 @@ import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified } from './modules/UnifiedWorkout.js';
 import { openSportPicker } from './modules/SportPicker.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
+import { storePending, loadPending, clearPending } from './modules/pendingWork.js';
 import { celebrateNewAchievements } from './modules/achievementCelebration.js';
 import { liveTracker } from './modules/LiveTracker.js';
 import { FriendsView } from './modules/FriendsView.js';
@@ -1470,7 +1471,42 @@ class App {
      *  Teraz przy kazdym starcie sprawdzamy, czy w IndexedDB nie ma
      *  niedokonczonej sesji. Jesli jest — odtwarzamy ja BEZ PYTANIA, tak jak
      *  robi to Strava. Z punktu widzenia uzytkownika nic sie nie stalo. */
+    /**
+     * Bring back a workout that was finished but never saved.
+     *
+     * WHY THIS IS NEEDED
+     * ------------------
+     * `Tracker.stop()` clears the session from IndexedDB, so from that moment
+     * the workout lives only inside the save modal. Killing the app used to
+     * destroy it with no trace.
+     *
+     * The record is now written to durable storage the instant Finish is pressed
+     * (see `_finishWithActivity`), so all that is left is to notice it on
+     * startup and put the modal back.
+     *
+     * @returns `true` when something was restored, so the caller can skip the
+     *          normal session restore.
+     */
+    _restorePendingSave() {
+        const activity = loadPending('save-activity');
+        if (!activity)
+            return false;
+        dlog('[Track] restoring an unsaved workout');
+        // Reuse the normal finish pipeline rather than copying it. The save path
+        // touches half a dozen stores and a notification; a second copy would
+        // drift out of sync the first time either is changed.
+        this._finishWithActivity(activity, { restored: true });
+        return true;
+    }
     async _restoreSessionIfAny() {
+        // A finished-but-unsaved workout takes priority over everything else.
+        //
+        // These two states are mutually exclusive — `Tracker.stop()` clears the
+        // session before the save modal opens — but the order still matters:
+        // whatever is holding the user's data hostage has to come back first,
+        // before the app decides to show them a feed.
+        if (this._restorePendingSave())
+            return;
         try {
             const { loadSession, loadSessionCoords, clearSession, isStale } = await import('./modules/sessionStore.js');
             const state = await loadSession();
@@ -1507,7 +1543,18 @@ class App {
             // `_enterTrackingView()` sam ustawia zakladke poprawnie (i zdejmuje
             // aktywnosc z poprzedniej), wiec nie dublujemy tego tutaj.
             this._enterTrackingView();
-            dlog(`[Track] wznowiono trening: ${coords.length} punktow, ${(state.distanceM / 1000).toFixed(2)} km`);
+            // Reflect the paused state in the UI.
+            //
+            // `restore()` sets the tracker's internal `_paused` correctly, but the
+            // screen is drawn fresh by `_enterTrackingView()` and defaults to the
+            // running look: no yellow "Paused" bar and a "⏸ Pause" button on a
+            // workout that is already stopped.
+            //
+            // The confusing part was that tapping that button then RESUMED the
+            // workout, because internally it had been paused all along — the button
+            // simply showed the wrong label.
+            this._setTrackingState(state.paused ? 'paused' : 'active');
+            dlog(`[Track] resumed workout: ${coords.length} points, ${(state.distanceM / 1000).toFixed(2)} km`);
         }
         catch (e) {
             console.warn('[Track] nie udalo sie wznowic sesji:', e instanceof Error ? e.message : e);
@@ -2246,8 +2293,24 @@ class App {
         document.body.appendChild(ov);
     }
     // Shared finish pipeline (used by real Stop AND the dev simulator)
-    _finishWithActivity(activity) {
-        showGoodJobSplash(() => {
+    /**
+     * @param opts.restored  The workout is coming back after the app was killed.
+     *   Skips the celebration splash (it already played when the user pressed
+     *   Finish) and skips re-storing the record, which is already on disk.
+     */
+    _finishWithActivity(activity, opts) {
+        // Persist the workout BEFORE the modal appears.
+        //
+        // `Tracker.stop()` has already called `clearSession()`, so at this instant
+        // the only copy of the workout is the `activity` variable. Swiping the app
+        // away here used to destroy it outright — an hour of running gone, with
+        // nothing to recover and no warning.
+        //
+        // Writing first and showing second closes that window. `storePending` is
+        // synchronous, so it has finished before the modal is even constructed.
+        if (!opts?.restored)
+            storePending('save-activity', activity);
+        const openModal = () => {
             openSaveActivityModal(activity, async (enriched) => {
                 await CS.saveActivity(activity);
                 await CS.saveUnifiedWorkout({
@@ -2273,13 +2336,30 @@ class App {
                 // Nie czekamy na wynik: zapis jest juz zrobiony, a brak sieci
                 // ma nie blokowac zamkniecia okna.
                 void celebrateNewAchievements();
+                // Saved for real — nothing left to recover.
+                //
+                // Cleared here rather than at the top of the callback: if anything
+                // above throws, the entry survives and the workout can still be
+                // rescued on the next launch.
+                clearPending('save-activity');
                 __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
                 await __classPrivateFieldGet(this, _App_historyPanel, "f")?.render();
                 await statsView.render();
                 await homeView.render();
                 homeView.switchToHome();
-            }, () => { __classPrivateFieldGet(this, _App_tracker, "f")?.reset(); });
-        });
+            }, () => {
+                // Discard is still a decision — the workout is no longer pending.
+                clearPending('save-activity');
+                __classPrivateFieldGet(this, _App_tracker, "f")?.reset();
+            });
+        };
+        // No splash when restoring: the celebration already played when the
+        // workout was finished, and replaying it would suggest something new
+        // had happened.
+        if (opts?.restored)
+            openModal();
+        else
+            showGoodJobSplash(openModal);
     }
     // ── DEV: simulate a finished run (test without leaving home) ───────────────
     _isDevMode() { return localStorage.getItem('mapyou_dev') === 'true'; }

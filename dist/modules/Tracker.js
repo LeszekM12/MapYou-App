@@ -435,6 +435,10 @@ export class Tracker {
         this._startGPS();
         if (this._autoPauseOn && this._useMotionAP)
             this._startMotion();
+        // Pass the paused flag through: the layout is baked into the activity when
+        // it is created, so a restored-but-paused workout has to start in the
+        // paused layout. Updating data afterwards cannot swap a ticking timer for
+        // static text.
         void workoutLiveActivity.start(this.sport, getSportLabel(this.sport));
         this.timerInterval = setInterval(() => {
             if (!this._paused) {
@@ -514,7 +518,11 @@ export class Tracker {
             if (this._autoPauseOn && this._useMotionAP)
                 this._startMotion();
         }
-        void workoutLiveActivity.start(this.sport, getSportLabel(this.sport));
+        // Pass the paused flag through: the layout is baked into the activity when
+        // it is created, so a restored-but-paused workout has to start in the
+        // paused layout. Updating data afterwards cannot swap a ticking timer
+        // for static text.
+        void workoutLiveActivity.start(this.sport, getSportLabel(this.sport), this._paused);
         this.timerInterval = setInterval(() => {
             if (!this._paused) {
                 const stats = this._buildStats();
@@ -523,8 +531,6 @@ export class Tracker {
             }
         }, 1000);
         this.onUpdate(this._buildStats());
-        // Po wznowieniu z migawki wyspa musi znac stan pauzy — inaczej startuje
-        // w trybie „biegnie" mimo wstrzymanego treningu.
         void workoutLiveActivity.update(this._liveStats(this._buildStats()), true);
     }
     // ── Pause ───────────────────────────────────────────────────────────────────
