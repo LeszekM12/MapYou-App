@@ -1879,6 +1879,15 @@ function _openNotifPanel() {
       </div>
     </div>`;
     document.body.appendChild(panel);
+    // ── PROSBY O OBSERWOWANIE ─────────────────────────────────────────────────
+    //
+    // Wiersz na samej gorze, nad powiadomieniami. Pojawia sie TYLKO gdy sa
+    // prosby i — co najwazniejsze — czyta stan z SERWERA, nie z listy
+    // powiadomien. Dzieki temu „Clear all" go nie dotyka.
+    //
+    // Wczesniej prosba zyla wylacznie w powiadomieniu, wiec skasowanie
+    // powiadomien odcinalo jedyna droge do akceptacji.
+    void wstawWierszProsb(panel.querySelector('#hnList'));
     requestAnimationFrame(() => {
         panel.querySelector('#hnSheet')?.classList.add('hn-sheet--open');
         panel.querySelector('#hnOverlay')?.classList.add('hn-overlay--visible');
@@ -1896,7 +1905,18 @@ function _openNotifPanel() {
         panel.querySelectorAll('.hn-item').forEach(item => {
             item.addEventListener('click', () => {
                 const n = getNotifications().find(x => x.id === item.dataset.id);
-                if (!n?.target)
+                if (!n)
+                    return;
+                // Powiadomienie o PROSBIE prowadzi do listy prosb, nie do profilu
+                // proszacego. Z profilu widac jedna osobe i trzeba sie cofac, zeby
+                // obsluzyc reszte — z listy zalatwiasz wszystkie za jednym razem.
+                // Tak samo robia Instagram i X.
+                if (n.type === 'follow_request') {
+                    close();
+                    void pokazProsby();
+                    return;
+                }
+                if (!n.target)
                     return;
                 close();
                 void _routeNotifTarget(n.target);
@@ -1913,6 +1933,9 @@ function _openNotifPanel() {
             return;
         const fresh = getNotifications();
         listEl.innerHTML = fresh.length === 0 ? _NOTIF_EMPTY_HTML : fresh.map(_notifItemHtml).join('');
+        // Przerysowanie listy usunelo wiersz prosb — wstawiamy go z powrotem.
+        // Bez tego znikal po kazdej synchronizacji z backendem.
+        void wstawWierszProsb(listEl);
         bindItems();
         markAllRead();
         void markAllReadRemote(uid);
@@ -2493,6 +2516,26 @@ export class HomeView {
            <circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
          </svg>`;
         const unread = getUnreadCount();
+        // Licznik na dzwonku obejmuje TAKZE prosby o obserwowanie — inaczej
+        // uzytkownik z zerem nieprzeczytanych powiadomien nie mialby zadnego
+        // sygnalu, ze ktos czeka na jego decyzje.
+        void liczbaProsb().then(n => {
+            if (!n)
+                return;
+            const bell = document.getElementById('homeNotifBell');
+            if (!bell)
+                return;
+            const suma = unread + n;
+            let badge = bell.querySelector('.home-bell__badge');
+            // Gdy nieprzeczytanych bylo ZERO, znacznik w ogole nie powstal —
+            // trzeba go dorobic, inaczej prosby nie mialyby jak sie pokazac.
+            if (!badge) {
+                badge = document.createElement('span');
+                badge.className = 'home-bell__badge';
+                bell.appendChild(badge);
+            }
+            badge.textContent = suma > 9 ? '9+' : String(suma);
+        });
         greeting.innerHTML = `
       <div class="home-greeting__row">
         <div class="home-greeting__text-wrap">
@@ -5281,6 +5324,7 @@ import { esc, safeUrl } from '../utils/dom.js';
 import { odczytaj as cacheOdczytaj, zapisz as cacheZapisz } from './viewCache.js';
 import { pokazSzkieletFeedu, koniecSzkieletu } from './skeleton.js';
 import { feedRecycler } from './feedRecycler.js';
+import { wstawWierszProsb, liczbaProsb, pokazProsby } from './followRequests.js';
 import { menuCudzejTresci } from './moderation.js';
 window._mapyouGetIcon = _gi2;
 window._mapyouGetColor = _gc2;

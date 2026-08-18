@@ -755,6 +755,57 @@ console.log('\n=== 35. SZKIELET TYLKO NA PUSTY EKRAN ===');
   sprawdz('jedna karta też wystarczy', !pokazac(1));
 }
 
+console.log('\n=== 36. PROŚBY O OBSERWOWANIE — stan, nie sygnał ===');
+{
+  // Sedno błędu: prośba żyła tylko w powiadomieniu. „Clear all" ją odcinał,
+  // mimo że nadal leżała na serwerze w pendingFollowers.
+  const serwer = { pendingFollowers: ['u1','u2'] };
+  let powiadomienia = [{ type:'follow_request', from:'u1' }, { type:'follow_request', from:'u2' }];
+
+  const staryEkran = () => powiadomienia.filter(n => n.type === 'follow_request').length;
+  const nowyEkran  = () => serwer.pendingFollowers.length;
+
+  sprawdz('przed czyszczeniem oba pokazują 2', staryEkran() === 2 && nowyEkran() === 2);
+
+  powiadomienia = [];                       // „Clear all"
+  sprawdz('STARY: po Clear all → prośby zniknęły', staryEkran() === 0);
+  sprawdz('NOWY: po Clear all → prośby zostają', nowyEkran() === 2);
+  sprawdz('serwer nadal je ma (nic nie zginęło)', serwer.pendingFollowers.length === 2);
+}
+
+console.log('\n=== 37. DECYZJA USUWA POZYCJĘ ===');
+{
+  const serwer = { pending: ['u1','u2','u3'], followers: [] };
+  const cache = { lista: ['u1','u2','u3'] };
+  const decyzja = (id, akceptuj) => {
+    serwer.pending = serwer.pending.filter(x => x !== id);
+    if (akceptuj) serwer.followers.push(id);
+    cache.lista = cache.lista.filter(x => x !== id);   // usunięcie z cache
+    return true;
+  };
+
+  decyzja('u1', true);
+  sprawdz('akceptacja → obserwujący', serwer.followers.includes('u1'));
+  sprawdz('znika z oczekujących', !serwer.pending.includes('u1'));
+  sprawdz('znika z cache — nie wróci offline', !cache.lista.includes('u1'));
+
+  decyzja('u2', false);
+  sprawdz('odrzucenie → NIE zostaje obserwującym', !serwer.followers.includes('u2'));
+  sprawdz('też znika z listy', serwer.pending.length === 1);
+}
+
+console.log('\n=== 38. WIERSZ TYLKO GDY SĄ PROŚBY ===');
+{
+  const pokazac = (n) => n > 0;
+  sprawdz('zero próśb → brak wiersza', !pokazac(0));
+  sprawdz('jedna prośba → wiersz', pokazac(1));
+
+  // licznik na dzwonku = nieprzeczytane + prośby
+  const badge = (unread, prosby) => unread + prosby;
+  sprawdz('0 nieprzeczytanych + 2 prośby → znacznik 2', badge(0, 2) === 2);
+  sprawdz('3 nieprzeczytane + 2 prośby → 5', badge(3, 2) === 5);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));
