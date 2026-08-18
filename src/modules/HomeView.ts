@@ -2003,8 +2003,18 @@ function _openNotifPanel(): void {
 
   panel.querySelector('#hnClear')?.addEventListener('click', () => {
     clearAll();
-    panel.querySelector('#hnList')!.innerHTML =
+    const listEl = panel.querySelector<HTMLElement>('#hnList')!;
+    listEl.innerHTML =
       '<div class="hn-empty"><span>🔔</span><p>No notifications yet</p></div>';
+    // ── PROSBY PRZEZYWAJA CZYSZCZENIE ──────────────────────────────────────
+    //
+    // „Clear all" kasuje POWIADOMIENIA. Prosby o obserwowanie to osobny stan,
+    // ktory czeka na decyzje — nie wolno ich przy okazji zmiesc.
+    //
+    // Wiersz i tak wracal przy nastepnym otwarciu panelu (czyta z serwera),
+    // ale znikal na oczach uzytkownika, co wygladalo jakby czyszczenie
+    // odrzucilo prosby. Wstawiamy go z powrotem od razu.
+    void wstawWierszProsb(listEl);
   });
 
   // Swipe to close

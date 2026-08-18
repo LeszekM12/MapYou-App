@@ -886,6 +886,59 @@ console.log('\n=== 43. ZAKOŃCZENIE — zamroź przed zamknięciem ===');
     zakoncz(true)[0] === 'update-zamrozony');
 }
 
+console.log('\n=== 44. WIERSZ PRÓŚB — koniec wyścigu ===');
+{
+  // Panel woła wstawWierszProsb dwa razy: po otwarciu i po synchronizacji.
+  // STARY kod usuwał PRZED await → obie wersje widziały pustkę → dwa wiersze.
+  const symuluj = async (usunPrzed) => {
+    const dom = [];
+    const wstaw = async () => {
+      if (usunPrzed) { const i = dom.indexOf('wiersz'); if (i >= 0) dom.splice(i,1); }
+      await sleep(5);                                  // pobranie z serwera
+      if (!usunPrzed) { const i = dom.indexOf('wiersz'); if (i >= 0) dom.splice(i,1); }
+      dom.push('wiersz');
+    };
+    await Promise.all([wstaw(), wstaw()]);
+    return dom.filter(x => x === 'wiersz').length;
+  };
+
+  sprawdz('STARY: usuwanie przed await → DWA wiersze', await symuluj(true) === 2);
+  sprawdz('NOWY: usuwanie po await → jeden', await symuluj(false) === 1);
+}
+
+console.log('\n=== 45. CLEAR ALL NIE KASUJE PRÓŚB ===');
+{
+  const ekran = { powiadomienia: ['a','b'], wiersz: true };
+  const clearAll = (przywroc) => {
+    ekran.powiadomienia = [];
+    ekran.wiersz = false;              // innerHTML czyści wszystko
+    if (przywroc) ekran.wiersz = true; // wstawWierszProsb po czyszczeniu
+  };
+
+  clearAll(false);
+  sprawdz('STARY: wiersz znikał', !ekran.wiersz);
+  ekran.wiersz = true;
+  clearAll(true);
+  sprawdz('NOWY: wiersz zostaje', ekran.wiersz);
+  sprawdz('powiadomienia i tak wyczyszczone', ekran.powiadomienia.length === 0);
+}
+
+console.log('\n=== 46. WYSYŁKA ZDJĘĆ — natychmiastowy podgląd ===');
+{
+  const kafelki = [];
+  const wybierz = (n) => { for (let i=0;i<n;i++) kafelki.push({ pct:0, gotowe:false }); };
+  const skonczone = () => { const k = kafelki.shift(); if (k) k.gotowe = true; };
+
+  wybierz(3);
+  sprawdz('3 zdjęcia → 3 kafelki OD RAZU', kafelki.length === 3);
+  sprawdz('każdy ma własny postęp', kafelki.every(k => k.pct === 0));
+
+  skonczone();
+  sprawdz('po pierwszej wysyłce zostają 2', kafelki.length === 2);
+  skonczone(); skonczone();
+  sprawdz('po wszystkich — pusto', kafelki.length === 0);
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));

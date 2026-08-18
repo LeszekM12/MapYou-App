@@ -83,7 +83,7 @@ export function openEditActivity(act, userId, onSaved) {
         $('eaPhotoCount').textContent = `${photos.length + (cover ? 1 : 0)}/${MAX_PHOTOS}`;
     };
     nameEl.addEventListener('input', refreshCount);
-    // ── Galeria ───────────────────────────────────────────────────────────────
+    const wTrakcie = [];
     const renderGallery = () => {
         const all = [...(cover ? [cover] : []), ...photos];
         gallery.innerHTML = all.map((url, i) => {
@@ -96,7 +96,16 @@ export function openEditActivity(act, userId, onSaved) {
           ${i === 0 ? '<span class="ea-cover">Cover</span>' : ''}
           <button class="ea-remove" data-remove="${i}" aria-label="Remove photo">×</button>
         </div>`;
-        }).join('');
+        }).join('')
+            // Kafelki w trakcie wysylki — zawsze na koncu, w kolejnosci wyboru.
+            + wTrakcie.map(w => `
+        <div class="ea-thumb ea-thumb--wysylka">
+          <img src="${w.podglad}" alt="">
+          <div class="ea-thumb__zaslona">
+            <div class="ea-thumb__pasek"><i style="width:${w.pct}%"></i></div>
+            <span>${w.faza === 'compressing' ? 'Processing…' : `${w.pct}%`}</span>
+          </div>
+        </div>`).join('');
         refreshCount();
     };
     gallery.addEventListener('click', e => {
@@ -131,22 +140,42 @@ export function openEditActivity(act, userId, onSaved) {
         if (take.length < files.length) {
             alert(`Only ${take.length} of ${files.length} photos added — limit is ${MAX_PHOTOS}.`);
         }
+        // Kafelki pojawiaja sie OD RAZU — jeszcze przed rozpoczeciem wysylki.
+        for (const f of take) {
+            wTrakcie.push({ podglad: URL.createObjectURL(f), pct: 0, faza: 'uploading' });
+        }
+        renderGallery();
         void (async () => {
             const { uploadMediaFile } = await import('./cloudSync.js');
-            for (const f of take) {
+            for (let i = 0; i < take.length; i++) {
+                const f = take[i];
+                // Ten kafelek odpowiada temu plikowi. Szukamy po pozycji od konca,
+                // bo wczesniejsze sa juz usuwane w miare konczenia wysylek.
+                const mojKafelek = wTrakcie[0];
                 // `uploadMediaFile` sam odklada plik do kolejki, gdy siec zawiedzie,
                 // i oddaje adres zastepczy. Nie musimy tu rozrozniac online/offline.
-                const up = await uploadMediaFile(f, userId, 'activities');
+                const up = await uploadMediaFile(f, userId, 'activities', undefined, (pct, faza) => {
+                    if (!mojKafelek)
+                        return;
+                    mojKafelek.pct = pct;
+                    mojKafelek.faza = faza;
+                    renderGallery();
+                });
+                // Kafelek zastepczy znika — na jego miejsce wchodzi prawdziwe zdjecie.
+                if (mojKafelek) {
+                    URL.revokeObjectURL(mojKafelek.podglad); // zwalniamy pamiec podgladu
+                    wTrakcie.shift();
+                }
                 if (up?.url) {
                     if (!cover)
                         cover = up.url;
                     else
                         photos.push(up.url);
-                    renderGallery();
                 }
                 else {
                     console.warn('[EditActivity] nie udalo sie dodac zdjecia:', f.name);
                 }
+                renderGallery();
             }
         })();
     });

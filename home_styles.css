@@ -2876,6 +2876,73 @@ video.home-reel-viewer__media {
 .ea-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 
 /* Zdjecie czekajace na wyslanie — czytelnie, bez udawania, ze juz jest. */
+/* --- KAFELEK W TRAKCIE WYSYLKI ----------------------------------------------
+   Wysylka jednego zdjecia trwa okolo pieciu sekund. Zamiast szarego prostokata
+   pokazujemy PRAWDZIWY podglad (czytany lokalnie z pliku, bez sieci) przyciemniony
+   zaslona z paskiem postepu. Uzytkownik od razu widzi, ktore zdjecie doszlo. */
+/* --- PROFIL PRYWATNY --------------------------------------------------------
+   Te klasy istnialy TYLKO w jasnym motywie — w ciemnym nie mialy zadnych regul,
+   wiec sekcja renderowala sie surowo: tekst przyklejony do lewej krawedzi,
+   bez odstepow i bez wyrownania. */
+.pv-private-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    margin: 28px 20px;
+    padding: 34px 24px;
+    border-radius: 18px;
+    background: rgba(128, 128, 128, 0.10);
+    text-align: center;
+}
+.pv-private-box__icon {
+    width: 62px; height: 62px;
+    border-radius: 50%;
+    background: rgba(128, 128, 128, 0.16);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.9rem;
+}
+.pv-private-box__title {
+    font-size: 1.55rem;
+    font-weight: 700;
+    color: #fff;
+}
+.pv-private-box__desc {
+    font-size: 1.25rem;
+    line-height: 1.45;
+    color: rgba(255, 255, 255, 0.55);
+    max-width: 280px;
+}
+/* Kłódka przy imieniu — widoczna TAKZE wtedy, gdy juz obserwujesz.
+   Bez niej nie dalo sie poznac, ze konto jest zamkniete: profil wygladal
+   zwyczajnie, tylko z zerem aktywnosci. */
+.pv-lock {
+    display: inline-block;
+    margin-left: 7px;
+    font-size: 1.15rem;
+    opacity: 0.55;
+    vertical-align: middle;
+}
+
+.ea-thumb--wysylka { position: relative; }
+.ea-thumb--wysylka img { filter: brightness(0.55); }
+.ea-thumb__zaslona {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 7px;
+    color: #fff; font-size: 1.05rem; font-weight: 600;
+}
+.ea-thumb__pasek {
+    width: 62%; height: 4px; border-radius: 2px;
+    background: rgba(255, 255, 255, 0.28);
+    overflow: hidden;
+}
+.ea-thumb__pasek i {
+    display: block; height: 100%;
+    background: #00c46a;
+    transition: width 0.25s ease;
+}
+
 .ea-thumb--pending { display: flex; align-items: center; justify-content: center; }
 .ea-thumb-pending {
   font-size: 11.5px; color: #6B7580; font-weight: 500; text-align: center; padding: 6px;

@@ -62,8 +62,20 @@ function zapewnijStyl(): void {
 .mapyou-fr__stos > *:not(:first-child) { margin-left: -12px; }
 .mapyou-fr__tytul {
   flex: 1; font-size: 1.35rem; font-weight: 600;
-  color: var(--app-text, #fff);
+  /* Panel powiadomien NIE uzywa zmiennych motywu — ma zakodowane kolory
+     i nadpisania przez body.light-mode. Zmienna --app-text w jasnym motywie
+     spadala na biel, czyli bialy tekst na bialym tle. Stad wiersz wygladal
+     na pusty: widac bylo awatary, licznik i strzalke, ale napisu nie.
+     Trzymamy sie wiec tej samej konwencji co reszta panelu.
+     (BEZ BACKTICKOW — caly arkusz jest literalem szablonowym.) */
+  color: #fff;
 }
+body.light-mode .mapyou-fr__tytul { color: #1a1a1a; }
+body.light-mode .mapyou-fr__wiersz { border-bottom-color: rgba(0,0,0,0.07); }
+body.light-mode .mapyou-fr__panel { background: #fff; }
+body.light-mode .mapyou-fr__naglowek,
+body.light-mode .mapyou-fr__imie { color: #1a1a1a; }
+body.light-mode .mapyou-fr__stos > * { border-color: #fff; }
 .mapyou-fr__licznik {
   min-width: 22px; height: 22px; padding: 0 7px; border-radius: 11px;
   background: #00c46a; color: #fff;
@@ -163,7 +175,9 @@ async function usunZCache(userId: string): Promise<void> {
   void cacheZapisz(KLUCZ(uid), z.value.filter(p => p.userId !== userId));
 }
 
-async function decyzja(requesterId: string, akceptuj: boolean): Promise<boolean> {
+/** Zaakceptuj albo odrzuc prosbe. Eksportowane, bo decyzje da sie podjac
+ *  w dwoch miejscach: z listy prosb i wprost z profilu proszacego. */
+export async function decyzjaProsby(requesterId: string, akceptuj: boolean): Promise<boolean> {
   const uid = getUserId();
   if (!uid) return false;
   const akcja = akceptuj ? 'follow-approve' : 'follow-reject';
@@ -185,9 +199,20 @@ async function decyzja(requesterId: string, akceptuj: boolean): Promise<boolean>
  *  Dotkniecie otwiera pelny arkusz. */
 export async function wstawWierszProsb(kontener: HTMLElement | null): Promise<void> {
   if (!kontener) return;
-  kontener.querySelector('#mapyouFrRow')?.remove();
 
   const prosby = await pobierzProsby();
+
+  // ── USUWAMY PO CZEKANIU, NIE PRZED ──────────────────────────────────────
+  //
+  // Wczesniej usuniecie bylo PRZED `await`. Panel wola te funkcje dwa razy:
+  // raz od razu po otwarciu, drugi raz po synchronizacji z backendem. Obie
+  // sprawdzaly „czy jest wiersz" ZANIM ktorakolwiek zdazyla go wstawic,
+  // wiec obie widzialy pustke i obie dokladaly swoj — stad DWA wiersze.
+  //
+  // Po przesunieciu usuwania za `await` ta, ktora konczy pozniej, zdejmuje
+  // wiersz poprzedniczki. Zostaje dokladnie jeden.
+  kontener.querySelector('#mapyouFrRow')?.remove();
+
   if (!prosby.length) return;
 
   zapewnijStyl();
@@ -260,13 +285,24 @@ export async function pokazProsby(odswiezPo?: HTMLElement | null): Promise<void>
       ${p.avatarB64
         ? `<img class="mapyou-fr__avatar" src="${safeUrl(p.avatarB64)}" alt=""/>`
         : '<div class="mapyou-fr__avatar"></div>'}
-      <div class="mapyou-fr__info">
+      <div class="mapyou-fr__info" data-profil="${esc(p.userId)}" style="cursor:pointer">
         <div class="mapyou-fr__imie">${esc(p.name || 'User')}</div>
         ${p.bio ? `<div class="mapyou-fr__bio">${esc(p.bio)}</div>` : ''}
       </div>
       <button class="mapyou-fr__btn mapyou-fr__btn--ok"  data-ok="${esc(p.userId)}">Confirm</button>
       <button class="mapyou-fr__btn mapyou-fr__btn--nie" data-nie="${esc(p.userId)}">Delete</button>
     </div>`).join('');
+
+  // Dotkniecie imienia otwiera profil. Bez tego nie dalo sie sprawdzic,
+  // KOGO sie wpuszcza — a to najwazniejsza informacja przy tej decyzji.
+  lista.querySelectorAll<HTMLElement>('[data-profil]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const id = el.dataset.profil!;
+      zamknij();
+      const { openPublicProfile } = await import('./PublicProfile.js');
+      void openPublicProfile(id);
+    });
+  });
 
   lista.querySelectorAll<HTMLElement>('[data-ok],[data-nie]').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -278,7 +314,7 @@ export async function pokazProsby(odswiezPo?: HTMLElement | null): Promise<void>
       wiersz?.querySelectorAll('button').forEach(b => { (b as HTMLButtonElement).disabled = true; });
       btn.textContent = '…';
 
-      if (await decyzja(id, akceptuj)) {
+      if (await decyzjaProsby(id, akceptuj)) {
         wiersz?.remove();
         if (!lista.querySelector('[data-wiersz]')) pusto();
       } else {

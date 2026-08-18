@@ -159,10 +159,18 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId, hasRe
         </button>
       </div>
     </div>
+    <!-- ── PASEK PROSBY O OBSERWOWANIE ────────────────────────────────────────
+         Wypelniany asynchronicznie: jesli TA osoba czeka na moja zgode,
+         pojawia sie tu Confirm/Delete.
+
+         Powiadomienie o prosbie prowadzi wlasnie na ten profil, wiec decyzja
+         powinna byc mozliwa OD RAZU, bez wracania do listy. Wczesniej trzeba
+         bylo obejrzec profil, cofnac sie i dopiero wtedy akceptowac. -->
+    <div id="ppReqBar" style="display:none"></div>
     <div class="pv-hero">
       <div class="pv-avatar ${reelRingClass}" id="ppAvatarReel" style="${hasReels ? 'cursor:pointer' : ''}">${avatarHtml}</div>
       <div class="pv-hero__info">
-        <h2 class="pv-name">${esc(profile.name)}</h2>
+        <h2 class="pv-name">${esc(profile.name)}${profile.isPrivate ? '<span class="pv-lock" title="Private profile">🔒</span>' : ''}</h2>
         ${profile.bio ? `<p class="pv-bio">${esc(profile.bio)}</p>` : ''}
       </div>
     </div>
@@ -229,6 +237,45 @@ function _renderFull(overlay, sheet, profile, activities, posts, myUserId, hasRe
         if (data.status === 'ok')
             void _showFollowList('Followers', data.data.followers ?? [], myUserId, overlay);
     });
+    // ── CZY TA OSOBA CZEKA NA MOJA ZGODE ─────────────────────────────────────
+    void (async () => {
+        const { pobierzProsby } = await import('./followRequests.js');
+        const prosby = await pobierzProsby();
+        if (!prosby.some(x => x.userId === profile.userId))
+            return;
+        const bar = sheet.querySelector('#ppReqBar');
+        if (!bar)
+            return;
+        bar.style.display = '';
+        bar.style.cssText += ';display:flex;align-items:center;gap:10px;'
+            + 'margin:0 16px 4px;padding:12px 14px;border-radius:12px;'
+            + 'background:rgba(0,196,106,0.10)';
+        bar.innerHTML = `
+      <span style="flex:1;font-size:1.25rem;color:var(--app-text,#fff)">
+        Wants to follow you</span>
+      <button id="ppReqOk" style="border:none;border-radius:999px;padding:8px 16px;
+        background:#00c46a;color:#fff;font-size:1.2rem;font-weight:600;
+        font-family:inherit;cursor:pointer">Confirm</button>
+      <button id="ppReqNo" style="border:none;border-radius:999px;padding:8px 14px;
+        background:rgba(128,128,128,0.16);color:var(--app-text-secondary,#9aa0a6);
+        font-size:1.2rem;font-family:inherit;cursor:pointer">Delete</button>`;
+        const decyduj = async (akceptuj) => {
+            bar.querySelectorAll('button').forEach(b => { b.disabled = true; });
+            const { decyzjaProsby } = await import('./followRequests.js');
+            if (await decyzjaProsby(profile.userId, akceptuj)) {
+                bar.remove();
+                // Po akceptacji profil przestaje byc zamkniety — przeladowujemy,
+                // zeby od razu bylo widac tresci.
+                if (akceptuj)
+                    void openPublicProfile(profile.userId);
+            }
+            else {
+                bar.querySelectorAll('button').forEach(b => { b.disabled = false; });
+            }
+        };
+        bar.querySelector('#ppReqOk')?.addEventListener('click', () => void decyduj(true));
+        bar.querySelector('#ppReqNo')?.addEventListener('click', () => void decyduj(false));
+    })();
     sheet.querySelector('#ppFollowingBtn')?.addEventListener('click', async () => {
         const res = await fetch(`${BACKEND_URL}/users/${encodeURIComponent(profile.userId)}`);
         const data = await res.json();
