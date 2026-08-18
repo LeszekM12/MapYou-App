@@ -566,3 +566,7 @@ body.light-mode #tabStats .sv2-tabs { background: #f2f2f7 !important; }
 body.light-mode .sam-confirm__box   { background: #fff !important; }
 body.light-mode .sam-confirm__title { color: #1a1a1a !important; }
 body.light-mode .sam-confirm__text  { color: #666 !important; }
+body.light-mode .unsaved-list__sheet { background: #fff !important; }
+body.light-mode .unsaved-list__title,
+body.light-mode .unsaved-list__row   { color: #1a1a1a !important; }
+body.light-mode .unsaved-list__when  { color: #888 !important; }

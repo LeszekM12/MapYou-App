@@ -82,7 +82,7 @@ import { notifyActivityAdded } from './modules/NotificationsService.js';
 import { migrateToUnified, saveUnifiedWorkout } from './modules/UnifiedWorkout.js';
 import { openSportPicker } from './modules/SportPicker.js';
 import { openSaveActivityModal } from './modules/SaveActivityModal.js';
-import { storePending, loadPending, clearPending } from './modules/pendingWork.js';
+import { addPending, listPending, removePending, countPending } from './modules/pendingWork.js';
 import { celebrateNewAchievements } from './modules/achievementCelebration.js';
 import { liveTracker }          from './modules/LiveTracker.js';
 import { FriendsView }          from './modules/FriendsView.js';
@@ -1471,39 +1471,130 @@ class App {
    * way back would be to restart the app. Strava keeps a similar banner for
    * the same reason.
    */
-  _showUnsavedBar(): void {
+  /**
+   * A standing reminder that finished workouts have not been saved yet.
+   *
+   * Without it, dismissing the save sheet would hide the workout completely:
+   * still on disk, but nothing on screen saying so, and no way back short of
+   * restarting the app. Strava keeps a similar banner for the same reason.
+   *
+   * Shows a count once more than one is waiting, which is the normal state
+   * during a triathlon — swim finished, bike finished, run still to come.
+   */
+  _refreshUnsavedBar(): void {
     document.getElementById('mapyouUnsavedBar')?.remove();
 
+    const items = listPending<ActivityRecord>('save-activity');
+    if (!items.length) return;
+
+    const many = items.length > 1;
     const bar = document.createElement('button');
     bar.id = 'mapyouUnsavedBar';
     bar.type = 'button';
     bar.className = 'unsaved-bar';
     bar.innerHTML = `
       <span class="unsaved-bar__dot"></span>
-      <span class="unsaved-bar__text"><b>Unsaved workout</b> — tap to finish saving</span>
+      <span class="unsaved-bar__text">
+        <b>${many ? `${items.length} unsaved workouts` : 'Unsaved workout'}</b>
+        — tap to ${many ? 'review' : 'finish saving'}</span>
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round"><path d="M9 18l6-6-6-6"/></svg>`;
+
     bar.addEventListener('click', () => {
-      bar.remove();
-      this._restorePendingSave();
+      // One waiting: go straight to it, no extra tap. Several: let the user
+      // pick, because they know which one they want to deal with first.
+      if (many) this._openUnsavedList();
+      else this._reopenPending(items[0].id);
     });
+
     document.body.appendChild(bar);
   }
 
-  /** Take the reminder away once the workout is no longer waiting. */
+  /** Kept for callers that only ever hide it. */
   _hideUnsavedBar(): void {
     document.getElementById('mapyouUnsavedBar')?.remove();
   }
 
-  _restorePendingSave(): boolean {
-    const activity = loadPending<ActivityRecord>('save-activity');
-    if (!activity) return false;
+  /** Pick which of several unsaved workouts to deal with. */
+  _openUnsavedList(): void {
+    const items = listPending<ActivityRecord>('save-activity');
+    if (!items.length) return;
 
-    dlog('[Track] restoring an unsaved workout');
-    // Reuse the normal finish pipeline rather than copying it. The save path
-    // touches half a dozen stores and a notification; a second copy would
-    // drift out of sync the first time either is changed.
-    this._finishWithActivity(activity, { restored: true });
+    const ov = document.createElement('div');
+    ov.className = 'unsaved-list';
+    ov.innerHTML = `
+      <div class="unsaved-list__sheet">
+        <div class="unsaved-list__handle"></div>
+        <div class="unsaved-list__title">Unsaved workouts</div>
+        <div class="unsaved-list__body">
+          ${items.map(it => {
+            const a  = it.payload;
+            const km = (a.distanceKm ?? 0).toFixed(2);
+            const mm = Math.round((a.durationSec ?? 0) / 60);
+            const when = new Date(a.date ?? it.at).toLocaleString(undefined,
+              { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+            return `
+              <button class="unsaved-list__row" data-id="${it.id}">
+                <span class="unsaved-list__sport">${getIcon(a.sport ?? 'running')}</span>
+                <span class="unsaved-list__info">
+                  <span class="unsaved-list__main">${km} km · ${mm} min</span>
+                  <span class="unsaved-list__when">${when}</span>
+                </span>
+                <svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                  <path d="M9 18l6-6-6-6"/></svg>
+              </button>`;
+          }).join('')}
+        </div>
+        <button class="unsaved-list__close" data-close="1">Close</button>
+      </div>`;
+
+    ov.addEventListener('click', e => {
+      const t = e.target as HTMLElement;
+      if (t === ov || t.dataset.close) { ov.remove(); return; }
+      const row = t.closest<HTMLElement>('[data-id]');
+      if (row) { ov.remove(); this._reopenPending(row.dataset.id!); }
+    });
+    document.body.appendChild(ov);
+  }
+
+  /** Reopen the save sheet for one queued workout. */
+  _reopenPending(id: string): void {
+    const items = listPending<ActivityRecord>('save-activity');
+    const item  = items.find(it => it.id === id);
+    if (!item) { this._refreshUnsavedBar(); return; }
+
+    this._hideUnsavedBar();
+    this._finishWithActivity(item.payload, { restored: true, pendingId: item.id });
+  }
+
+  /**
+   * Bring back workouts that were finished but never saved.
+   *
+   * `Tracker.stop()` clears the session from IndexedDB, so from that moment a
+   * finished workout lives only in the queue. Killing the app used to destroy
+   * it with no trace.
+   *
+   * One waiting: reopen the sheet straight away, since there is nothing to
+   * choose between. Several: show the bar and let the user decide the order —
+   * shoving one of three in their face would be presumptuous, and after a
+   * triathlon three is the expected number.
+   *
+   * @returns `true` when something was waiting, so the caller can skip the
+   *          normal session restore.
+   */
+  _restorePendingSave(): boolean {
+    const waiting = countPending('save-activity');
+    if (!waiting) return false;
+
+    dlog(`[Track] ${waiting} unsaved workout(s) recovered`);
+
+    if (waiting === 1) {
+      const items = listPending<ActivityRecord>('save-activity');
+      this._reopenPending(items[0].id);
+    } else {
+      this._refreshUnsavedBar();
+    }
     return true;
   }
 
@@ -2271,7 +2362,10 @@ class App {
    *   Skips the celebration splash (it already played when the user pressed
    *   Finish) and skips re-storing the record, which is already on disk.
    */
-  _finishWithActivity(activity: ActivityRecord, opts?: { restored?: boolean }): void {
+  _finishWithActivity(
+    activity: ActivityRecord,
+    opts?: { restored?: boolean; pendingId?: string },
+  ): void {
     // Persist the workout BEFORE the modal appears.
     //
     // `Tracker.stop()` has already called `clearSession()`, so at this instant
@@ -2281,7 +2375,9 @@ class App {
     //
     // Writing first and showing second closes that window. `storePending` is
     // synchronous, so it has finished before the modal is even constructed.
-    if (!opts?.restored) storePending('save-activity', activity);
+    // Each finished workout gets its own queue entry. A triathlete finishing
+    // the swim and starting the bike must not overwrite what came before.
+    const pendingId = opts?.pendingId ?? addPending('save-activity', activity);
 
     const openModal = (): void => {
       openSaveActivityModal(activity,
@@ -2315,8 +2411,8 @@ class App {
           // Cleared here rather than at the top of the callback: if anything
           // above throws, the entry survives and the workout can still be
           // rescued on the next launch.
-          clearPending('save-activity');
-          this._hideUnsavedBar();
+          removePending('save-activity', pendingId);
+          this._refreshUnsavedBar();
           this.#tracker?.reset();
           await this.#historyPanel?.render();
           await statsView.render();
@@ -2324,9 +2420,9 @@ class App {
           homeView.switchToHome();
         },
         () => {
-          // Discard is still a decision — the workout is no longer pending.
-          clearPending('save-activity');
-          this._hideUnsavedBar();
+          // Discard is still a decision — this one is no longer pending.
+          removePending('save-activity', pendingId);
+          this._refreshUnsavedBar();
           this.#tracker?.reset();
         },
         () => {
@@ -2334,7 +2430,7 @@ class App {
           // put a way back to it in front of the user, otherwise it is
           // invisible until the next launch.
           this.#tracker?.reset();
-          this._showUnsavedBar();
+          this._refreshUnsavedBar();
         },
       );
     };

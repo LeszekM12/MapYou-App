@@ -3189,3 +3189,93 @@ video.home-reel-viewer__media {
     font-size: 1.25rem;
     cursor: pointer;
 }
+
+/* Picker for when several workouts are waiting — the normal state during a
+   triathlon: swim done, bike done, run still to come. */
+.unsaved-list {
+    position: fixed;
+    inset: 0;
+    z-index: 9500;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.unsaved-list__sheet {
+    width: 100%;
+    max-width: 520px;
+    background: #1c1f24;
+    border-radius: 18px 18px 0 0;
+    padding: 8px 0 calc(env(safe-area-inset-bottom, 0px) + 12px);
+    animation: unsavedListIn 0.24s ease both;
+}
+
+@keyframes unsavedListIn {
+    from { transform: translateY(100%); }
+    to   { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .unsaved-list__sheet { animation: none; }
+}
+
+.unsaved-list__handle {
+    width: 38px;
+    height: 4px;
+    border-radius: 2px;
+    margin: 6px auto 12px;
+    background: rgba(128, 128, 128, 0.4);
+}
+
+.unsaved-list__title {
+    padding: 2px 20px 12px;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.unsaved-list__body { max-height: 52vh; overflow-y: auto; }
+
+.unsaved-list__row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 13px 20px;
+    border: none;
+    background: none;
+    font-family: 'Manrope', sans-serif;
+    text-align: left;
+    cursor: pointer;
+    color: #fff;
+}
+.unsaved-list__row:active { background: rgba(128, 128, 128, 0.12); }
+
+.unsaved-list__sport { font-size: 1.8rem; flex-shrink: 0; }
+.unsaved-list__info  { flex: 1; min-width: 0; }
+
+.unsaved-list__main {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 600;
+}
+.unsaved-list__when {
+    display: block;
+    font-size: 1.15rem;
+    color: rgba(255, 255, 255, 0.5);
+    margin-top: 2px;
+}
+
+.unsaved-list__close {
+    width: 100%;
+    padding: 14px;
+    margin-top: 6px;
+    border: none;
+    border-top: 1px solid rgba(128, 128, 128, 0.14);
+    background: none;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Manrope', sans-serif;
+    font-size: 1.25rem;
+    cursor: pointer;
+}

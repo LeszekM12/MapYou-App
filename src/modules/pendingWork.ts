@@ -1,4 +1,4 @@
-// ─── PENDING WORK THAT MUST SURVIVE THE APP BEING KILLED ─────────────────────
+// ─── WORK AWAITING A USER DECISION ───────────────────────────────────────────
 // src/modules/pendingWork.ts
 //
 // THE BUG THIS EXISTS TO FIX
@@ -7,94 +7,131 @@
 //
 //   1. `Tracker.stop()` called `clearSession()` — the workout was wiped from
 //      IndexedDB, because as far as the tracker was concerned it was done.
-//   2. The save modal opened, holding the only remaining copy of the workout
+//   2. The save sheet opened, holding the only remaining copy of the workout
 //      in a JavaScript variable.
 //
-// Between those two moments the workout existed *only in memory*. Swipe the app
-// away from the task switcher and an hour of running was gone for good, with no
-// warning and nothing to recover.
+// Between those two moments the workout existed *only in memory*. Swipe the
+// app away, or dismiss the sheet by accident, and an hour of running was gone.
 //
-// THE RULE THIS MODULE ENFORCES
-// -----------------------------
-// If something is waiting on a decision from the user, and losing it would mean
-// losing their data, then it gets written to durable storage the moment it
-// appears — and it gets restored before anything else when the app comes back.
+// WHY THIS IS A QUEUE AND NOT A SINGLE SLOT
+// -----------------------------------------
+// The first version stored one record under a fixed key, so finishing a second
+// workout silently overwrote the first. That breaks the case this app exists
+// for: a triathlete finishes the swim, starts the bike, finishes that, starts
+// the run — three workouts back to back, saved afterwards at leisure. Under a
+// single-slot design the first two would simply vanish.
+//
+// Every finished workout now gets its own entry with its own id, and entries
+// only leave when the user has actually decided what to do with them.
 //
 // WHY localStorage AND NOT IndexedDB
 // ----------------------------------
 // `localStorage.setItem` is synchronous: it has finished by the time the next
 // statement runs. IndexedDB writes are asynchronous and can be lost if the
-// process dies mid-transaction — which is exactly the scenario we are guarding
-// against. Slower, but it cannot half-write.
+// process dies mid-transaction — exactly the scenario being guarded against.
+// Slower, but it cannot half-write.
 //
-// Size is not a concern in practice: a 20 km run is roughly 4000 GPS points,
-// about 100 KB of JSON, against a 5 MB budget.
+// Capacity is not a concern: a 20 km run is roughly 4000 GPS points, about
+// 100 KB of JSON, against a 5 MB budget. A full triathlon is three of those.
 
 import { dlog } from '../utils/log.js';
 
-/** One kind of pending work. Add a member when a new screen needs the same
- *  protection — for example an unsaved activity edit. */
+/** One kind of pending work. Add a member when another screen needs the same
+ *  protection — an unsaved activity edit, for example. */
 export type PendingKind = 'save-activity';
+
+export interface PendingItem<T> {
+  id:      string;
+  /** When it was queued. Used to drop debris left by a crash. */
+  at:      number;
+  payload: T;
+}
 
 const KEY = (kind: PendingKind): string => `mapyou_pending_${kind}`;
 
+/** Anything older than this is treated as crash debris, not as work. */
+const MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
 /**
- * Store work that is waiting on the user.
+ * How many entries we are willing to hold.
  *
- * Call this *before* showing the UI that owns the decision, never after — the
- * gap between the two is precisely the window where data goes missing.
+ * A guard against a bug elsewhere filling storage, not a limit anyone should
+ * reach: even an Ironman is three workouts. If it is ever hit, the oldest
+ * entry is dropped — losing the stalest one beats failing to store the newest.
  */
-export function storePending<T>(kind: PendingKind, payload: T): void {
+const MAX_ITEMS = 20;
+
+function readAll<T>(kind: PendingKind): Array<PendingItem<T>> {
   try {
-    localStorage.setItem(KEY(kind), JSON.stringify({ at: Date.now(), payload }));
-    dlog(`[Pending] stored: ${kind}`);
+    const raw = localStorage.getItem(KEY(kind));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    const now = Date.now();
+    return (parsed as Array<PendingItem<T>>).filter(it =>
+      it && typeof it.id === 'string' && it.payload !== undefined
+      && (typeof it.at !== 'number' || now - it.at <= MAX_AGE_MS));
+  } catch {
+    // Corrupt entry — drop it rather than crashing on every launch.
+    try { localStorage.removeItem(KEY(kind)); } catch { /* nothing to do */ }
+    return [];
+  }
+}
+
+function writeAll<T>(kind: PendingKind, items: Array<PendingItem<T>>): void {
+  try {
+    localStorage.setItem(KEY(kind), JSON.stringify(items));
   } catch (e) {
-    // Quota exceeded, or private mode. Nothing sensible to do beyond making
-    // the failure visible — silently carrying on would recreate the very bug
-    // this module exists to prevent.
+    // Quota exceeded, or private browsing. Nothing sensible to do beyond
+    // making the failure loud — carrying on silently would recreate the very
+    // bug this module exists to prevent.
     console.warn(`[Pending] could not store ${kind}:`, e);
   }
 }
 
-/** Anything older than this is treated as debris from a crash, not as work. */
-const MAX_AGE_MS = 24 * 60 * 60 * 1000;
-
 /**
- * Read back pending work, or `null` if there is none.
+ * Queue work that is waiting on the user.
  *
- * Entries older than a day are discarded: an unfinished workout from last week
- * is not something the user wants shoved in their face on launch.
+ * Call this *before* showing the UI that owns the decision, never after — the
+ * gap between the two is precisely where data goes missing.
+ *
+ * @returns the id of the new entry, so the caller can remove exactly this one
+ *          once the user decides.
  */
-export function loadPending<T>(kind: PendingKind): T | null {
-  try {
-    const raw = localStorage.getItem(KEY(kind));
-    if (!raw) return null;
+export function addPending<T>(kind: PendingKind, payload: T): string {
+  const items = readAll<T>(kind);
+  const id = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    const parsed = JSON.parse(raw) as { at?: number; payload?: T };
-    if (!parsed?.payload) { clearPending(kind); return null; }
+  items.push({ id, at: Date.now(), payload });
+  while (items.length > MAX_ITEMS) items.shift();
 
-    if (typeof parsed.at === 'number' && Date.now() - parsed.at > MAX_AGE_MS) {
-      dlog(`[Pending] discarding stale entry: ${kind}`);
-      clearPending(kind);
-      return null;
-    }
-    return parsed.payload;
-  } catch {
-    // Corrupt entry — drop it rather than crashing on every launch.
-    clearPending(kind);
-    return null;
-  }
+  writeAll(kind, items);
+  dlog(`[Pending] queued ${kind} (${items.length} waiting)`);
+  return id;
 }
 
-/** Call once the user has actually decided: saved, discarded, whatever. */
-export function clearPending(kind: PendingKind): void {
-  try {
-    localStorage.removeItem(KEY(kind));
-    dlog(`[Pending] cleared: ${kind}`);
-  } catch { /* nothing to do */ }
+/** Everything still waiting, oldest first. */
+export function listPending<T>(kind: PendingKind): Array<PendingItem<T>> {
+  return readAll<T>(kind);
 }
 
-/** Whether anything is waiting. Cheap enough to call on startup. */
-export function hasPending(kind: PendingKind): boolean {
-  try { return localStorage.getItem(KEY(kind)) !== null; } catch { return false; }
+/** A single entry, or `null` if it is already gone. */
+export function getPending<T>(kind: PendingKind, id: string): PendingItem<T> | null {
+  return readAll<T>(kind).find(it => it.id === id) ?? null;
+}
+
+/** Call once the user has decided about this one: saved, discarded, whatever. */
+export function removePending(kind: PendingKind, id: string): void {
+  const items = readAll(kind);
+  const left  = items.filter(it => it.id !== id);
+  if (left.length === items.length) return;   // nothing to do
+
+  writeAll(kind, left);
+  dlog(`[Pending] resolved ${kind} (${left.length} left)`);
+}
+
+/** How many are waiting. Cheap enough to call on startup. */
+export function countPending(kind: PendingKind): number {
+  return readAll(kind).length;
 }
