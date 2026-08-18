@@ -3597,6 +3597,49 @@ body {
 .ad-stat { background: var(--app-bg-card, rgba(255,255,255,0.05)); border: 1px solid var(--app-border, rgba(255,255,255,0.08)); border-radius: 1.4rem; padding: 1.4rem; }
 .ad-stat-v { display: block; font-size: 2.4rem; font-weight: 800; color: var(--app-text-primary, #fff); font-variant-numeric: tabular-nums; }
 .ad-stat-l { display: block; font-size: 1.2rem; color: var(--app-text-tertiary, #8b9197); margin-top: 0.2rem; }
+/* --- GALERIA ZDJEC W SZCZEGOLACH AKTYWNOSCI ---------------------------------
+   Przewijana tasma z zatrzaskiem na kazdym zdjeciu. Przewijanie obsluguje
+   przegladarka przez `scroll-snap` — plynniej niz wlasna obsluga `touchmove`,
+   z bezwladnoscia i wsparciem dla czytnikow ekranu. My tylko podswietlamy
+   wlasciwa kropke. */
+.ad-gal { position: relative; }
+.ad-gal__track {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 14px;
+}
+.ad-gal__track::-webkit-scrollbar { display: none; }
+.ad-gal__item {
+    flex: 0 0 100%;
+    scroll-snap-align: center;
+}
+.ad-gal__item img,
+.ad-gal__item video {
+    width: 100%;
+    display: block;
+    border-radius: 14px;
+    object-fit: cover;
+}
+.ad-gal__dots {
+    display: flex;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 10px;
+}
+.ad-gal__dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: rgba(128, 128, 128, 0.35);
+    transition: background 0.2s, width 0.2s;
+}
+.ad-gal__dot--on {
+    width: 18px;
+    border-radius: 3px;
+    background: var(--color-brand--2, #00c46a);
+}
+
 .ad-photo { margin: 1.6rem 0; border-radius: 1.4rem; overflow: hidden; }
 .ad-photo img, .ad-photo video { width: 100%; display: block; }
 .ad-section { margin: 2rem 0 0.6rem; }

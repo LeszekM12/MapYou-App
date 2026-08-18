@@ -116,56 +116,80 @@ export async function uploadMediaFile(file, userId, folder, fixedPublicId, onPro
     if (fixedPublicId)
         form.append('publicId', fixedPublicId);
     return new Promise(resolve => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${BACKEND_URL}/upload/media`);
-        xhr.timeout = 300000; // 5 min
-        // Upload progress (0–100% = sending bytes to server)
-        xhr.upload.addEventListener('progress', e => {
-            if (e.lengthComputable && onProgress) {
-                onProgress(Math.round(e.loaded / e.total * 100), 'uploading');
-            }
-        });
-        // Upload done — now server is compressing
-        xhr.upload.addEventListener('load', () => {
-            if (onProgress)
-                onProgress(100, 'compressing');
-        });
-        xhr.addEventListener('load', () => {
-            try {
-                const data = JSON.parse(xhr.responseText);
-                resolve(data.status === 'ok'
-                    ? { url: data.url, publicId: data.publicId, mediaType: data.mediaType }
-                    : null);
-            }
-            catch {
-                resolve(null);
-            }
-        });
-        // Blad sieci albo przekroczony czas — plik NIE moze zniknac.
-        //
-        // Wczesniej oba przypadki konczyly sie `resolve(null)`, czyli zdjecie
-        // przepadalo bez sladu i bez ostrzezenia. Teraz laduje w kolejce
-        // (`mediaQueue`) razem z zawartoscia, a wolajacy dostaje adres zastepczy
-        // `mapyou-pending://<id>`. Rekord zapisuje sie z nim normalnie i dziala
-        // offline; po powrocie sieci zastepnik zostaje podmieniony na prawdziwy
-        // adres w bazie lokalnej i w chmurze.
-        const queueIt = (why) => {
-            void (async () => {
-                try {
-                    const { enqueueMedia } = await import('./mediaQueue.js');
-                    const placeholder = await enqueueMedia(file, file.name ?? 'upload', userId, folder, fixedPublicId ?? null);
-                    dwarn(`[Upload] ${why} — plik odlozony do kolejki`);
-                    resolve({ url: placeholder, publicId: fixedPublicId ?? '', mediaType: 'image' });
+        void (async () => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', `${BACKEND_URL}/upload/media`);
+            xhr.timeout = 300000; // 5 min
+            // ── TOKEN ────────────────────────────────────────────────────────────────
+            //
+            // `XMLHttpRequest` omija `authFetch`, wiec token trzeba dolozyc RECZNIE.
+            // Bez tego `POST /upload/media` (chroniony przez `requireAuth`) odrzucal
+            // kazde zdjecie z 401 — a klient dostawal `null` i po cichu je pomijal.
+            //
+            // Objaw: wybrane zdjecie nie pojawialo sie w galerii i nie zapisywalo,
+            // bez zadnego komunikatu.
+            //
+            // XHR jest tu uzyty celowo: tylko on raportuje postep wysylki, a przy
+            // zdjeciach i filmach pasek postepu ma znaczenie.
+            const { pobierzTokenDlaXhr } = await import('./authFetch.js');
+            const tok = await pobierzTokenDlaXhr();
+            if (tok)
+                xhr.setRequestHeader('Authorization', `Bearer ${tok}`);
+            // Upload progress (0–100% = sending bytes to server)
+            xhr.upload.addEventListener('progress', e => {
+                if (e.lengthComputable && onProgress) {
+                    onProgress(Math.round(e.loaded / e.total * 100), 'uploading');
                 }
-                catch (e) {
-                    console.error('[Upload] nie udalo sie odlozyc pliku:', e instanceof Error ? e.message : e);
+            });
+            // Upload done — now server is compressing
+            xhr.upload.addEventListener('load', () => {
+                if (onProgress)
+                    onProgress(100, 'compressing');
+            });
+            xhr.addEventListener('load', () => {
+                // Kod bledu w logu. Wczesniej kazde niepowodzenie konczylo sie cichym
+                // `null` — nie dalo sie odroznic braku tokena od pelnego dysku.
+                if (xhr.status < 200 || xhr.status >= 300) {
+                    console.warn(`[Upload] serwer odrzucil plik: HTTP ${xhr.status}`, xhr.responseText.slice(0, 160));
+                    resolve(null);
+                    return;
+                }
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    resolve(data.status === 'ok'
+                        ? { url: data.url, publicId: data.publicId, mediaType: data.mediaType }
+                        : null);
+                }
+                catch {
                     resolve(null);
                 }
-            })();
-        };
-        xhr.addEventListener('error', () => queueIt('blad sieci'));
-        xhr.addEventListener('timeout', () => queueIt('przekroczony czas'));
-        xhr.send(form);
+            });
+            // Blad sieci albo przekroczony czas — plik NIE moze zniknac.
+            //
+            // Wczesniej oba przypadki konczyly sie `resolve(null)`, czyli zdjecie
+            // przepadalo bez sladu i bez ostrzezenia. Teraz laduje w kolejce
+            // (`mediaQueue`) razem z zawartoscia, a wolajacy dostaje adres zastepczy
+            // `mapyou-pending://<id>`. Rekord zapisuje sie z nim normalnie i dziala
+            // offline; po powrocie sieci zastepnik zostaje podmieniony na prawdziwy
+            // adres w bazie lokalnej i w chmurze.
+            const queueIt = (why) => {
+                void (async () => {
+                    try {
+                        const { enqueueMedia } = await import('./mediaQueue.js');
+                        const placeholder = await enqueueMedia(file, file.name ?? 'upload', userId, folder, fixedPublicId ?? null);
+                        dwarn(`[Upload] ${why} — plik odlozony do kolejki`);
+                        resolve({ url: placeholder, publicId: fixedPublicId ?? '', mediaType: 'image' });
+                    }
+                    catch (e) {
+                        console.error('[Upload] nie udalo sie odlozyc pliku:', e instanceof Error ? e.message : e);
+                        resolve(null);
+                    }
+                })();
+            };
+            xhr.addEventListener('error', () => queueIt('blad sieci'));
+            xhr.addEventListener('timeout', () => queueIt('przekroczony czas'));
+            xhr.send(form);
+        })();
     });
 }
 /**

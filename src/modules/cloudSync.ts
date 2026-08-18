@@ -151,9 +151,25 @@ export async function uploadMediaFile(
   if (fixedPublicId) form.append('publicId', fixedPublicId);
 
   return new Promise(resolve => {
+    void (async () => {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${BACKEND_URL}/upload/media`);
     xhr.timeout = 300_000; // 5 min
+
+    // ── TOKEN ────────────────────────────────────────────────────────────────
+    //
+    // `XMLHttpRequest` omija `authFetch`, wiec token trzeba dolozyc RECZNIE.
+    // Bez tego `POST /upload/media` (chroniony przez `requireAuth`) odrzucal
+    // kazde zdjecie z 401 — a klient dostawal `null` i po cichu je pomijal.
+    //
+    // Objaw: wybrane zdjecie nie pojawialo sie w galerii i nie zapisywalo,
+    // bez zadnego komunikatu.
+    //
+    // XHR jest tu uzyty celowo: tylko on raportuje postep wysylki, a przy
+    // zdjeciach i filmach pasek postepu ma znaczenie.
+    const { pobierzTokenDlaXhr } = await import('./authFetch.js');
+    const tok = await pobierzTokenDlaXhr();
+    if (tok) xhr.setRequestHeader('Authorization', `Bearer ${tok}`);
 
     // Upload progress (0–100% = sending bytes to server)
     xhr.upload.addEventListener('progress', e => {
@@ -168,6 +184,14 @@ export async function uploadMediaFile(
     });
 
     xhr.addEventListener('load', () => {
+      // Kod bledu w logu. Wczesniej kazde niepowodzenie konczylo sie cichym
+      // `null` — nie dalo sie odroznic braku tokena od pelnego dysku.
+      if (xhr.status < 200 || xhr.status >= 300) {
+        console.warn(`[Upload] serwer odrzucil plik: HTTP ${xhr.status}`,
+          xhr.responseText.slice(0, 160));
+        resolve(null);
+        return;
+      }
       try {
         const data = JSON.parse(xhr.responseText) as {
           status: string; url: string; publicId: string; mediaType: 'image' | 'video';
@@ -205,6 +229,7 @@ export async function uploadMediaFile(
     xhr.addEventListener('error',   () => queueIt('blad sieci'));
     xhr.addEventListener('timeout', () => queueIt('przekroczony czas'));
     xhr.send(form);
+    })();
   });
 }
 

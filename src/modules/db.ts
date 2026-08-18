@@ -38,6 +38,11 @@ export interface EnrichedActivity {
   coordsEnc?:  string | null;   // Encoded Polyline (compressed, for Atlas backup)
   minimapUrl?: string | null;   // Static map image URL
   photoPublicId?: string | null; // Cloudinary public_id (for deletion)
+  /** Dodatkowe zdjecia poza okladka. Pole istnialo w modelu na backendzie
+   *  (`EnrichedActivity.photos`) i edycja je zapisywala, ale typ po stronie
+   *  klienta o nim nie wiedzial — wiec szczegoly aktywnosci pokazywaly
+   *  wylacznie `photoUrl`, a reszta byla niewidoczna mimo zapisania. */
+  photos?:        string[];
   distanceKm:  number;
   durationSec: number;
   paceMinKm:   number;

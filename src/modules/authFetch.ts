@@ -67,6 +67,21 @@ export function setTokenProvider(fn: TokenProvider): void {
   _getToken = fn;
 }
 
+/** Token dla żądań, które NIE przechodzą przez `authFetch`.
+ *
+ *  Istnieje z powodu `uploadMediaFile`, które używa `XMLHttpRequest` — bo tylko
+ *  XHR raportuje postęp wysyłki, a przy zdjęciach i filmach pasek postępu ma
+ *  znaczenie. Skutkiem ubocznym było jednak to, że wysyłka omijała `authFetch`
+ *  i leciała BEZ TOKENA, a `POST /upload/media` ma `requireAuth`.
+ *
+ *  Objaw: wybrane zdjęcie nie pojawiało się w galerii i nie zapisywało —
+ *  serwer odrzucał je z 401, a klient dostawał `null` i po cichu je pomijał.
+ *
+ *  Każdy inny kod powinien używać zwykłego `fetch`, który dokłada token sam. */
+export async function pobierzTokenDlaXhr(): Promise<string | null> {
+  try { return await _getToken(); } catch { return null; }
+}
+
 /** Czy sesja MapYou jest gotowa — moduly synchronizacji sprawdzaja to,
  *  zeby nie mielic setek rekordow, ktore i tak zostana odciete. */
 export function isSessionReady(): boolean { return _sessionReady; }

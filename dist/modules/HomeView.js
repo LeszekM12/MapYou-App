@@ -1117,12 +1117,32 @@ export async function openActivityDetail(act, isOwn, actId) {
     const title = (full.name || '').replace(/^(undefined|null)\s*/i, '').trim() || getSportLabel(full.sport);
     const dateStr = new Date(full.date).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long', year: 'numeric' })
         + ' · ' + new Date(full.date).toLocaleTimeString('pl-PL', { hour: '2-digit', minute: '2-digit' });
-    const photoIsVideo = full.mediaType === 'video' || (full.photoUrl?.includes('/video/upload/') ?? false);
-    const photoHtml = full.photoUrl
-        ? photoIsVideo
-            ? `<div class="ad-photo"><video src="${safeUrl(full.photoUrl)}" playsinline controls preload="metadata"></video></div>`
-            : `<div class="ad-photo"><img src="${safeUrl(full.photoUrl)}" alt="Activity photo" loading="lazy"/></div>`
-        : '';
+    // ── GALERIA ZDJEC ─────────────────────────────────────────────────────────
+    //
+    // Wczesniej szczegoly pokazywaly WYLACZNIE okladke (`photoUrl`), mimo ze
+    // model `EnrichedActivity` ma tablice `photos` i edycja pozwala dodac
+    // do dwudziestu. Pozostale zdjecia byly zapisane, ale niewidoczne.
+    //
+    // Teraz okladka i reszta trafiaja do jednej przesuwanej tasmy.
+    // `scroll-snap` zamiast wlasnej obslugi gestow: przegladarka robi to
+    // plynniej, obsluguje bezwladnosc i dziala z czytnikami ekranu.
+    const wszystkie = [full.photoUrl, ...(full.photos ?? [])]
+        .filter((u) => !!u);
+    const kafel = (u) => {
+        const wideo = u.includes('/video/upload/');
+        return `<div class="ad-gal__item">${wideo
+            ? `<video src="${safeUrl(u)}" playsinline controls preload="metadata"></video>`
+            : `<img src="${safeUrl(u)}" alt="Activity photo" loading="lazy"/>`}</div>`;
+    };
+    const photoHtml = !wszystkie.length ? '' : wszystkie.length === 1
+        // Jedno zdjecie — bez tasmy i kropek, zeby nie sugerowac, ze jest wiecej.
+        ? `<div class="ad-photo">${kafel(wszystkie[0]).replace(/^<div class="ad-gal__item">|<\/div>$/g, '')}</div>`
+        : `<div class="ad-gal">
+         <div class="ad-gal__track" id="adGalTrack">${wszystkie.map(kafel).join('')}</div>
+         <div class="ad-gal__dots" id="adGalDots">
+           ${wszystkie.map((_, i) => `<span class="ad-gal__dot${i === 0 ? ' ad-gal__dot--on' : ''}"></span>`).join('')}
+         </div>
+       </div>`;
     // Splits — author only, only when real laps exist
     let splitsHtml = '';
     const lapsArr = (full.laps ?? rec.laps);
@@ -1342,6 +1362,22 @@ export async function openActivityDetail(act, isOwn, actId) {
       </div>
     </div>`;
     document.body.appendChild(ov);
+    // ── KROPKI GALERII ──────────────────────────────────────────────────────────
+    //
+    // Przewijanie obsluguje przegladarka (`scroll-snap`), my tylko podswietlamy
+    // wlasciwa kropke. Dzieki temu dziala bezwladnosc, gest wstecz i czytniki
+    // ekranu — czego wlasna obsluga `touchmove` by nie dala.
+    {
+        const tor = ov.querySelector('#adGalTrack');
+        const dots = ov.querySelector('#adGalDots');
+        if (tor && dots) {
+            const kropki = Array.from(dots.children);
+            tor.addEventListener('scroll', () => {
+                const i = Math.round(tor.scrollLeft / tor.clientWidth);
+                kropki.forEach((d, j) => d.classList.toggle('ad-gal__dot--on', j === i));
+            }, { passive: true });
+        }
+    }
     // Elevation needs a coordinate array. The viewer's `full.coords` is empty
     // (only coordsEnc is sent), which is exactly why the chart was missing for
     // other people — feed a decoded copy so it renders for everyone.

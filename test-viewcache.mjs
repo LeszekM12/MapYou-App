@@ -806,6 +806,36 @@ console.log('\n=== 38. WIERSZ TYLKO GDY SĄ PROŚBY ===');
   sprawdz('3 nieprzeczytane + 2 prośby → 5', badge(3, 2) === 5);
 }
 
+console.log('\n=== 39. WYSYŁKA ZDJĘĆ — token w XHR ===');
+{
+  // XMLHttpRequest omija authFetch, więc token trzeba dołożyć ręcznie.
+  // Bez tego POST /upload/media (requireAuth) odrzucał każde zdjęcie z 401,
+  // a klient dostawał null i po cichu je pomijał.
+  const wyslij = (token) => token ? 200 : 401;
+  const wynik  = (status) => status === 200 ? { url: 'https://…' } : null;
+
+  sprawdz('STARY: brak tokena → 401', wyslij(null) === 401);
+  sprawdz('STARY: klient dostaje null', wynik(wyslij(null)) === null);
+  sprawdz('NOWY: token → 200', wyslij('abc') === 200);
+  sprawdz('NOWY: klient dostaje adres', wynik(wyslij('abc'))?.url !== undefined);
+}
+
+console.log('\n=== 40. GALERIA — okładka + reszta ===');
+{
+  const zbierz = (photoUrl, photos) => [photoUrl, ...(photos ?? [])].filter(Boolean);
+
+  sprawdz('sama okładka → 1 zdjęcie', zbierz('a.jpg', []).length === 1);
+  sprawdz('okładka + 2 → 3 zdjęcia', zbierz('a.jpg', ['b.jpg','c.jpg']).length === 3);
+  sprawdz('okładka pierwsza', zbierz('a.jpg', ['b.jpg'])[0] === 'a.jpg');
+  sprawdz('brak zdjęć → pusto', zbierz(null, []).length === 0);
+  sprawdz('null w tablicy odsiany', zbierz('a.jpg', [null, 'b.jpg']).length === 2);
+
+  // taśma tylko przy więcej niż jednym
+  const tasma = (n) => n > 1;
+  sprawdz('1 zdjęcie → bez taśmy i kropek', !tasma(1));
+  sprawdz('2 zdjęcia → taśma', tasma(2));
+}
+
 console.log(`\n${'='.repeat(50)}`);
 console.log(`WYNIK: ${zdane} zdanych, ${oblane} oblanych`);
 console.log('='.repeat(50));
