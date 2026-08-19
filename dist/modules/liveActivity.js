@@ -376,12 +376,18 @@ class WorkoutLiveActivity {
         }
     }
     async start(sportKey, sportLabel, paused = false) {
-        // Clean up before creating anything new, so orphans cannot pile up.
-        await this._sweepOrphans();
         const p = laPlugin();
+        // Guard first, sweep second. The sweep dismisses everything in the
+        // registry, so running it before this check would kill the card of a
+        // workout that is still going — which is what happens when someone
+        // switches away from the app and comes back.
         if (!p || this._id || this._starting)
             return;
         this._starting = true;
+        // Safe here: we are about to create a new activity, so anything still
+        // listed belongs to a workout that is already over — normally one left
+        // behind when the app was killed mid-session.
+        await this._sweepOrphans();
         try {
             const pal = systemPalette();
             this._pal = pal;
@@ -549,26 +555,6 @@ class WorkoutLiveActivity {
     get trackedIds() { return registryRead(); }
 }
 export const workoutLiveActivity = new WorkoutLiveActivity();
-/**
- * Clear cards the app can no longer reach.
- *
- * `start()` already sweeps, but only when a new workout begins. Someone who
- * kills the app mid-workout, reopens it and finishes from the restored session
- * never passes through a fresh `start()` — so without this the orphan would
- * sit on the lock screen counting up.
- *
- * Called once at launch and again whenever the app returns to the foreground,
- * since a card can be orphaned while the app is away.
- */
-export function sweepOrphanActivities() {
-    void workoutLiveActivity._sweepOrphans();
-}
-if (typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
-        if (document.visibilityState === 'visible')
-            sweepOrphanActivities();
-    });
-}
 /** What the registry holds right now. Diagnostics only. */
 globalThis.mapyouLA = () => ({
     tracked: workoutLiveActivity.trackedIds,
