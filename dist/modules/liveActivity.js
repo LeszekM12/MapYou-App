@@ -193,6 +193,59 @@ function islandLayout(sport, sportLabel, paused) {
         },
     };
 }
+// ─── REGISTRY OF LIVE ACTIVITIES WE HAVE CREATED ─────────────────────────────
+//
+// WHY A LIST AND NOT A SINGLE ID
+// ------------------------------
+// One workout can span several activities. `setPaused()` cannot change a
+// layout in place — the layout is frozen into the activity when it is created
+// — so switching between the running and paused looks means ending one and
+// starting another. A workout paused three times goes through four of them.
+//
+// If any of those `end` calls quietly fails, that card stays on the lock
+// screen while `_id` moves on to the next one. Its id is then lost, and
+// nothing can dismiss it: the clock ticks on until the user swipes it away by
+// hand. That is exactly the symptom this fixes.
+//
+// WHY IT IS PERSISTED
+// -------------------
+// If the app is killed mid-workout, in-memory ids die with the process while
+// the card lives on — iOS keeps it running without us. Keeping the list in
+// localStorage lets the next launch clean up. Synchronous, so it cannot be
+// half-written when the process is killed.
+const REGISTRY_KEY = 'mapyou_la_ids';
+function registryRead() {
+    try {
+        const raw = localStorage.getItem(REGISTRY_KEY);
+        const arr = raw ? JSON.parse(raw) : null;
+        return Array.isArray(arr) ? arr.filter((x) => typeof x === 'string') : [];
+    }
+    catch {
+        return [];
+    }
+}
+function registryAdd(id) {
+    try {
+        const ids = registryRead();
+        if (!ids.includes(id))
+            ids.push(id);
+        // A workout paused dozens of times should not grow this without bound.
+        localStorage.setItem(REGISTRY_KEY, JSON.stringify(ids.slice(-12)));
+    }
+    catch { /* nothing sensible to do */ }
+}
+function registryRemove(id) {
+    try {
+        localStorage.setItem(REGISTRY_KEY, JSON.stringify(registryRead().filter(x => x !== id)));
+    }
+    catch { /* nothing sensible to do */ }
+}
+function registryClear() {
+    try {
+        localStorage.removeItem(REGISTRY_KEY);
+    }
+    catch { /* ignore */ }
+}
 class WorkoutLiveActivity {
     constructor() {
         Object.defineProperty(this, "_id", {
@@ -253,7 +306,31 @@ class WorkoutLiveActivity {
      *   workout — and no data update could fix it, because the layout is frozen
      *   into the activity when it is created.
      */
+    /**
+     * Dismiss cards left over from a previous run.
+     *
+     * If the app is killed mid-workout the card survives — iOS keeps it going
+     * without us — but its id dies with the process. The registry outlives the
+     * process, so the next launch can still clean up. Without this, an orphaned
+     * card would tick indefinitely with no way to reach it from the app.
+     */
+    async _sweepOrphans() {
+        const p = laPlugin();
+        const ids = registryRead();
+        if (!p || !ids.length)
+            return;
+        console.warn(`[LiveActivity] clearing ${ids.length} card(s) left by a previous run`);
+        for (const id of ids) {
+            try {
+                await p.endActivity({ activityId: id, data: {} });
+                registryRemove(id);
+            }
+            catch { /* already gone, or unreachable — the retry in end() covers it */ }
+        }
+    }
     async start(sportKey, sportLabel, paused = false) {
+        // Clean up before creating anything new, so orphans cannot pile up.
+        await this._sweepOrphans();
         const p = laPlugin();
         if (!p || this._id || this._starting)
             return;
@@ -271,6 +348,8 @@ class WorkoutLiveActivity {
                 behavior: { systemActionForegroundColor: pal.accent, keyLineTint: pal.accent },
             });
             this._id = res?.activityId ?? null;
+            if (this._id)
+                registryAdd(this._id);
         }
         catch (e) {
             console.warn('[LiveActivity] start failed:', e);
@@ -304,10 +383,14 @@ class WorkoutLiveActivity {
         const stary = this._id;
         this._id = null;
         try {
+            // The old id stays in the registry until its `end` actually returns.
+            // A failure here used to lose the id along with any chance of ever
+            // dismissing that card.
             // Zamykamy stara kartę. Z `dismissalPolicy: .immediate` (latka
             // `scripts/patch-live-activities.mjs`) znika od razu, bez czterogodzinnego
             // ogona, ktory wczesniej zostawal na ekranie blokady.
             await p.endActivity({ activityId: stary, data: laData({ ...s, paused }, this._pal) });
+            registryRemove(stary);
             const res = await p.startActivity({
                 layout: lockLayout(this._sport, this._label, this._pal, paused),
                 dynamicIslandLayout: islandLayout(this._sport, this._label, paused),
@@ -315,6 +398,8 @@ class WorkoutLiveActivity {
                 behavior: { systemActionForegroundColor: this._pal.accent, keyLineTint: this._pal.accent },
             });
             this._id = res?.activityId ?? null;
+            if (this._id)
+                registryAdd(this._id);
             this._paused = paused;
             this._lastPush = Date.now();
         }
@@ -361,44 +446,80 @@ class WorkoutLiveActivity {
      * Dismissal is the part that must not be skipped, so it gets its own try and
      * a second attempt. Freezing the numbers first is only a nicety.
      */
+    /**
+     * Dismiss every Live Activity this workout created.
+     *
+     * WHY IT ENDS A LIST AND NOT ONE ID
+     * ---------------------------------
+     * `setPaused()` cannot alter a layout in place, so each switch between the
+     * running and paused looks ends one activity and starts another. A workout
+     * paused three times leaves four ids behind.
+     *
+     * If any of those `end` calls quietly failed, that card kept running while
+     * `_id` moved on — and its id was gone, so nothing could dismiss it. The
+     * clock carried on until the user swiped it off the lock screen by hand.
+     * That is the bug this method now closes.
+     *
+     * Ids are read from a persisted registry, so cards orphaned by the app being
+     * killed mid-workout are cleaned up on the next launch too.
+     *
+     * WHY TWO ATTEMPTS PER ID
+     * -----------------------
+     * `endActivity` throws `activityNotFound` whenever the plugin's in-memory
+     * dictionary is stale — right after a relaunch, or right after `setPaused()`
+     * rebuilt the activity. The first call makes the plugin re-sync, so the
+     * retry usually succeeds.
+     */
     async end(final) {
         const p = laPlugin();
-        const id = this._id;
+        const ids = Array.from(new Set([...(this._id ? [this._id] : []), ...registryRead()]));
         this._id = null;
         this._lastPush = 0;
         this._paused = false;
-        if (!p || !id)
+        if (!p || !ids.length) {
+            registryClear();
             return;
+        }
         const finalData = final
             ? laData({ ...final, state: 'Finished', paused: true }, this._pal)
             : laData({
                 time: '', dist: '', third: '', thirdLabel: '',
                 state: 'Finished', timerRef: Date.now(), paused: true,
             }, this._pal);
-        // Best effort: freeze the numbers so the card cannot show a running clock
-        // during the brief moment before iOS removes it. Failure here is harmless.
-        try {
-            await p.updateActivity({ activityId: id, data: finalData });
-            await new Promise(r => setTimeout(r, 250));
-        }
-        catch { /* the dismissal below is what actually matters */ }
-        // The part that must happen. Two attempts, because the first one can hit
-        // the same stale-dictionary window described above — and by then the
-        // plugin has re-synced, so the retry succeeds.
-        for (let attempt = 1; attempt <= 2; attempt++) {
+        let stubborn = 0;
+        for (const id of ids) {
+            // Best effort: freeze the numbers so the card cannot show a running
+            // clock in the moment before iOS removes it. Failure is harmless.
             try {
-                await p.endActivity({ activityId: id, data: finalData });
-                return;
+                await p.updateActivity({ activityId: id, data: finalData });
             }
-            catch (e) {
-                if (attempt === 2) {
-                    console.warn('[LiveActivity] could not dismiss the card:', e);
-                    return;
+            catch { /* the dismissal below is what matters */ }
+            let done = false;
+            for (let attempt = 1; attempt <= 2 && !done; attempt++) {
+                try {
+                    await p.endActivity({ activityId: id, data: finalData });
+                    done = true;
                 }
-                await new Promise(r => setTimeout(r, 400));
+                catch (e) {
+                    if (attempt === 2) {
+                        stubborn++;
+                        console.warn(`[LiveActivity] could not dismiss ${id}:`, e);
+                    }
+                    else {
+                        await new Promise(r => setTimeout(r, 400));
+                    }
+                }
             }
+            if (done)
+                registryRemove(id);
         }
+        if (!stubborn)
+            registryClear();
+        else
+            console.warn(`[LiveActivity] ${stubborn} card(s) left; will retry on next start`);
     }
+    /** What the registry currently holds. Diagnostics only. */
+    get trackedIds() { return registryRead(); }
 }
 export const workoutLiveActivity = new WorkoutLiveActivity();
 //# sourceMappingURL=liveActivity.js.map
