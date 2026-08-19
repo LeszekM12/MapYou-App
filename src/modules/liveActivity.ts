@@ -316,6 +316,54 @@ class WorkoutLiveActivity {
    * process, so the next launch can still clean up. Without this, an orphaned
    * card would tick indefinitely with no way to reach it from the app.
    */
+  /**
+   * Dismiss one card, and report whether it really went.
+   *
+   * WHY THE WARM-UP CALL MATTERS
+   * ----------------------------
+   * The plugin keeps its activities in an in-memory dictionary that is empty
+   * after a process restart. `endActivity` on an id it does not recognise
+   * re-syncs from the system and then — in the version shipped with the
+   * plugin — returns without ending anything. From JavaScript that looks like
+   * success: no exception is thrown.
+   *
+   * That is how orphans became unreachable. The sweep "succeeded", dropped the
+   * id from the registry, and the card ticked on with nothing left that could
+   * dismiss it.
+   *
+   * `updateActivity` triggers the same re-sync, so calling it first leaves the
+   * dictionary populated and the following `endActivity` has something real to
+   * work with. Two attempts, because the first is what performs the sync.
+   */
+  private async _dismissOne(p: LAPlugin, id: string, data: Record<string, unknown>): Promise<boolean> {
+    // Warm-up: forces the plugin to re-sync. Its result is irrelevant.
+    try { await p.updateActivity({ activityId: id, data }); }
+    catch { /* expected when the dictionary is stale */ }
+
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        await p.endActivity({ activityId: id, data });
+        // A silent no-op looks identical to success here, so the second pass
+        // runs regardless — ending an already-ended activity is harmless.
+        if (attempt === 2) return true;
+      } catch (e) {
+        if (attempt === 2) {
+          console.warn(`[LiveActivity] could not dismiss ${id}:`, e);
+          return false;
+        }
+      }
+      await new Promise(r => setTimeout(r, 250));
+    }
+    return true;
+  }
+
+  /**
+   * Dismiss cards left over from a previous run.
+   *
+   * If the app is killed mid-workout the card survives — iOS keeps it going
+   * without us — but its id dies with the process. The registry outlives the
+   * process, so the next launch can still clean up.
+   */
   private async _sweepOrphans(): Promise<void> {
     const p = laPlugin();
     const ids = registryRead();
@@ -323,10 +371,7 @@ class WorkoutLiveActivity {
 
     console.warn(`[LiveActivity] clearing ${ids.length} card(s) left by a previous run`);
     for (const id of ids) {
-      try {
-        await p.endActivity({ activityId: id, data: {} });
-        registryRemove(id);
-      } catch { /* already gone, or unreachable — the retry in end() covers it */ }
+      if (await this._dismissOne(p, id, {})) registryRemove(id);
     }
   }
 
@@ -485,26 +530,8 @@ class WorkoutLiveActivity {
     let stubborn = 0;
 
     for (const id of ids) {
-      // Best effort: freeze the numbers so the card cannot show a running
-      // clock in the moment before iOS removes it. Failure is harmless.
-      try { await p.updateActivity({ activityId: id, data: finalData }); }
-      catch { /* the dismissal below is what matters */ }
-
-      let done = false;
-      for (let attempt = 1; attempt <= 2 && !done; attempt++) {
-        try {
-          await p.endActivity({ activityId: id, data: finalData });
-          done = true;
-        } catch (e) {
-          if (attempt === 2) {
-            stubborn++;
-            console.warn(`[LiveActivity] could not dismiss ${id}:`, e);
-          } else {
-            await new Promise(r => setTimeout(r, 400));
-          }
-        }
-      }
-      if (done) registryRemove(id);
+      if (await this._dismissOne(p, id, finalData)) registryRemove(id);
+      else stubborn++;
     }
 
     if (!stubborn) registryClear();
@@ -516,3 +543,31 @@ class WorkoutLiveActivity {
 }
 
 export const workoutLiveActivity = new WorkoutLiveActivity();
+
+/**
+ * Clear cards the app can no longer reach.
+ *
+ * `start()` already sweeps, but only when a new workout begins. Someone who
+ * kills the app mid-workout, reopens it and finishes from the restored session
+ * never passes through a fresh `start()` — so without this the orphan would
+ * sit on the lock screen counting up.
+ *
+ * Called once at launch and again whenever the app returns to the foreground,
+ * since a card can be orphaned while the app is away.
+ */
+export function sweepOrphanActivities(): void {
+  void (workoutLiveActivity as unknown as {
+    _sweepOrphans(): Promise<void>;
+  })._sweepOrphans();
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') sweepOrphanActivities();
+  });
+}
+
+/** What the registry holds right now. Diagnostics only. */
+(globalThis as unknown as Record<string, unknown>).mapyouLA = (): unknown => ({
+  tracked: workoutLiveActivity.trackedIds,
+});
