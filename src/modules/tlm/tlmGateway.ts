@@ -18,8 +18,8 @@
 declare const sodium: any;
 
 import {
-  ensureTlmIdentity, resolveMapyouUser, encryptFor, decryptFrom,
-  TlmGatewaySocket, type TlmIdentity,
+  ensureTlmIdentity, resolveMapyouUser, fetchPublicKeyByTlmId,
+  encryptFor, decryptFrom, TlmGatewaySocket, type TlmIdentity,
 } from './tlmClient.js';
 import {
   saveGwMessage, setGwMessageStatus, conversationWith, markConversationRead,
@@ -157,10 +157,8 @@ class TlmGateway {
     if (frame.type === 'msg') {
       let peerPk = this.peerKeys.get(frame.from);
       if (!peerPk) {
-        const res = await fetch(
-          'https://tlm.natours-mikrut.com/keys/' + encodeURIComponent(frame.from));
-        if (!res.ok) return;
-        const { publicKey } = await res.json();
+        const publicKey = await fetchPublicKeyByTlmId(frame.from);
+        if (!publicKey) return;
         peerPk = sodium.from_base64(publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
         this.peerKeys.set(frame.from, peerPk!);
       }

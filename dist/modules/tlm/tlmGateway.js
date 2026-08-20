@@ -13,7 +13,7 @@
 //   await tlmGateway.openConversation(userId);            // wejscie w czat (read)
 //   await tlmGateway.chatList();                          // lista rozmow + badge
 //   await tlmGateway.totalUnread();                       // badge w bottom nav
-import { ensureTlmIdentity, resolveMapyouUser, encryptFor, decryptFrom, TlmGatewaySocket, } from './tlmClient.js';
+import { ensureTlmIdentity, resolveMapyouUser, fetchPublicKeyByTlmId, encryptFor, decryptFrom, TlmGatewaySocket, } from './tlmClient.js';
 import { saveGwMessage, setGwMessageStatus, conversationWith, markConversationRead, unreadCount, totalUnread, chatSummaries, rememberPeer, peerUserIdFor, } from './tlmStore.js';
 function packText(text) {
     const nick = localStorage.getItem('mapyou_userName') ?? 'MapYou';
@@ -173,10 +173,9 @@ class TlmGateway {
         if (frame.type === 'msg') {
             let peerPk = this.peerKeys.get(frame.from);
             if (!peerPk) {
-                const res = await fetch('https://tlm.natours-mikrut.com/keys/' + encodeURIComponent(frame.from));
-                if (!res.ok)
+                const publicKey = await fetchPublicKeyByTlmId(frame.from);
+                if (!publicKey)
                     return;
-                const { publicKey } = await res.json();
                 peerPk = sodium.from_base64(publicKey, sodium.base64_variants.URLSAFE_NO_PADDING);
                 this.peerKeys.set(frame.from, peerPk);
             }

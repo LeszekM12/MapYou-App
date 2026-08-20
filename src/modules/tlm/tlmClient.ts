@@ -14,11 +14,10 @@
 // Wymaga libsodium zaladowanego globalnie (script tag - jak Dexie w MapYou).
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { dlog } from '../../utils/log.js';
-
 declare const sodium: any;
 
-const TLM_SERVER_URL = 'https://tlm.natours-mikrut.com';
+/** JEDYNE miejsce z adresem serwera TLM - reszta modulow importuje stad. */
+export const TLM_SERVER_URL = 'https://tlm.leszekmikrut.com';
 const TLM_WS_URL = TLM_SERVER_URL.replace(/^http/, 'ws') + '/ws';
 
 // Klucze w localStorage. Uczciwie: web nie ma Keystore jak Android;
@@ -78,7 +77,7 @@ export async function ensureTlmIdentity(): Promise<TlmIdentity> {
   localStorage.setItem(LS_SK, sodium.to_base64(kp.privateKey, B64()));
   localStorage.setItem(LS_PK, sodium.to_base64(kp.publicKey, B64()));
   localStorage.setItem(LS_ID, id);
-  dlog('[TLM-GW] utworzono tozsamosc TLM:', id);
+  console.log('[TLM-GW] utworzono tozsamosc TLM:', id);
   return { tlmId: id, publicKey: kp.publicKey, privateKey: kp.privateKey };
 }
 
@@ -110,6 +109,14 @@ export async function resolveMapyouUser(userId: string): Promise<{ tlmId: string
   return res.json();
 }
 
+/** Klucz publiczny po TLM-ID (gdy przyjdzie wiadomosc od nieznanego nadawcy). */
+export async function fetchPublicKeyByTlmId(tlmId: string): Promise<string | null> {
+  const res = await fetch(`${TLM_SERVER_URL}/keys/${encodeURIComponent(tlmId)}`);
+  if (!res.ok) return null;
+  const json = await res.json();
+  return json.publicKey as string;
+}
+
 // ── WebSocket: polaczenie, handshake, wysylka/odbior ─────────────────────────
 
 type FrameCb = (frame: any) => void;
@@ -129,6 +136,8 @@ export class TlmGatewaySocket {
   on(cb: FrameCb) { this.listeners.push(cb); }
 
   connect() {
+    // Nie otwieraj drugiego polaczenia, jesli poprzednie zyje.
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return;
     this.closedByUs = false;
     this.ws = new WebSocket(TLM_WS_URL);
 
@@ -153,7 +162,7 @@ export class TlmGatewaySocket {
       }
       if (frame.type === 'ready') {
         this.ready = true;
-        dlog('[TLM-GW] zalogowano jako', this.identity.tlmId);
+        console.log('[TLM-GW] zalogowano jako', this.identity.tlmId);
         for (const f of this.queue) this.rawSend(f);
         this.queue = [];
       }
